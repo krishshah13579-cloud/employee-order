@@ -7,7 +7,6 @@ import {
   Calendar,
   Users,
   Layers,
-  FilePlus,
   Package,
   TrendingUp,
   Clock,
@@ -152,14 +151,6 @@ export default function HomePage() {
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
-
-            <Link
-              href="/orders/new"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md shadow-orange-600/20 transition-all hover:scale-105 active:scale-95"
-            >
-              <FilePlus size={16} />
-              <span>+ Take New Order</span>
-            </Link>
           </div>
         </div>
 
@@ -345,16 +336,8 @@ export default function HomePage() {
                             : "No customer orders placed yet"}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Click &quot;+ Take New Order&quot; to book the first wholesale order.
+                          No wholesale customer orders recorded yet.
                         </p>
-                        {!searchFilter && (
-                          <Link
-                            href="/orders/new"
-                            className="mt-4 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition"
-                          >
-                            + Take New Order
-                          </Link>
-                        )}
                       </div>
                     </td>
                   </tr>
