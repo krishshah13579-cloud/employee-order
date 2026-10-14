@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════
+   GarmentPro Wholesale Types & Constants
+   ═══════════════════════════════════════════ */
+
+export interface CartItem {
+  productId: number;
+  productName: string;
+  size: string;
+  color: string;
+  quantity: number;
+  unitPrice: number;
+  notes?: string;
+  setsCount?: number;
+  pcsPerSet?: number;
+  maxSetsAvailable?: number;
+}
+
+export interface CreateOrderPayload {
+  customerId: number;
+  placedBy?: string;
+  notes?: string;
+  items: {
+    productId: number;
+    colorSets?: ColorSetEntry[] | string;
+    sizeRatio?: string;
+    sizesList?: string;
+    pcsPerSet?: number;
+    totalSets?: number;
+    size?: string;
+    color?: string;
+    quantity?: number;
+    unitPrice: number;
+    notes?: string;
+  }[];
+}
+
+export interface CreateCustomerPayload {
+  shopName?: string;
+  firmName?: string;
+  name?: string;
+  gstPanNo?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  phoneNumber?: string;
+  email?: string;
+  company?: string;
+  visitingCardUrl?: string;
+  contactPerson?: string;
+}
+
+export interface AdminProfileData {
+  id?: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  companyName: string;
+  gstNo: string;
+  panNo: string;
+  address: string;
+  bankName: string;
+  accountNo: string;
+  ifscCode: string;
+  notes?: string | null;
+}
+
+export interface EmployeeData {
+  id: number;
+  name: string;
+  pin?: string;
+  mobileNumber: string;
+  address: string;
+  proofUrl?: string | null;
+  designation: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerData {
+  id: number;
+  shopName: string; // Firm Name / Shop Name
+  firmName?: string;
+  gstPanNo: string;
+  address: string; // Shop Address
+  city?: string | null;
+  state?: string | null;
+  phoneNumber: string;
+  visitingCardUrl?: string | null;
+  contactPerson?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  orders?: any[];
+  _count?: {
+    orders: number;
+  };
+}
+
+export interface SizeGuideRow {
+  brandSize: string;
+  waist: string;
+  length: string;
+}
+
+export interface ProductData {
+  id: number;
+  name: string;
+  category: string;
+  colorsAvailable: string; // e.g. "Dark Blue, Jet Black, Grey, Olive"
+  sizesRatio: string;      // e.g. "30 to 38"
+  sizesList: string;       // e.g. "30, 32, 34, 36, 38"
+  pcsPerSet: number;       // e.g. 5
+  price: number;           // price per piece
+  setsColorwise?: string | null; // e.g. "Dark Blue: 20, Jet Black: 25, Grey: 15"
+  sizeGuide?: string | null;
+  imageUrl?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ColorSetEntry {
+  color: string;
+  sets: number;
+}
+
+export interface OrderItemData {
+  id?: number;
+  productId: number;
+  productName: string;
+  colorSets: ColorSetEntry[] | string; // Color sets list, e.g. [{color: "Dark Blue", sets: 2}]
+  sizeRatio: string;                   // e.g. "30 to 38"
+  sizesList: string;                   // e.g. "30, 32, 34, 36, 38"
+  pcsPerSet: number;                   // e.g. 5
+  totalSets: number;                   // sum of color sets (e.g. 2 + 3 = 5)
+  totalPcs: number;                    // totalSets * pcsPerSet (e.g. 5 * 5 = 25)
+  unitPrice: number;                   // price per piece
+  itemSubtotal: number;                // totalPcs * unitPrice
+  notes?: string | null;
+}
+
+export interface OrderData {
+  id: number;
+  orderNumber: string;
+  customerId: number;
+  customerName: string;
+  customerGstPan: string;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  orderDate: string;
+  status: OrderStatus;
+  subtotal: number;
+  gstRate: number;      // 5%
+  gstAmount: number;     // subtotal * 0.05
+  grandTotal: number;    // subtotal + gstAmount
+  totalPcs: number;
+  totalSets: number;
+  placedBy?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer?: CustomerData;
+  items: OrderItemData[];
+}
+
+export interface DashboardStats {
+  totalOrders: number;
+  pendingOrders: number;
+  totalCustomers: number;
+  totalEmployees: number;
+  totalProducts: number;
+  totalRevenue: number;
+  recentOrders: {
+    id: number;
+    orderNumber: string;
+    customerName: string;
+    status: string;
+    grandTotal: number;
+    totalPcs: number;
+    orderDate: string;
+  }[];
+}
+
+export const ORDER_STATUSES = [
+  "Pending",
+  "Confirmed",
+  "In Production",
+  "Ready",
+  "Dispatched",
+  "Delivered",
+  "Cancelled",
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const STANDARD_SIZE_RATIOS = [
+  { label: "28 to 36 (28, 30, 32, 34, 36)", value: "28 to 36", sizes: "28, 30, 32, 34, 36", pcs: 5 },
+  { label: "30 to 38 (30, 32, 34, 36, 38)", value: "30 to 38", sizes: "30, 32, 34, 36, 38", pcs: 5 },
+  { label: "28 to 40 (28, 30, 32, 34, 36, 38, 40)", value: "28 to 40", sizes: "28, 30, 32, 34, 36, 38, 40", pcs: 7 },
+  { label: "32 to 42 (32, 34, 36, 38, 40, 42)", value: "32 to 42", sizes: "32, 34, 36, 38, 40, 42", pcs: 6 },
+  { label: "S to XXL (S, M, L, XL, XXL)", value: "S to XXL", sizes: "S, M, L, XL, XXL", pcs: 5 },
+  { label: "M to 3XL (M, L, XL, XXL, 3XL)", value: "M to 3XL", sizes: "M, L, XL, XXL, 3XL", pcs: 5 },
+];
+
+export const PRODUCT_CATEGORIES = [
+  "EVERYDAY CASUAL",
+  "FORMAL WEAR",
+  "LINEN",
+] as const;
+
+export const STATUS_COLORS: Record<string, string> = {
+  Pending: "bg-amber-100 text-amber-800 border-amber-300",
+  Confirmed: "bg-blue-100 text-blue-800 border-blue-300",
+  "In Production": "bg-purple-100 text-purple-800 border-purple-300",
+  Ready: "bg-teal-100 text-teal-800 border-teal-300",
+  Dispatched: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  Delivered: "bg-green-100 text-green-800 border-green-300",
+  Cancelled: "bg-red-100 text-red-700 border-red-300",
+};

@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Admin Authentication & 2FA Credentials Stored in Database
+model AdminAccount {
+  id               Int       @id @default(autoincrement())
+  username         String    @unique // krishshah13579@gmail.com
+  password         String    // Krish@2000
+  twoFactorSecret  String    @default("135790") // 6-digit 2FA secret/PIN stored in DB
+  twoFactorEnabled Boolean   @default(true)
+  lastOtp          String?   // Latest generated 2FA OTP stored in DB
+  otpExpiresAt     DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+// 1. Admin Page (Admin Details)
+model AdminProfile {
+  id          Int      @id @default(autoincrement())
+  fullName    String   @default("Krish Shah")
+  email       String   @default("krishshah13579@gmail.com")
+  phone       String   @default("+91 98250 13579")
+  companyName String   @default("IQ TROUSERS")
+  gstNo       String   @default("24AAACI1357Q1Z2")
+  panNo       String   @default("AAACI1357Q")
+  address     String   @default("Plot 501-504, Textile Tower, Ring Road, Surat, Gujarat - 395002")
+  bankName    String   @default("HDFC Bank Ltd")
+  accountNo   String   @default("50200098765432")
+  ifscCode    String   @default("HDFC0001357")
+  notes       String?  @default("IQ TROUSERS — Premium Quality Mens & Boys Garment Manufacturers")
+  updatedAt   DateTime @updatedAt
+}
+
+// 2. Employee Page (Employee Details: Name, PIN, Mobile Number, Address, Proof (Upload))
+model Employee {
+  id           Int      @id @default(autoincrement())
+  name         String
+  pin          String   @default("1234") // Secret PIN for employee portal login
+  mobileNumber String
+  address      String
+  proofUrl     String?  // Photo or document link (Aadhar / PAN / Driving License)
+  designation  String   @default("Sales Representative")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 3. Customer Page (Customer Details: Shop Name / Firm Name, GST No./PAN No., Address, City, State, Phone Number, Visiting Card (Photo/Upload))
+model Customer {
+  id              Int      @id @default(autoincrement())
+  shopName        String   // Firm Name / Shop Name
+  gstPanNo        String   // GST No. / PAN No.
+  address         String   // Shop Address
+  city            String?  // City
+  state           String?  // State
+  phoneNumber     String   // Phone Number
+  visitingCardUrl String?  // Visiting Card (Photo/Upload)
+  contactPerson   String?  // Contact Person Name
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+}
+
+// 5. Product Page (Product Details: Product Name, Colors Available, Sizes (all size mandatory - 28 to 36, 30 to 38, 28 to 40, etc.), Price, No of Set Colorwise, Size Guide)
+model Product {
+  id              Int         @id @default(autoincrement())
+  name            String
+  category        String      @default("Formal & Casual Trousers")
+  colorsAvailable String      // Comma-separated list: "Dark Grey, Navy Blue, Jet Black, Khaki"
+  sizesRatio      String      @default("30 to 38") // e.g., "28 to 36", "30 to 38", "28 to 40"
+  sizesList       String      @default("30, 32, 34, 36, 38") // Mandatory sizes in 1 set
+  pcsPerSet       Int         @default(5) // Number of pcs in one set
+  price           Float       @default(490) // Price per PC
+  setsColorwise   String?     // Stock/Default Sets colorwise, e.g. "Dark Grey: 25, Navy Blue: 30, Jet Black: 40"
+  sizeGuide       String?     // Size guide instructions / dimensions / image link
+  imageUrl        String?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+}
+
+// 4. Order Page (Order Details: Customer Name, Customer GST/PAN No., Order Date, Product Name (Colors), SET (Color Wise) like A-2, B-3, C-2, SIZES (all size mandatory) like 30 to 38, PCS = SET * PCS like if there are 5 set for the product and the sizes are 30 to 38 it would be like 5*5 = 25 PCS, Price, Total Price, at last add 5% GST)
+model Order {
+  id              Int         @id @default(autoincrement())
+  orderNumber     String      @unique
+  customerId      Int
+  customerName    String      // Shop Name or Customer Name
+  customerGstPan  String      // GST/PAN No
+  customerPhone   String?
+  customerAddress String?
+  orderDate       DateTime    @default(now())
+  status          String      @default("Pending") // Pending, Confirmed, In Production, Ready, Dispatched, Delivered, Cancelled
+  subtotal        Float       @default(0) // Total Price before GST
+  gstRate         Float       @default(5.0) // 5% GST
+  gstAmount       Float       @default(0) // Subtotal * 0.05
+  grandTotal      Float       @default(0) // Subtotal + gstAmount
+  totalPcs        Int         @default(0) // Total Pieces
+  totalSets       Int         @default(0) // Total Sets
+  placedBy        String?     // Booked by employee/admin
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id           Int     @id @default(autoincrement())
+  orderId      Int
+  productId    Int
+  productName  String
+  colorSets    String  // JSON string: [{"color": "Dark Grey", "sets": 2}, {"color": "Navy Blue", "sets": 3}]
+  sizeRatio    String  // e.g. "30 to 38"
+  sizesList    String  // e.g. "30, 32, 34, 36, 38"
+  pcsPerSet    Int     // e.g. 5
+  totalSets    Int     // e.g. 5
+  totalPcs     Int     // e.g. 5 * 5 = 25
+  unitPrice    Float   // Price per piece
+  itemSubtotal Float   // totalPcs * unitPrice
+  notes        String?
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+}
+
+// 6. Category Page (Organize products into custom categories and collections)
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

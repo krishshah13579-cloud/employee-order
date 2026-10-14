@@ -1,0 +1,469 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Calendar,
+  Users,
+  Layers,
+  FilePlus,
+  Package,
+  TrendingUp,
+  Clock,
+  ArrowRight,
+  RefreshCw,
+  Search,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Truck,
+  IndianRupee,
+  Sparkles,
+} from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { STATUS_COLORS } from "@/lib/types";
+
+interface OrderItemSummary {
+  id?: number;
+  productId: number;
+  productName: string;
+  colorSets?: any;
+  totalSets: number;
+  totalPcs: number;
+  unitPrice: number;
+  itemSubtotal: number;
+}
+
+interface RecentOrder {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  customerGstPan: string;
+  customerPhone?: string;
+  status: string;
+  grandTotal: number;
+  totalPcs: number;
+  totalSets: number;
+  orderDate: string;
+  items?: OrderItemSummary[];
+}
+
+interface StatsData {
+  todayOrders: number;
+  todayRevenue: number;
+  totalCustomers: number;
+  totalCategories: number;
+  categories: string[];
+  totalOrders: number;
+  totalRevenue: number;
+  recentOrders: RecentOrder[];
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState<string>("");
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch("/api/stats");
+      if (res.ok) {
+        const statsData: StatsData = await res.json();
+        setStats(statsData);
+      } else {
+        throw new Error(`Failed to load stats (${res.status})`);
+      }
+    } catch (err: any) {
+      console.error("Error loading home stats:", err);
+      setError(err.message || "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Filter recent orders
+  const filteredRecentOrders = (stats?.recentOrders || []).filter((order) => {
+    if (!searchFilter.trim()) return true;
+    const term = searchFilter.toLowerCase().trim();
+    return (
+      order.orderNumber.toLowerCase().includes(term) ||
+      order.customerName.toLowerCase().includes(term) ||
+      (order.customerGstPan && order.customerGstPan.toLowerCase().includes(term)) ||
+      (order.customerPhone && order.customerPhone.toLowerCase().includes(term))
+    );
+  });
+
+  const categoriesList =
+    stats?.categories && stats.categories.length > 0
+      ? stats.categories
+      : ["EVERYDAY CASUAL", "FORMAL WEAR", "LINEN"];
+
+  return (
+    <div className="min-h-screen bg-white text-slate-900 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 space-y-8">
+        {/* Error alert */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 font-medium">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={loadData}
+              className="font-bold underline hover:text-red-900"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Dashboard Header Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-xs font-bold uppercase tracking-wider mb-2">
+              <Sparkles size={13} />
+              <span>Employee Wholesale Portal</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+              Order Collection &amp; Operations
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Real-time daily metrics, registered wholesale customers, and recent customer orders.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={loadData}
+              disabled={loading}
+              className="p-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl transition"
+              title="Refresh metrics"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </button>
+
+            <Link
+              href="/orders/new"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md shadow-orange-600/20 transition-all hover:scale-105 active:scale-95"
+            >
+              <FilePlus size={16} />
+              <span>+ Take New Order</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════
+            KEY METRICS:
+            1. TOTAL ORDERS (PRESENT DAY)
+            2. CUSTOMERS
+            3. CATEGORY
+            ═══════════════════════════════════════════ */}
+        <section aria-label="Key Dashboard Metrics">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 1. TOTAL ORDERS (PRESENT DAY) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center shadow-xs">
+                  <Calendar size={22} />
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200 uppercase tracking-wider">
+                  Present Day
+                </span>
+              </div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Total Orders (Present Day)
+              </h3>
+              <div className="mt-2 flex items-baseline gap-3">
+                <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
+                  {loading ? "..." : stats?.todayOrders ?? 0}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  orders booked today
+                </span>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                <span>Booked Value Today:</span>
+                <span className="font-bold text-slate-900">
+                  {loading ? "..." : formatCurrency(stats?.todayRevenue || 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. CUSTOMERS */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-xs">
+                  <Users size={22} />
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase tracking-wider">
+                  Wholesale Network
+                </span>
+              </div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Customers
+              </h3>
+              <div className="mt-2 flex items-baseline gap-3">
+                <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
+                  {loading ? "..." : stats?.totalCustomers ?? 0}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  registered shops
+                </span>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                <span>Mandatory for Orders:</span>
+                <span className="font-bold text-blue-600">Shop Name + GST/PAN</span>
+              </div>
+            </div>
+
+            {/* 3. CATEGORY */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
+                  <Layers size={22} />
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">
+                  {stats?.totalCategories ?? 3} Active Lines
+                </span>
+              </div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Category
+              </h3>
+              <div className="mt-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {categoriesList.map((cat) => (
+                    <span
+                      key={cat}
+                      className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-neutral-100 text-neutral-800 border border-neutral-200"
+                    >
+                      {cat}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                <span>Product Lines:</span>
+                <Link
+                  href="/products"
+                  className="font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                >
+                  View Catalog <ArrowRight size={12} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════
+            RECENT ORDERS (10 CUSTOMER ORDERS SHOWN)
+            WHEN THE CUSTOMER ORDER DETAIL IS CLICKED THE ORDER FORM OPENS
+            ═══════════════════════════════════════════ */}
+        <section className="bg-white rounded-3xl border border-neutral-200/90 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-50/60">
+            <div>
+              <div className="flex items-center gap-2">
+                <Package size={20} className="text-orange-600" />
+                <h2 className="text-lg font-black text-slate-900">
+                  Recent Orders (10 Customer Orders Shown)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Click on any customer order row below to open and edit the Order Form.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Order#, Shop, GST..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-neutral-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <Link
+                href="/orders"
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 px-3 py-1.5 rounded-lg hover:bg-orange-50 transition flex items-center gap-1 whitespace-nowrap"
+              >
+                <span>View All</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-neutral-100/70 border-b border-neutral-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                  <th className="py-3.5 px-5">Order #</th>
+                  <th className="py-3.5 px-5">Customer / Shop Name</th>
+                  <th className="py-3.5 px-5">GST / PAN No.</th>
+                  <th className="py-3.5 px-5">Product(s) &amp; Colors</th>
+                  <th className="py-3.5 px-5 text-center">PCS (Sets)</th>
+                  <th className="py-3.5 px-5 text-right">Grand Total (₹)</th>
+                  <th className="py-3.5 px-5 text-center">Status</th>
+                  <th className="py-3.5 px-5">Date</th>
+                  <th className="py-3.5 px-5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td colSpan={9} className="py-4 px-5">
+                        <div className="w-full h-5 bg-neutral-200 rounded" />
+                      </td>
+                    </tr>
+                  ))
+                ) : filteredRecentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <div className="max-w-sm mx-auto flex flex-col items-center">
+                        <div className="w-14 h-14 bg-neutral-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
+                          <Package size={28} />
+                        </div>
+                        <p className="font-bold text-slate-700 text-sm">
+                          {searchFilter
+                            ? "No matching orders found"
+                            : "No customer orders placed yet"}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Click &quot;+ Take New Order&quot; to book the first wholesale order.
+                        </p>
+                        {!searchFilter && (
+                          <Link
+                            href="/orders/new"
+                            className="mt-4 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition"
+                          >
+                            + Take New Order
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecentOrders.map((order) => {
+                    const statusStyle =
+                      STATUS_COLORS[order.status] ||
+                      "bg-neutral-100 text-neutral-700 border-neutral-200";
+
+                    const itemsSummary = (order.items || []).map((it) => {
+                      let colorInfo = "";
+                      try {
+                        const parsedColors = Array.isArray(it.colorSets)
+                          ? it.colorSets
+                          : typeof it.colorSets === "string"
+                          ? JSON.parse(it.colorSets)
+                          : [];
+                        if (parsedColors.length > 0) {
+                          colorInfo = parsedColors
+                            .map((c: any) => `${c.color} (${c.sets}s)`)
+                            .join(", ");
+                        }
+                      } catch {}
+                      return `${it.productName}${colorInfo ? ` [${colorInfo}]` : ""}`;
+                    });
+
+                    return (
+                      <tr
+                        key={order.id}
+                        onClick={() => router.push(`/orders/${order.id}`)}
+                        className="hover:bg-orange-50/50 cursor-pointer transition-colors group"
+                        title="Click to open and edit Order Form"
+                      >
+                        <td className="py-4 px-5 font-mono font-bold text-slate-900 group-hover:text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
+                          <span>{order.orderNumber}</span>
+                          <ExternalLink
+                            size={12}
+                            className="opacity-0 group-hover:opacity-100 text-orange-500 transition-opacity"
+                          />
+                        </td>
+
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-slate-900">
+                            {order.customerName}
+                          </div>
+                          {order.customerPhone && (
+                            <div className="text-[10px] text-slate-500">
+                              Ph: {order.customerPhone}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-5 font-mono font-medium text-slate-700 whitespace-nowrap">
+                          {order.customerGstPan || "—"}
+                        </td>
+
+                        <td className="py-4 px-5 max-w-xs truncate text-slate-700">
+                          {itemsSummary.length > 0 ? (
+                            <span title={itemsSummary.join(" | ")}>
+                              {itemsSummary.join("; ")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Wholesale Garments</span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-5 text-center">
+                          <span className="font-bold text-slate-900">
+                            {order.totalPcs || 0} Pcs
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            ({order.totalSets || 0} Sets)
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-5 text-right font-black text-slate-900 whitespace-nowrap">
+                          {formatCurrency(order.grandTotal)}
+                          <span className="text-[10px] font-normal text-slate-500 block">
+                            incl. 5% GST
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-5 text-center">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusStyle}`}
+                          >
+                            {order.status}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-5 text-slate-500 whitespace-nowrap">
+                          {formatDate(order.orderDate)}
+                        </td>
+
+                        <td className="py-4 px-5 text-center">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 bg-orange-100/60 group-hover:bg-orange-600 group-hover:text-white px-2.5 py-1 rounded-lg transition-colors">
+                            <span>Open Form</span>
+                            <ArrowRight size={12} />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
