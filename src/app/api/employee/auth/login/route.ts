@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { isNightLogoutTimeIST } from "@/lib/time";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check daily after 9:00 PM IST working hours restriction
+    if (isNightLogoutTimeIST()) {
+      return NextResponse.json(
+        {
+          error:
+            "Employee portal is closed for the day (Daily logout after 9:00 PM IST). Access will resume tomorrow morning.",
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const name = (body.name || "").trim();
     const pin = (body.pin || "").trim();

@@ -29,6 +29,7 @@ import {
   X,
   Upload,
   Loader2,
+  Truck,
   Image as ImageIcon,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
@@ -64,6 +65,7 @@ interface ConfirmedOrder {
   totalPcs: number;
   totalSets: number;
   orderDate: string;
+  transportName?: string;
 }
 
 export default function OrderFormPage() {
@@ -98,6 +100,11 @@ export default function OrderFormPage() {
   const [items, setItems] = useState<DraftOrderItem[]>([]);
   const [orderNotes, setOrderNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Transport Popup Modal State
+  const [isTransportModalOpen, setIsTransportModalOpen] = useState<boolean>(false);
+  const [transportName, setTransportName] = useState<string>("");
+  const [transportStation, setTransportStation] = useState<string>("");
 
   // Confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
@@ -360,8 +367,8 @@ export default function OrderFormPage() {
   const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
 
-  // Handle Order Submission
-  const handleSubmitOrder = async () => {
+  // Step 1: Validate and Open Transport Popup Modal
+  const handleSubmitOrder = () => {
     // 1. Mandatory Customer Selection Check
     if (!selectedCustomerId || !selectedCustomer) {
       toast("Mandatory: Please select a Customer / Shop Name with GST/PAN No.", "error");
@@ -381,14 +388,39 @@ export default function OrderFormPage() {
       return;
     }
 
+    // Auto-fill transport station with customer city if available
+    if (!transportStation && selectedCustomer.city) {
+      setTransportStation(selectedCustomer.city);
+    }
+
+    // Open Transport Popup
+    setIsTransportModalOpen(true);
+  };
+
+  // Step 2: Final Submit with Transport Name Confirmed
+  const handleFinalSubmitOrder = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const finalPlacedBy = (employee?.name || placedBy).trim();
+    if (!finalPlacedBy) {
+      toast("Mandatory: Please log in as an employee to place orders", "error");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       localStorage.setItem("garmentpro_employee_name", finalPlacedBy);
 
+      // Structure transport info inside order notes
+      const transportDetails = transportName.trim()
+        ? `[TRANSPORT: ${transportName.trim()}${transportStation.trim() ? ` | Station: ${transportStation.trim()}` : ""}]`
+        : "";
+      const finalNotes = [transportDetails, orderNotes.trim()].filter(Boolean).join("\n");
+
       const payload = {
         customerId: selectedCustomerId,
         placedBy: finalPlacedBy,
-        notes: orderNotes.trim() || undefined,
+        notes: finalNotes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
           colorSets: it.colorSets,
@@ -421,14 +453,16 @@ export default function OrderFormPage() {
       setConfirmedOrder({
         id: result.id,
         orderNumber: result.orderNumber,
-        customerName: selectedCustomer.shopName,
-        customerGstPan: selectedCustomer.gstPanNo,
+        customerName: selectedCustomer!.shopName,
+        customerGstPan: selectedCustomer!.gstPanNo,
         grandTotal: result.grandTotal || grandTotal,
         totalPcs: result.totalPcs || totalPcs,
         totalSets: result.totalSets || totalSets,
         orderDate: new Date().toISOString(),
+        transportName: transportName.trim() || undefined,
       });
 
+      setIsTransportModalOpen(false);
       toast(`Order #${result.orderNumber} placed successfully!`);
     } catch (err: any) {
       console.error("Order submission failed:", err);
@@ -479,6 +513,15 @@ export default function OrderFormPage() {
                   {confirmedOrder.totalSets} Sets ({confirmedOrder.totalPcs} Pcs)
                 </span>
               </div>
+              {confirmedOrder.transportName && (
+                <div className="flex justify-between text-slate-700">
+                  <span className="text-slate-500">Transport:</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Truck size={14} className="text-orange-500" />
+                    <span>{confirmedOrder.transportName}</span>
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
                 <span className="font-bold text-slate-900">Grand Total:</span>
                 <span className="font-black text-orange-600">
@@ -1299,6 +1342,127 @@ export default function OrderFormPage() {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════
+          TRANSPORT NAME POPUP MODAL
+          ═══════════════════════════════════════════ */}
+      <Modal
+        isOpen={isTransportModalOpen}
+        onClose={() => !isSubmitting && setIsTransportModalOpen(false)}
+        title="Transport / Dispatch Details"
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => setIsTransportModalOpen(false)}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleFinalSubmitOrder}
+              className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Placing Order...</span>
+                </>
+              ) : (
+                <>
+                  <Truck size={14} />
+                  <span>Confirm Transport &amp; Submit</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs py-1">
+          {/* Customer Dispatch Card */}
+          <div className="p-3.5 bg-orange-50/60 border border-orange-200/80 rounded-2xl flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Truck size={18} />
+            </div>
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider block">
+                Wholesale Dispatch To:
+              </span>
+              <p className="font-extrabold text-slate-900 text-sm truncate">
+                {selectedCustomer?.shopName || "Customer Shop"}
+              </p>
+              <p className="text-[11px] text-slate-600">
+                GST/PAN: <strong className="font-mono">{selectedCustomer?.gstPanNo || "—"}</strong>
+                {selectedCustomer?.city ? ` • ${selectedCustomer.city}` : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                Transport Name / Courier Service <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={transportName}
+                onChange={(e) => setTransportName(e.target.value)}
+                placeholder="Enter transport name (e.g. VRL Logistics, TCI, Navkar Roadways...)"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+              />
+            </div>
+
+            {/* Quick Transport Chips */}
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Quick Select Popular Transporters:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "VRL Logistics",
+                  "TCI Express",
+                  "Navkar Roadways",
+                  "Shree Maruti Courier",
+                  "Ghatge Patil",
+                  "Self Delivery / Hand Delivery",
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setTransportName(chip)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${
+                      transportName === chip
+                        ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-orange-300 hover:bg-orange-50/40"
+                    }`}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Booking Station / City */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                Booking Station / Destination City
+              </label>
+              <input
+                type="text"
+                value={transportStation}
+                onChange={(e) => setTransportStation(e.target.value)}
+                placeholder="e.g. Ahmedabad, Mumbai, Surat, Rajkot, Indore..."
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+              />
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

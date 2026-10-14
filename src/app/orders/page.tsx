@@ -17,6 +17,8 @@ import {
   ArrowRight,
   AlertCircle,
   Truck,
+  Eye,
+  MapPin,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -182,7 +184,7 @@ export default function EmployeeOrdersListPage() {
         </div>
 
         {/* ═══════════════════════════════════════════
-            ORDERS TABLE
+            ORDERS TABLE (ONE CUSTOMER LINE - NO PRODUCTS SHOWN HERE)
             ═══════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -192,11 +194,10 @@ export default function EmployeeOrdersListPage() {
                   <th className="py-3.5 px-4">Order #</th>
                   <th className="py-3.5 px-4">Customer / Shop Name</th>
                   <th className="py-3.5 px-4">GST NO. / PAN NO.</th>
-                  <th className="py-3.5 px-4">Products & Colors Summary</th>
-                  <th className="py-3.5 px-4 text-center">PCS (Sets)</th>
+                  <th className="py-3.5 px-4">City / Station</th>
                   <th className="py-3.5 px-4 text-right">Grand Total (₹)</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
-                  <th className="py-3.5 px-4">Placed By</th>
+                  <th className="py-3.5 px-4">Booked By</th>
                   <th className="py-3.5 px-4">Order Date</th>
                   <th className="py-3.5 px-4 text-center">Action</th>
                 </tr>
@@ -206,14 +207,14 @@ export default function EmployeeOrdersListPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
-                      <td colSpan={10} className="py-4 px-4">
+                      <td colSpan={9} className="py-4 px-4">
                         <div className="w-full h-5 bg-slate-200 rounded" />
                       </td>
                     </tr>
                   ))
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-14 text-center text-slate-500">
+                    <td colSpan={9} className="py-14 text-center text-slate-500">
                       <div className="max-w-sm mx-auto flex flex-col items-center">
                         <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
                           <Package size={28} />
@@ -235,30 +236,12 @@ export default function EmployeeOrdersListPage() {
                       STATUS_COLORS[order.status] ||
                       "bg-slate-100 text-slate-700 border-slate-200";
 
-                    // Items summary
-                    const itemsSummary = (order.items || []).map((it) => {
-                      let colorInfo = "";
-                      try {
-                        const parsed = Array.isArray(it.colorSets)
-                          ? it.colorSets
-                          : typeof it.colorSets === "string"
-                          ? JSON.parse(it.colorSets)
-                          : [];
-                        if (parsed.length > 0) {
-                          colorInfo = parsed
-                            .map((c: any) => `${c.color} (${c.sets}s)`)
-                            .join(", ");
-                        }
-                      } catch {}
-                      return `${it.productName}${colorInfo ? ` [${colorInfo}]` : ""}`;
-                    });
-
                     return (
                       <tr
                         key={order.id}
                         onClick={() => router.push(`/orders/${order.id}`)}
                         className="hover:bg-orange-50/60 cursor-pointer transition-colors group"
-                        title="Click to open and edit Order Form"
+                        title="Click to view customer product details and edit order"
                       >
                         {/* Order # */}
                         <td className="py-4 px-4 font-mono font-bold text-slate-900 group-hover:text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
@@ -271,7 +254,7 @@ export default function EmployeeOrdersListPage() {
 
                         {/* Customer / Shop Name */}
                         <td className="py-4 px-4">
-                          <div className="font-bold text-slate-900">
+                          <div className="font-bold text-slate-900 text-sm">
                             {order.customerName}
                           </div>
                           {order.customerPhone && (
@@ -282,37 +265,23 @@ export default function EmployeeOrdersListPage() {
                         </td>
 
                         {/* GST / PAN No. */}
-                        <td className="py-4 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
+                        <td className="py-4 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
                           {order.customerGstPan || "—"}
                         </td>
 
-                        {/* Products & Colors */}
-                        <td className="py-4 px-4 max-w-xs truncate text-slate-700">
-                          {itemsSummary.length > 0 ? (
-                            <span title={itemsSummary.join(" | ")}>
-                              {itemsSummary.join("; ")}
+                        {/* City / Station */}
+                        <td className="py-4 px-4 text-slate-600 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <MapPin size={12} className="text-orange-500 shrink-0" />
+                            <span>
+                              {order.customerAddress?.split(",").slice(-2)[0]?.trim() || "Gujarat"}
                             </span>
-                          ) : (
-                            <span className="text-slate-400 italic">Wholesale Garments</span>
-                          )}
-                        </td>
-
-                        {/* Total PCS & Sets */}
-                        <td className="py-4 px-4 text-center">
-                          <span className="font-bold text-slate-900">
-                            {order.totalPcs || 0} Pcs
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">
-                            ({order.totalSets || 0} Sets)
-                          </span>
+                          </div>
                         </td>
 
                         {/* Grand Total */}
-                        <td className="py-4 px-4 text-right font-black text-slate-900 whitespace-nowrap">
+                        <td className="py-4 px-4 text-right font-black text-slate-900 text-sm whitespace-nowrap">
                           {formatCurrency(order.grandTotal)}
-                          <span className="text-[10px] font-normal text-slate-500 block">
-                            incl. 5% GST
-                          </span>
                         </td>
 
                         {/* Status */}
@@ -324,8 +293,8 @@ export default function EmployeeOrdersListPage() {
                           </span>
                         </td>
 
-                        {/* Placed By */}
-                        <td className="py-4 px-4 text-slate-600 whitespace-nowrap">
+                        {/* Booked By */}
+                        <td className="py-4 px-4 text-slate-700 font-medium whitespace-nowrap">
                           {order.placedBy || "Employee"}
                         </td>
 
@@ -334,12 +303,20 @@ export default function EmployeeOrdersListPage() {
                           {formatDate(order.orderDate)}
                         </td>
 
-                        {/* Action */}
+                        {/* Action: View Order */}
                         <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 bg-orange-100/60 group-hover:bg-orange-600 group-hover:text-white px-2.5 py-1 rounded-lg transition-colors">
-                            <Edit3 size={12} />
-                            <span>Edit Form</span>
-                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/orders/${order.id}`);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-3 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95"
+                            title="View customer product details"
+                          >
+                            <Eye size={13} />
+                            <span>View Order</span>
+                          </button>
                         </td>
                       </tr>
                     );

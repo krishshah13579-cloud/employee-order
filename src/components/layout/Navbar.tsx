@@ -103,7 +103,7 @@ export default function Navbar() {
 
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={() => logout()}
                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition cursor-pointer"
                   title="Logout Employee Session"
                 >

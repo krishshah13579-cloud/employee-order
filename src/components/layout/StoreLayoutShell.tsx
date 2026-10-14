@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
+import EmployeeWelcomeBreadcrumb from "@/components/layout/EmployeeWelcomeBreadcrumb";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { Loader2 } from "lucide-react";
 
@@ -69,10 +70,11 @@ export default function StoreLayoutShell({
     );
   }
 
-  // 5. Authenticated employee side: Navbar at top, main body in middle (No footer)
+  // 5. Authenticated employee side: Navbar at top, Welcome Breadcrumb with motivation message, main body
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900">
       <Navbar />
+      <EmployeeWelcomeBreadcrumb />
       <main className="flex-1">{children}</main>
     </div>
   );

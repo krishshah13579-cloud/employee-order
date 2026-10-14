@@ -24,6 +24,17 @@ export default function EmployeeLoginPage() {
   const [showPin, setShowPin] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isNightLogoutNotice, setIsNightLogoutNotice] = useState<boolean>(false);
+
+  // Check URL params for night logout reason
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reason") === "night_logout") {
+        setIsNightLogoutNotice(true);
+      }
+    }
+  }, []);
 
   // If already authenticated as employee, redirect to dashboard
   useEffect(() => {
@@ -116,6 +127,20 @@ export default function EmployeeLoginPage() {
               Enter your registered employee name and PIN to access the wholesale order dashboard.
             </p>
           </div>
+
+          {isNightLogoutNotice && (
+            <div className="p-3.5 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-amber-300 animate-in fade-in">
+              <span className="text-base leading-none">🌙</span>
+              <div>
+                <strong className="block text-amber-200 font-bold mb-0.5">
+                  Necessary Daily Logout (After 9:00 PM IST)
+                </strong>
+                <span>
+                  The employee wholesale portal automatically logs out everyday after 9:00 PM IST. Access will reopen tomorrow morning.
+                </span>
+              </div>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-red-400 animate-in fade-in">
