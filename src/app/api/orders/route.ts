@@ -178,10 +178,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Add 5% GST
-    const gstRate = 5.0;
-    const gstAmount = Math.round(orderSubtotal * (gstRate / 100) * 100) / 100;
-    const grandTotal = Math.round((orderSubtotal + gstAmount) * 100) / 100;
+    // No GST, with Round Off to nearest Rupee
+    const gstRate = 0.0;
+    const gstAmount = 0.0;
+    const grandTotal = Math.round(orderSubtotal);
 
     // Generate Order Number GO-YYMMDD-NNN
     const now = new Date();

@@ -314,9 +314,10 @@ export default function OrderEditPage() {
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const gstRate = 5.0; // 5% GST
-  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
-  const grandTotal = Math.round((subtotal + gstAmount) * 100) / 100;
+  const gstRate = 0.0;
+  const gstAmount = 0.0;
+  const roundOff = Math.round(subtotal) - subtotal;
+  const grandTotal = Math.round(subtotal);
 
   // Save Order Changes (`PUT /api/orders/[id]`)
   const handleSaveChanges = async () => {
@@ -846,7 +847,7 @@ export default function OrderEditPage() {
           {/* Wholesale Totals Card */}
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
             <h3 className="text-sm font-black text-slate-900 pb-3 border-b border-slate-100">
-              Wholesale Order Calculation (5% GST)
+              Wholesale Order Summary
             </h3>
 
             <div className="space-y-2.5 text-xs">
@@ -861,26 +862,23 @@ export default function OrderEditPage() {
               </div>
 
               <div className="flex justify-between text-slate-600 pt-2 border-t border-slate-100">
-                <span>Subtotal (before GST):</span>
+                <span>Order Subtotal:</span>
                 <span className="font-bold text-slate-900 text-sm">
                   {formatCurrency(subtotal)}
                 </span>
               </div>
 
-              <div className="flex justify-between text-slate-600">
-                <span>GST Rate:</span>
-                <span className="font-bold text-slate-900">5.0%</span>
-              </div>
-
-              <div className="flex justify-between text-slate-600">
-                <span>GST Amount (5%):</span>
-                <span className="font-bold text-orange-600 text-sm">
-                  {formatCurrency(gstAmount)}
-                </span>
-              </div>
+              {Math.abs(roundOff) > 0.001 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Round Off:</span>
+                  <span className="font-bold text-slate-700">
+                    {roundOff > 0 ? `+${formatCurrency(roundOff)}` : `-${formatCurrency(Math.abs(roundOff))}`}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between items-baseline pt-3 border-t-2 border-slate-900 text-sm">
-                <span className="font-black text-slate-900 text-base">Grand Total:</span>
+                <span className="font-black text-slate-900 text-base">Grand Total (Rounded):</span>
                 <span className="font-black text-2xl text-orange-600">
                   {formatCurrency(grandTotal)}
                 </span>

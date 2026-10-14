@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
+  Lock,
+  User,
   Printer,
   RotateCcw,
   ShoppingBag,
@@ -350,13 +352,14 @@ export default function OrderFormPage() {
     }
   };
 
-  // Mathematical Calculations
+  // Mathematical Calculations (No GST, with Round Off)
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const gstRate = 5.0; // 5% GST
-  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
-  const grandTotal = Math.round((subtotal + gstAmount) * 100) / 100;
+  const roundOff = Math.round(subtotal) - subtotal;
+  const grandTotal = Math.round(subtotal);
+  const gstRate = 0;
+  const gstAmount = 0;
 
   // Handle Order Submission
   const handleSubmitOrder = async () => {
@@ -373,18 +376,19 @@ export default function OrderFormPage() {
     }
 
     // 3. Mandatory Placed By Check
-    if (!placedBy.trim()) {
-      toast("Mandatory: Please enter Employee Name placing this order", "error");
+    const finalPlacedBy = (employee?.name || placedBy).trim();
+    if (!finalPlacedBy) {
+      toast("Mandatory: Please log in as an employee to place orders", "error");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      localStorage.setItem("garmentpro_employee_name", placedBy.trim());
+      localStorage.setItem("garmentpro_employee_name", finalPlacedBy);
 
       const payload = {
         customerId: selectedCustomerId,
-        placedBy: placedBy.trim(),
+        placedBy: finalPlacedBy,
         notes: orderNotes.trim() || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -477,7 +481,7 @@ export default function OrderFormPage() {
                 </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                <span className="font-bold text-slate-900">Grand Total (incl. 5% GST):</span>
+                <span className="font-bold text-slate-900">Grand Total (Rounded):</span>
                 <span className="font-black text-orange-600">
                   {formatCurrency(confirmedOrder.grandTotal)}
                 </span>
@@ -968,7 +972,7 @@ export default function OrderFormPage() {
         </section>
 
         {/* ═══════════════════════════════════════════
-            3. ORDER DETAILS & SUMMARY (EMPLOYEE, NOTES, TOTALS, 5% GST)
+            3. ORDER DETAILS & SUMMARY (EMPLOYEE, NOTES, TOTALS, ROUNDED)
             ═══════════════════════════════════════════ */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Employee credentials & Notes */}
@@ -977,21 +981,29 @@ export default function OrderFormPage() {
               Employee & Order Details
             </h3>
 
-            {/* Placed By (Mandatory) */}
+            {/* Placed By (Locked to Logged-in Employee) */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Placed By (Employee Name) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Enter your name / employee ID (e.g. Krish Shah)"
-                value={placedBy}
-                onChange={(e) => {
-                  setPlacedBy(e.target.value);
-                  saveDraft(items, selectedCustomerId, orderNotes, e.target.value);
-                }}
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Booked By (Employee Name) <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <Lock size={10} />
+                  <span>Logged In Staff (Locked)</span>
+                </span>
+              </div>
+              <div className="relative">
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={employee?.name || placedBy || "Sales Representative"}
+                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-slate-100 border border-slate-300 rounded-xl text-slate-900 font-bold cursor-not-allowed select-none"
+                  title="Employee name is locked to the authenticated user."
+                />
+                <Lock size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
             </div>
 
             {/* Order Notes */}
@@ -1016,7 +1028,7 @@ export default function OrderFormPage() {
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-5">
             <div>
               <h3 className="text-sm font-black text-slate-900 pb-3 border-b border-slate-100">
-                Order Summary & GST Breakdown
+                Order Summary
               </h3>
 
               <div className="space-y-2.5 pt-3 text-xs">
@@ -1031,26 +1043,23 @@ export default function OrderFormPage() {
                 </div>
 
                 <div className="flex justify-between text-slate-600 pt-2 border-t border-slate-100">
-                  <span>Subtotal (before GST):</span>
+                  <span>Subtotal Amount:</span>
                   <span className="font-bold text-slate-900 text-sm">
                     {formatCurrency(subtotal)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-slate-600">
-                  <span>GST Rate:</span>
-                  <span className="font-bold text-slate-900">5.0%</span>
-                </div>
-
-                <div className="flex justify-between text-slate-600">
-                  <span>GST Amount (5%):</span>
-                  <span className="font-bold text-orange-600 text-sm">
-                    {formatCurrency(gstAmount)}
-                  </span>
-                </div>
+                {Math.abs(roundOff) > 0.001 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Round Off:</span>
+                    <span className="font-bold font-mono">
+                      {roundOff >= 0 ? `+${formatCurrency(roundOff)}` : `-${formatCurrency(Math.abs(roundOff))}`}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-baseline pt-3 border-t-2 border-slate-900 text-sm">
-                  <span className="font-black text-slate-900 text-base">Grand Total:</span>
+                  <span className="font-black text-slate-900 text-base">Grand Total (Rounded):</span>
                   <span className="font-black text-2xl text-orange-600">
                     {formatCurrency(grandTotal)}
                   </span>
