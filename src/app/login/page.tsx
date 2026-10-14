@@ -139,7 +139,7 @@ export default function EmployeeLoginPage() {
                   type="text"
                   required
                   autoFocus
-                  placeholder="e.g. Krish Shah or Ramesh Patel"
+                  placeholder="Enter your registered employee name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-slate-950/70 border border-slate-800 rounded-2xl text-xs font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
@@ -161,7 +161,7 @@ export default function EmployeeLoginPage() {
                   type={showPin ? "text" : "password"}
                   required
                   maxLength={8}
-                  placeholder="Enter 4-digit PIN (e.g. 1234)"
+                  placeholder="Enter security PIN"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full pl-10 pr-11 py-3 bg-slate-950/70 border border-slate-800 rounded-2xl text-xs font-mono font-bold tracking-widest text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
@@ -175,13 +175,6 @@ export default function EmployeeLoginPage() {
                   {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
-
-            {/* Demo/Staff Notice */}
-            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-              <div className="font-bold text-slate-300">Staff Access Guide:</div>
-              <div>Default accounts: <strong className="text-white">Krish Shah</strong>, <strong className="text-white">Ramesh Patel</strong>, or <strong className="text-white">Suresh Kumar</strong></div>
-              <div>Default PIN: <strong className="text-orange-400 font-mono">1234</strong></div>
             </div>
 
             {/* Submit Button */}
