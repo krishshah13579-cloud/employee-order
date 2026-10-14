@@ -352,14 +352,13 @@ export default function OrderFormPage() {
     }
   };
 
-  // Mathematical Calculations (No GST, with Round Off)
+  // Mathematical Calculations
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const roundOff = Math.round(subtotal) - subtotal;
-  const grandTotal = Math.round(subtotal);
-  const gstRate = 0;
-  const gstAmount = 0;
+  const gstRate = 5.0; // 5% GST
+  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
+  const grandTotal = Math.round(subtotal + gstAmount);
 
   // Handle Order Submission
   const handleSubmitOrder = async () => {
@@ -481,7 +480,7 @@ export default function OrderFormPage() {
                 </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                <span className="font-bold text-slate-900">Grand Total (Rounded):</span>
+                <span className="font-bold text-slate-900">Grand Total:</span>
                 <span className="font-black text-orange-600">
                   {formatCurrency(confirmedOrder.grandTotal)}
                 </span>
@@ -981,17 +980,11 @@ export default function OrderFormPage() {
               Employee & Order Details
             </h3>
 
-            {/* Placed By (Locked to Logged-in Employee) */}
+            {/* Placed By (Logged-in Employee) */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  Booked By (Employee Name) <span className="text-red-500">*</span>
-                </label>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                  <Lock size={10} />
-                  <span>Logged In Staff (Locked)</span>
-                </span>
-              </div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Booked By (Employee Name) <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -999,10 +992,8 @@ export default function OrderFormPage() {
                   readOnly
                   disabled
                   value={employee?.name || placedBy || "Sales Representative"}
-                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-slate-100 border border-slate-300 rounded-xl text-slate-900 font-bold cursor-not-allowed select-none"
-                  title="Employee name is locked to the authenticated user."
+                  className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-slate-100 border border-slate-300 rounded-xl text-slate-900 font-bold cursor-not-allowed select-none"
                 />
-                <Lock size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
             </div>
 
@@ -1049,17 +1040,15 @@ export default function OrderFormPage() {
                   </span>
                 </div>
 
-                {Math.abs(roundOff) > 0.001 && (
-                  <div className="flex justify-between text-slate-500">
-                    <span>Round Off:</span>
-                    <span className="font-bold font-mono">
-                      {roundOff >= 0 ? `+${formatCurrency(roundOff)}` : `-${formatCurrency(Math.abs(roundOff))}`}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between text-slate-600">
+                  <span>GST (5%):</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {formatCurrency(gstAmount)}
+                  </span>
+                </div>
 
                 <div className="flex justify-between items-baseline pt-3 border-t-2 border-slate-900 text-sm">
-                  <span className="font-black text-slate-900 text-base">Grand Total (Rounded):</span>
+                  <span className="font-black text-slate-900 text-base">Grand Total:</span>
                   <span className="font-black text-2xl text-orange-600">
                     {formatCurrency(grandTotal)}
                   </span>

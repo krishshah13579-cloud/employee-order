@@ -139,9 +139,9 @@ export async function PUT(
       }
     }
 
-    const gstRate = 0.0;
-    const gstAmount = 0.0;
-    const grandTotal = Math.round(orderSubtotal);
+    const gstRate = 5.0;
+    const gstAmount = Math.round(orderSubtotal * 0.05 * 100) / 100;
+    const grandTotal = Math.round(orderSubtotal + gstAmount);
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       if (validatedItems.length > 0) {
