@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Package,
   Search,
-  FilePlus,
   RefreshCw,
   ExternalLink,
   Calendar,
@@ -112,14 +111,6 @@ export default function EmployeeOrdersListPage() {
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
-
-            <Link
-              href="/orders/new"
-              className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5"
-            >
-              <FilePlus size={16} />
-              <span>+ Take New Order</span>
-            </Link>
           </div>
         </div>
       </div>
@@ -233,14 +224,8 @@ export default function EmployeeOrdersListPage() {
                             : "No wholesale orders placed in this status"}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Click &quot;+ Take New Order&quot; to book an order for a customer.
+                          No wholesale customer orders recorded in this status.
                         </p>
-                        <Link
-                          href="/orders/new"
-                          className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition"
-                        >
-                          + Take New Order
-                        </Link>
                       </div>
                     </td>
                   </tr>
