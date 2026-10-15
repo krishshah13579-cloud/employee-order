@@ -4,9 +4,13 @@ import prisma from "@/lib/prisma";
 export async function GET() {
   try {
     const adminCount = await prisma.adminAccount.count();
+    const admins = await prisma.adminAccount.findMany({
+      select: { username: true },
+    });
     return NextResponse.json({
       needsSetup: adminCount === 0,
       adminCount,
+      registeredUsernames: admins.map((a) => a.username),
     });
   } catch (error: any) {
     console.error("Setup check error:", error);

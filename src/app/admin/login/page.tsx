@@ -17,6 +17,9 @@ import {
   Sparkles,
   Loader2,
   CheckCircle,
+  RefreshCw,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function AdminLoginPage() {
@@ -26,6 +29,7 @@ export default function AdminLoginPage() {
   // Setup state
   const [checkingSetup, setCheckingSetup] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [registeredUsernames, setRegisteredUsernames] = useState<string[]>([]);
 
   // Setup Form State
   const [setupFullName, setSetupFullName] = useState("");
@@ -39,10 +43,18 @@ export default function AdminLoginPage() {
   // Normal Login State
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("krishshah13579@gmail.com");
+  const [password, setPassword] = useState("Krish@2000");
   const [showPassword, setShowPassword] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  // Reset Modal State
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [newResetUser, setNewResetUser] = useState("krishshah13579@gmail.com");
+  const [newResetPass, setNewResetPass] = useState("Krish@2000");
+  const [newResetPin, setNewResetPin] = useState("135790");
 
   // Check if admin account exists in database
   useEffect(() => {
@@ -55,6 +67,11 @@ export default function AdminLoginPage() {
           setNeedsSetup(true);
         } else {
           setNeedsSetup(false);
+          if (data.registeredUsernames && data.registeredUsernames.length > 0) {
+            setRegisteredUsernames(data.registeredUsernames);
+            // Default username if input empty
+            setUsername(data.registeredUsernames[0]);
+          }
         }
       } catch (err) {
         console.error("Failed to check setup status:", err);
@@ -98,10 +115,81 @@ export default function AdminLoginPage() {
     }
   };
 
+  // 1-Click Quick Reset to Default Master Credentials
+  const handleQuickResetToDefault = async () => {
+    setResetLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: "krishshah13579@gmail.com",
+          password: "Krish@2000",
+          twoFactorSecret: "135790",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast("Admin credentials successfully set in database!", "success");
+        setUsername("krishshah13579@gmail.com");
+        setPassword("Krish@2000");
+        setTwoFactorCode("135790");
+        setRegisteredUsernames(["krishshah13579@gmail.com"]);
+        setLoginError("");
+        setShowResetModal(false);
+      } else {
+        toast(data.error || "Failed to reset credentials", "error");
+      }
+    } catch (err: any) {
+      toast("Reset error: " + err.message, "error");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Custom Reset Handler
+  const handleCustomReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: newResetUser,
+          password: newResetPass,
+          twoFactorSecret: newResetPin,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast("New credentials saved to database!", "success");
+        setUsername(newResetUser);
+        setPassword(newResetPass);
+        setTwoFactorCode(newResetPin);
+        setRegisteredUsernames([newResetUser]);
+        setLoginError("");
+        setShowResetModal(false);
+      } else {
+        toast(data.error || "Failed to update credentials", "error");
+      }
+    } catch (err: any) {
+      toast("Error updating credentials: " + err.message, "error");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   // Handle Step 1: Submit Username & Password
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginError("");
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -116,10 +204,14 @@ export default function AdminLoginPage() {
         toast("Credentials verified! Please enter your 6-digit 2FA code.", "success");
         setStep(2);
       } else {
-        toast(data.error || "Authentication failed. Check username and password.", "error");
+        const errMsg = data.error || "Authentication failed. Check username and password.";
+        setLoginError(errMsg);
+        toast(errMsg, "error");
       }
     } catch (err: any) {
-      toast("Error logging in: " + err.message, "error");
+      const msg = "Error logging in: " + err.message;
+      setLoginError(msg);
+      toast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -222,7 +314,7 @@ export default function AdminLoginPage() {
                     value={setupFullName}
                     onChange={(e) => setSetupFullName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none"
-                    placeholder="e.g. Master Administrator"
+                    placeholder="e.g. Krish Shah"
                   />
                 </div>
               </div>
@@ -239,7 +331,7 @@ export default function AdminLoginPage() {
                     value={setupUsername}
                     onChange={(e) => setSetupUsername(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none"
-                    placeholder="admin@iqtrousers.com"
+                    placeholder="krishshah13579@gmail.com"
                   />
                 </div>
               </div>
@@ -282,7 +374,7 @@ export default function AdminLoginPage() {
                     value={setup2FAPin}
                     onChange={(e) => setSetup2FAPin(e.target.value.replace(/\D/g, ""))}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none font-mono tracking-widest"
-                    placeholder="e.g. 123456"
+                    placeholder="e.g. 135790"
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1 block">
@@ -371,18 +463,28 @@ export default function AdminLoginPage() {
             {step === 1 && (
               <form onSubmit={handleCredentialsSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                    Admin Username / Email
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Admin Username / Email
+                    </label>
+                    {registeredUsernames.length > 0 && (
+                      <span className="text-[10px] text-slate-400">
+                        DB: <strong className="text-orange-400">{registeredUsernames[0]}</strong>
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                     <input
                       type="text"
                       required
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        setLoginError("");
+                      }}
                       className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none transition"
-                      placeholder="Enter admin email or username"
+                      placeholder="krishshah13579@gmail.com"
                     />
                   </div>
                 </div>
@@ -399,9 +501,12 @@ export default function AdminLoginPage() {
                       type={showPassword ? "text" : "password"}
                       required
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setLoginError("");
+                      }}
                       className="w-full pl-10 pr-11 py-3 bg-slate-800/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none transition font-mono"
-                      placeholder="Enter password"
+                      placeholder="Krish@2000"
                     />
                     <button
                       type="button"
@@ -412,6 +517,32 @@ export default function AdminLoginPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Error Box with Direct Reset Prompt */}
+                {loginError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-300 space-y-2">
+                    <div className="flex items-center gap-1.5 font-bold text-red-400">
+                      <AlertTriangle size={14} />
+                      <span>{loginError}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Database credentials may have been changed or not yet synchronized.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleQuickResetToDefault}
+                      disabled={resetLoading}
+                      className="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 text-[11px]"
+                    >
+                      {resetLoading ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <RefreshCw size={13} />
+                      )}
+                      <span>Restore Default Master Credentials in Database</span>
+                    </button>
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -430,6 +561,30 @@ export default function AdminLoginPage() {
                     </>
                   )}
                 </button>
+
+                {/* Quick actions: Fill Default & Reset Modal Toggle */}
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsername("krishshah13579@gmail.com");
+                      setPassword("Krish@2000");
+                      setLoginError("");
+                    }}
+                    className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold underline underline-offset-2 transition"
+                  >
+                    Auto-fill default
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(true)}
+                    className="text-[11px] text-slate-400 hover:text-white font-semibold transition flex items-center gap-1"
+                  >
+                    <RefreshCw size={11} />
+                    <span>Reset / Change Password</span>
+                  </button>
+                </div>
               </form>
             )}
 
@@ -442,7 +597,7 @@ export default function AdminLoginPage() {
                   </div>
                   <h3 className="text-sm font-bold text-white">Two-Factor Authentication</h3>
                   <p className="text-xs text-slate-300 mt-1">
-                    Enter the 6-digit security PIN configured for <strong>{username}</strong>.
+                    Enter the 6-digit security PIN for <strong>{username}</strong> (Default: <strong className="text-orange-400 font-mono">135790</strong>).
                   </p>
                 </div>
 
@@ -459,7 +614,7 @@ export default function AdminLoginPage() {
                       autoFocus
                       value={twoFactorCode}
                       onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ""))}
-                      placeholder="••••••"
+                      placeholder="135790"
                       className="w-full pl-10 pr-4 py-3 bg-slate-800 border-2 border-orange-500/60 rounded-xl text-xl font-bold tracking-widest text-center text-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 outline-none font-mono"
                     />
                   </div>
@@ -506,6 +661,122 @@ export default function AdminLoginPage() {
           </p>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════
+          RESET / RECOVER CREDENTIALS MODAL
+          ══════════════════════════════════════════════════ */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+            <button
+              onClick={() => setShowResetModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                <RefreshCw size={16} />
+              </div>
+              <h2 className="text-base font-black text-white">Reset Admin Credentials</h2>
+            </div>
+
+            <p className="text-xs text-slate-300 mb-4">
+              Need to restore access? You can 1-click reset to the default master credentials or configure new credentials directly in the database.
+            </p>
+
+            {/* 1-Click Default Reset */}
+            <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-4">
+              <span className="text-[11px] font-bold text-orange-400 block mb-1 uppercase tracking-wider">
+                ⚡ 1-Click Master Reset
+              </span>
+              <p className="text-xs text-slate-300 mb-3">
+                Sets Username to <code className="text-orange-300 bg-slate-900 px-1 py-0.5 rounded">krishshah13579@gmail.com</code>, Password to <code className="text-orange-300 bg-slate-900 px-1 py-0.5 rounded">Krish@2000</code>, and 2FA PIN to <code className="text-orange-300 bg-slate-900 px-1 py-0.5 rounded">135790</code>.
+              </p>
+              <button
+                type="button"
+                onClick={handleQuickResetToDefault}
+                disabled={resetLoading}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {resetLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={14} />
+                )}
+                <span>Reset to Default Master Credentials</span>
+              </button>
+            </div>
+
+            {/* Custom Credentials Form */}
+            <form onSubmit={handleCustomReset} className="space-y-3">
+              <span className="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">
+                Or Set Custom Credentials:
+              </span>
+
+              <div>
+                <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                  Username / Email
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newResetUser}
+                  onChange={(e) => setNewResetUser(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                  New Password
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={6}
+                  value={newResetPass}
+                  onChange={(e) => setNewResetPass(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                  6-Digit 2FA PIN
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={newResetPin}
+                  onChange={(e) => setNewResetPin(e.target.value.replace(/\D/g, ""))}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-2 focus:ring-orange-500 font-mono tracking-widest"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="w-1/2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="w-1/2 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                >
+                  {resetLoading && <Loader2 size={13} className="animate-spin" />}
+                  <span>Save in Database</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
