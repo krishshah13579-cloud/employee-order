@@ -56,6 +56,8 @@ model Customer {
   id              Int      @id @default(autoincrement())
   shopName        String   // Firm Name / Shop Name
   gstPanNo        String   // GST No. / PAN No.
+  businessType    String   @default("RETAILER") // RETAILER or WHOLESALER
+  creditDays      Int      @default(0) // Credit payment days (Super Admin only can edit)
   address         String   // Shop Address
   city            String?  // City
   state           String?  // State
@@ -78,7 +80,10 @@ model Product {
   sizesRatio      String      @default("30 to 38") // e.g., "28 to 36", "30 to 38", "28 to 40"
   sizesList       String      @default("30, 32, 34, 36, 38") // Mandatory sizes in 1 set
   pcsPerSet       Int         @default(5) // Number of pcs in one set
-  price           Float       @default(490) // Price per PC
+  mrp             Float?      // Maximum Retail Price
+  retailerPrice   Float?      // Retailer Selling Price: MRP / 2
+  wholesalerPrice Float?      // Wholesaler Selling Price: MRP / 2 - 100
+  price           Float       @default(490) // Base / Retailer Price per PC
   setsColorwise   String?     // Stock/Default Sets colorwise, e.g. "Dark Grey: 25, Navy Blue: 30, Jet Black: 40"
   sizeGuide       String?     // Size guide instructions / dimensions / image link
   imageUrl        String?
@@ -97,6 +102,8 @@ model Order {
   customerGstPan  String      // GST/PAN No
   customerPhone   String?
   customerAddress String?
+  businessType    String?     // Customer Type: RETAILER or WHOLESALER
+  creditDays      Int         @default(0) // Credit payment days granted for this order
   orderDate       DateTime    @default(now())
   status          String      @default("Pending") // Pending, Confirmed, In Production, Ready, Dispatched, Delivered, Cancelled
   subtotal        Float       @default(0) // Total Price before GST

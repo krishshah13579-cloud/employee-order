@@ -316,3 +316,158 @@ export async function sendNewCustomerNotification(customer: {
     }
   }
 }
+
+/**
+ * Dispatch comprehensive monthly processed orders report to administrator via email
+ */
+export async function sendMonthlyOrdersReportEmail(reportData: {
+  monthName: string;
+  year: number;
+  totalOrders: number;
+  totalRevenue: number;
+  totalSets: number;
+  totalPcs: number;
+  retailerOrdersCount: number;
+  wholesalerOrdersCount: number;
+  orders: {
+    orderNumber: string;
+    customerName: string;
+    customerGstPan?: string;
+    businessType?: string;
+    creditDays?: number;
+    totalSets: number;
+    totalPcs: number;
+    grandTotal: number;
+    status: string;
+    orderDate: string;
+  }[];
+  generatedAt?: string;
+}, recipientEmail = "krishshah13579@gmail.com") {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const adminEmail = recipientEmail || "krishshah13579@gmail.com";
+
+  console.log(`\n📊 [MONTHLY ORDERS REPORT DISPATCH]`);
+  console.log(`Period       : ${reportData.monthName} ${reportData.year}`);
+  console.log(`Total Orders : ${reportData.totalOrders}`);
+  console.log(`Total Revenue: ₹${reportData.totalRevenue.toLocaleString("en-IN")}`);
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser.trim(),
+          pass: gmailAppPassword.replace(/\s+/g, "").trim(),
+        },
+      });
+
+      const orderRowsHtml = reportData.orders.slice(0, 50).map((ord) => `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 10px 12px; font-family: monospace; font-weight: bold; color: #0f172a; font-size: 12px;">${ord.orderNumber}</td>
+          <td style="padding: 10px 12px; font-size: 12px; color: #1e293b;">
+            <strong>${ord.customerName}</strong>
+            ${ord.customerGstPan ? `<span style="display:block; font-size: 10px; color: #64748b; font-family: monospace;">${ord.customerGstPan}</span>` : ""}
+          </td>
+          <td style="padding: 10px 12px; font-size: 11px;">
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: bold; ${ord.businessType === "WHOLESALER" ? "background: #f3e8ff; color: #7e22ce;" : "background: #dbeafe; color: #1d4ed8;"}">
+              ${ord.businessType || "RETAILER"}
+            </span>
+          </td>
+          <td style="padding: 10px 12px; font-size: 11px; text-align: center; color: #475569;">
+            ${ord.creditDays ? `<span style="font-weight: bold; color: #d97706;">${ord.creditDays}d</span>` : "Cash/0d"}
+          </td>
+          <td style="padding: 10px 12px; font-size: 12px; text-align: center; font-family: monospace; color: #334155;">
+            ${ord.totalSets}s (${ord.totalPcs}p)
+          </td>
+          <td style="padding: 10px 12px; font-size: 12px; text-align: right; font-weight: bold; color: #0f172a; font-family: monospace;">
+            ₹${ord.grandTotal.toLocaleString("en-IN")}
+          </td>
+          <td style="padding: 10px 12px; font-size: 11px; text-align: center;">
+            <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #ecfdf5; color: #047857;">
+              ${ord.status}
+            </span>
+          </td>
+        </tr>
+      `).join("");
+
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 780px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #0f172a;">
+            <h1 style="color: #0f172a; font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+            <p style="color: #ea580c; font-size: 12px; font-weight: 800; text-transform: uppercase; margin-top: 4px; letter-spacing: 2px;">Monthly Processed Orders Report — ${reportData.monthName} ${reportData.year}</p>
+            <p style="color: #64748b; font-size: 11px; margin-top: 4px;">Generated on: ${reportData.generatedAt || new Date().toLocaleString("en-IN")}</p>
+          </div>
+
+          <!-- KPI Cards Grid -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Total Revenue</span>
+              <strong style="color: #16a34a; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">₹${reportData.totalRevenue.toLocaleString("en-IN")}</strong>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Orders Processed</span>
+              <strong style="color: #0f172a; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">${reportData.totalOrders}</strong>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Volume (Sets / Pcs)</span>
+              <strong style="color: #0f172a; font-size: 15px; font-family: monospace; display: block; margin-top: 6px;">${reportData.totalSets}s / ${reportData.totalPcs}p</strong>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Channel Mix</span>
+              <span style="font-size: 11px; display: block; margin-top: 6px; color: #334155;">
+                <strong style="color: #1d4ed8;">${reportData.retailerOrdersCount}</strong> Retailer | <strong style="color: #7e22ce;">${reportData.wholesalerOrdersCount}</strong> Wholesaler
+              </span>
+            </div>
+          </div>
+
+          <!-- Orders Table -->
+          <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <thead style="background: #0f172a; color: #ffffff;">
+                <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  <th style="padding: 10px 12px;">Order #</th>
+                  <th style="padding: 10px 12px;">Customer</th>
+                  <th style="padding: 10px 12px;">Type</th>
+                  <th style="padding: 10px 12px; text-align: center;">Credit</th>
+                  <th style="padding: 10px 12px; text-align: center;">Sets (Pcs)</th>
+                  <th style="padding: 10px 12px; text-align: right;">Amount (₹)</th>
+                  <th style="padding: 10px 12px; text-align: center;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${orderRowsHtml || `<tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">No processed orders found for this period.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background: #fff7ed; border: 1px solid #ffedd5; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 16px;">
+            <p style="color: #c2410c; font-size: 12px; margin: 0; font-weight: 600;">
+              Total Processed Wholesale Turnover: ₹${reportData.totalRevenue.toLocaleString("en-IN")} (incl. 5% GST) across ${reportData.totalOrders} order(s).
+            </p>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+            IQ TROUSERS Wholesale Automation System • Confidential Internal Report
+          </p>
+        </div>
+      `;
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Reports" <${gmailUser.trim()}>`,
+        to: adminEmail,
+        subject: `📊 [Monthly Report] ${reportData.monthName} ${reportData.year} — ₹${reportData.totalRevenue.toLocaleString("en-IN")} (${reportData.totalOrders} Orders)`,
+        html,
+      });
+
+      console.log(`✅ Monthly report email successfully dispatched to ${adminEmail}`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send monthly report email:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: false, error: "Email credentials not configured in environment." };
+}

@@ -221,11 +221,34 @@ function ProductDetailContent() {
       .map(([color, sets]) => ({ color, sets }));
   }, [colorSetsSelection]);
 
-  // Wholesale Calculations
+  // Active Draft Customer (to detect Retailer vs Wholesaler price)
+  const [draftCustomer, setDraftCustomer] = useState<{
+    id?: number;
+    shopName?: string;
+    businessType?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("garmentpro_order_draft");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.customer) {
+          setDraftCustomer(parsed.customer);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Wholesale Calculations & Dynamic Selling Price (Retailer vs Wholesaler)
   const pcsPerSet = product?.pcsPerSet || 5;
   const totalSets = selectedEntries.reduce((sum, item) => sum + item.sets, 0);
   const totalPcs = totalSets * pcsPerSet;
-  const unitPrice = product?.price || 0;
+
+  const isWholesaler = draftCustomer?.businessType === "WHOLESALER";
+  const retPrice = product?.retailerPrice ?? product?.price ?? 0;
+  const whoPrice = product?.wholesalerPrice ?? Math.max(0, retPrice - 100);
+  const unitPrice = isWholesaler ? whoPrice : retPrice;
   const totalAmount = totalPcs * unitPrice;
 
   // Add To Order Form Action
@@ -264,7 +287,8 @@ function ProductDetailContent() {
       sizesList: product.sizesList,
       pcsPerSet: pcsPerSet,
       totalSets: totalSets,
-      totalPcs: totalPcs,
+      retailerPrice: retPrice,
+      wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
       itemSubtotal: totalAmount,
       notes: itemNotes.trim() || undefined,
@@ -448,15 +472,43 @@ function ProductDetailContent() {
               </div>
 
               {/* Pricing & Packaging Formula */}
-              <div className="grid grid-cols-2 gap-3 p-4 bg-orange-50/60 rounded-xl border border-orange-200/60">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-orange-50/60 rounded-xl border border-orange-200/60">
                 <div>
-                  <div className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
-                    Wholesale Price
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
+                      {draftCustomer
+                        ? isWholesaler
+                          ? "Wholesaler Selling Rate"
+                          : "Retailer Selling Rate"
+                        : "Selling Rate / PC"}
+                    </span>
+                    {draftCustomer && (
+                      <span
+                        className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          isWholesaler
+                            ? "bg-purple-100 text-purple-800 border border-purple-200"
+                            : "bg-blue-100 text-blue-800 border border-blue-200"
+                        }`}
+                      >
+                        {draftCustomer.businessType || "RETAILER"}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-xl font-black text-slate-900 mt-0.5">
-                    {formatCurrency(product.price)}
-                    <span className="text-xs font-semibold text-slate-500 ml-1">/ pc</span>
+                  <div className="text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-1.5 font-mono">
+                    <span>{formatCurrency(unitPrice)}</span>
+                    <span className="text-xs font-semibold text-slate-500 font-sans">/ pc</span>
                   </div>
+                  {draftCustomer ? (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Applied for <strong>{draftCustomer.shopName}</strong> ({isWholesaler ? "MRP/2 - ₹100" : "MRP/2"})
+                    </p>
+                  ) : (
+                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-mono">
+                      <span>Ret: {formatCurrency(retPrice)}</span>
+                      <span>•</span>
+                      <span>Whol: {formatCurrency(whoPrice)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -467,6 +519,9 @@ function ProductDetailContent() {
                     {product.pcsPerSet || 5} Pcs
                     <span className="text-xs font-semibold text-slate-500 ml-1">/ set</span>
                   </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    1 set = 1 pc of each ratio size
+                  </p>
                 </div>
               </div>
 

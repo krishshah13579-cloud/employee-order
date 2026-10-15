@@ -51,6 +51,20 @@ export async function PUT(
       ? body.sizesList.split(",").length
       : 5;
 
+    const numMrp = body.mrp !== undefined && body.mrp !== null && String(body.mrp).trim() !== ""
+      ? parseFloat(body.mrp)
+      : null;
+    const retailerPrice = numMrp !== null
+      ? Math.round(numMrp / 2)
+      : body.retailerPrice !== undefined
+      ? parseFloat(body.retailerPrice)
+      : parseFloat(body.price) || 0;
+    const wholesalerPrice = numMrp !== null
+      ? Math.max(0, Math.round(numMrp / 2) - 100)
+      : body.wholesalerPrice !== undefined
+      ? parseFloat(body.wholesalerPrice)
+      : Math.max(0, retailerPrice - 100);
+
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
@@ -60,7 +74,10 @@ export async function PUT(
         sizesRatio: body.sizesRatio,
         sizesList: body.sizesList,
         pcsPerSet: pcs,
-        price: parseFloat(body.price) || 0,
+        mrp: numMrp,
+        retailerPrice: retailerPrice,
+        wholesalerPrice: wholesalerPrice,
+        price: retailerPrice,
         setsColorwise: body.setsColorwise,
         sizeGuide: body.sizeGuide,
         imageUrl: body.imageUrl,

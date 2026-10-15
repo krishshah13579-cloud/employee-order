@@ -222,6 +222,8 @@ export async function POST(request: NextRequest) {
           customerGstPan: customer.gstPanNo,
           customerPhone: customer.phoneNumber,
           customerAddress: customer.address,
+          businessType: body.businessType || (customer as any).businessType || "RETAILER",
+          creditDays: body.creditDays !== undefined ? (parseInt(body.creditDays, 10) || 0) : ((customer as any).creditDays || 0),
           orderDate: orderDate ? new Date(orderDate) : new Date(),
           status: "Pending",
           subtotal: orderSubtotal,

@@ -79,6 +79,7 @@ function CustomerRegistrationContent() {
   const [state, setState] = useState("Gujarat");
   const [transportName, setTransportName] = useState("");
   const [visitingCardUrl, setVisitingCardUrl] = useState("");
+  const [businessType, setBusinessType] = useState<"RETAILER" | "WHOLESALER">("RETAILER");
 
   // Tracking which fields were auto-filled by OCR
   const [autoFilledFields, setAutoFilledFields] = useState<Record<string, boolean>>({});
@@ -251,6 +252,10 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please enter Phone / Mobile Number", "error");
       return;
     }
+    if (!businessType) {
+      toast("Mandatory: Please select Type of Business (Retailer or Wholesaler)", "error");
+      return;
+    }
 
     setSavingCustomer(true);
 
@@ -265,6 +270,7 @@ function CustomerRegistrationContent() {
       const payload = {
         shopName: shopName.trim(),
         gstPanNo: gstPanNo.trim().toUpperCase(),
+        businessType: businessType,
         phoneNumber: phoneNumber.trim(),
         contactPerson: contactPerson.trim() || undefined,
         contactPersons: allContacts.length > 0 ? allContacts : undefined,
@@ -567,6 +573,61 @@ function CustomerRegistrationContent() {
                   <span className="text-[11px] text-red-500 font-bold">
                     * Mandatory Fields
                   </span>
+                </div>
+
+                {/* Mandatory Business Type: Retailer or Wholesaler */}
+                <div className="space-y-2 p-4 bg-slate-50/90 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <span>Type of Business</span>
+                      <span className="text-red-500 font-bold">* (Mandatory)</span>
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      Sets product rate pricing tier
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setBusinessType("RETAILER")}
+                      className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                        businessType === "RETAILER"
+                          ? "border-blue-600 bg-blue-50/90 text-blue-950 shadow-xs ring-1 ring-blue-500"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-black text-sm text-blue-900">RETAILER</div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Standard Selling Rate: <strong className="text-blue-700 font-mono">MRP / 2</strong>
+                        </div>
+                      </div>
+                      {businessType === "RETAILER" && (
+                        <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setBusinessType("WHOLESALER")}
+                      className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                        businessType === "WHOLESALER"
+                          ? "border-purple-600 bg-purple-50/90 text-purple-950 shadow-xs ring-1 ring-purple-500"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-black text-sm text-purple-900">WHOLESALER</div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Wholesale Selling Rate: <strong className="text-purple-700 font-mono">(MRP / 2) - ₹100</strong>
+                        </div>
+                      </div>
+                      {businessType === "WHOLESALER" && (
+                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Field 1: Firm Name */}

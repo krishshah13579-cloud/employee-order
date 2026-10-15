@@ -233,7 +233,7 @@ export default function ProductsPage() {
                 <th className="py-3.5 px-6">Colors Available</th>
                 <th className="py-3.5 px-6">Mandatory Size Ratio</th>
                 <th className="py-3.5 px-6">Stock Sets</th>
-                <th className="py-3.5 px-6">Wholesale Rate</th>
+                <th className="py-3.5 px-6">Dual Selling Rate</th>
                 <th className="py-3.5 px-6">Size Guide</th>
                 <th className="py-3.5 px-6">Status</th>
                 <th className="py-3.5 px-6 text-right">Actions</th>
@@ -383,8 +383,30 @@ export default function ProductsPage() {
                         );
                       })()}
                     </td>
-                    <td className="py-4 px-6 font-bold text-gray-900 font-mono text-sm">
-                      {formatCurrency(p.price)}
+                    <td className="py-4 px-6 text-xs">
+                      <div className="flex flex-col gap-1 font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 uppercase">
+                            Retailer
+                          </span>
+                          <span className="font-bold text-gray-900">
+                            {formatCurrency(p.retailerPrice || p.price)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 uppercase">
+                            Wholesaler
+                          </span>
+                          <span className="font-bold text-gray-900">
+                            {formatCurrency(p.wholesalerPrice || Math.max(0, (p.retailerPrice || p.price) - 100))}
+                          </span>
+                        </div>
+                        {p.mrp ? (
+                          <div className="text-[10px] text-gray-400 font-sans mt-0.5">
+                            MRP: ₹{p.mrp}
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="py-4 px-6">
                       {p.sizeGuide ? (

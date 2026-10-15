@@ -78,6 +78,20 @@ export async function POST(request: NextRequest) {
 
     const pcs = parseInt(pcsPerSet, 10) || (sizesList ? sizesList.split(",").length : 5);
 
+    const numMrp = body.mrp !== undefined && body.mrp !== null && String(body.mrp).trim() !== ""
+      ? parseFloat(body.mrp)
+      : null;
+    const retailerPrice = numMrp !== null
+      ? Math.round(numMrp / 2)
+      : body.retailerPrice !== undefined
+      ? parseFloat(body.retailerPrice)
+      : parseFloat(price) || 0;
+    const wholesalerPrice = numMrp !== null
+      ? Math.max(0, Math.round(numMrp / 2) - 100)
+      : body.wholesalerPrice !== undefined
+      ? parseFloat(body.wholesalerPrice)
+      : Math.max(0, retailerPrice - 100);
+
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
@@ -86,7 +100,10 @@ export async function POST(request: NextRequest) {
         sizesRatio: sizesRatio || "30 to 38",
         sizesList: sizesList || "30, 32, 34, 36, 38",
         pcsPerSet: pcs,
-        price: parseFloat(price) || 0,
+        mrp: numMrp,
+        retailerPrice: retailerPrice,
+        wholesalerPrice: wholesalerPrice,
+        price: retailerPrice,
         setsColorwise: setsColorwise || null,
         sizeGuide: sizeGuide || null,
         imageUrl: imageUrl || null,

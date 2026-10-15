@@ -70,10 +70,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const rawBusinessType = (body.businessType || "").trim().toUpperCase();
+    if (!rawBusinessType || (rawBusinessType !== "RETAILER" && rawBusinessType !== "WHOLESALER")) {
+      return NextResponse.json(
+        { error: "Business Type is mandatory. Please select either Retailer or Wholesaler." },
+        { status: 400 }
+      );
+    }
+    const businessType = rawBusinessType;
+    const creditDays = parseInt(body.creditDays, 10) || 0;
+
     const customer = await prisma.customer.create({
       data: {
         shopName: finalShopName,
         gstPanNo: gstPanNo,
+        businessType: businessType,
+        creditDays: creditDays,
         address: finalAddress || "Direct Delivery",
         city: finalCity || null,
         state: finalState || null,

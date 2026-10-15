@@ -49,6 +49,7 @@ function ProductsContent() {
   // Active draft info
   const [draftInfo, setDraftInfo] = useState<{
     customerName?: string;
+    businessType?: string;
     itemsCount: number;
   } | null>(null);
 
@@ -61,6 +62,7 @@ function ProductsContent() {
         if (parsed && (parsed.customer || (parsed.items && parsed.items.length > 0))) {
           setDraftInfo({
             customerName: parsed.customer?.shopName || parsed.customerName,
+            businessType: parsed.customer?.businessType,
             itemsCount: parsed.items?.length || 0,
           });
         }
@@ -374,11 +376,27 @@ function ProductsContent() {
                     {/* Price & Action Button */}
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[10px] uppercase font-bold text-slate-400">
-                          Price per PC
+                        <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                          <span>Rate per PC</span>
+                          {draftInfo?.customerName && (
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                draftInfo.businessType === "WHOLESALER"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {draftInfo.businessType === "WHOLESALER" ? "Wholesale" : "Retail"}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-lg font-black text-slate-900">
-                          {formatCurrency(product.price)}
+                        <div className="text-lg font-black text-slate-900 font-mono">
+                          {(() => {
+                            const isWholesaler = draftInfo?.businessType === "WHOLESALER";
+                            const ret = product.retailerPrice || product.price;
+                            const who = product.wholesalerPrice || Math.max(0, ret - 100);
+                            return formatCurrency(isWholesaler ? who : ret);
+                          })()}
                         </div>
                       </div>
 

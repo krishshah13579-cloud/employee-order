@@ -19,6 +19,8 @@ export interface CreateOrderPayload {
   customerId: number;
   placedBy?: string;
   notes?: string;
+  businessType?: string;
+  creditDays?: number;
   items: {
     productId: number;
     colorSets?: ColorSetEntry[] | string;
@@ -39,6 +41,8 @@ export interface CreateCustomerPayload {
   firmName?: string;
   name?: string;
   gstPanNo?: string;
+  businessType?: "RETAILER" | "WHOLESALER" | string;
+  creditDays?: number;
   address?: string;
   city?: string;
   state?: string;
@@ -48,6 +52,7 @@ export interface CreateCustomerPayload {
   company?: string;
   visitingCardUrl?: string;
   contactPerson?: string;
+  contactPersons?: string;
 }
 
 export interface AdminProfileData {
@@ -84,6 +89,8 @@ export interface CustomerData {
   shopName: string; // Firm Name / Shop Name
   firmName?: string;
   gstPanNo: string;
+  businessType?: "RETAILER" | "WHOLESALER" | string;
+  creditDays?: number;
   address: string; // Shop Address
   city?: string | null;
   state?: string | null;
@@ -114,7 +121,10 @@ export interface ProductData {
   sizesRatio: string;      // e.g. "30 to 38"
   sizesList: string;       // e.g. "30, 32, 34, 36, 38"
   pcsPerSet: number;       // e.g. 5
-  price: number;           // price per piece
+  mrp?: number | null;      // Maximum Retail Price
+  retailerPrice?: number | null; // Retailer Selling Price (MRP / 2)
+  wholesalerPrice?: number | null; // Wholesaler Selling Price (MRP / 2 - 100)
+  price: number;           // base price per piece
   setsColorwise?: string | null; // e.g. "Dark Blue: 20, Jet Black: 25, Grey: 15"
   sizeGuide?: string | null;
   imageUrl?: string | null;
@@ -151,6 +161,8 @@ export interface OrderData {
   customerGstPan: string;
   customerPhone?: string | null;
   customerAddress?: string | null;
+  businessType?: string | null;
+  creditDays?: number;
   orderDate: string;
   status: OrderStatus;
   subtotal: number;

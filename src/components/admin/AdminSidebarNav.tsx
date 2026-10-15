@@ -10,6 +10,7 @@ import {
   Package,
   FolderTree,
   ShoppingCart,
+  FileText,
   LogOut,
   ExternalLink,
 } from "lucide-react";
@@ -59,6 +60,12 @@ const navItems = [
     name: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+    exact: false,
+  },
+  {
+    name: "Reports",
+    href: "/admin/reports",
+    icon: FileText,
     exact: false,
   },
 ];

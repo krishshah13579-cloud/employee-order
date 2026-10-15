@@ -9,6 +9,7 @@ import {
   Store,
   Package,
   ShoppingCart,
+  FileText,
   ArrowRight,
   LogOut,
   Sparkles,
@@ -54,6 +55,12 @@ const navItems = [
     label: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    href: "/admin/reports",
+    icon: FileText,
   },
 ];
 

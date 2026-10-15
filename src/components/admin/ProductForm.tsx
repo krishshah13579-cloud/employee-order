@@ -303,18 +303,47 @@ export default function ProductForm({
     loadCategories();
   }, [initialData]);
 
-  // Form base state
+  // Form base state with dual selling prices:
+  // Retailer Price = MRP / 2
+  // Wholesaler Price = (MRP / 2) - 100
+  const initialMrp = initialData?.mrp ?? (initialData?.price ? initialData.price * 2 : 1000);
+  const initialRetailerPrice = initialData?.retailerPrice ?? (initialData?.price ?? Math.round(initialMrp / 2));
+  const initialWholesalerPrice = initialData?.wholesalerPrice ?? Math.max(0, initialRetailerPrice - 100);
+
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     category: initialData?.category || "EVERYDAY CASUAL",
     sizesRatio: initialData?.sizesRatio || "30 to 38",
     sizesList: initialData?.sizesList || "30, 32, 34, 36, 38",
     pcsPerSet: initialData?.pcsPerSet || 5,
-    price: initialData?.price ?? 450,
+    mrp: initialMrp,
+    retailerPrice: initialRetailerPrice,
+    wholesalerPrice: initialWholesalerPrice,
+    price: initialRetailerPrice,
     setsColorwise: initialData?.setsColorwise || "",
     description: "", // Description note
     isActive: initialData?.isActive ?? true,
   });
+
+  const handleMrpChange = (val: string) => {
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0) {
+      const ret = Math.round(num / 2);
+      const who = Math.max(0, ret - 100);
+      setFormData((prev) => ({
+        ...prev,
+        mrp: num,
+        retailerPrice: ret,
+        wholesalerPrice: who,
+        price: ret,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        mrp: val as any,
+      }));
+    }
+  };
 
   // Color stock mapping
   const [colorStockMap, setColorStockMap] = useState<Record<string, number>>(() => {
@@ -604,6 +633,14 @@ export default function ProductForm({
       }
       const serializedStock = stringifyColorwiseSets(finalStockMap);
 
+      const numMrp = formData.mrp ? parseFloat(String(formData.mrp)) : null;
+      const retPrice = formData.retailerPrice !== undefined && !isNaN(Number(formData.retailerPrice))
+        ? parseFloat(String(formData.retailerPrice))
+        : numMrp ? Math.round(numMrp / 2) : Number(formData.price) || 0;
+      const whoPrice = formData.wholesalerPrice !== undefined && !isNaN(Number(formData.wholesalerPrice))
+        ? parseFloat(String(formData.wholesalerPrice))
+        : Math.max(0, retPrice - 100);
+
       const payload = {
         name: formData.name.trim(),
         category: formData.category,
@@ -611,7 +648,10 @@ export default function ProductForm({
         sizesRatio: formData.sizesRatio,
         sizesList: formData.sizesList,
         pcsPerSet: formData.pcsPerSet,
-        price: Number(formData.price) || 0,
+        mrp: numMrp,
+        retailerPrice: retPrice,
+        wholesalerPrice: whoPrice,
+        price: retPrice,
         setsColorwise: serializedStock || null,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
         imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
@@ -984,29 +1024,102 @@ export default function ProductForm({
             </select>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Wholesale Price / Piece (₹) *
+          {/* Dual Selling Price Configuration */}
+          <div className="sm:col-span-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-2">
+                <span>Dual Selling Price Engine</span>
+                <span className="text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                  Retailer = MRP/2 • Wholesaler = MRP/2 - 100
+                </span>
               </label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
                 + 5% GST in Order
               </span>
             </div>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-gray-400 font-bold">₹</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="450.00"
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all font-mono font-bold"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50/80 p-4 rounded-2xl border border-gray-200">
+              {/* 1. MRP Input */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  MRP (Maximum Retail Price) (₹) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-gray-400 font-bold">₹</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    value={formData.mrp}
+                    onChange={(e) => handleMrpChange(e.target.value)}
+                    placeholder="1000"
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-black font-mono font-bold text-gray-900"
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Base printed retail price tag</p>
+              </div>
+
+              {/* 2. Retailer Type Selling Price: MRP / 2 */}
+              <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/80">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                    Retailer Selling Price (₹)
+                  </label>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
+                    MRP / 2
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-blue-400 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.retailerPrice}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setFormData({
+                        ...formData,
+                        retailerPrice: val,
+                        wholesalerPrice: Math.max(0, val - 100),
+                        price: val,
+                      });
+                    }}
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-blue-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-600 font-mono font-bold text-blue-950"
+                  />
+                </div>
+                <p className="text-[10px] text-blue-700 mt-1">Calculated as {formData.mrp ? Math.round(Number(formData.mrp) / 2) : 0} (MRP ÷ 2)</p>
+              </div>
+
+              {/* 3. Wholesaler Type Selling Price: MRP / 2 - 100 */}
+              <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/80">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900">
+                    Wholesaler Selling Price (₹)
+                  </label>
+                  <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 px-1.5 py-0.5 rounded">
+                    (MRP/2) - 100
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-purple-400 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.wholesalerPrice}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        wholesalerPrice: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-purple-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-600 font-mono font-bold text-purple-950"
+                  />
+                </div>
+                <p className="text-[10px] text-purple-700 mt-1">Calculated as Retailer Price - ₹100 / piece</p>
+              </div>
             </div>
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
   AlertCircle,
   FileText,
   Lock,
+  Clock,
   User,
   Printer,
   RotateCcw,
@@ -52,6 +53,8 @@ interface DraftOrderItem {
   pcsPerSet: number;
   totalSets: number;
   totalPcs: number;
+  retailerPrice?: number;
+  wholesalerPrice?: number;
   unitPrice: number;
   itemSubtotal: number;
   notes?: string;
@@ -82,6 +85,10 @@ export default function OrderFormPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState<boolean>(false);
+
+  // Credit Days on Order Form (Locks permanently if 45 days is selected)
+  const [orderCreditDays, setOrderCreditDays] = useState<number>(0);
+  const [isCreditLocked, setIsCreditLocked] = useState<boolean>(false);
 
 
   // Order Items in Draft
@@ -177,6 +184,13 @@ export default function OrderFormPage() {
           if (draft.placedBy && !placedBy) {
             setPlacedBy(draft.placedBy);
           }
+          if (draft.creditDays !== undefined) {
+            const cd = parseInt(draft.creditDays, 10) || 0;
+            setOrderCreditDays(cd);
+            if (cd === 45) {
+              setIsCreditLocked(true);
+            }
+          }
         }
       }
     } catch (err) {
@@ -189,10 +203,12 @@ export default function OrderFormPage() {
     updatedItems: DraftOrderItem[],
     customerId: number | null,
     notes: string,
-    employee: string
+    employee: string,
+    creditDaysVal?: number
   ) => {
     try {
       const cust = customers.find((c) => c.id === customerId);
+      const cd = creditDaysVal !== undefined ? creditDaysVal : orderCreditDays;
       const draftObj = {
         customerId,
         customer: cust
@@ -205,9 +221,12 @@ export default function OrderFormPage() {
               address: cust.address,
               city: cust.city,
               state: cust.state,
+              businessType: cust.businessType || "RETAILER",
+              creditDays: cust.creditDays || 0,
               visitingCardUrl: cust.visitingCardUrl,
             }
           : undefined,
+        creditDays: cd,
         items: updatedItems,
         notes,
         placedBy: employee,
@@ -223,6 +242,20 @@ export default function OrderFormPage() {
   const selectedCustomer = useMemo(() => {
     return customers.find((c) => c.id === selectedCustomerId) || null;
   }, [customers, selectedCustomerId]);
+
+  // Handle Credit Days Change with permanent lock when set to 45 Days
+  const handleCreditDaysChange = (days: number) => {
+    if (isCreditLocked || orderCreditDays === 45) {
+      toast("Credit Days is set to 45 Days and cannot be modified from employee side.", "error");
+      return;
+    }
+    setOrderCreditDays(days);
+    if (days === 45) {
+      setIsCreditLocked(true);
+      toast("Credit terms set to 45 Days — Locked permanently for employee side.", "success");
+    }
+    saveDraft(items, selectedCustomerId, orderNotes, placedBy, days);
+  };
 
   // Filtered customer list for searchable dropdown
   const filteredCustomers = useMemo(() => {
@@ -242,8 +275,37 @@ export default function OrderFormPage() {
     setSelectedCustomerId(c.id);
     setCustomerDropdownOpen(false);
     setCustomerSearchQuery("");
-    saveDraft(items, c.id, orderNotes, placedBy);
-    toast(`Customer selected: ${c.shopName}`);
+
+    // Credit Days handling: if set to 45, lock permanently
+    const custCredit = c.creditDays || 0;
+    setOrderCreditDays(custCredit);
+    if (custCredit === 45) {
+      setIsCreditLocked(true);
+    } else {
+      setIsCreditLocked(false);
+    }
+
+    // Dynamic Price sync:
+    // If selected customer is Retailer -> use Retailer Price (MRP / 2)
+    // If selected customer is Wholesaler -> use Wholesaler Price (MRP / 2 - 100)
+    const isWholesaler = c.businessType === "WHOLESALER";
+    const updatedItems = items.map((it) => {
+      let applicableUnitPrice = it.unitPrice;
+      if (isWholesaler && it.wholesalerPrice !== undefined) {
+        applicableUnitPrice = it.wholesalerPrice;
+      } else if (!isWholesaler && it.retailerPrice !== undefined) {
+        applicableUnitPrice = it.retailerPrice;
+      }
+      return {
+        ...it,
+        unitPrice: applicableUnitPrice,
+        itemSubtotal: (it.totalPcs || 0) * applicableUnitPrice,
+      };
+    });
+
+    setItems(updatedItems);
+    saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit);
+    toast(`Customer selected: ${c.shopName} (${isWholesaler ? "Wholesaler Pricing" : "Retailer Pricing"})`);
   };
 
   // Handle Remove Item
@@ -328,6 +390,8 @@ export default function OrderFormPage() {
       const payload = {
         customerId: selectedCustomerId,
         placedBy: finalPlacedBy,
+        businessType: selectedCustomer?.businessType || "RETAILER",
+        creditDays: orderCreditDays,
         notes: finalNotes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -737,6 +801,96 @@ export default function OrderFormPage() {
                       {selectedCustomer.state || "—"}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* 3. Business Type & Order Credit Days Terms */}
+              <div className="pt-3 border-t border-orange-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
+                      Business Type / Pricing Tier
+                    </span>
+                    {selectedCustomer.businessType === "WHOLESALER" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold">
+                        <span>🟣 WHOLESALER</span>
+                        <span className="font-mono text-[11px] text-purple-700">((MRP / 2) - ₹100 / pc)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
+                        <span>🔵 RETAILER</span>
+                        <span className="font-mono text-[11px] text-blue-700">(MRP / 2 / pc)</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
+                      Order Credit Terms
+                    </span>
+                    {(orderCreditDays === 45 || isCreditLocked) ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold shadow-2xs">
+                        <Lock size={13} className="text-amber-700" />
+                        <span>🔒 45 Days Credit Approved — Locked</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold font-mono">
+                        <Clock size={12} className="text-slate-500" />
+                        <span>{orderCreditDays > 0 ? `${orderCreditDays} Days Credit` : "Advance (0 Days)"}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Credit Days Option Selector */}
+                <div className="bg-white p-3.5 rounded-xl border border-orange-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <Clock size={14} className="text-orange-600" />
+                      <span>Select Order Credit Days:</span>
+                    </label>
+                    {(orderCreditDays === 45 || isCreditLocked) && (
+                      <span className="text-[10px] font-bold text-red-600 flex items-center gap-1">
+                        <Lock size={11} /> Cannot be changed from employee side
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[0, 15, 30, 45].map((d) => {
+                      const isSelected = orderCreditDays === d;
+                      const isDisabled = isCreditLocked || orderCreditDays === 45;
+
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          disabled={isDisabled && !isSelected}
+                          onClick={() => handleCreditDaysChange(d)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                            isSelected
+                              ? d === 45
+                                ? "bg-purple-900 text-white shadow-xs ring-2 ring-purple-600"
+                                : "bg-orange-600 text-white shadow-xs ring-2 ring-orange-500"
+                              : isDisabled
+                              ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50"
+                              : "bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          {d === 45 && <Lock size={12} />}
+                          <span>{d === 0 ? "Advance (0d)" : `${d} Days Credit`}</span>
+                          {isSelected && <span>✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {(orderCreditDays === 45 || isCreditLocked) && (
+                    <p className="text-[11px] font-semibold text-purple-900 bg-purple-50 p-2 rounded-lg border border-purple-200 flex items-center gap-1.5 mt-1.5">
+                      <Lock size={12} className="text-purple-700 shrink-0" />
+                      <span>45 Days Credit is active and locked for this customer. No update is allowed from employee side.</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
