@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
       where = {
         OR: [
           { name: { contains: search } },
+          { email: { contains: search } },
           { mobileNumber: { contains: search } },
           { address: { contains: search } },
         ],
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, mobileNumber, address, proofUrl, designation, isActive, pin } = body;
+    const { name, email, mobileNumber, address, proofUrl, designation, isActive, pin } = body;
 
     if (!name || !mobileNumber || !address) {
       return NextResponse.json(
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     const employee = await prisma.employee.create({
       data: {
         name: name.trim(),
+        email: (email || "").trim() || null,
         pin: (pin || "1234").trim(),
         mobileNumber: mobileNumber.trim(),
         address: address.trim(),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { sendNewCustomerNotification } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,12 +52,20 @@ export async function POST(request: NextRequest) {
     const finalCity = (body.city || "").trim();
     const finalState = (body.state || "").trim();
     const finalContact = (body.contactPerson || body.name || "").trim();
-    const gstPanNo = (body.gstPanNo || "N/A").trim().toUpperCase();
+    const gstPanNo = (body.gstPanNo || "").trim().toUpperCase();
+    const contactPersons = body.contactPersons ? JSON.stringify(body.contactPersons) : null;
     const visitingCardUrl = body.visitingCardUrl || null;
 
     if (!finalShopName || !finalPhone) {
       return NextResponse.json(
         { error: "Firm Name / Shop Name and Phone Number are mandatory" },
+        { status: 400 }
+      );
+    }
+
+    if (!gstPanNo || gstPanNo === "N/A") {
+      return NextResponse.json(
+        { error: "GST No. / PAN No. is strictly mandatory" },
         { status: 400 }
       );
     }
@@ -71,8 +80,20 @@ export async function POST(request: NextRequest) {
         phoneNumber: finalPhone,
         visitingCardUrl: visitingCardUrl,
         contactPerson: finalContact || null,
+        contactPersons: contactPersons,
       },
     });
+
+    // Send immediate email notification alert to admin (non-blocking)
+    sendNewCustomerNotification({
+      shopName: customer.shopName,
+      gstPanNo: customer.gstPanNo,
+      phoneNumber: customer.phoneNumber,
+      contactPerson: customer.contactPerson || undefined,
+      city: customer.city || undefined,
+      state: customer.state || undefined,
+      address: customer.address || undefined,
+    }).catch((err) => console.error("Customer email notification background error:", err));
 
     return NextResponse.json(customer, { status: 201 });
   } catch (error: any) {

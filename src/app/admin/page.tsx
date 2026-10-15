@@ -13,15 +13,30 @@ import {
   ArrowRight,
   Plus,
   RefreshCw,
-  Layers,
+  Bell,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { DashboardStats, STATUS_COLORS } from "@/lib/types";
+
+interface AdminNotification {
+  id: string;
+  type: "order" | "customer";
+  title: string;
+  subtitle: string;
+  timestamp: string;
+  status?: string;
+  link: string;
+}
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   const fetchStats = async () => {
     try {
@@ -41,8 +56,34 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      setLoadingNotifications(true);
+      const res = await fetch("/api/admin/notifications");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchNotifications();
+
+    // Check super admin status
+    fetch("/api/auth/check")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.authenticated && data?.user?.isSuperAdmin) {
+          setIsSuperAdmin(true);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const statCards = [
@@ -112,20 +153,27 @@ export default function AdminDashboardPage() {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchStats}
+            onClick={() => {
+              fetchStats();
+              fetchNotifications();
+            }}
             disabled={loading}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? "animate-spin text-zinc-900" : ""} />
             <span>Refresh</span>
           </button>
-          <Link
-            href="/admin/orders/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Book New Order</span>
-          </Link>
+          
+          {/* Book New Order button: Allowed ONLY for Super Admin */}
+          {isSuperAdmin && (
+            <Link
+              href="/admin/orders/new"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Book New Order</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -167,40 +215,88 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
-      {/* Quick Dedicated Page Actions Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
-        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 block">
-          Quick Management Actions (Opens in dedicated page)
-        </span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Link
-            href="/admin/products/new"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-gray-200 text-xs font-semibold text-gray-900 transition-colors shadow-2xs"
+      {/* Live Notification Center: New Customers & Orders Received */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-orange-50/50 to-amber-50/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm">
+              <Bell size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                  Live Notifications
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">
+                  {notifications.length} Recent Alerts
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Instant alerts for newly registered customer retail shops and wholesale orders received.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={fetchNotifications}
+            className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <Plus size={16} className="text-orange-600" />
-            <span>Add New Garment</span>
-          </Link>
-          <Link
-            href="/admin/orders/new"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-gray-200 text-xs font-semibold text-gray-900 transition-colors shadow-2xs"
-          >
-            <Plus size={16} className="text-blue-600" />
-            <span>Book New Order</span>
-          </Link>
-          <Link
-            href="/admin/customers/new"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-gray-200 text-xs font-semibold text-gray-900 transition-colors shadow-2xs"
-          >
-            <Plus size={16} className="text-emerald-600" />
-            <span>Add Customer Shop</span>
-          </Link>
-          <Link
-            href="/admin/employees/new"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-gray-200 text-xs font-semibold text-gray-900 transition-colors shadow-2xs"
-          >
-            <Plus size={16} className="text-purple-600" />
-            <span>Add Employee</span>
-          </Link>
+            <RefreshCw size={12} className={loadingNotifications ? "animate-spin" : ""} />
+            <span>Check Updates</span>
+          </button>
+        </div>
+
+        <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+          {loadingNotifications ? (
+            <div className="p-6 text-center text-xs text-gray-400">Loading notifications...</div>
+          ) : notifications.length === 0 ? (
+            <div className="p-8 text-center text-xs text-gray-400">
+              No new customer or order alerts at this time.
+            </div>
+          ) : (
+            notifications.map((notif) => (
+              <Link
+                key={notif.id}
+                href={notif.link}
+                className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group block"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                      notif.type === "order"
+                        ? "bg-blue-50 text-blue-600 border border-blue-200"
+                        : "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                    }`}
+                  >
+                    {notif.type === "order" ? <ShoppingCart size={15} /> : <Store size={15} />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-gray-900 group-hover:text-orange-600 transition-colors">
+                        {notif.title}
+                      </span>
+                      {notif.status && (
+                        <span
+                          className={`px-2 py-0.2 rounded-full text-[9px] font-bold ${
+                            STATUS_COLORS[notif.status] || "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {notif.status}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{notif.subtitle}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-[11px] text-gray-400">
+                    {formatDate(notif.timestamp)}
+                  </span>
+                  <ExternalLink size={14} className="text-gray-300 group-hover:text-gray-600 transition-colors" />
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </div>
 
@@ -246,7 +342,7 @@ export default function AdminDashboardPage() {
               ) : !stats?.recentOrders || stats.recentOrders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-gray-400">
-                    No orders booked yet. Use "Book New Order" to create one.
+                    No orders booked yet.
                   </td>
                 </tr>
               ) : (

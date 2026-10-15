@@ -39,6 +39,7 @@ import {
   getTotalAvailableSets,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
+import { extractColorsFromImage } from "@/lib/colorExtractor";
 
 // Standard Trouser & Formal Apparel Color Presets
 const PRESET_COLORS = [
@@ -111,6 +112,57 @@ export default function ProductForm({
   const [selectedColors, setSelectedColors] = useState<string[]>(parseInitialColors);
   const [customColorInput, setCustomColorInput] = useState("");
 
+  // Color Alphabet Mapping: e.g. { "A": "Ice Grey", "B": "Jet Black" }
+  const parseInitialColorMapping = (): Record<string, string> => {
+    if (initialData?.colorMapping) {
+      try {
+        const parsed = JSON.parse(initialData.colorMapping);
+        if (typeof parsed === "object" && parsed !== null) return parsed;
+      } catch {}
+    }
+    const colors = parseInitialColors();
+    const map: Record<string, string> = {};
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+    colors.forEach((c, i) => {
+      map[letters[i] || `C${i + 1}`] = c;
+    });
+    return map;
+  };
+
+  const [colorAlphabetMap, setColorAlphabetMap] = useState<Record<string, string>>(parseInitialColorMapping);
+
+  // Keep colorAlphabetMap synchronized with selectedColors
+  useEffect(() => {
+    setColorAlphabetMap((prev) => {
+      const updated: Record<string, string> = {};
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      const assignedColors = new Set<string>();
+
+      // Retain existing mapped letters for colors that are still selected
+      for (const [letter, col] of Object.entries(prev)) {
+        if (selectedColors.includes(col)) {
+          updated[letter] = col;
+          assignedColors.add(col);
+        }
+      }
+
+      // Assign remaining colors to next available alphabet letters
+      let letterIdx = 0;
+      for (const col of selectedColors) {
+        if (!assignedColors.has(col)) {
+          while (letterIdx < letters.length && updated[letters[letterIdx]]) {
+            letterIdx++;
+          }
+          const letter = letters[letterIdx] || `C${letterIdx + 1}`;
+          updated[letter] = col;
+          assignedColors.add(col);
+        }
+      }
+
+      return updated;
+    });
+  }, [selectedColors]);
+
   // Parse initial images list (supports comma-separated, single URL, or JSON array)
   const parseInitialImages = (): string[] => {
     if (!initialData?.imageUrl) return [];
@@ -120,6 +172,9 @@ export default function ProductForm({
         const parsed = JSON.parse(val);
         if (Array.isArray(parsed)) return parsed.filter(Boolean);
       } catch {}
+    }
+    if (val.startsWith("data:")) {
+      return [val];
     }
     return val.split(",").map((s) => s.trim()).filter(Boolean);
   };
@@ -348,20 +403,49 @@ export default function ProductForm({
 
     setUploadingImages(true);
     const uploadedUrls: string[] = [];
+    const extractedColorsFromPhotos: string[] = [];
 
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
         uploadedUrls.push(dataUrl);
+
+        // Fetch all colors from uploaded photo
+        try {
+          const colorsFound = await extractColorsFromImage(dataUrl);
+          for (const c of colorsFound) {
+            if (!extractedColorsFromPhotos.includes(c)) {
+              extractedColorsFromPhotos.push(c);
+            }
+          }
+        } catch (colorErr) {
+          console.warn("Could not extract colors from uploaded photo:", colorErr);
+        }
       }
 
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
-        toast(
-          `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}!`,
-          "success"
-        );
+
+        // Merge newly detected colors with selectedColors
+        if (extractedColorsFromPhotos.length > 0) {
+          setSelectedColors((prev) => {
+            const next = [...prev];
+            for (const c of extractedColorsFromPhotos) {
+              if (!next.includes(c)) next.push(c);
+            }
+            return next;
+          });
+          toast(
+            `Uploaded ${uploadedUrls.length} photo(s) & detected colors: ${extractedColorsFromPhotos.slice(0, 3).join(", ")}${extractedColorsFromPhotos.length > 3 ? "..." : ""}`,
+            "success"
+          );
+        } else {
+          toast(
+            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}!`,
+            "success"
+          );
+        }
       }
     } catch (err: any) {
       console.error("Image upload error:", err);
@@ -466,7 +550,8 @@ export default function ProductForm({
         price: Number(formData.price) || 0,
         setsColorwise: serializedStock || null,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
-        imageUrl: imagesList.length > 0 ? imagesList.join(",") : null,
+        imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
+        colorMapping: JSON.stringify(colorAlphabetMap),
         isActive: formData.isActive,
       };
 
@@ -1267,6 +1352,55 @@ export default function ProductForm({
                   </span>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Color Alphabet Mapping (Admin Wholesale Codes: A -> Ice Grey, B -> Black) */}
+        {selectedColors.length > 0 && (
+          <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-200/80 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-orange-950 uppercase tracking-wider block">
+                    Color Alphabet Mapping (Admin Only)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-200/70 text-orange-900 rounded-md">
+                    Admin Exclusive
+                  </span>
+                </div>
+                <p className="text-[11px] text-orange-800/80 mt-0.5">
+                  Wholesale color code mapping (e.g. A → Ice Grey, B → Jet Black). This mapping is strictly hidden from employee views.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {Object.entries(colorAlphabetMap)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([letter, color]) => {
+                  const colorInfo = getColorHex(color);
+                  return (
+                    <div
+                      key={letter}
+                      className="flex items-center gap-2.5 p-2.5 bg-white rounded-xl border border-orange-200/80 shadow-2xs"
+                    >
+                      <span className="w-6 h-6 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        {letter}
+                      </span>
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border shrink-0"
+                        style={{
+                          backgroundColor: colorInfo.hex,
+                          borderColor: colorInfo.isLight ? "#cbd5e1" : "transparent",
+                        }}
+                      />
+                      <span className="text-xs font-bold text-gray-900 truncate">
+                        {color}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

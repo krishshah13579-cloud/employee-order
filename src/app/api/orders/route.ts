@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAvailableSetsForColor, deductSetsFromStock } from "@/lib/stock";
+import { sendNewOrderNotification } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   try {
@@ -241,6 +242,18 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // Send immediate email notification alert to admin (non-blocking)
+    sendNewOrderNotification({
+      orderNumber: createdOrder.orderNumber,
+      customerName: createdOrder.customerName,
+      customerGstPan: createdOrder.customerGstPan,
+      customerPhone: createdOrder.customerPhone || undefined,
+      grandTotal: createdOrder.grandTotal,
+      totalPcs: createdOrder.totalPcs,
+      totalSets: createdOrder.totalSets,
+      placedBy: createdOrder.placedBy || undefined,
+    }).catch((err) => console.error("Order email notification background error:", err));
 
     return NextResponse.json(createdOrder, { status: 201 });
   } catch (error: any) {

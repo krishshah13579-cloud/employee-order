@@ -24,6 +24,29 @@ export async function PUT(
       );
     }
 
+    if (status === "Confirmed") {
+      const sessionCookie = request.cookies.get("iq_admin_session");
+      let isAdmin = false;
+      if (sessionCookie?.value) {
+        try {
+          const decoded = JSON.parse(Buffer.from(sessionCookie.value, "base64").toString("utf-8"));
+          if (decoded?.username) {
+            const admin = await prisma.adminAccount.findUnique({
+              where: { username: decoded.username },
+            });
+            if (admin) isAdmin = true;
+          }
+        } catch {}
+      }
+
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Admin or Super Admin can confirm orders." },
+          { status: 403 }
+        );
+      }
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: { status },

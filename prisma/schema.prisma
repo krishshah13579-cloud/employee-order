@@ -36,10 +36,11 @@ model AdminProfile {
   updatedAt   DateTime @updatedAt
 }
 
-// 2. Employee Page (Employee Details: Name, PIN, Mobile Number, Address, Proof (Upload))
+// 2. Employee Page (Employee Details: Name, Email, PIN, Mobile Number, Address, Proof (Upload))
 model Employee {
   id           Int      @id @default(autoincrement())
   name         String
+  email        String?  // Staff Email Address
   pin          String   @default("1234") // Secret PIN for employee portal login
   mobileNumber String
   address      String
@@ -60,18 +61,20 @@ model Customer {
   state           String?  // State
   phoneNumber     String   // Phone Number
   visitingCardUrl String?  // Visiting Card (Photo/Upload)
-  contactPerson   String?  // Contact Person Name
+  contactPerson   String?  // Primary Contact Person Name
+  contactPersons  String?  // JSON Array of Multiple Contact Persons [{name, phone, designation}]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   orders          Order[]
 }
 
-// 5. Product Page (Product Details: Product Name, Colors Available, Sizes (all size mandatory - 28 to 36, 30 to 38, 28 to 40, etc.), Price, No of Set Colorwise, Size Guide)
+// 5. Product Page (Product Details: Product Name, Colors Available, Sizes, Price, No of Set Colorwise, Size Guide)
 model Product {
   id              Int         @id @default(autoincrement())
   name            String
   category        String      @default("Formal & Casual Trousers")
   colorsAvailable String      // Comma-separated list: "Dark Grey, Navy Blue, Jet Black, Khaki"
+  colorMapping    String?     // Admin Color Alphabet Mapping JSON: {"A": "Dark Grey", "B": "Navy Blue"}
   sizesRatio      String      @default("30 to 38") // e.g., "28 to 36", "30 to 38", "28 to 40"
   sizesList       String      @default("30, 32, 34, 36, 38") // Mandatory sizes in 1 set
   pcsPerSet       Int         @default(5) // Number of pcs in one set

@@ -34,6 +34,18 @@ export default function OrdersPage() {
   const [statusModalOrder, setStatusModalOrder] = useState<OrderData | null>(null);
   const [newStatus, setNewStatus] = useState<OrderStatus>("Confirmed");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/check")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.authenticated && data?.user?.isSuperAdmin) {
+          setIsSuperAdmin(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -117,13 +129,15 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        <Link
-          href="/admin/orders/new"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer self-start md:self-auto"
-        >
-          <Plus size={16} />
-          <span>Book New Order</span>
-        </Link>
+        {isSuperAdmin && (
+          <Link
+            href="/admin/orders/new"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer self-start md:self-auto"
+          >
+            <Plus size={16} />
+            <span>Book New Order</span>
+          </Link>
+        )}
       </div>
 
       {/* Toolbar & Filters */}

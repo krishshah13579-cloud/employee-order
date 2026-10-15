@@ -109,13 +109,47 @@ function ProductDetailContent() {
     }
   }, [productId]);
 
-  // All colors for this product
+  // All colors for this product (hide out-of-stock colors from employee panel)
   const availableColors = useMemo(() => {
     if (!product?.colorsAvailable) return [];
-    return product.colorsAvailable
+    const colors = product.colorsAvailable
       .split(",")
       .map((c) => c.trim())
       .filter(Boolean);
+
+    // If any color is out of stock, don't show it on employee panel
+    return colors.filter((color) => {
+      if (!product.setsColorwise || !product.setsColorwise.trim()) return true;
+      const stock = getAvailableSetsForColor(product.setsColorwise, color);
+      return stock > 0;
+    });
+  }, [product]);
+
+  // Size guide synced with product database
+  const sizeGuideData = useMemo(() => {
+    if (product?.sizeGuide) {
+      try {
+        const parsed = Array.isArray(product.sizeGuide)
+          ? product.sizeGuide
+          : JSON.parse(product.sizeGuide);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((r: any) => ({
+            brandSize: String(r.brandSize || ""),
+            waist: r.waist
+              ? String(r.waist).includes('"') || String(r.waist).includes("cm")
+                ? String(r.waist)
+                : `${r.waist}"`
+              : "-",
+            length: r.length
+              ? String(r.length).includes('"') || String(r.length).includes("cm")
+                ? String(r.length)
+                : `${r.length}"`
+              : "-",
+          }));
+        }
+      } catch {}
+    }
+    return DEFAULT_SIZE_GUIDE;
   }, [product]);
 
   // Images list
@@ -354,9 +388,7 @@ function ProductDetailContent() {
                       : "bg-red-950/80 text-red-300 border border-red-700/60"
                   }`}
                 >
-                  {totalProductStock > 0
-                    ? `${totalProductStock} Total Sets In Stock`
-                    : "Out of Stock"}
+                  {totalProductStock > 0 ? "In Stock" : "Out of Stock"}
                 </span>
               </div>
 
@@ -419,7 +451,7 @@ function ProductDetailContent() {
                 </div>
               </div>
 
-              {/* Sizes in one set */}
+              {/* Mandatory Size Ratio */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between text-slate-600">
                   <span className="font-bold">Mandatory Size Ratio:</span>
@@ -427,15 +459,6 @@ function ProductDetailContent() {
                     {product.sizesRatio}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span className="font-bold">Sizes in Each 1 Set:</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {product.sizesList || "30, 32, 34, 36, 38"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 italic pt-1">
-                  * Note: Wholesale equation is <strong>PCS = SETS × {product.pcsPerSet || 5}</strong>. All sizes are mandatory in every set.
-                </p>
               </div>
 
               {/* Collapsible Size Guide */}
@@ -463,7 +486,7 @@ function ProductDetailContent() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/60 font-mono">
-                        {DEFAULT_SIZE_GUIDE.map((row, idx) => (
+                        {sizeGuideData.map((row, idx) => (
                           <tr key={idx}>
                             <td className="py-1 px-2 font-bold text-slate-800">
                               {row.brandSize}
@@ -581,17 +604,10 @@ function ProductDetailContent() {
                                 )}
                               </div>
                               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                                <span>
-                                  Available Stock:{" "}
-                                  <strong className={stock > 0 ? "text-emerald-700" : "text-red-600"}>
-                                    {stock} Sets
-                                  </strong>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>In Stock</span>
                                 </span>
-                                {isOutOfStock && (
-                                  <span className="text-[10px] font-bold text-red-600 uppercase">
-                                    (Out of Stock)
-                                  </span>
-                                )}
                               </div>
                             </div>
                           </div>

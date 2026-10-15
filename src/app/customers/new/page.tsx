@@ -23,6 +23,8 @@ import {
   EyeOff,
   Image as ImageIcon,
   Check,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -69,6 +71,9 @@ function CustomerRegistrationContent() {
   const [gstPanNo, setGstPanNo] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [contactPerson, setContactPerson] = useState("");
+  const [additionalContacts, setAdditionalContacts] = useState<
+    { name: string; phone: string; designation: string }[]
+  >([]);
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("Gujarat");
@@ -238,6 +243,10 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please enter Firm Name / Shop Name", "error");
       return;
     }
+    if (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A") {
+      toast("Mandatory: Please enter valid GST No. or PAN No.", "error");
+      return;
+    }
     if (!phoneNumber.trim()) {
       toast("Mandatory: Please enter Phone / Mobile Number", "error");
       return;
@@ -246,11 +255,19 @@ function CustomerRegistrationContent() {
     setSavingCustomer(true);
 
     try {
+      const allContacts = [
+        ...(contactPerson.trim()
+          ? [{ name: contactPerson.trim(), phone: phoneNumber.trim(), designation: "Primary Contact" }]
+          : []),
+        ...additionalContacts.filter((c) => c.name.trim()),
+      ];
+
       const payload = {
         shopName: shopName.trim(),
-        gstPanNo: gstPanNo.trim() || "N/A",
+        gstPanNo: gstPanNo.trim().toUpperCase(),
         phoneNumber: phoneNumber.trim(),
         contactPerson: contactPerson.trim() || undefined,
+        contactPersons: allContacts.length > 0 ? allContacts : undefined,
         address: address.trim() || "Direct Delivery",
         city: city.trim() || undefined,
         state: state.trim() || undefined,
@@ -582,7 +599,7 @@ function CustomerRegistrationContent() {
                       <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                         <CreditCard size={14} className="text-slate-500" />
                         <span>GST / PAN No.</span>
-                        <span className="text-slate-400 text-[10px] font-normal lowercase">(optional)</span>
+                        <span className="text-red-500">*</span>
                       </label>
                       {autoFilledFields.gstPanNo && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
@@ -592,9 +609,10 @@ function CustomerRegistrationContent() {
                     </div>
                     <input
                       type="text"
+                      required
                       value={gstPanNo}
                       onChange={(e) => setGstPanNo(e.target.value.toUpperCase())}
-                      placeholder="e.g. 24ABCDE1234F1Z5, PAN or N/A"
+                      placeholder="e.g. 24ABCDE1234F1Z5 or PAN"
                       className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs"
                     />
                   </div>
@@ -623,26 +641,115 @@ function CustomerRegistrationContent() {
                   </div>
                 </div>
 
-                {/* Field 4: Contact Person */}
-                <div className="space-y-1.5">
+                {/* Field 4: Contact Persons with Add Another Contact Person Button */}
+                <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                       <User size={14} className="text-slate-500" />
-                      <span>Contact Person / Proprietor</span>
+                      <span>Contact Persons</span>
                     </label>
-                    {autoFilledFields.contactPerson && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                        <Check size={10} /> Auto-filled
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAdditionalContacts((prev) => [
+                          ...prev,
+                          { name: "", phone: "", designation: "" },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-orange-50 text-orange-600 border border-slate-300 hover:border-orange-400 rounded-lg text-[11px] font-bold transition shadow-2xs cursor-pointer"
+                    >
+                      <Plus size={13} />
+                      <span>+ Add Another Contact Person</span>
+                    </button>
                   </div>
-                  <input
-                    type="text"
-                    value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
-                    placeholder="e.g. Rajesh Kumar (Proprietor)"
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
-                  />
+
+                  {/* Primary Contact Person */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Primary Contact / Proprietor
+                    </span>
+                    <input
+                      type="text"
+                      value={contactPerson}
+                      onChange={(e) => setContactPerson(e.target.value)}
+                      placeholder="e.g. Rajesh Kumar (Proprietor)"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                    />
+                  </div>
+
+                  {/* Additional Contact Persons */}
+                  {additionalContacts.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                      {additionalContacts.map((contact, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 relative"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600">
+                              Contact Person #{idx + 2}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAdditionalContacts((prev) =>
+                                  prev.filter((_, i) => i !== idx)
+                                )
+                              }
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition cursor-pointer"
+                              title="Remove contact person"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={contact.name}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdditionalContacts((prev) => {
+                                  const copy = [...prev];
+                                  copy[idx] = { ...copy[idx], name: val };
+                                  return copy;
+                                });
+                              }}
+                              placeholder="Full Name *"
+                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            />
+                            <input
+                              type="tel"
+                              value={contact.phone}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdditionalContacts((prev) => {
+                                  const copy = [...prev];
+                                  copy[idx] = { ...copy[idx], phone: val };
+                                  return copy;
+                                });
+                              }}
+                              placeholder="Mobile Number"
+                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            />
+                            <input
+                              type="text"
+                              value={contact.designation}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdditionalContacts((prev) => {
+                                  const copy = [...prev];
+                                  copy[idx] = { ...copy[idx], designation: val };
+                                  return copy;
+                                });
+                              }}
+                              placeholder="Designation (e.g. Manager)"
+                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Field 5: Store Address */}

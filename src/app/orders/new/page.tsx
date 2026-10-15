@@ -97,6 +97,9 @@ export default function OrderFormPage() {
   // Confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
 
+  // Visiting Card Modal State
+  const [viewVisitingCard, setViewVisitingCard] = useState<string | null>(null);
+
   // Authenticated employee
   const { employee } = useEmployee();
 
@@ -688,11 +691,10 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
                       VISITING CARD
                     </span>
-                    <a
-                      href={selectedCustomer.visitingCardUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative block w-16 h-12 rounded-lg overflow-hidden border border-orange-200 shadow-xs hover:ring-2 hover:ring-orange-500 transition"
+                    <button
+                      type="button"
+                      onClick={() => setViewVisitingCard(selectedCustomer.visitingCardUrl!)}
+                      className="group relative block w-16 h-12 rounded-lg overflow-hidden border border-orange-200 shadow-xs hover:ring-2 hover:ring-orange-500 transition cursor-pointer text-left"
                       title="Click to view visiting card full size"
                     >
                       <img
@@ -703,7 +705,7 @@ export default function OrderFormPage() {
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[9px] font-bold">
                         View
                       </div>
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -760,13 +762,20 @@ export default function OrderFormPage() {
               </p>
             </div>
 
-            <Link
-              href="/products?returnTo=/orders/new"
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto"
-            >
-              <Plus size={16} />
-              <span>+ Add Product to Form</span>
-            </Link>
+            {selectedCustomer ? (
+              <Link
+                href="/products?returnTo=/orders/new"
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>+ Add Product to Form</span>
+              </Link>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold self-start sm:self-auto">
+                <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                <span>Select customer above to add products</span>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -797,15 +806,19 @@ export default function OrderFormPage() {
                           No Products in Order Form Yet
                         </p>
                         <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                          Click &quot;+ Add Product to Form&quot; to browse products, open any product, and pick multiple colors and sets at once.
+                          {selectedCustomer
+                            ? "Click + Add Product to Form to browse products, pick multiple colors and sets at once."
+                            : "Please select a customer above first to start adding products."}
                         </p>
-                        <Link
-                          href="/products?returnTo=/orders/new"
-                          className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5"
-                        >
-                          <Plus size={14} />
-                          <span>+ Add Product Now</span>
-                        </Link>
+                        {selectedCustomer && (
+                          <Link
+                            href="/products?returnTo=/orders/new"
+                            className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5"
+                          >
+                            <Plus size={14} />
+                            <span>+ Add Product Now</span>
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1147,6 +1160,24 @@ export default function OrderFormPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Visiting Card Lightbox Modal */}
+      {viewVisitingCard && (
+        <Modal
+          isOpen={!!viewVisitingCard}
+          onClose={() => setViewVisitingCard(null)}
+          title={`Visiting Card — ${selectedCustomer?.shopName || "Customer"}`}
+          size="md"
+        >
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center">
+            <img
+              src={viewVisitingCard}
+              alt="Visiting Card Proof"
+              className="max-h-[75vh] w-auto rounded-xl object-contain shadow-xs"
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   XCircle,
   Eye,
   RefreshCw,
+  Mail,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 
@@ -120,6 +121,7 @@ export default function EmployeesPage() {
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 <th className="py-3.5 px-6">Employee Name</th>
                 <th className="py-3.5 px-6">Designation</th>
+                <th className="py-3.5 px-6">Email Address</th>
                 <th className="py-3.5 px-6">Mobile Number</th>
                 <th className="py-3.5 px-6">Residential Address</th>
                 <th className="py-3.5 px-6">KYC / ID Proof</th>
@@ -130,13 +132,13 @@ export default function EmployeesPage() {
             <tbody className="divide-y divide-gray-100">
               {loading && employees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
                     Loading employees...
                   </td>
                 </tr>
               ) : employees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
                     No employees registered yet. Click "Add Employee" to create a staff record.
                   </td>
                 </tr>
@@ -165,6 +167,19 @@ export default function EmployeesPage() {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-800">
                         {emp.designation}
                       </span>
+                    </td>
+                    <td className="py-4 px-6 text-gray-700">
+                      {emp.email ? (
+                        <a
+                          href={`mailto:${emp.email}`}
+                          className="inline-flex items-center gap-1.5 hover:text-orange-600 font-medium transition-colors"
+                        >
+                          <Mail size={13} className="text-gray-400" />
+                          <span className="truncate max-w-[160px]">{emp.email}</span>
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic text-[11px]">No email</span>
+                      )}
                     </td>
                     <td className="py-4 px-6 font-mono font-medium text-gray-800">
                       <a

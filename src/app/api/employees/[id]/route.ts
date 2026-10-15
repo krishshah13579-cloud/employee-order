@@ -31,6 +31,7 @@ export async function PUT(
       where: { id: parseInt(id) },
       data: {
         name: body.name,
+        email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
         pin: body.pin !== undefined ? body.pin.trim() : undefined,
         mobileNumber: body.mobileNumber,
         address: body.address,

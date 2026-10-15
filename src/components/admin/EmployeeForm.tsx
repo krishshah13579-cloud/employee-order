@@ -40,6 +40,7 @@ export default function EmployeeForm({
 
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
+    email: initialData?.email || "",
     pin: initialData?.pin || "1234",
     mobileNumber: initialData?.mobileNumber || "",
     address: initialData?.address || "",
@@ -159,6 +160,19 @@ export default function EmployeeForm({
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g. Ramesh Patel"
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Staff Email Address
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="e.g. ramesh.patel@iqtrousers.com"
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
           </div>

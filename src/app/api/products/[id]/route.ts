@@ -55,6 +55,7 @@ export async function PUT(
         setsColorwise: body.setsColorwise,
         sizeGuide: body.sizeGuide,
         imageUrl: body.imageUrl,
+        colorMapping: body.colorMapping,
         isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
       },
     });

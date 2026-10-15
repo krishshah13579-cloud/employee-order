@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { DashboardStats } from "@/lib/types";
+import { getTotalAvailableSets } from "@/lib/stock";
 
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
       totalCustomers,
       totalEmployees,
       totalProducts,
+      activeProductsList,
       categoriesRaw,
       revenueAggregation,
       recentOrdersRaw,
@@ -34,6 +36,10 @@ export async function GET() {
       prisma.customer.count(),
       prisma.employee.count({ where: { isActive: true } }),
       prisma.product.count({ where: { isActive: true } }),
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, setsColorwise: true },
+      }),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
       prisma.order.aggregate({
         _sum: {
@@ -61,6 +67,16 @@ export async function GET() {
       }),
     ]);
 
+    let inStockProductsCount = 0;
+    for (const p of activeProductsList) {
+      if (!p.setsColorwise || !p.setsColorwise.trim()) {
+        inStockProductsCount++;
+      } else {
+        const total = getTotalAvailableSets(p.setsColorwise);
+        if (total > 0) inStockProductsCount++;
+      }
+    }
+
     const stats = {
       totalOrders,
       todayOrders,
@@ -69,6 +85,7 @@ export async function GET() {
       totalCustomers,
       totalEmployees,
       totalProducts,
+      inStockProducts: inStockProductsCount,
       totalCategories: categoriesRaw.length,
       categories: categoriesRaw.map((c) => c.name),
       totalRevenue: Math.round((revenueAggregation._sum.grandTotal || 0) * 100) / 100,

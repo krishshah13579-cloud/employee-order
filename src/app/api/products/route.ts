@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       setsColorwise,
       sizeGuide,
       imageUrl,
+      colorMapping,
       isActive,
     } = body;
 
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
         setsColorwise: setsColorwise || null,
         sizeGuide: sizeGuide || null,
         imageUrl: imageUrl || null,
+        colorMapping: colorMapping || null,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });

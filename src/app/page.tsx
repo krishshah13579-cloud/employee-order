@@ -55,6 +55,8 @@ interface StatsData {
   totalCategories: number;
   categories: string[];
   totalOrders: number;
+  totalProducts: number;
+  inStockProducts?: number;
   totalRevenue: number;
   recentOrders: RecentOrder[];
 }
@@ -218,38 +220,34 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 3. CATEGORY */}
+            {/* 3. PRODUCTS IN STOCK */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
-                  <Layers size={22} />
+                  <Package size={22} />
                 </div>
                 <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">
-                  {stats?.totalCategories ?? 3} Active Lines
+                  Live Stock
                 </span>
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Category
+                Products In Stock
               </h3>
-              <div className="mt-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {categoriesList.map((cat) => (
-                    <span
-                      key={cat}
-                      className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-neutral-100 text-neutral-800 border border-neutral-200"
-                    >
-                      {cat}
-                    </span>
-                  ))}
-                </div>
+              <div className="mt-2 flex items-baseline gap-3">
+                <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
+                  {loading ? "..." : stats?.inStockProducts ?? stats?.totalProducts ?? 0}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  designs available
+                </span>
               </div>
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                <span>Product Lines:</span>
+                <span>Available Catalog:</span>
                 <Link
                   href="/products"
                   className="font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                 >
-                  View Catalog <ArrowRight size={12} />
+                  Browse Designs <ArrowRight size={12} />
                 </Link>
               </div>
             </div>

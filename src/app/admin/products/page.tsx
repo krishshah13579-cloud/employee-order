@@ -252,11 +252,28 @@ export default function ProductsPage() {
                           const trimmed = c.trim();
                           if (!trimmed) return null;
                           const colorInfo = getColorHex(trimmed);
+
+                          // Find alphabet letter from colorMapping if present
+                          let letter = String.fromCharCode(65 + i); // Default A, B, C...
+                          if (p.colorMapping) {
+                            try {
+                              const map = JSON.parse(p.colorMapping);
+                              const found = Object.entries(map).find(
+                                ([_, col]) => String(col).toLowerCase() === trimmed.toLowerCase()
+                              );
+                              if (found) letter = found[0];
+                            } catch {}
+                          }
+
                           return (
                             <span
                               key={i}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-gray-800 text-[11px] font-semibold rounded-lg border border-gray-200 shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white text-gray-800 text-[11px] font-semibold rounded-lg border border-gray-200 shadow-2xs"
+                              title={`Admin Wholesale Code: ${letter} -> ${trimmed}`}
                             >
+                              <span className="w-4 h-4 rounded-md bg-zinc-900 text-white font-mono font-black text-[10px] flex items-center justify-center shrink-0">
+                                {letter}
+                              </span>
                               <span
                                 className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/15"
                                 style={{ backgroundColor: colorInfo.hex }}

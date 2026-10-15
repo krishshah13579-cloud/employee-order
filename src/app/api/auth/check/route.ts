@@ -20,9 +20,10 @@ export async function GET(req: NextRequest) {
         });
 
         if (admin) {
+          const isSuperAdmin = admin.username.toLowerCase() === "krishshah13579@gmail.com";
           return NextResponse.json({
             authenticated: true,
-            user: { username: admin.username },
+            user: { username: admin.username, isSuperAdmin },
           });
         }
       }

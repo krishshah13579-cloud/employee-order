@@ -58,6 +58,7 @@ export default function OrderEditPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Order Details
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [orderNumber, setOrderNumber] = useState<string>("");
   const [orderDate, setOrderDate] = useState<string>("");
   const [status, setStatus] = useState<OrderStatus>("Pending");
@@ -157,6 +158,16 @@ export default function OrderEditPage() {
     if (orderId) {
       fetchOrder();
     }
+    // Check if current user is admin/super admin
+    fetch("/api/auth/check")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.authenticated) {
+          setIsAdmin(true);
+        }
+      })
+      .catch(() => {});
+
     // Load customers
     fetch("/api/customers")
       .then((r) => r.json())
@@ -322,6 +333,11 @@ export default function OrderEditPage() {
   const handleSaveChanges = async () => {
     if (!customerName.trim() || !customerGstPan.trim()) {
       toast("Customer Shop Name and GST/PAN are mandatory", "error");
+      return;
+    }
+
+    if (status === "Confirmed" && !isAdmin) {
+      toast("Order confirmation is strictly restricted to Admin / Super Admin", "error");
       return;
     }
 
@@ -634,15 +650,30 @@ export default function OrderEditPage() {
               </span>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as OrderStatus)}
+                onChange={(e) => {
+                  const newStatus = e.target.value as OrderStatus;
+                  if (newStatus === "Confirmed" && !isAdmin) {
+                    toast("Only an Admin or Super Admin can confirm orders", "error");
+                    return;
+                  }
+                  setStatus(newStatus);
+                }}
                 className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 print:hidden"
               >
-                {ORDER_STATUSES.map((st: string) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
+                {ORDER_STATUSES.map((st: string) => {
+                  const isRestricted = st === "Confirmed" && !isAdmin;
+                  return (
+                    <option key={st} value={st} disabled={isRestricted}>
+                      {st} {isRestricted ? "(Admin Only)" : ""}
+                    </option>
+                  );
+                })}
               </select>
+              {!isAdmin && status === "Pending" && (
+                <p className="text-[10px] text-amber-600 mt-1 font-medium">
+                  Note: Order confirmation is restricted to Admin or Super Admin.
+                </p>
+              )}
               <div className="hidden print:block font-bold text-sm text-slate-900">
                 {status}
               </div>

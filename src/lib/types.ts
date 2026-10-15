@@ -68,6 +68,7 @@ export interface AdminProfileData {
 export interface EmployeeData {
   id: number;
   name: string;
+  email?: string | null;
   pin?: string;
   mobileNumber: string;
   address: string;
@@ -89,6 +90,7 @@ export interface CustomerData {
   phoneNumber: string;
   visitingCardUrl?: string | null;
   contactPerson?: string | null;
+  contactPersons?: string | null;
   createdAt: string;
   updatedAt: string;
   orders?: any[];
@@ -108,6 +110,7 @@ export interface ProductData {
   name: string;
   category: string;
   colorsAvailable: string; // e.g. "Dark Blue, Jet Black, Grey, Olive"
+  colorMapping?: string | null; // e.g. '{"A": "Dark Blue", "B": "Jet Black"}'
   sizesRatio: string;      // e.g. "30 to 38"
   sizesList: string;       // e.g. "30, 32, 34, 36, 38"
   pcsPerSet: number;       // e.g. 5

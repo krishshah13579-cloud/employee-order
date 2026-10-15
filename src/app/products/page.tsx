@@ -316,9 +316,7 @@ function ProductsContent() {
                           : "bg-red-950/80 text-red-300 border border-red-700/60"
                       }`}
                     >
-                      {totalAvailableStock > 0
-                        ? `${totalAvailableStock} Sets Available`
-                        : "Out of Stock"}
+                      {totalAvailableStock > 0 ? "In Stock" : "Out of Stock"}
                     </span>
                   </Link>
 
