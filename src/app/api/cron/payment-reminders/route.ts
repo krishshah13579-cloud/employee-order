@@ -75,3 +75,55 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const origin =
+      request.headers.get("origin") ||
+      request.headers.get("referer") ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "https://employee-order.vercel.app";
+
+    const orders = await prisma.order.findMany({
+      where: {
+        status: {
+          notIn: ["Cancelled"],
+        },
+      },
+      include: {
+        customer: true,
+      },
+      orderBy: {
+        orderDate: "desc",
+      },
+    });
+
+    const results: any[] = [];
+    for (const ord of orders) {
+      const phone = ord.customerPhone || ord.customer?.phoneNumber || "";
+      if (!phone) continue;
+
+      const message = generatePaymentReminderWhatsAppMessage(ord as any, origin);
+      const autoResult = await dispatchAutomatedWhatsApp(phone, message);
+      results.push({
+        orderNumber: ord.orderNumber,
+        customerName: ord.customerName,
+        phone,
+        success: autoResult.success,
+        method: autoResult.method,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      totalProcessed: results.length,
+      results,
+    });
+  } catch (error: any) {
+    console.error("Direct payment reminder dispatch error:", error);
+    return NextResponse.json(
+      { error: "Failed to dispatch weekly payment reminders: " + error.message },
+      { status: 500 }
+    );
+  }
+}

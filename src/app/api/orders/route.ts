@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAvailableSetsForColor, deductSetsFromStock } from "@/lib/stock";
 import { sendNewOrderNotification } from "@/lib/email";
+import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 
 export async function GET(request: NextRequest) {
   try {
@@ -257,7 +258,30 @@ export async function POST(request: NextRequest) {
       placedBy: createdOrder.placedBy || undefined,
     }).catch((err) => console.error("Order email notification background error:", err));
 
-    return NextResponse.json(createdOrder, { status: 201 });
+    // Send immediate automated WhatsApp message directly to customer via Meta Cloud API
+    const customerPhone = createdOrder.customerPhone || (createdOrder.customer as any)?.phoneNumber;
+    let whatsAppSent = false;
+    if (customerPhone) {
+      const origin =
+        request.headers.get("origin") ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "https://employee-order.vercel.app";
+      const messageText = generateOrderWhatsAppMessage(createdOrder as any, origin);
+      try {
+        const dispatchRes = await dispatchAutomatedWhatsApp(customerPhone, messageText);
+        whatsAppSent = dispatchRes.success;
+      } catch (err) {
+        console.error("Order WhatsApp automated dispatch exception:", err);
+      }
+    }
+
+    return NextResponse.json(
+      {
+        ...createdOrder,
+        whatsAppSent,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error("Error creating wholesale order:", error);
     return NextResponse.json(

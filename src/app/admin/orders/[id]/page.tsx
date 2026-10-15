@@ -43,17 +43,19 @@ export default function OrderInvoicePage() {
       if (!res.ok) throw new Error(data.error || "Failed to process WhatsApp");
 
       if (data.automated) {
-        toast("✅ WhatsApp message dispatched to customer automatically!", "success");
-      } else {
+        toast(
+          type === "PAYMENT_REMINDER"
+            ? "✅ Payment reminder sent directly to customer's WhatsApp!"
+            : "✅ Tax Invoice & order updates sent directly to customer's WhatsApp!",
+          "success"
+        );
+      } else if (data.whatsappUrl) {
         toast(
           type === "PAYMENT_REMINDER"
             ? "Opening WhatsApp with Payment Reminder..."
             : "Opening WhatsApp with Order Details...",
           "success"
         );
-      }
-
-      if (data.whatsappUrl) {
         window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
       }
     } catch (err: any) {

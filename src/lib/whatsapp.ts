@@ -51,6 +51,12 @@ export function generateOrderWhatsAppMessage(
   const creditTermText =
     creditDays > 0 ? `Payment within ${creditDays} Days` : "Advance Payment (0 Days Credit)";
 
+  let resolvedTransport = order.transportName || "";
+  if (!resolvedTransport && (order as any).notes) {
+    const match = (order as any).notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
+    if (match && match[1]) resolvedTransport = match[1].trim();
+  }
+
   return (
     `🧵 *KRISH CLOTHING CO.* — Tax Invoice & Order Confirmation\n\n` +
     `Dear *${order.customerName}*,\n` +
@@ -62,7 +68,7 @@ export function generateOrderWhatsAppMessage(
     `• *Taxable Amount:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
     `• *GST (5%):* ₹${order.gstAmount.toLocaleString("en-IN")}\n` +
     `• *Grand Total:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
-    `• *Transport:* ${order.transportName || "Direct Parcel / Transport"}\n` +
+    `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
     `• *Credit Terms:* ${creditTermText}\n\n` +
     `🏦 *Bank Account Details for RTGS / NEFT:*\n` +
     `• *Bank:* ICICI BANK\n` +

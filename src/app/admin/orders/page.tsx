@@ -289,10 +289,14 @@ export default function OrdersPage() {
                               body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
                             });
                             const data = await res.json();
-                            if (data.whatsappUrl) {
+                            if (data.automated) {
+                              toast("✅ Invoice & details sent directly to customer WhatsApp!", "success");
+                            } else if (data.whatsappUrl) {
                               window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
                             }
-                          } catch {}
+                          } catch {
+                            toast("Could not send WhatsApp message", "error");
+                          }
                         }}
                         className="p-1.5 inline-flex text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                         title="Send Order Updates & Invoice on WhatsApp"

@@ -65,12 +65,14 @@ interface ConfirmedOrder {
   id: number;
   orderNumber: string;
   customerName: string;
+  customerPhone?: string;
   customerGstPan: string;
   grandTotal: number;
   totalPcs: number;
   totalSets: number;
   orderDate: string;
   transportName?: string;
+  whatsAppSent?: boolean;
 }
 
 export default function OrderFormPage() {
@@ -432,16 +434,22 @@ export default function OrderFormPage() {
         id: result.id,
         orderNumber: result.orderNumber,
         customerName: selectedCustomer!.shopName,
+        customerPhone: selectedCustomer!.phoneNumber,
         customerGstPan: selectedCustomer!.gstPanNo,
         grandTotal: result.grandTotal || grandTotal,
         totalPcs: result.totalPcs || totalPcs,
         totalSets: result.totalSets || totalSets,
         orderDate: new Date().toISOString(),
         transportName: transportName.trim() || undefined,
+        whatsAppSent: result.whatsAppSent,
       });
 
       setIsTransportModalOpen(false);
-      toast(`Order #${result.orderNumber} placed successfully!`);
+      if (result.whatsAppSent) {
+        toast(`✅ Order #${result.orderNumber} placed & WhatsApp sent to customer!`, "success");
+      } else {
+        toast(`Order #${result.orderNumber} placed successfully!`);
+      }
     } catch (err: any) {
       console.error("Order submission failed:", err);
       toast(err.message || "Failed to place order", "error");
@@ -508,6 +516,17 @@ export default function OrderFormPage() {
               </div>
             </div>
 
+            {/* WhatsApp Direct Dispatch Status Notice */}
+            {confirmedOrder.whatsAppSent ? (
+              <div className="w-full p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center justify-center gap-2 text-center">
+                <span>✅ Tax Invoice & Order confirmation sent directly to customer ({confirmedOrder.customerPhone || "phone"}) via WhatsApp!</span>
+              </div>
+            ) : (
+              <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium flex items-center justify-center gap-2 text-center">
+                <span>ℹ️ Automated WhatsApp message ready to send.</span>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 pt-2">
               <button
@@ -520,18 +539,23 @@ export default function OrderFormPage() {
                       body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
                     });
                     const data = await res.json();
-                    if (data.whatsappUrl) {
-                      window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                    if (!res.ok) {
+                      throw new Error(data.error || "Failed to dispatch WhatsApp");
                     }
-                    toast("Opening WhatsApp with order details & invoice link!", "success");
-                  } catch {
-                    toast("Could not open WhatsApp", "error");
+                    if (data.automated) {
+                      toast("✅ Sent directly to customer's WhatsApp via Meta Cloud API!", "success");
+                    } else if (data.whatsappUrl) {
+                      window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                      toast("Opening WhatsApp with order details & invoice link!", "success");
+                    }
+                  } catch (err: any) {
+                    toast(err.message || "Could not send WhatsApp message", "error");
                   }
                 }}
                 className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <MessageCircle size={16} />
-                <span>Send on WhatsApp</span>
+                <span>{confirmedOrder.whatsAppSent ? "Resend on WhatsApp" : "Send on WhatsApp"}</span>
               </button>
 
               <button

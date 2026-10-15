@@ -22,12 +22,14 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
+import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ORDER_STATUSES, STATUS_COLORS, type OrderStatus } from "@/lib/types";
 import type { OrderData } from "@/lib/types";
 
 export default function EmployeeOrdersListPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -331,10 +333,14 @@ export default function EmployeeOrdersListPage() {
                                     body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
                                   });
                                   const data = await res.json();
-                                  if (data.whatsappUrl) {
+                                  if (data.automated) {
+                                    toast("✅ Order confirmation & invoice sent directly to customer's WhatsApp!", "success");
+                                  } else if (data.whatsappUrl) {
                                     window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
                                   }
-                                } catch {}
+                                } catch {
+                                  toast("Could not send WhatsApp message", "error");
+                                }
                               }}
                               className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition"
                               title="Send invoice & updates on WhatsApp"
