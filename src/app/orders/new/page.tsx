@@ -1022,14 +1022,19 @@ export default function OrderFormPage() {
                               item.colorSets.map((cs) => (
                                 <span
                                   key={cs.color}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] text-slate-800"
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] text-slate-800"
                                 >
                                   <span
-                                    className="w-2 h-2 rounded-full inline-block"
+                                    className="w-2 h-2 rounded-full inline-block shrink-0"
                                     style={{ backgroundColor: getColorHex(cs.color).hex }}
                                   />
                                   <span>{cs.color}:</span>
                                   <strong className="text-orange-600 font-bold">{cs.sets}s</strong>
+                                  {cs.ratioSets && cs.ratioSets.length > 0 && (
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      ({cs.ratioSets.map((r: any) => `${r.ratio}: ${r.sets}s`).join(", ")})
+                                    </span>
+                                  )}
                                 </span>
                               ))
                             ) : (

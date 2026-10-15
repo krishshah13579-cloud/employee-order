@@ -132,7 +132,11 @@ export async function GET() {
       })),
     };
 
-    return NextResponse.json(stats);
+    return NextResponse.json(stats, {
+      headers: {
+        "Cache-Control": "public, max-age=4, s-maxage=8, stale-while-revalidate=20",
+      },
+    });
   } catch (error: any) {
     console.error("Error fetching stats:", error);
     return NextResponse.json(

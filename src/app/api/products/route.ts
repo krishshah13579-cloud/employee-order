@@ -29,16 +29,34 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    const fullImages = searchParams.get("full_images") === "1";
+
     const products = await prisma.product.findMany({
       where,
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
-    return NextResponse.json(products, {
+    const optimizedProducts = fullImages
+      ? products
+      : products.map((p) => {
+          let cover = p.imageUrl;
+          if (cover && cover.startsWith("[") && cover.endsWith("]")) {
+            try {
+              const arr = JSON.parse(cover);
+              if (Array.isArray(arr) && arr.length > 0) {
+                cover = arr[0];
+              }
+            } catch {}
+          }
+          return {
+            ...p,
+            imageUrl: cover,
+          };
+        });
+
+    return NextResponse.json(optimizedProducts, {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
+        "Cache-Control": "public, max-age=4, s-maxage=8, stale-while-revalidate=20",
       },
     });
   } catch (error: any) {

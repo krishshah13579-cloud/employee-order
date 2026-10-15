@@ -1063,8 +1063,13 @@ export default function ProductForm({
               {/* 2. Retailer Type Selling Price: MRP / 2 */}
               <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/80">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900">
-                    Retailer Selling Price (₹)
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5 flex-wrap">
+                    <span>Retailer Selling Price:</span>
+                    {formData.mrp ? (
+                      <span className="line-through text-gray-400 font-normal text-[11px]">
+                        MRP ₹{formData.mrp}
+                      </span>
+                    ) : null}
                   </label>
                   <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
                     MRP / 2
@@ -1095,8 +1100,13 @@ export default function ProductForm({
               {/* 3. Wholesaler Type Selling Price: MRP / 2 - 100 */}
               <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/80">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900">
-                    Wholesaler Selling Price (₹)
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5 flex-wrap">
+                    <span>Wholesaler Selling Price:</span>
+                    {formData.mrp ? (
+                      <span className="line-through text-gray-400 font-normal text-[11px]">
+                        MRP ₹{formData.mrp}
+                      </span>
+                    ) : null}
                   </label>
                   <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 px-1.5 py-0.5 rounded">
                     (MRP/2) - 100
