@@ -83,19 +83,6 @@ export default function OrderFormPage() {
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState<boolean>(false);
 
-  // New Customer Modal
-  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState<boolean>(false);
-  const [newShopName, setNewShopName] = useState<string>("");
-  const [newGstPanNo, setNewGstPanNo] = useState<string>("");
-  const [newPhoneNumber, setNewPhoneNumber] = useState<string>("");
-  const [newContactPerson, setNewContactPerson] = useState<string>("");
-  const [newAddress, setNewAddress] = useState<string>("");
-  const [newCity, setNewCity] = useState<string>("");
-  const [newState, setNewState] = useState<string>("");
-  const [newVisitingCardUrl, setNewVisitingCardUrl] = useState<string>("");
-  const [uploadingCard, setUploadingCard] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [savingCustomer, setSavingCustomer] = useState<boolean>(false);
 
   // Order Items in Draft
   const [items, setItems] = useState<DraftOrderItem[]>([]);
@@ -144,7 +131,28 @@ export default function OrderFormPage() {
   };
 
   useEffect(() => {
-    fetchCustomers();
+    fetchCustomers().then(() => {
+      try {
+        const storedId = localStorage.getItem("garmentpro_selected_customer_id");
+        if (storedId) {
+          const parsedId = parseInt(storedId, 10);
+          if (!isNaN(parsedId)) {
+            setSelectedCustomerId(parsedId);
+          }
+          localStorage.removeItem("garmentpro_selected_customer_id");
+          return;
+        }
+        if (typeof window !== "undefined") {
+          const urlParam = new URLSearchParams(window.location.search).get("customerId");
+          if (urlParam) {
+            const parsedId = parseInt(urlParam, 10);
+            if (!isNaN(parsedId)) {
+              setSelectedCustomerId(parsedId);
+            }
+          }
+        }
+      } catch {}
+    });
   }, []);
 
   // Load active draft from localStorage
@@ -255,99 +263,6 @@ export default function OrderFormPage() {
     }
   };
 
-  // Handle Visiting Card Photo Upload
-  const handleVisitingCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setUploadingCard(true);
-      const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
-      setNewVisitingCardUrl(dataUrl);
-      toast("Visiting card photo attached successfully!");
-    } catch (err: any) {
-      console.error("Visiting card upload error:", err);
-      toast(err.message || "Failed to process photo", "error");
-    } finally {
-      setUploadingCard(false);
-      if (e.target) e.target.value = "";
-    }
-  };
-
-  // Create New Customer inline
-  const handleCreateNewCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newShopName.trim()) {
-      toast("Mandatory: Please enter Firm Name", "error");
-      return;
-    }
-    if (!newGstPanNo.trim()) {
-      toast("Mandatory: Please enter GST No. / PAN No.", "error");
-      return;
-    }
-    if (!newPhoneNumber.trim()) {
-      toast("Mandatory: Please enter Phone Number", "error");
-      return;
-    }
-    if (!newAddress.trim()) {
-      toast("Mandatory: Please enter Shop Address", "error");
-      return;
-    }
-    if (!newCity.trim()) {
-      toast("Mandatory: Please enter City", "error");
-      return;
-    }
-    if (!newState.trim()) {
-      toast("Mandatory: Please enter State", "error");
-      return;
-    }
-
-    try {
-      setSavingCustomer(true);
-      const res = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firmName: newShopName.trim(),
-          shopName: newShopName.trim(),
-          gstPanNo: newGstPanNo.trim().toUpperCase(),
-          phoneNumber: newPhoneNumber.trim(),
-          contactPerson: newContactPerson.trim() || undefined,
-          address: newAddress.trim(),
-          city: newCity.trim(),
-          state: newState.trim(),
-          visitingCardUrl: newVisitingCardUrl.trim() || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to create customer");
-      }
-
-      const created: CustomerData = await res.json();
-      setCustomers((prev) => [created, ...prev]);
-      setSelectedCustomerId(created.id);
-      setIsNewCustomerModalOpen(false);
-
-      // Reset fields
-      setNewShopName("");
-      setNewGstPanNo("");
-      setNewPhoneNumber("");
-      setNewContactPerson("");
-      setNewAddress("");
-      setNewCity("");
-      setNewState("");
-      setNewVisitingCardUrl("");
-
-      saveDraft(items, created.id, orderNotes, placedBy);
-      toast(`Customer "${created.shopName}" added and selected!`);
-    } catch (err: any) {
-      toast(err.message || "Failed to create customer", "error");
-    } finally {
-      setSavingCustomer(false);
-    }
-  };
 
   // Mathematical Calculations
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
@@ -612,7 +527,12 @@ export default function OrderFormPage() {
 
             <button
               type="button"
-              onClick={() => setIsNewCustomerModalOpen(true)}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  saveDraft(items, selectedCustomerId, orderNotes, placedBy);
+                }
+                router.push("/customers/new?returnTo=/orders/new");
+              }}
               className="self-start sm:self-auto text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-xl border border-orange-200 transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:border-orange-300"
             >
               <Plus size={14} />
@@ -1106,233 +1026,6 @@ export default function OrderFormPage() {
           </div>
         </section>
       </main>
-
-      {/* ═══════════════════════════════════════════
-          NEW CUSTOMER MODAL
-          ═══════════════════════════════════════════ */}
-      <Modal
-        isOpen={isNewCustomerModalOpen}
-        onClose={() => setIsNewCustomerModalOpen(false)}
-        title="Add New Customer"
-        size="lg"
-        footer={
-          <div className="flex items-center justify-end gap-2.5 w-full">
-            <button
-              type="button"
-              onClick={() => setIsNewCustomerModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={savingCustomer || uploadingCard}
-              onClick={handleCreateNewCustomer}
-              className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              {savingCustomer ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving Customer...</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={14} />
-                  <span>Save Customer</span>
-                </>
-              )}
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleCreateNewCustomer} className="space-y-4 text-xs">
-          {/* Top Notice */}
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              All registered wholesale shop details and visiting card proofs are automatically verified and linked to order tax invoices.
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* 1. FIRM NAME */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                FIRM NAME <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Royal Fashion Retailers"
-                value={newShopName}
-                onChange={(e) => setNewShopName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-semibold"
-              />
-            </div>
-
-            {/* 2. GST NO. / PAN NO. */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                GST NO. / PAN NO. <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 24AAAAA0000A1Z5 or AAACI1357Q"
-                value={newGstPanNo}
-                onChange={(e) => setNewGstPanNo(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl uppercase font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-bold text-orange-600"
-              />
-            </div>
-
-            {/* 3. PHONE NUMBER */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                PHONE NUMBER <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="e.g. 98250 13579"
-                value={newPhoneNumber}
-                onChange={(e) => setNewPhoneNumber(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-semibold"
-              />
-            </div>
-
-            {/* 4. Contact PERSON NAME */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                Contact PERSON NAME
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Ramesh Bhai"
-                value={newContactPerson}
-                onChange={(e) => setNewContactPerson(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-semibold"
-              />
-            </div>
-          </div>
-
-          {/* 5. Shop Address */}
-          <div>
-            <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-              Shop Address <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={2}
-              required
-              placeholder="e.g. Shop 12, Ground Floor, Textile Tower, Ring Road Market"
-              value={newAddress}
-              onChange={(e) => setNewAddress(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-medium"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* 6. CITY */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                CITY <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Surat"
-                value={newCity}
-                onChange={(e) => setNewCity(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-semibold"
-              />
-            </div>
-
-            {/* 7. STATE */}
-            <div>
-              <label className="block font-bold text-slate-800 mb-1 uppercase tracking-wider text-[11px]">
-                STATE <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Gujarat"
-                value={newState}
-                onChange={(e) => setNewState(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white text-xs font-semibold"
-              />
-            </div>
-          </div>
-
-          {/* 8. VISITING CARD UPLOAD */}
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-            <label className="block font-bold text-slate-800 uppercase tracking-wider text-[11px]">
-              VISITING CARD UPLOAD
-            </label>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              {newVisitingCardUrl ? (
-                <div className="relative w-40 h-24 rounded-xl overflow-hidden border border-slate-300 bg-white shadow-xs shrink-0 group">
-                  <img
-                    src={newVisitingCardUrl}
-                    alt="Visiting Card Preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setNewVisitingCardUrl("")}
-                    className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition"
-                    title="Remove Photo"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ) : (
-                <div className="w-40 h-24 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 bg-white shrink-0">
-                  <ImageIcon size={24} />
-                  <span className="text-[10px] font-semibold mt-1">No Card Photo</span>
-                </div>
-              )}
-
-              <div className="flex-1 space-y-2 w-full">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                  onChange={handleVisitingCardUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingCard}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-bold border border-slate-300 shadow-xs transition cursor-pointer"
-                >
-                  {uploadingCard ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
-                  ) : (
-                    <Upload className="w-4 h-4 text-orange-600" />
-                  )}
-                  <span>
-                    {uploadingCard ? "Uploading..." : "Upload Visiting Card Photo"}
-                  </span>
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
-                    OR URL:
-                  </span>
-                  <input
-                    type="text"
-                    value={newVisitingCardUrl}
-                    onChange={(e) => setNewVisitingCardUrl(e.target.value)}
-                    placeholder="https://example.com/card.jpg"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      </Modal>
 
       {/* ═══════════════════════════════════════════
           TRANSPORT NAME POPUP MODAL
