@@ -88,7 +88,7 @@ function ProductDetailContent() {
         const data: ProductData = await res.json();
         setProduct(data);
 
-        // Pre-initialize color sets selection to 0 for all colors
+        // Pre-initialize color sets selection from existing draft or 0 for all colors
         const colors = getAllProductColors(
           data.colorsAvailable,
           data.setsColorwise,
@@ -99,6 +99,38 @@ function ProductDetailContent() {
         colors.forEach((col) => {
           initial[col] = 0;
         });
+
+        // Check if there is an existing draft item for this product
+        try {
+          const draftStr = localStorage.getItem("garmentpro_order_draft");
+          if (draftStr) {
+            const draft = JSON.parse(draftStr);
+            if (Array.isArray(draft.items)) {
+              const existingItem = draft.items.find(
+                (item: any) => String(item.productId) === String(data.id)
+              );
+              if (existingItem) {
+                if (Array.isArray(existingItem.colorSets)) {
+                  existingItem.colorSets.forEach((cs: any) => {
+                    if (cs && cs.color && typeof cs.sets === "number") {
+                      initial[cs.color] = cs.sets;
+                    }
+                  });
+                  const firstWithQty = existingItem.colorSets.find((cs: any) => cs.sets > 0);
+                  if (firstWithQty?.color) {
+                    setActiveColor(firstWithQty.color);
+                  }
+                }
+                if (existingItem.notes) {
+                  setItemNotes(existingItem.notes);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error reading draft:", e);
+        }
+
         setColorSetsSelection(initial);
       } catch (err: any) {
         console.error("Error loading product:", err);
@@ -221,6 +253,7 @@ function ProductDetailContent() {
 
   // Handle color set count change with strict stock cap
   const handleSetChange = (color: string, requestedSets: number) => {
+    setActiveColor(color);
     const maxStock = getAvailableSetsForColor(
       product?.setsColorwise,
       color,
@@ -335,6 +368,7 @@ function ProductDetailContent() {
       sizesList: product.sizesList,
       pcsPerSet: pcsPerSet,
       totalSets: totalSets,
+      totalPcs: totalSets * pcsPerSet,
       retailerPrice: retPrice,
       wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
@@ -455,73 +489,6 @@ function ProductDetailContent() {
               LEFT COLUMN: COLOR PHOTO & SETS ORDERING
               ═══════════════════════════════════════════ */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Color Selector Bar above Photo */}
-            {availableColors.length > 0 && (
-              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Select Color (Photo & Sets Below):
-                  </span>
-                  <span className="text-[10px] text-orange-600 font-bold">
-                    {availableColors.length} Color{availableColors.length > 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {availableColors.map((col, idx) => {
-                    const isSelected = activeColor.toLowerCase() === col.toLowerCase();
-                    const hex = getColorHex(col).hex;
-                    let letter = String.fromCharCode(65 + idx);
-                    if (product.colorMapping) {
-                      try {
-                        const map = JSON.parse(product.colorMapping);
-                        const found = Object.entries(map).find(
-                          ([_, c]) => String(c).toLowerCase() === col.toLowerCase()
-                        );
-                        if (found) letter = found[0];
-                      } catch {}
-                    }
-                    const currentSets = colorSetsSelection[col] || 0;
-
-                    return (
-                      <button
-                        key={col}
-                        type="button"
-                        onClick={() => {
-                          setActiveColor(col);
-                          const colImg = getProductColorImage(product, col);
-                          const fIdx = allImages.findIndex((i) => i === colImg);
-                          if (fIdx !== -1) setActiveImageIndex(fIdx);
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                          isSelected
-                            ? "bg-slate-950 text-white shadow-md ring-2 ring-orange-500"
-                            : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
-                        }`}
-                      >
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
-                          style={{ backgroundColor: hex }}
-                        />
-                        <span>{col}</span>
-                        <span
-                          className={`text-[9px] px-1 py-0.2 rounded font-black ${
-                            isSelected ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-700"
-                          }`}
-                        >
-                          {letter}
-                        </span>
-                        {currentSets > 0 && (
-                          <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                            {currentSets}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Main Product Photo for Active Color */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-3">
               <div className="relative w-full aspect-square bg-slate-100 rounded-xl overflow-hidden">
@@ -555,72 +522,6 @@ function ProductDetailContent() {
                   {totalProductStock > 0 ? "In Stock" : "Out of Stock"}
                 </span>
               </div>
-
-              {/* SETS ORDERED RIGHT BELOW THE PHOTO */}
-              {activeColor && (
-                <div className="mt-3 p-3.5 bg-orange-50/90 rounded-xl border-2 border-orange-300 shadow-xs space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
-                        style={{ backgroundColor: getColorHex(activeColor).hex }}
-                      />
-                      <span className="font-black text-slate-900 text-sm">
-                        Order Sets: {activeColor}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full">
-                      {getAvailableSetsForColor(product.setsColorwise, activeColor, product.colorMapping)} Sets in Stock
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <div>
-                      <div className="text-base font-black font-mono text-slate-900">
-                        {(colorSetsSelection[activeColor] || 0) * pcsPerSet} PCS
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-semibold">
-                        ({colorSetsSelection[activeColor] || 0} Sets × {pcsPerSet} pcs/set)
-                      </div>
-                    </div>
-
-                    <div className="flex items-center border-2 border-orange-400 rounded-xl overflow-hidden bg-white shadow-xs">
-                      <button
-                        type="button"
-                        disabled={(colorSetsSelection[activeColor] || 0) <= 0}
-                        onClick={() => handleSetChange(activeColor, (colorSetsSelection[activeColor] || 0) - 1)}
-                        className="w-10 h-10 flex items-center justify-center text-slate-800 hover:bg-orange-100 disabled:opacity-30 transition font-bold cursor-pointer"
-                        aria-label="Decrease sets"
-                      >
-                        <Minus size={16} />
-                      </button>
-
-                      <input
-                        type="number"
-                        min={0}
-                        max={getAvailableSetsForColor(product.setsColorwise, activeColor, product.colorMapping)}
-                        value={colorSetsSelection[activeColor] === 0 ? "" : (colorSetsSelection[activeColor] || "")}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
-                          handleSetChange(activeColor, isNaN(val) ? 0 : val);
-                        }}
-                        className="w-16 h-10 text-center font-black text-slate-900 text-base focus:outline-none bg-white font-mono"
-                      />
-
-                      <button
-                        type="button"
-                        disabled={(colorSetsSelection[activeColor] || 0) >= getAvailableSetsForColor(product.setsColorwise, activeColor, product.colorMapping)}
-                        onClick={() => handleSetChange(activeColor, (colorSetsSelection[activeColor] || 0) + 1)}
-                        className="w-10 h-10 flex items-center justify-center text-slate-800 hover:bg-orange-100 disabled:opacity-30 transition font-bold cursor-pointer"
-                        aria-label="Increase sets"
-                      >
-                        <Plus size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Thumbnails row */}
               {allImages.length > 1 && (
@@ -812,6 +713,73 @@ function ProductDetailContent() {
                 </div>
               </div>
 
+              {/* Transferred Color Selector Bar */}
+              {availableColors.length > 0 && (
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Select Color (Click to preview photo):
+                    </span>
+                    <span className="text-[10px] text-orange-600 font-bold">
+                      {availableColors.length} Color{availableColors.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {availableColors.map((col, idx) => {
+                      const isSelected = activeColor.toLowerCase() === col.toLowerCase();
+                      const hex = getColorHex(col).hex;
+                      let letter = String.fromCharCode(65 + idx);
+                      if (product.colorMapping) {
+                        try {
+                          const map = JSON.parse(product.colorMapping);
+                          const found = Object.entries(map).find(
+                            ([_, c]) => String(c).toLowerCase() === col.toLowerCase()
+                          );
+                          if (found) letter = found[0];
+                        } catch {}
+                      }
+                      const currentSets = colorSetsSelection[col] || 0;
+
+                      return (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => {
+                            setActiveColor(col);
+                            const colImg = getProductColorImage(product, col);
+                            const fIdx = allImages.findIndex((i) => i === colImg);
+                            if (fIdx !== -1) setActiveImageIndex(fIdx);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                            isSelected
+                              ? "bg-slate-950 text-white shadow-md ring-2 ring-orange-500"
+                              : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                          }`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
+                            style={{ backgroundColor: hex }}
+                          />
+                          <span>{col}</span>
+                          <span
+                            className={`text-[9px] px-1 py-0.2 rounded font-black ${
+                              isSelected ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {letter}
+                          </span>
+                          {currentSets > 0 && (
+                            <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                              {currentSets}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ═══════════════════════════════════════════
                   COLORS SELECTION TABLE / MATRIX
                   ═══════════════════════════════════════════ */}
@@ -827,11 +795,20 @@ function ProductDetailContent() {
                     const currentSets = colorSetsSelection[color] || 0;
                     const calculatedColorPcs = currentSets * pcsPerSet;
                     const isOutOfStock = stock <= 0;
+                    const isPhotoActive = activeColor.toLowerCase() === color.toLowerCase();
 
                     return (
                       <div
                         key={color}
-                        className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
+                        onClick={() => {
+                          setActiveColor(color);
+                          const colImg = getProductColorImage(product, color);
+                          const fIdx = allImages.findIndex((i) => i === colImg);
+                          if (fIdx !== -1) setActiveImageIndex(fIdx);
+                        }}
+                        className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+                          isPhotoActive ? "ring-2 ring-orange-500" : ""
+                        } ${
                           currentSets > 0
                             ? "bg-orange-50/70 border-orange-300 shadow-xs"
                             : isOutOfStock

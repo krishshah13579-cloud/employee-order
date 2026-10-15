@@ -371,6 +371,11 @@ export default function OrderFormPage() {
   const handleFinalSubmitOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    if (!transportName.trim()) {
+      toast("Mandatory: Transport Name / Courier Service is required to dispatch the order", "error");
+      return;
+    }
+
     const finalPlacedBy = (employee?.name || placedBy).trim();
     if (!finalPlacedBy) {
       toast("Mandatory: Please log in as an employee to place orders", "error");
@@ -603,7 +608,7 @@ export default function OrderFormPage() {
               className="self-start sm:self-auto text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-xl border border-orange-200 transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:border-orange-300"
             >
               <Plus size={14} />
-              <span>+ Add New Customer</span>
+              <span>Add New Customer</span>
             </button>
           </div>
 
@@ -826,69 +831,50 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
                       Order Credit Terms
                     </span>
-                    {(orderCreditDays === 45 || isCreditLocked) ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold shadow-2xs">
-                        <Lock size={13} className="text-amber-700" />
-                        <span>🔒 45 Days Credit Approved — Locked</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold font-mono">
-                        <Clock size={12} className="text-slate-500" />
-                        <span>{orderCreditDays > 0 ? `${orderCreditDays} Days Credit` : "Advance (0 Days)"}</span>
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold font-mono">
+                      <Clock size={12} className="text-slate-500" />
+                      <span>{orderCreditDays > 0 ? `${orderCreditDays} Days` : "Advance (0 Days)"}</span>
+                    </span>
                   </div>
                 </div>
 
-                {/* Credit Days Option Selector */}
+                {/* Credit Days Keyboard Input (No Preset Option Buttons) */}
                 <div className="bg-white p-3.5 rounded-xl border border-orange-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                       <Clock size={14} className="text-orange-600" />
-                      <span>Select Order Credit Days:</span>
+                      <span>Credit Days (Enter using keyboard):</span>
                     </label>
                     {(orderCreditDays === 45 || isCreditLocked) && (
                       <span className="text-[10px] font-bold text-red-600 flex items-center gap-1">
-                        <Lock size={11} /> Cannot be changed from employee side
+                        <Lock size={11} /> Locked: Cannot be changed from employee side
                       </span>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[0, 15, 30, 45].map((d) => {
-                      const isSelected = orderCreditDays === d;
-                      const isDisabled = isCreditLocked || orderCreditDays === 45;
-
-                      return (
-                        <button
-                          key={d}
-                          type="button"
-                          disabled={isDisabled && !isSelected}
-                          onClick={() => handleCreditDaysChange(d)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                            isSelected
-                              ? d === 45
-                                ? "bg-purple-900 text-white shadow-xs ring-2 ring-purple-600"
-                                : "bg-orange-600 text-white shadow-xs ring-2 ring-orange-500"
-                              : isDisabled
-                              ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50"
-                              : "bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-100"
-                          }`}
-                        >
-                          {d === 45 && <Lock size={12} />}
-                          <span>{d === 0 ? "Advance (0d)" : `${d} Days Credit`}</span>
-                          {isSelected && <span>✓</span>}
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-48">
+                      <input
+                        type="number"
+                        min={0}
+                        max={180}
+                        disabled={isCreditLocked || orderCreditDays === 45}
+                        value={orderCreditDays === 0 ? "" : orderCreditDays}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                          handleCreditDaysChange(isNaN(val) ? 0 : val);
+                        }}
+                        className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
+                        Days
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600">
+                      {orderCreditDays > 0 ? `${orderCreditDays} Days` : "Advance (0 Days)"}
+                    </span>
                   </div>
-
-                  {(orderCreditDays === 45 || isCreditLocked) && (
-                    <p className="text-[11px] font-semibold text-purple-900 bg-purple-50 p-2 rounded-lg border border-purple-200 flex items-center gap-1.5 mt-1.5">
-                      <Lock size={12} className="text-purple-700 shrink-0" />
-                      <span>45 Days Credit is active and locked for this customer. No update is allowed from employee side.</span>
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
@@ -920,7 +906,7 @@ export default function OrderFormPage() {
                 className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
                 <Plus size={16} />
-                <span>+ Add Product to Form</span>
+                <span>Add Product to Form</span>
               </Link>
             ) : (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold self-start sm:self-auto">
@@ -935,8 +921,6 @@ export default function OrderFormPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-4">Customer Name</th>
-                  <th className="py-3.5 px-4">GST NO. / PAN NO.</th>
                   <th className="py-3.5 px-4">Product Name</th>
                   <th className="py-3.5 px-4">Colors & Sets</th>
                   <th className="py-3.5 px-4 text-center">PCS</th>
@@ -949,7 +933,7 @@ export default function OrderFormPage() {
               <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={6} className="py-12 text-center text-slate-500">
                       <div className="max-w-sm mx-auto flex flex-col items-center">
                         <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
                           <ShoppingBag size={28} />
@@ -959,7 +943,7 @@ export default function OrderFormPage() {
                         </p>
                         <p className="text-xs text-slate-500 mt-1 max-w-xs">
                           {selectedCustomer
-                            ? "Click + Add Product to Form to browse products, pick multiple colors and sets at once."
+                            ? "Click Add Product to Form to browse products, pick multiple colors and sets at once."
                             : "Please select a customer above first to start adding products."}
                         </p>
                         {selectedCustomer && (
@@ -968,7 +952,7 @@ export default function OrderFormPage() {
                             className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5"
                           >
                             <Plus size={14} />
-                            <span>+ Add Product Now</span>
+                            <span>Add Product Now</span>
                           </Link>
                         )}
                       </div>
@@ -976,22 +960,11 @@ export default function OrderFormPage() {
                   </tr>
                 ) : (
                   items.map((item, index) => {
-                    const customerShop = selectedCustomer?.shopName || "Not Selected";
-                    const customerGst = selectedCustomer?.gstPanNo || "—";
+                    const itemTotalPcs = item.totalPcs || ((item.totalSets || 0) * (item.pcsPerSet || 5));
 
                     return (
                       <tr key={index} className="hover:bg-slate-50/80 transition-colors">
-                        {/* 1. Customer Name */}
-                        <td className="py-4 px-4 font-bold text-slate-900 max-w-[150px] truncate">
-                          {customerShop}
-                        </td>
-
-                        {/* 2. GST NO. / PAN NO. */}
-                        <td className="py-4 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
-                          {customerGst}
-                        </td>
-
-                        {/* 3. Product Name */}
+                        {/* 1. Product Name */}
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2.5">
                             {item.imageUrl && (
@@ -1015,7 +988,7 @@ export default function OrderFormPage() {
                           </div>
                         </td>
 
-                        {/* 4. Colors */}
+                        {/* 2. Colors */}
                         <td className="py-4 px-4">
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {item.colorSets && item.colorSets.length > 0 ? (
@@ -1041,10 +1014,10 @@ export default function OrderFormPage() {
                           </span>
                         </td>
 
-                        {/* 5. PCS */}
+                        {/* 3. PCS */}
                         <td className="py-4 px-4 text-center">
                           <span className="font-black text-slate-900 text-sm">
-                            {item.totalPcs}
+                            {itemTotalPcs}
                           </span>
                           <span className="text-[10px] text-slate-500 block">Pcs</span>
                         </td>
@@ -1212,9 +1185,9 @@ export default function OrderFormPage() {
             </button>
             <button
               type="button"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !transportName.trim()}
               onClick={handleFinalSubmitOrder}
-              className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSubmitting ? (
                 <>

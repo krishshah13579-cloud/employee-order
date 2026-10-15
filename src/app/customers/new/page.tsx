@@ -80,6 +80,7 @@ function CustomerRegistrationContent() {
   const [transportName, setTransportName] = useState("");
   const [visitingCardUrl, setVisitingCardUrl] = useState("");
   const [businessType, setBusinessType] = useState<"RETAILER" | "WHOLESALER">("RETAILER");
+  const [creditDays, setCreditDays] = useState<number | "">(0);
 
   // Tracking which fields were auto-filled by OCR
   const [autoFilledFields, setAutoFilledFields] = useState<Record<string, boolean>>({});
@@ -271,6 +272,7 @@ function CustomerRegistrationContent() {
         shopName: shopName.trim(),
         gstPanNo: gstPanNo.trim().toUpperCase(),
         businessType: businessType,
+        creditDays: Number(creditDays) || 0,
         phoneNumber: phoneNumber.trim(),
         contactPerson: contactPerson.trim() || undefined,
         contactPersons: allContacts.length > 0 ? allContacts : undefined,
@@ -617,6 +619,40 @@ function CustomerRegistrationContent() {
                   </div>
                 </div>
 
+                {/* Field: Credit Days Limit */}
+                <div className="space-y-1.5 p-3.5 bg-slate-50/80 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <span>Credit Days Limit</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-semibold">
+                      (0 = Advance, 15, 30, 45 Days)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-44">
+                      <input
+                        type="number"
+                        min={0}
+                        max={180}
+                        value={creditDays === "" ? "" : creditDays}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? "" : parseInt(e.target.value, 10);
+                          setCreditDays(isNaN(val as number) ? "" : val);
+                        }}
+                        placeholder="0"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
+                        Days Limit
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">
+                      {creditDays ? `${creditDays} Days Credit Limit` : "Advance Payment (0 Days Credit)"}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Field 1: Firm Name */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -707,7 +743,7 @@ function CustomerRegistrationContent() {
                       className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-orange-50 text-orange-600 border border-slate-300 hover:border-orange-400 rounded-lg text-[11px] font-bold transition shadow-2xs cursor-pointer"
                     >
                       <Plus size={13} />
-                      <span>+ Add Another Contact Person</span>
+                      <span>Add Another Contact Person</span>
                     </button>
                   </div>
 
