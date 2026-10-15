@@ -4,47 +4,42 @@ import prisma from "@/lib/prisma";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const username = (body.username || "krishshah13579@gmail.com").trim().toLowerCase();
+    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is permitted
+    const username = "krishshah13579@gmail.com";
     const password = (body.password || "Krish@2000").trim();
-    const twoFactorSecret = (body.twoFactorSecret || "135790").trim();
     const fullName = (body.fullName || "Krish Shah").trim();
     const companyName = (body.companyName || "IQ TROUSERS").trim();
 
-    if (!username || !password) {
+    if (!password) {
       return NextResponse.json(
-        { error: "Username and password are required for reset." },
+        { error: "Password is required for reset." },
         { status: 400 }
       );
     }
 
-    // Upsert or update existing admin account
-    const existingAdmins = await prisma.adminAccount.findMany();
+    // Purge any unauthorized admin accounts
+    try {
+      await prisma.adminAccount.deleteMany({
+        where: { username: { not: "krishshah13579@gmail.com" } },
+      });
+    } catch {}
 
-    let adminRecord;
-    if (existingAdmins.length > 0) {
-      // Update the first admin account
-      adminRecord = await prisma.adminAccount.update({
-        where: { id: existingAdmins[0].id },
-        data: {
-          username,
-          password,
-          twoFactorSecret,
-          twoFactorEnabled: true,
-          lastOtp: null,
-          otpExpiresAt: null,
-        },
-      });
-    } else {
-      // Create fresh admin account
-      adminRecord = await prisma.adminAccount.create({
-        data: {
-          username,
-          password,
-          twoFactorSecret,
-          twoFactorEnabled: true,
-        },
-      });
-    }
+    // Upsert or update master admin account
+    const adminRecord = await prisma.adminAccount.upsert({
+      where: { username },
+      update: {
+        password,
+        twoFactorEnabled: true,
+        lastOtp: null,
+        otpExpiresAt: null,
+      },
+      create: {
+        username,
+        password,
+        twoFactorSecret: "135790",
+        twoFactorEnabled: true,
+      },
+    });
 
     // Also ensure AdminProfile exists or updated
     const existingProfile = await prisma.adminProfile.findFirst();
@@ -69,11 +64,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Admin credentials successfully reset and active in database!",
+      message: "Admin credentials successfully reset for krishshah13579@gmail.com!",
       credentials: {
         username: adminRecord.username,
         password: adminRecord.password,
-        twoFactorPin: adminRecord.twoFactorSecret,
       },
     });
   } catch (error: any) {

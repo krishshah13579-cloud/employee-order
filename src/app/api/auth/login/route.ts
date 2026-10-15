@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,11 +16,38 @@ export async function POST(req: NextRequest) {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Check if database currently has zero admin accounts
-    const adminCount = await prisma.adminAccount.count();
-    if (adminCount === 0) {
-      // Auto-initialize default Master Admin account
-      await prisma.adminAccount.create({
+    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is authorized.
+    // Reject any other email like krishclothingco3@gmail.com immediately.
+    if (cleanUser !== "krishshah13579@gmail.com") {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: Only krishshah13579@gmail.com is authorized to access the Admin Panel.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Automatically purge any unauthorized admin accounts that may have been created
+    try {
+      await prisma.adminAccount.deleteMany({
+        where: {
+          username: {
+            not: "krishshah13579@gmail.com",
+          },
+        },
+      });
+    } catch (e) {
+      // Continue even if purge encounters a minor issue
+    }
+
+    // Check if master admin exists in database, or initialize it
+    let admin = await prisma.adminAccount.findUnique({
+      where: { username: cleanUser },
+    });
+
+    if (!admin) {
+      admin = await prisma.adminAccount.create({
         data: {
           username: "krishshah13579@gmail.com",
           password: "Krish@2000",
@@ -40,53 +68,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Try finding the admin by exact username
-    let admin = await prisma.adminAccount.findUnique({
-      where: { username: cleanUser },
-    });
-
-    // If master credentials are entered (krishshah13579@gmail.com + Krish@2000),
-    // ensure it is accepted and synchronized
-    if (cleanUser === "krishshah13579@gmail.com" && cleanPass === "Krish@2000") {
-      if (!admin) {
-        // Upsert master admin
-        admin = await prisma.adminAccount.upsert({
-          where: { username: cleanUser },
-          update: {
-            password: cleanPass,
-            twoFactorSecret: "135790",
-            twoFactorEnabled: true,
-          },
-          create: {
-            username: cleanUser,
-            password: cleanPass,
-            twoFactorSecret: "135790",
-            twoFactorEnabled: true,
-          },
-        });
-      }
-    }
-
-    // If still not found by username, check if there's only 1 admin account in DB
-    if (!admin) {
-      const allAdmins = await prisma.adminAccount.findMany();
-      if (allAdmins.length === 1 && (allAdmins[0].password === cleanPass || allAdmins[0].password.trim() === cleanPass)) {
-        admin = allAdmins[0];
-      }
-    }
-
-    if (!admin || admin.password.trim() !== cleanPass) {
+    // Verify password
+    if (admin.password.trim() !== cleanPass) {
       return NextResponse.json(
-        { error: "Invalid username or password" },
+        { error: "Invalid password. Please check your credentials." },
         { status: 401 }
       );
     }
 
-    // Generate fresh 6-digit 2FA code and store in Database
-    // Also accepts the configured twoFactorSecret (e.g. 135790)
+    // Generate fresh 6-digit OTP code (Valid for 10 minutes)
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
+    // Save OTP to database
     await prisma.adminAccount.update({
       where: { id: admin.id },
       data: {
@@ -95,10 +89,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Send real OTP email to krishshah13579@gmail.com via Gmail SMTP
+    await sendOtpEmail("krishshah13579@gmail.com", generatedOtp, "Krish Shah");
+
     return NextResponse.json({
       requires2FA: true,
       username: admin.username,
-      message: "Credentials verified. Please enter your 6-digit 2FA Security Code.",
+      email: "krishshah13579@gmail.com",
+      message:
+        "Credentials verified! A 6-digit 2FA login code has been sent to your email (krishshah13579@gmail.com).",
     });
   } catch (error: any) {
     console.error("Login error:", error);

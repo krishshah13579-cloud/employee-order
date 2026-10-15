@@ -7,38 +7,57 @@ export async function POST(req: NextRequest) {
 
     if (!username || !code) {
       return NextResponse.json(
-        { error: "Username and 2FA code are required" },
+        { error: "Username and 2FA code are required." },
         { status: 400 }
       );
     }
 
+    const cleanUser = username.trim().toLowerCase();
     const cleanCode = code.toString().trim();
 
+    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is authorized
+    if (cleanUser !== "krishshah13579@gmail.com") {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: Only krishshah13579@gmail.com is authorized to access the Admin Panel.",
+        },
+        { status: 403 }
+      );
+    }
+
     const admin = await prisma.adminAccount.findUnique({
-      where: { username: username.trim().toLowerCase() },
+      where: { username: cleanUser },
     });
 
     if (!admin) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
-    // Check code against Database:
-    // 1. Matches configured twoFactorSecret in DB (e.g. 135790)
-    // 2. OR matches lastOtp stored in DB within validity
-    // 3. OR matches master PIN 135790
-    const isSecretMatch = admin.twoFactorSecret && admin.twoFactorSecret === cleanCode;
-    const isMasterPin = cleanCode === "135790";
+    // STRICT VALIDATION: Code must match the fresh 6-digit OTP sent to email
     const isOtpMatch =
       admin.lastOtp &&
       admin.lastOtp === cleanCode &&
       (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
 
-    if (!isSecretMatch && !isOtpMatch && !isMasterPin) {
+    if (!isOtpMatch) {
       return NextResponse.json(
-        { error: "Invalid or expired 2FA code. Please check and try again." },
+        {
+          error:
+            "Invalid or expired 2FA code. Please enter the 6-digit code sent to krishshah13579@gmail.com.",
+        },
         { status: 401 }
       );
     }
+
+    // Clear one-time OTP so it cannot be reused
+    await prisma.adminAccount.update({
+      where: { id: admin.id },
+      data: {
+        lastOtp: null,
+        otpExpiresAt: null,
+      },
+    });
 
     // Generate Session Token
     const sessionToken = Buffer.from(
@@ -59,7 +78,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set({
       name: "iq_admin_session",
       value: sessionToken,
-      httpOnly: false, // Accessible to client-side auth state checks
+      httpOnly: false,
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: "lax",
