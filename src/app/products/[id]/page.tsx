@@ -33,6 +33,7 @@ import {
   getAvailableSetsForColor,
   getTotalAvailableSets,
   parseColorwiseSets,
+  getAllProductColors,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
 
@@ -78,18 +79,19 @@ function ProductDetailContent() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`/api/products/${productId}`);
+        const res = await fetch(`/api/products/${productId}`, { cache: "no-store" });
         if (!res.ok) {
           throw new Error(`Failed to load product #${productId} (${res.status})`);
         }
         const data: ProductData = await res.json();
         setProduct(data);
 
-        // Pre-initialize color sets selection to 0
-        const colors = (data.colorsAvailable || "")
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean);
+        // Pre-initialize color sets selection to 0 for all colors
+        const colors = getAllProductColors(
+          data.colorsAvailable,
+          data.setsColorwise,
+          data.colorMapping
+        );
 
         const initial: Record<string, number> = {};
         colors.forEach((col) => {
@@ -111,16 +113,21 @@ function ProductDetailContent() {
 
   // All colors for this product (hide out-of-stock colors from employee panel)
   const availableColors = useMemo(() => {
-    if (!product?.colorsAvailable) return [];
-    const colors = product.colorsAvailable
-      .split(",")
-      .map((c) => c.trim())
-      .filter(Boolean);
+    if (!product) return [];
+    const colors = getAllProductColors(
+      product.colorsAvailable,
+      product.setsColorwise,
+      product.colorMapping
+    );
 
     // If any color is out of stock, don't show it on employee panel
     return colors.filter((color) => {
       if (!product.setsColorwise || !product.setsColorwise.trim()) return true;
-      const stock = getAvailableSetsForColor(product.setsColorwise, color);
+      const stock = getAvailableSetsForColor(
+        product.setsColorwise,
+        color,
+        product.colorMapping
+      );
       return stock > 0;
     });
   }, [product]);
@@ -166,7 +173,11 @@ function ProductDetailContent() {
 
   // Handle color set count change with strict stock cap
   const handleSetChange = (color: string, requestedSets: number) => {
-    const maxStock = getAvailableSetsForColor(product?.setsColorwise, color);
+    const maxStock = getAvailableSetsForColor(
+      product?.setsColorwise,
+      color,
+      product?.colorMapping
+    );
     const validCount = Math.max(0, Math.min(requestedSets, maxStock));
 
     if (requestedSets > maxStock) {
@@ -183,7 +194,11 @@ function ProductDetailContent() {
   const handleSelectOneEach = () => {
     const updated: Record<string, number> = {};
     availableColors.forEach((color) => {
-      const maxStock = getAvailableSetsForColor(product?.setsColorwise, color);
+      const maxStock = getAvailableSetsForColor(
+        product?.setsColorwise,
+        color,
+        product?.colorMapping
+      );
       updated[color] = maxStock > 0 ? 1 : 0;
     });
     setColorSetsSelection(updated);
@@ -224,7 +239,11 @@ function ProductDetailContent() {
 
     // Verify stock limits
     for (const entry of selectedEntries) {
-      const maxStock = getAvailableSetsForColor(product.setsColorwise, entry.color);
+      const maxStock = getAvailableSetsForColor(
+        product.setsColorwise,
+        entry.color,
+        product.colorMapping
+      );
       if (entry.sets > maxStock) {
         toast(
           `Cannot add ${entry.sets} sets for ${entry.color}. Only ${maxStock} available in stock.`,
@@ -566,7 +585,7 @@ function ProductDetailContent() {
                 ) : (
                   availableColors.map((color) => {
                     const hex = getColorHex(color).hex;
-                    const stock = getAvailableSetsForColor(product.setsColorwise, color);
+                    const stock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
                     const currentSets = colorSetsSelection[color] || 0;
                     const calculatedColorPcs = currentSets * pcsPerSet;
                     const isOutOfStock = stock <= 0;

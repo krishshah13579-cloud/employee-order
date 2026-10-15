@@ -23,7 +23,14 @@ import {
   type ProductData,
   type SizeGuideRow,
 } from "@/lib/types";
-import { parseColorwiseSets, getTotalAvailableSets } from "@/lib/stock";
+import {
+  parseColorwiseSets,
+  getTotalAvailableSets,
+  getAllProductColors,
+  getAvailableSetsForColor,
+  stringifyColorwiseSets,
+  cleanColorName,
+} from "@/lib/stock";
 
 export default function ProductsPage() {
   const { toast } = useToast();
@@ -34,6 +41,49 @@ export default function ProductsPage() {
   const [previewGuide, setPreviewGuide] = useState<{ name: string; guide: string } | null>(null);
   const [previewUnit, setPreviewUnit] = useState<"IN" | "CM">("IN");
   const [categoriesList, setCategoriesList] = useState<string[]>([...PRODUCT_CATEGORIES]);
+
+  // Quick Stock Sets Editor Modal State
+  const [quickStockProduct, setQuickStockProduct] = useState<ProductData | null>(null);
+  const [quickStockMap, setQuickStockMap] = useState<Record<string, number>>({});
+  const [savingQuickStock, setSavingQuickStock] = useState(false);
+
+  const openQuickStock = (p: ProductData) => {
+    setQuickStockProduct(p);
+    const colors = getAllProductColors(p.colorsAvailable, p.setsColorwise, p.colorMapping);
+    const map: Record<string, number> = {};
+    colors.forEach((c) => {
+      map[c] = getAvailableSetsForColor(p.setsColorwise, c, p.colorMapping);
+    });
+    setQuickStockMap(map);
+  };
+
+  const handleSaveQuickStock = async () => {
+    if (!quickStockProduct) return;
+    setSavingQuickStock(true);
+    try {
+      const serialized = stringifyColorwiseSets(quickStockMap);
+      const res = await fetch(`/api/products/${quickStockProduct.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...quickStockProduct,
+          setsColorwise: serialized,
+        }),
+      });
+      if (res.ok) {
+        toast("Stock sets updated successfully!", "success");
+        setQuickStockProduct(null);
+        fetchProducts();
+      } else {
+        const err = await res.json();
+        toast(err.error || "Failed to update stock", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setSavingQuickStock(false);
+    }
+  };
 
   useEffect(() => {
     async function loadCategories() {
@@ -297,28 +347,37 @@ export default function ProductsPage() {
                     </td>
                     <td className="py-4 px-6 text-xs max-w-xs">
                       {(() => {
-                        if (!p.setsColorwise || !p.setsColorwise.trim()) {
-                          return <span className="text-gray-400 italic">No limit</span>;
-                        }
-                        const total = getTotalAvailableSets(p.setsColorwise);
-                        const parsed = parseColorwiseSets(p.setsColorwise);
-                        const isZero = total === 0;
+                        const total = p.setsColorwise ? getTotalAvailableSets(p.setsColorwise) : 0;
+                        const parsed = p.setsColorwise ? parseColorwiseSets(p.setsColorwise) : {};
+                        const isZero = !p.setsColorwise || total === 0;
 
                         return (
-                          <div className="flex flex-col gap-1">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold font-mono text-[11px] w-fit ${
-                                isZero
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                              }`}
-                            >
-                              {isZero ? "0 Sets (Sold Out)" : `${total} Sets in Stock`}
-                            </span>
-                            <div className="text-[10px] text-gray-500 truncate" title={p.setsColorwise}>
-                              {Object.entries(parsed)
-                                .map(([col, cnt]) => `${col}: ${cnt}`)
-                                .join(", ")}
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold font-mono text-[11px] w-fit ${
+                                  isZero
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                }`}
+                              >
+                                {isZero ? "0 Sets (Sold Out)" : `${total} Sets in Stock`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openQuickStock(p)}
+                                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md transition cursor-pointer"
+                                title="Update Stock Sets"
+                              >
+                                ⚡ Edit Stock
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-gray-500 truncate" title={p.setsColorwise || "No stock configured"}>
+                              {Object.keys(parsed).length > 0
+                                ? Object.entries(parsed)
+                                    .map(([col, cnt]) => `${col}: ${cnt}`)
+                                    .join(", ")
+                                : "No stock configured"}
                             </div>
                           </div>
                         );
@@ -350,7 +409,14 @@ export default function ProductsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-6 text-right space-x-2">
+                    <td className="py-4 px-6 text-right space-x-1">
+                      <button
+                        onClick={() => openQuickStock(p)}
+                        className="p-1.5 inline-flex text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="⚡ Quick Update Stock Sets"
+                      >
+                        <Layers size={15} />
+                      </button>
                       <Link
                         href={`/admin/products/${p.id}/edit`}
                         className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
@@ -471,6 +537,173 @@ export default function ProductsPage() {
           </Modal>
         );
       })()}
+
+      {/* Quick Stock Sets Modal */}
+      {quickStockProduct && (
+        <Modal
+          isOpen={true}
+          onClose={() => setQuickStockProduct(null)}
+          title={`⚡ Quick Stock Sets: ${quickStockProduct.name}`}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2">
+              <Layers size={16} className="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Live Inventory Sync</p>
+                <p className="text-[11px] text-blue-800 mt-0.5">
+                  Colors with <strong>0 sets</strong> are automatically hidden on the Employee Side until sets are added here. Set at least 1 set for each color to show it on employee panels.
+                </p>
+              </div>
+            </div>
+
+            {/* Bulk Fill Tool */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl">
+              <span className="text-xs font-semibold text-gray-700">Quick Bulk Fill:</span>
+              <div className="flex items-center gap-2">
+                {[5, 10, 20].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => {
+                      const updated: Record<string, number> = {};
+                      Object.keys(quickStockMap).forEach((c) => {
+                        updated[c] = amt;
+                      });
+                      setQuickStockMap(updated);
+                    }}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg border border-gray-300 bg-white hover:bg-gray-100 transition cursor-pointer"
+                  >
+                    Set all {amt}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated: Record<string, number> = {};
+                    Object.keys(quickStockMap).forEach((c) => {
+                      updated[c] = 0;
+                    });
+                    setQuickStockMap(updated);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition cursor-pointer"
+                >
+                  Clear all
+                </button>
+              </div>
+            </div>
+
+            {/* Colors Stock List */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase font-bold text-[11px] tracking-wider sticky top-0">
+                  <tr>
+                    <th className="py-2.5 px-4">Color Shade</th>
+                    <th className="py-2.5 px-4 w-44 text-center">Available Sets</th>
+                    <th className="py-2.5 px-4 text-right">Pieces ({quickStockProduct.pcsPerSet || 5} / set)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {Object.keys(quickStockMap).length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-gray-400 italic">
+                        No color shades configured for this garment.
+                      </td>
+                    </tr>
+                  ) : (
+                    Object.entries(quickStockMap).map(([color, sets]) => {
+                      const cInfo = getColorHex(color);
+                      const pcs = sets * (quickStockProduct.pcsPerSet || 5);
+                      const isZero = sets <= 0;
+
+                      return (
+                        <tr key={color} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="w-4 h-4 rounded-full border border-black/15 shrink-0"
+                                style={{ backgroundColor: cInfo.hex }}
+                              />
+                              <span className="font-bold text-gray-900">{color}</span>
+                              {isZero && (
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                  Hidden (0 Sets)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setQuickStockMap((prev) => ({
+                                    ...prev,
+                                    [color]: Math.max(0, sets - 1),
+                                  }))
+                                }
+                                className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-100 font-bold cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={sets}
+                                onChange={(e) =>
+                                  setQuickStockMap((prev) => ({
+                                    ...prev,
+                                    [color]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  }))
+                                }
+                                className="w-20 text-center py-1.5 bg-gray-50 border border-gray-300 rounded-lg font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setQuickStockMap((prev) => ({
+                                    ...prev,
+                                    [color]: sets + 1,
+                                  }))
+                                }
+                                className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-100 font-bold cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-gray-800">
+                            {pcs} PCS
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setQuickStockProduct(null)}
+                className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingQuickStock}
+                onClick={handleSaveQuickStock}
+                className="px-5 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingQuickStock ? "Updating Inventory..." : "Save Stock Sets"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

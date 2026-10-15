@@ -37,6 +37,9 @@ import {
   parseColorwiseSets,
   stringifyColorwiseSets,
   getTotalAvailableSets,
+  getAllProductColors,
+  getAvailableSetsForColor,
+  cleanColorName,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
 import { extractColorsFromImage } from "@/lib/colorExtractor";
@@ -98,15 +101,15 @@ export default function ProductForm({
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(true);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(true);
 
-  // Parse initial colors into array
+  // Parse initial colors into array (all colors from colorsAvailable, setsColorwise, and colorMapping)
   const parseInitialColors = (): string[] => {
-    if (!initialData?.colorsAvailable) {
-      return ["Dark Indigo", "Light Blue", "Jet Black", "Charcoal Grey"];
-    }
-    return initialData.colorsAvailable
-      .split(",")
-      .map((c) => c.trim())
-      .filter(Boolean);
+    const list = getAllProductColors(
+      initialData?.colorsAvailable,
+      initialData?.setsColorwise,
+      initialData?.colorMapping
+    );
+    if (list.length > 0) return list;
+    return ["Dark Indigo", "Light Blue", "Jet Black", "Charcoal Grey"];
   };
 
   const [selectedColors, setSelectedColors] = useState<string[]>(parseInitialColors);
@@ -315,10 +318,24 @@ export default function ProductForm({
 
   // Color stock mapping
   const [colorStockMap, setColorStockMap] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
     if (initialData?.setsColorwise) {
-      return parseColorwiseSets(initialData.setsColorwise);
+      const parsed = parseColorwiseSets(initialData.setsColorwise);
+      for (const [k, v] of Object.entries(parsed)) {
+        map[cleanColorName(k)] = v;
+      }
     }
-    return {};
+    const initialColors = parseInitialColors();
+    initialColors.forEach((c) => {
+      if (map[c] === undefined) {
+        map[c] = getAvailableSetsForColor(
+          initialData?.setsColorwise,
+          c,
+          initialData?.colorMapping
+        );
+      }
+    });
+    return map;
   });
 
   const [bulkSetsInput, setBulkSetsInput] = useState<number>(20);
@@ -326,7 +343,7 @@ export default function ProductForm({
   const handleColorStockChange = (color: string, val: number) => {
     setColorStockMap((prev) => ({
       ...prev,
-      [color]: Math.max(0, val),
+      [cleanColorName(color)]: Math.max(0, val),
     }));
   };
 
@@ -334,7 +351,7 @@ export default function ProductForm({
     setColorStockMap((prev) => {
       const next: Record<string, number> = { ...prev };
       for (const c of selectedColors) {
-        next[c] = Math.max(0, sets);
+        next[cleanColorName(c)] = Math.max(0, sets);
       }
       return next;
     });
@@ -357,16 +374,36 @@ export default function ProductForm({
 
   // Color management
   const handleToggleColor = (colorName: string) => {
-    setSelectedColors((prev) =>
-      prev.includes(colorName)
-        ? prev.filter((c) => c !== colorName)
-        : [...prev, colorName]
-    );
+    setSelectedColors((prev) => {
+      const isSelected = prev.includes(colorName);
+      if (isSelected) {
+        return prev.filter((c) => c !== colorName);
+      } else {
+        setColorStockMap((stockPrev) => {
+          const clean = cleanColorName(colorName);
+          if (stockPrev[clean] === undefined || stockPrev[clean] === 0) {
+            return { ...stockPrev, [clean]: Math.max(4, bulkSetsInput) };
+          }
+          return stockPrev;
+        });
+        return [...prev, colorName];
+      }
+    });
   };
 
   const handleSelectAllPresets = () => {
     const presetNames = PRESET_COLORS.map((c) => c.name);
     setSelectedColors((prev) => Array.from(new Set([...prev, ...presetNames])));
+    setColorStockMap((stockPrev) => {
+      const next = { ...stockPrev };
+      for (const c of presetNames) {
+        const clean = cleanColorName(c);
+        if (next[clean] === undefined || next[clean] === 0) {
+          next[clean] = Math.max(4, bulkSetsInput);
+        }
+      }
+      return next;
+    });
   };
 
   const handleClearColors = () => {
@@ -376,13 +413,22 @@ export default function ProductForm({
   const handleAddCustomColor = () => {
     const trimmed = customColorInput.trim();
     if (!trimmed) return;
-    const newItems = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    const newItems = trimmed.split(",").map((s) => cleanColorName(s.trim())).filter(Boolean);
     setSelectedColors((prev) => {
       const updated = [...prev];
       for (const item of newItems) {
         if (!updated.includes(item)) updated.push(item);
       }
       return updated;
+    });
+    setColorStockMap((stockPrev) => {
+      const next = { ...stockPrev };
+      for (const item of newItems) {
+        if (next[item] === undefined || next[item] === 0) {
+          next[item] = Math.max(4, bulkSetsInput);
+        }
+      }
+      return next;
     });
     setCustomColorInput("");
   };
@@ -415,8 +461,9 @@ export default function ProductForm({
         try {
           const colorsFound = await extractColorsFromImage(dataUrl);
           for (const c of colorsFound) {
-            if (!extractedColorsFromPhotos.includes(c)) {
-              extractedColorsFromPhotos.push(c);
+            const clean = cleanColorName(c);
+            if (!extractedColorsFromPhotos.includes(clean)) {
+              extractedColorsFromPhotos.push(clean);
             }
           }
         } catch (colorErr) {
@@ -427,12 +474,21 @@ export default function ProductForm({
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
 
-        // Merge newly detected colors with selectedColors
+        // Merge newly detected colors with selectedColors and initialize their stock
         if (extractedColorsFromPhotos.length > 0) {
           setSelectedColors((prev) => {
             const next = [...prev];
             for (const c of extractedColorsFromPhotos) {
               if (!next.includes(c)) next.push(c);
+            }
+            return next;
+          });
+          setColorStockMap((stockPrev) => {
+            const next = { ...stockPrev };
+            for (const c of extractedColorsFromPhotos) {
+              if (next[c] === undefined || next[c] === 0) {
+                next[c] = Math.max(4, bulkSetsInput);
+              }
             }
             return next;
           });
@@ -536,7 +592,15 @@ export default function ProductForm({
       // Generate clean setsColorwise from colorStockMap for selectedColors
       const finalStockMap: Record<string, number> = {};
       for (const c of selectedColors) {
-        finalStockMap[c] = Math.max(0, colorStockMap[c] ?? 0);
+        const clean = cleanColorName(c);
+        finalStockMap[clean] = Math.max(
+          0,
+          colorStockMap[clean] !== undefined
+            ? colorStockMap[clean]
+            : colorStockMap[c] !== undefined
+            ? colorStockMap[c]
+            : 0
+        );
       }
       const serializedStock = stringifyColorwiseSets(finalStockMap);
 
@@ -1467,8 +1531,9 @@ export default function ProductForm({
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {selectedColors.map((color) => {
+                    const clean = cleanColorName(color);
                     const cInfo = getColorHex(color);
-                    const sets = colorStockMap[color] ?? 0;
+                    const sets = colorStockMap[clean] !== undefined ? colorStockMap[clean] : (colorStockMap[color] ?? 0);
                     const pcs = sets * (formData.pcsPerSet || 5);
                     const value = pcs * (formData.price || 0);
 
@@ -1481,6 +1546,11 @@ export default function ProductForm({
                               style={{ backgroundColor: cInfo.hex }}
                             />
                             <span className="font-semibold text-gray-900">{color}</span>
+                            {sets === 0 && (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                0 Sets (Hidden on Employee Side)
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">

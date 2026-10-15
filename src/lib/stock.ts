@@ -66,30 +66,146 @@ export function parseColorwiseSets(raw: string | null | undefined): Record<strin
 }
 
 /**
+ * Extracts and cleans a color string by stripping alphabet prefixes (e.g., "A: Ice Grey" -> "Ice Grey", "A - Black" -> "Black")
+ */
+export function cleanColorName(color: string): string {
+  if (!color) return "";
+  let cleaned = color.trim();
+  // Strip single-letter prefix like "A: ", "A - ", "A. ", "A) "
+  cleaned = cleaned.replace(/^[A-Za-z][:\s\.\-\)]+\s*/, "").trim();
+  return cleaned || color.trim();
+}
+
+/**
+ * Gets all unique, normalized color names for a product from:
+ * 1. colorsAvailable (comma-separated string)
+ * 2. setsColorwise (JSON string or key-value list)
+ * 3. colorMapping (JSON string mapping letters to colors)
+ */
+export function getAllProductColors(
+  colorsAvailable: string | null | undefined,
+  setsColorwise: string | null | undefined,
+  colorMapping?: string | null | undefined
+): string[] {
+  const result: string[] = [];
+  const seenLower = new Set<string>();
+
+  const addColor = (raw: string) => {
+    const cleaned = cleanColorName(raw);
+    if (!cleaned || cleaned === "__default__") return;
+    const lower = cleaned.toLowerCase();
+    if (!seenLower.has(lower)) {
+      seenLower.add(lower);
+      result.push(cleaned);
+    }
+  };
+
+  // 1. From colorsAvailable
+  if (colorsAvailable) {
+    colorsAvailable
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .forEach(addColor);
+  }
+
+  // 2. From setsColorwise keys
+  if (setsColorwise) {
+    const parsed = parseColorwiseSets(setsColorwise);
+    Object.keys(parsed).forEach(addColor);
+  }
+
+  // 3. From colorMapping values
+  if (colorMapping) {
+    try {
+      const map = JSON.parse(colorMapping);
+      if (typeof map === "object" && map !== null) {
+        Object.values(map).forEach((val) => {
+          if (typeof val === "string") addColor(val);
+        });
+      }
+    } catch {}
+  }
+
+  return result;
+}
+
+/**
  * Gets the number of available sets for a specific color of a product.
+ * Supports:
+ * - Exact match
+ * - Case-insensitive match
+ * - Alphabet prefix match (e.g. key "A: Ice Grey" matching "Ice Grey" or vice-versa)
+ * - Color mapping resolution (e.g. key "A" matching "Ice Grey" if A is mapped to Ice Grey)
+ * - Normalized alphanumeric match
  * Returns 0 if none available or out of stock.
  */
 export function getAvailableSetsForColor(
   setsColorwise: string | null | undefined,
-  color: string
+  color: string,
+  colorMapping?: string | null | undefined
 ): number {
-  if (!setsColorwise) return 0;
+  if (!setsColorwise || !color) return 0;
   const parsed = parseColorwiseSets(setsColorwise);
+  const targetClean = cleanColorName(color);
+  const targetLower = targetClean.toLowerCase();
+  const targetAlphaNum = targetClean.replace(/[^a-z0-9]/gi, "").toLowerCase();
 
-  // Exact match
-  if (parsed[color] !== undefined) {
-    return parsed[color];
+  // 1. Exact match on target or cleaned target
+  if (parsed[color] !== undefined) return parsed[color];
+  if (parsed[targetClean] !== undefined) return parsed[targetClean];
+
+  // Parse color mapping if available
+  let alphabetLetterForTarget: string | null = null;
+  const letterToColorMap: Record<string, string> = {};
+  if (colorMapping) {
+    try {
+      const map = JSON.parse(colorMapping);
+      if (typeof map === "object" && map !== null) {
+        for (const [letter, val] of Object.entries(map)) {
+          const valStr = String(val).trim();
+          letterToColorMap[letter.toUpperCase()] = valStr;
+          if (valStr.toLowerCase() === targetLower || cleanColorName(valStr).toLowerCase() === targetLower) {
+            alphabetLetterForTarget = letter.toUpperCase();
+          }
+        }
+      }
+    } catch {}
   }
 
-  // Case-insensitive match
-  const lower = color.trim().toLowerCase();
-  for (const [k, v] of Object.entries(parsed)) {
-    if (k.toLowerCase() === lower) {
-      return v;
+  // If color was mapped to a letter (e.g. "A"), check if parsed has key "A"
+  if (alphabetLetterForTarget && parsed[alphabetLetterForTarget] !== undefined) {
+    return parsed[alphabetLetterForTarget];
+  }
+
+  // 2. Iterate through parsed keys with fuzzy/prefix matching
+  for (const [rawKey, val] of Object.entries(parsed)) {
+    if (rawKey === "__default__") continue;
+    const keyClean = cleanColorName(rawKey);
+    const keyLower = keyClean.toLowerCase();
+
+    // Direct case-insensitive match
+    if (keyLower === targetLower) return val;
+
+    // Check if key is a mapped letter
+    const mappedColor = letterToColorMap[rawKey.trim().toUpperCase()];
+    if (mappedColor && mappedColor.toLowerCase() === targetLower) {
+      return val;
+    }
+
+    // Alphanumeric match (ignoring spaces/dashes)
+    const keyAlphaNum = keyClean.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (keyAlphaNum && keyAlphaNum === targetAlphaNum) {
+      return val;
+    }
+
+    // Substring containment (e.g. "Ice Grey" contained in "A: Ice Grey Soft")
+    if (keyLower.includes(targetLower) || targetLower.includes(keyLower)) {
+      return val;
     }
   }
 
-  // Fallback if single number was provided for whole product
+  // 3. Fallback if single number was provided for whole product
   if (parsed["__default__"] !== undefined) {
     return parsed["__default__"];
   }
@@ -109,12 +225,12 @@ export function getTotalAvailableSets(setsColorwise: string | null | undefined):
 }
 
 /**
- * Converts Record<string, number> into a clean JSON string for storage in SQLite.
+ * Converts Record<string, number> into a clean JSON string for storage in database.
  */
 export function stringifyColorwiseSets(stockMap: Record<string, number>): string {
   const cleanMap: Record<string, number> = {};
   for (const [k, v] of Object.entries(stockMap)) {
-    const trimmed = k.trim();
+    const trimmed = cleanColorName(k.trim());
     if (trimmed && trimmed !== "__default__") {
       cleanMap[trimmed] = Math.max(0, parseInt(String(v), 10) || 0);
     }
@@ -133,17 +249,17 @@ export function deductSetsFromStock(
   const stockMap = parseColorwiseSets(setsColorwise);
 
   for (const orderItem of orderedColorSets) {
-    const targetColor = orderItem.color.trim();
+    const targetColor = cleanColorName(orderItem.color.trim());
     const setsToDeduct = Math.max(0, orderItem.sets);
 
-    // Find matching key (exact or case-insensitive)
+    // Find matching key (exact, cleaned, or case-insensitive)
     let matchedKey: string | null = null;
     if (stockMap[targetColor] !== undefined) {
       matchedKey = targetColor;
     } else {
       const lower = targetColor.toLowerCase();
       for (const k of Object.keys(stockMap)) {
-        if (k.toLowerCase() === lower) {
+        if (cleanColorName(k).toLowerCase() === lower || k.toLowerCase() === lower) {
           matchedKey = k;
           break;
         }
@@ -154,6 +270,44 @@ export function deductSetsFromStock(
       stockMap[matchedKey] = Math.max(0, stockMap[matchedKey] - setsToDeduct);
     } else if (stockMap["__default__"] !== undefined) {
       stockMap["__default__"] = Math.max(0, stockMap["__default__"] - setsToDeduct);
+    }
+  }
+
+  return stringifyColorwiseSets(stockMap);
+}
+
+/**
+ * Restores sets back to stock when an order is cancelled or modified.
+ * Returns the updated setsColorwise string.
+ */
+export function restoreSetsToStock(
+  setsColorwise: string | null | undefined,
+  returnedColorSets: { color: string; sets: number }[]
+): string {
+  const stockMap = parseColorwiseSets(setsColorwise);
+
+  for (const orderItem of returnedColorSets) {
+    const targetColor = cleanColorName(orderItem.color.trim());
+    const setsToRestore = Math.max(0, orderItem.sets);
+    if (setsToRestore === 0) continue;
+
+    let matchedKey: string | null = null;
+    if (stockMap[targetColor] !== undefined) {
+      matchedKey = targetColor;
+    } else {
+      const lower = targetColor.toLowerCase();
+      for (const k of Object.keys(stockMap)) {
+        if (cleanColorName(k).toLowerCase() === lower || k.toLowerCase() === lower) {
+          matchedKey = k;
+          break;
+        }
+      }
+    }
+
+    if (matchedKey && stockMap[matchedKey] !== undefined) {
+      stockMap[matchedKey] += setsToRestore;
+    } else {
+      stockMap[targetColor] = setsToRestore;
     }
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/types";
+import { restoreSetsToStock, deductSetsFromStock } from "@/lib/stock";
 
 export async function PUT(
   request: NextRequest,
@@ -44,6 +45,68 @@ export async function PUT(
           { error: "Permission Denied: Only Admin or Super Admin can confirm orders." },
           { status: 403 }
         );
+      }
+    }
+
+    // Fetch existing order with items to handle stock adjustment
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!existingOrder) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // 1. If cancelling order, restore stock sets back to inventory
+    if (status === "Cancelled" && existingOrder.status !== "Cancelled") {
+      for (const item of existingOrder.items) {
+        if (item.productId && item.colorSets) {
+          try {
+            const parsed = JSON.parse(item.colorSets);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const product = await prisma.product.findUnique({
+                where: { id: item.productId },
+                select: { id: true, setsColorwise: true },
+              });
+              if (product && product.setsColorwise) {
+                const restored = restoreSetsToStock(product.setsColorwise, parsed);
+                await prisma.product.update({
+                  where: { id: product.id },
+                  data: { setsColorwise: restored },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Error restoring stock sets on cancellation:", e);
+          }
+        }
+      }
+    }
+
+    // 2. If un-cancelling order, re-deduct stock
+    if (existingOrder.status === "Cancelled" && status !== "Cancelled") {
+      for (const item of existingOrder.items) {
+        if (item.productId && item.colorSets) {
+          try {
+            const parsed = JSON.parse(item.colorSets);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const product = await prisma.product.findUnique({
+                where: { id: item.productId },
+                select: { id: true, setsColorwise: true },
+              });
+              if (product && product.setsColorwise) {
+                const deducted = deductSetsFromStock(product.setsColorwise, parsed);
+                await prisma.product.update({
+                  where: { id: product.id },
+                  data: { setsColorwise: deducted },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Error re-deducting stock sets:", e);
+          }
+        }
       }
     }
 
