@@ -24,3 +24,24 @@ export function getISTFormattedTime(): string {
     hour12: true,
   });
 }
+
+/**
+ * Check if employee is a Team Leader (T.L.) who has 24*7 panel access
+ */
+export function isEmployeeTeamLeader(
+  emp: { isTeamLeader?: boolean | null; designation?: string | null } | null | undefined
+): boolean {
+  if (!emp) return false;
+  if (emp.isTeamLeader) return true;
+  const des = (emp.designation || "").trim().toLowerCase();
+  return (
+    des === "t.l." ||
+    des === "tl" ||
+    des === "team leader" ||
+    des.includes("team leader") ||
+    des.includes("t.l.") ||
+    des.includes("(t.l.)") ||
+    des.startsWith("tl ") ||
+    des.endsWith(" tl")
+  );
+}

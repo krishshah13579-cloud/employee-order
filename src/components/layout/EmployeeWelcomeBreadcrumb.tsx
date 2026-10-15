@@ -3,8 +3,9 @@
 import React, { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, Home, ChevronRight, User, Award } from "lucide-react";
+import { Sparkles, Home, ChevronRight, User, Award, Crown } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { isEmployeeTeamLeader } from "@/lib/time";
 
 const MOTIVATIONAL_MESSAGES = [
   "“Success is the sum of small efforts, repeated day in and day out. Have a winning sales day!”",
@@ -70,6 +71,15 @@ export default function EmployeeWelcomeBreadcrumb() {
               <span className="text-[10px] text-slate-400">
                 ({employee.designation || "Staff"})
               </span>
+              {isEmployeeTeamLeader(employee) && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold text-[10px]"
+                  title="Team Leader: 24*7 Panel Access Enabled"
+                >
+                  <Crown size={11} className="text-amber-400" />
+                  <span>T.L. (24*7)</span>
+                </span>
+              )}
             </div>
           </div>
 

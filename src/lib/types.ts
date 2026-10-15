@@ -79,6 +79,7 @@ export interface EmployeeData {
   address: string;
   proofUrl?: string | null;
   designation: string;
+  isTeamLeader?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

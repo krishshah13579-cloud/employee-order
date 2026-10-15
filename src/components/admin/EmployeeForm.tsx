@@ -15,10 +15,12 @@ import {
   Briefcase,
   Loader2,
   Trash2,
+  Crown,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { EmployeeData } from "@/lib/types";
 import { compressImageFile } from "@/lib/imageCompression";
+import { isEmployeeTeamLeader } from "@/lib/time";
 
 interface EmployeeFormProps {
   initialData?: EmployeeData;
@@ -46,6 +48,7 @@ export default function EmployeeForm({
     address: initialData?.address || "",
     proofUrl: initialData?.proofUrl || "",
     designation: initialData?.designation || "Sales Representative",
+    isTeamLeader: initialData?.isTeamLeader ?? isEmployeeTeamLeader(initialData),
     isActive: initialData?.isActive ?? true,
   });
 
@@ -235,6 +238,47 @@ export default function EmployeeForm({
                 </span>
               </div>
             </label>
+          </div>
+
+          {/* Team Leader (T.L.) 24*7 Access Toggle */}
+          <div className="sm:col-span-2 p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Crown size={16} />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                    <span>Designate as Team Leader (T.L.)</span>
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.2 rounded-full border border-amber-300">
+                      24*7 Access
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-gray-600">
+                    Team Leaders are permitted to access the employee panel <strong>24*7</strong> (bypasses standard 9:00 PM IST daily logout).
+                  </span>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.isTeamLeader)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isTeamLeader: e.target.checked,
+                      designation:
+                        e.target.checked && prev.designation === "Sales Representative"
+                          ? "Team Leader (T.L.)"
+                          : prev.designation,
+                    }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+              </label>
+            </div>
           </div>
         </div>
       </div>

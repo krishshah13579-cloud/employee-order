@@ -46,6 +46,7 @@ model Employee {
   address      String
   proofUrl     String?  // Photo or document link (Aadhar / PAN / Driving License)
   designation  String   @default("Sales Representative")
+  isTeamLeader Boolean  @default(false) // T.L. has unrestricted 24*7 access to employee panel
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

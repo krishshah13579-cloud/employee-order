@@ -133,10 +133,10 @@ export default function EmployeeLoginPage() {
               <span className="text-base leading-none">🌙</span>
               <div>
                 <strong className="block text-amber-200 font-bold mb-0.5">
-                  Necessary Daily Logout (After 9:00 PM IST)
+                  Standard Daily Logout (After 9:00 PM IST)
                 </strong>
                 <span>
-                  The employee wholesale portal automatically logs out everyday after 9:00 PM IST. Access will reopen tomorrow morning.
+                  The employee wholesale portal automatically closes everyday after 9:00 PM IST for general sales staff. Team Leaders (T.L.) have unrestricted 24*7 access.
                 </span>
               </div>
             </div>

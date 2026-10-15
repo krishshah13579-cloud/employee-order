@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
         address: address.trim(),
         proofUrl: proofUrl || null,
         designation: designation || "Sales Representative",
+        isTeamLeader: Boolean(body.isTeamLeader),
         isActive: isActive !== undefined ? isActive : true,
       },
     });

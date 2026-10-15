@@ -37,8 +37,46 @@ export async function PUT(
         address: body.address,
         proofUrl: body.proofUrl,
         designation: body.designation,
+        isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
+    });
+
+    return NextResponse.json(employee);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+
+    const updateData: any = {};
+    if (body.isTeamLeader !== undefined) {
+      updateData.isTeamLeader = Boolean(body.isTeamLeader);
+      if (body.designation) {
+        updateData.designation = body.designation;
+      } else if (body.isTeamLeader) {
+        updateData.designation = "Team Leader (T.L.)";
+      } else {
+        updateData.designation = "Sales Representative";
+      }
+    }
+    if (body.isActive !== undefined) {
+      updateData.isActive = Boolean(body.isActive);
+    }
+    if (body.pin !== undefined) {
+      updateData.pin = body.pin.trim();
+    }
+
+    const employee = await prisma.employee.update({
+      where: { id: parseInt(id) },
+      data: updateData,
     });
 
     return NextResponse.json(employee);

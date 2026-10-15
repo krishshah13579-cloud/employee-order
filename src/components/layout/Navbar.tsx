@@ -10,8 +10,10 @@ import {
   FilePlus,
   Package,
   LogOut,
+  Crown,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { isEmployeeTeamLeader } from "@/lib/time";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -92,8 +94,13 @@ export default function Navbar() {
                     {employee.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-900 leading-tight text-[11px]">
-                      {employee.name}
+                    <span className="font-bold text-slate-900 leading-tight text-[11px] flex items-center gap-1.5">
+                      <span>{employee.name}</span>
+                      {isEmployeeTeamLeader(employee) && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded-full font-black text-[9px]">
+                          <Crown size={9} className="text-amber-600" /> T.L. 24*7
+                        </span>
+                      )}
                     </span>
                     <span className="text-[9px] text-orange-600 font-semibold leading-none">
                       {employee.designation || "Sales Staff"}
@@ -145,7 +152,14 @@ export default function Navbar() {
                   {employee.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900 text-xs">{employee.name}</div>
+                  <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <span>{employee.name}</span>
+                    {isEmployeeTeamLeader(employee) && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded-full font-black text-[9px]">
+                        <Crown size={9} className="text-amber-600" /> T.L. 24*7
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[10px] text-orange-600 font-semibold">{employee.designation}</div>
                 </div>
               </div>

@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-import { isNightLogoutTimeIST } from "@/lib/time";
+import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
 
 export async function POST(req: NextRequest) {
   try {
-    // Check daily after 9:00 PM IST working hours restriction
-    if (isNightLogoutTimeIST()) {
-      return NextResponse.json(
-        {
-          error:
-            "Employee portal is closed for the day (Daily logout after 9:00 PM IST). Access will resume tomorrow morning.",
-        },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
     const name = (body.name || "").trim();
     const pin = (body.pin || "").trim();
@@ -59,11 +48,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isTL = isEmployeeTeamLeader(employee);
+
+    // If NOT Team Leader, check daily after 9:00 PM IST working hours restriction
+    // Team Leaders (T.L.) have unrestricted 24*7 access!
+    if (!isTL && isNightLogoutTimeIST()) {
+      return NextResponse.json(
+        {
+          error:
+            "Employee portal is closed for the day (Daily logout after 9:00 PM IST). Access will resume tomorrow morning. (Team Leaders have 24*7 access).",
+        },
+        { status: 403 }
+      );
+    }
+
     // Set employee session cookie
     const sessionData = {
       id: employee.id,
       name: employee.name,
       designation: employee.designation,
+      isTeamLeader: isTL,
       mobileNumber: employee.mobileNumber,
       loggedInAt: new Date().toISOString(),
     };
@@ -83,9 +87,10 @@ export async function POST(req: NextRequest) {
         id: employee.id,
         name: employee.name,
         designation: employee.designation,
+        isTeamLeader: isTL,
         mobileNumber: employee.mobileNumber,
       },
-      message: `Welcome, ${employee.name}!`,
+      message: `Welcome, ${employee.name}!${isTL ? " (T.L. 24*7 Access Active)" : ""}`,
     });
   } catch (error: any) {
     console.error("Employee login error:", error);
