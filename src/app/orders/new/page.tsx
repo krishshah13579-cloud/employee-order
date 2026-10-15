@@ -844,11 +844,7 @@ export default function OrderFormPage() {
                     <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                       <Clock size={14} className="text-orange-600" />
                       <span>Credit Days:</span>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-48">
+                      <div className="relative w-48">
                       <input
                         type="number"
                         min={0}
@@ -866,7 +862,11 @@ export default function OrderFormPage() {
                         Days
                       </span>
                     </div>
-                    
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                                        
                   </div>
                 </div>
               </div>
