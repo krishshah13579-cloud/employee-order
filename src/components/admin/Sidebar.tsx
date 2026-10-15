@@ -9,6 +9,7 @@ import {
   Store,
   Package,
   ShoppingCart,
+  Boxes,
   FileText,
   ArrowRight,
   LogOut,
@@ -55,6 +56,12 @@ const navItems = [
     label: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    id: "stock",
+    label: "Stock",
+    href: "/admin/stock",
+    icon: Boxes,
   },
   {
     id: "reports",

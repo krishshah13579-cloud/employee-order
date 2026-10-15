@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Link as LinkIcon,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
@@ -40,6 +41,7 @@ import {
   getAllProductColors,
   getAvailableSetsForColor,
   cleanColorName,
+  parseDetailedColorRatioSets,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
 import { extractColorsFromImage } from "@/lib/colorExtractor";
@@ -320,6 +322,8 @@ export default function ProductForm({
     retailerPrice: initialRetailerPrice,
     wholesalerPrice: initialWholesalerPrice,
     price: initialRetailerPrice,
+    costPrice: initialData?.costPrice ?? "",
+    mixPcs: initialData?.mixPcs ?? 0,
     setsColorwise: initialData?.setsColorwise || "",
     description: "", // Description note
     isActive: initialData?.isActive ?? true,
@@ -345,42 +349,119 @@ export default function ProductForm({
     }
   };
 
-  // Color stock mapping
-  const [colorStockMap, setColorStockMap] = useState<Record<string, number>>(() => {
-    const map: Record<string, number> = {};
-    if (initialData?.setsColorwise) {
-      const parsed = parseColorwiseSets(initialData.setsColorwise);
-      for (const [k, v] of Object.entries(parsed)) {
-        map[cleanColorName(k)] = v;
-      }
+  // Color -> Photo mapping (e.g. {"Ice Grey": "data:image/...", "Jet Black": "data:image/..."})
+  const [colorImages, setColorImages] = useState<Record<string, string>>(() => {
+    if (initialData?.colorImages) {
+      try {
+        const parsed =
+          typeof initialData.colorImages === "string"
+            ? JSON.parse(initialData.colorImages)
+            : initialData.colorImages;
+        if (parsed && typeof parsed === "object") return parsed;
+      } catch {}
     }
+    return {};
+  });
+
+  // Multi-ratio color stock breakdown: { [color]: { [ratio]: count } }
+  // e.g. { "Navy Blue": { "30 to 38": 5, "32 to 38": 1 } }
+  const [colorRatioStockMap, setColorRatioStockMap] = useState<Record<string, Record<string, number>>>(() => {
+    const result: Record<string, Record<string, number>> = {};
+    const detailed = parseDetailedColorRatioSets(
+      initialData?.setsColorwise,
+      initialData?.sizesRatio || "30 to 38"
+    );
     const initialColors = parseInitialColors();
+
+    for (const [col, ratios] of Object.entries(detailed)) {
+      const clean = cleanColorName(col);
+      result[clean] = { ...ratios };
+    }
+
     initialColors.forEach((c) => {
-      if (map[c] === undefined) {
-        map[c] = getAvailableSetsForColor(
+      const clean = cleanColorName(c);
+      if (!result[clean] || Object.keys(result[clean]).length === 0) {
+        const fallbackSets = getAvailableSetsForColor(
           initialData?.setsColorwise,
           c,
           initialData?.colorMapping
         );
+        result[clean] = { [initialData?.sizesRatio || "30 to 38"]: fallbackSets };
       }
     });
-    return map;
+
+    return result;
   });
 
   const [bulkSetsInput, setBulkSetsInput] = useState<number>(20);
 
-  const handleColorStockChange = (color: string, val: number) => {
-    setColorStockMap((prev) => ({
-      ...prev,
-      [cleanColorName(color)]: Math.max(0, val),
-    }));
+  const handleColorRatioSetChange = (color: string, ratio: string, val: number) => {
+    const clean = cleanColorName(color);
+    setColorRatioStockMap((prev) => {
+      const current = prev[clean] || { [formData.sizesRatio]: 0 };
+      return {
+        ...prev,
+        [clean]: {
+          ...current,
+          [ratio]: Math.max(0, val),
+        },
+      };
+    });
+  };
+
+  const handleAddRatioToColor = (color: string, newRatio: string) => {
+    const clean = cleanColorName(color);
+    setColorRatioStockMap((prev) => {
+      const current = prev[clean] || {};
+      if (current[newRatio] !== undefined) return prev;
+      return {
+        ...prev,
+        [clean]: {
+          ...current,
+          [newRatio]: 1,
+        },
+      };
+    });
+  };
+
+  const handleRemoveRatioFromColor = (color: string, ratioToRemove: string) => {
+    const clean = cleanColorName(color);
+    setColorRatioStockMap((prev) => {
+      const current = { ...(prev[clean] || {}) };
+      delete current[ratioToRemove];
+      if (Object.keys(current).length === 0) {
+        current[formData.sizesRatio] = 0;
+      }
+      return {
+        ...prev,
+        [clean]: current,
+      };
+    });
+  };
+
+  const getColorTotalSets = (color: string) => {
+    const clean = cleanColorName(color);
+    const ratios = colorRatioStockMap[clean];
+    if (!ratios) return 0;
+    return Object.values(ratios).reduce((sum, count) => sum + (count || 0), 0);
   };
 
   const handleBulkSetStock = (sets: number) => {
-    setColorStockMap((prev) => {
-      const next: Record<string, number> = { ...prev };
+    setColorRatioStockMap((prev) => {
+      const next: Record<string, Record<string, number>> = { ...prev };
       for (const c of selectedColors) {
-        next[cleanColorName(c)] = Math.max(0, sets);
+        const clean = cleanColorName(c);
+        const existing = next[clean] || {};
+        const keys = Object.keys(existing);
+        if (keys.length === 0) {
+          next[clean] = { [formData.sizesRatio]: Math.max(0, sets) };
+        } else {
+          const updated: Record<string, number> = {};
+          keys.forEach((k, idx) => {
+            updated[k] = idx === 0 ? Math.max(0, sets) : 0;
+          });
+          next[clean] = updated;
+        }
       }
       return next;
     });
@@ -408,10 +489,13 @@ export default function ProductForm({
       if (isSelected) {
         return prev.filter((c) => c !== colorName);
       } else {
-        setColorStockMap((stockPrev) => {
-          const clean = cleanColorName(colorName);
-          if (stockPrev[clean] === undefined || stockPrev[clean] === 0) {
-            return { ...stockPrev, [clean]: Math.max(4, bulkSetsInput) };
+        const clean = cleanColorName(colorName);
+        setColorRatioStockMap((stockPrev) => {
+          if (!stockPrev[clean] || Object.keys(stockPrev[clean]).length === 0) {
+            return {
+              ...stockPrev,
+              [clean]: { [formData.sizesRatio]: Math.max(4, bulkSetsInput) },
+            };
           }
           return stockPrev;
         });
@@ -423,12 +507,12 @@ export default function ProductForm({
   const handleSelectAllPresets = () => {
     const presetNames = PRESET_COLORS.map((c) => c.name);
     setSelectedColors((prev) => Array.from(new Set([...prev, ...presetNames])));
-    setColorStockMap((stockPrev) => {
+    setColorRatioStockMap((stockPrev) => {
       const next = { ...stockPrev };
       for (const c of presetNames) {
         const clean = cleanColorName(c);
-        if (next[clean] === undefined || next[clean] === 0) {
-          next[clean] = Math.max(4, bulkSetsInput);
+        if (!next[clean] || Object.keys(next[clean]).length === 0) {
+          next[clean] = { [formData.sizesRatio]: Math.max(4, bulkSetsInput) };
         }
       }
       return next;
@@ -450,11 +534,11 @@ export default function ProductForm({
       }
       return updated;
     });
-    setColorStockMap((stockPrev) => {
+    setColorRatioStockMap((stockPrev) => {
       const next = { ...stockPrev };
       for (const item of newItems) {
-        if (next[item] === undefined || next[item] === 0) {
-          next[item] = Math.max(4, bulkSetsInput);
+        if (!next[item] || Object.keys(next[item]).length === 0) {
+          next[item] = { [formData.sizesRatio]: Math.max(4, bulkSetsInput) };
         }
       }
       return next;
@@ -464,6 +548,12 @@ export default function ProductForm({
 
   const handleRemoveColor = (colorName: string) => {
     setSelectedColors((prev) => prev.filter((c) => c !== colorName));
+    setColorImages((prev) => {
+      const copy = { ...prev };
+      delete copy[colorName];
+      delete copy[cleanColorName(colorName)];
+      return copy;
+    });
   };
 
   // Image management
@@ -478,59 +568,23 @@ export default function ProductForm({
 
     setUploadingImages(true);
     const uploadedUrls: string[] = [];
-    const extractedColorsFromPhotos: string[] = [];
 
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
+        // High compression to ensure fast loading (<150KB per image)
+        const dataUrl = await compressImageFile(file, 850, 850, 0.70);
         uploadedUrls.push(dataUrl);
-
-        // Fetch all colors from uploaded photo
-        try {
-          const colorsFound = await extractColorsFromImage(dataUrl);
-          for (const c of colorsFound) {
-            const clean = cleanColorName(c);
-            if (!extractedColorsFromPhotos.includes(clean)) {
-              extractedColorsFromPhotos.push(clean);
-            }
-          }
-        } catch (colorErr) {
-          console.warn("Could not extract colors from uploaded photo:", colorErr);
-        }
       }
 
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
-
-        // Merge newly detected colors with selectedColors and initialize their stock
-        if (extractedColorsFromPhotos.length > 0) {
-          setSelectedColors((prev) => {
-            const next = [...prev];
-            for (const c of extractedColorsFromPhotos) {
-              if (!next.includes(c)) next.push(c);
-            }
-            return next;
-          });
-          setColorStockMap((stockPrev) => {
-            const next = { ...stockPrev };
-            for (const c of extractedColorsFromPhotos) {
-              if (next[c] === undefined || next[c] === 0) {
-                next[c] = Math.max(4, bulkSetsInput);
-              }
-            }
-            return next;
-          });
-          toast(
-            `Uploaded ${uploadedUrls.length} photo(s) & detected colors: ${extractedColorsFromPhotos.slice(0, 3).join(", ")}${extractedColorsFromPhotos.length > 3 ? "..." : ""}`,
-            "success"
-          );
-        } else {
-          toast(
-            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}!`,
-            "success"
-          );
-        }
+        // Note: Do NOT automatically push extracted background colors to selectedColors.
+        // Prevents studio background colors (e.g. wall, floor) from polluting product colors.
+        toast(
+          `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}!`,
+          "success"
+        );
       }
     } catch (err: any) {
       console.error("Image upload error:", err);
@@ -618,20 +672,17 @@ export default function ProductForm({
         return row;
       });
 
-      // Generate clean setsColorwise from colorStockMap for selectedColors
-      const finalStockMap: Record<string, number> = {};
+      // Generate clean setsColorwise from colorRatioStockMap for selectedColors
+      const finalStockMap: Record<string, Record<string, number>> = {};
       for (const c of selectedColors) {
         const clean = cleanColorName(c);
-        finalStockMap[clean] = Math.max(
-          0,
-          colorStockMap[clean] !== undefined
-            ? colorStockMap[clean]
-            : colorStockMap[c] !== undefined
-            ? colorStockMap[c]
-            : 0
-        );
+        const ratios = colorRatioStockMap[clean] || { [formData.sizesRatio]: 0 };
+        finalStockMap[clean] = {};
+        for (const [r, count] of Object.entries(ratios)) {
+          finalStockMap[clean][r] = Math.max(0, parseInt(String(count), 10) || 0);
+        }
       }
-      const serializedStock = stringifyColorwiseSets(finalStockMap);
+      const serializedStock = JSON.stringify(finalStockMap);
 
       const numMrp = formData.mrp ? parseFloat(String(formData.mrp)) : null;
       const retPrice = formData.retailerPrice !== undefined && !isNaN(Number(formData.retailerPrice))
@@ -652,6 +703,9 @@ export default function ProductForm({
         retailerPrice: retPrice,
         wholesalerPrice: whoPrice,
         price: retPrice,
+        costPrice: formData.costPrice !== undefined && String(formData.costPrice).trim() !== "" ? parseFloat(String(formData.costPrice)) : null,
+        mixPcs: formData.mixPcs !== undefined ? parseInt(String(formData.mixPcs), 10) || 0 : 0,
+        colorImages: Object.keys(colorImages).length > 0 ? JSON.stringify(colorImages) : null,
         setsColorwise: serializedStock || null,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
         imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
@@ -1063,13 +1117,8 @@ export default function ProductForm({
               {/* 2. Retailer Type Selling Price: MRP / 2 */}
               <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/80">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5 flex-wrap">
-                    <span>Retailer Selling Price:</span>
-                    {formData.mrp ? (
-                      <span className="line-through text-gray-400 font-normal text-[11px]">
-                        MRP ₹{formData.mrp}
-                      </span>
-                    ) : null}
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                    Retailer Selling Price (₹)
                   </label>
                   <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
                     MRP / 2
@@ -1100,13 +1149,8 @@ export default function ProductForm({
               {/* 3. Wholesaler Type Selling Price: MRP / 2 - 100 */}
               <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/80">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5 flex-wrap">
-                    <span>Wholesaler Selling Price:</span>
-                    {formData.mrp ? (
-                      <span className="line-through text-gray-400 font-normal text-[11px]">
-                        MRP ₹{formData.mrp}
-                      </span>
-                    ) : null}
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900">
+                    Wholesaler Selling Price (₹)
                   </label>
                   <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 px-1.5 py-0.5 rounded">
                     (MRP/2) - 100
@@ -1129,6 +1173,63 @@ export default function ProductForm({
                   />
                 </div>
                 <p className="text-[10px] text-purple-700 mt-1">Calculated as Retailer Price - ₹100 / piece</p>
+              </div>
+            </div>
+
+            {/* Costing & Loose Stock (Mix Pcs) for Admin Stock Tab */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200/60">
+              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/80">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                    Costing / Piece (₹)
+                  </label>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                    Inventory Valuation
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-emerald-600 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.costPrice ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        costPrice: e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="e.g. 450"
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-emerald-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-600 font-mono font-bold text-emerald-950"
+                  />
+                </div>
+                <p className="text-[10px] text-emerald-700 mt-1">Costing basis shown on Admin Stock tab to calculate total valuation</p>
+              </div>
+
+              <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                    Mix Pcs (Loose Stock)
+                  </label>
+                  <span className="text-[10px] font-semibold text-slate-600 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                    Loose Pieces
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.mixPcs ?? 0}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      mixPcs: Math.max(0, parseInt(e.target.value, 10) || 0),
+                    })
+                  }
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-600 font-mono font-bold text-slate-900"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Non-packaged individual sample or loose pieces</p>
               </div>
             </div>
           </div>
@@ -1286,88 +1387,134 @@ export default function ProductForm({
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-              {imagesList.map((imgUrl, idx) => (
-                <div
-                  key={idx}
-                  className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-xs flex flex-col justify-between"
-                >
-                  <img
-                    src={imgUrl}
-                    alt={`Product photo ${idx + 1}`}
-                    className="w-full h-full object-cover object-center"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'>Photo Unavailable</text></svg>";
-                    }}
-                  />
+              {imagesList.map((imgUrl, idx) => {
+                const assignedColor = (() => {
+                  for (const [col, url] of Object.entries(colorImages)) {
+                    if (url === imgUrl) return col;
+                  }
+                  return "";
+                })();
 
-                  {/* Top Bar: Number badge & Delete */}
-                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-xs pointer-events-auto ${
-                        idx === 0
-                          ? "bg-black/90 text-white shadow-xs"
-                          : "bg-black/65 text-white"
-                      }`}
-                    >
-                      {idx === 0 ? (
-                        <>
-                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                          <span>Cover</span>
-                        </>
-                      ) : (
-                        <span>#{idx + 1}</span>
-                      )}
-                    </span>
+                return (
+                  <div
+                    key={idx}
+                    className="group relative rounded-xl overflow-hidden bg-white border border-gray-200 shadow-xs flex flex-col justify-between"
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-gray-100">
+                      <img
+                        src={imgUrl}
+                        alt={`Product photo ${idx + 1}`}
+                        className="w-full h-full object-cover object-center"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'>Photo Unavailable</text></svg>";
+                        }}
+                      />
 
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="p-1.5 rounded-md bg-red-600/90 hover:bg-red-600 text-white shadow-xs pointer-events-auto transition-transform hover:scale-105 cursor-pointer"
-                      title="Delete photo"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                      {/* Top Bar: Number badge & Delete */}
+                      <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-xs pointer-events-auto ${
+                            idx === 0
+                              ? "bg-black/90 text-white shadow-xs"
+                              : "bg-black/65 text-white"
+                          }`}
+                        >
+                          {idx === 0 ? (
+                            <>
+                              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                              <span>Cover</span>
+                            </>
+                          ) : (
+                            <span>#{idx + 1}</span>
+                          )}
+                        </span>
 
-                  {/* Bottom Bar: Reorder arrows & Cover button on hover */}
-                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex items-center gap-1">
-                      {idx > 0 && (
                         <button
                           type="button"
-                          onClick={() => handleMoveImage(idx, idx - 1)}
-                          className="p-1 rounded-md bg-white/95 hover:bg-white text-gray-800 shadow-xs cursor-pointer"
-                          title="Move earlier"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="p-1.5 rounded-md bg-red-600/90 hover:bg-red-600 text-white shadow-xs pointer-events-auto transition-transform hover:scale-105 cursor-pointer"
+                          title="Delete photo"
                         >
-                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      {idx < imagesList.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleMoveImage(idx, idx + 1)}
-                          className="p-1 rounded-md bg-white/95 hover:bg-white text-gray-800 shadow-xs cursor-pointer"
-                          title="Move later"
-                        >
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      </div>
+
+                      {/* Bottom Bar: Reorder arrows & Cover button on hover */}
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, idx - 1)}
+                              className="p-1 rounded-md bg-white/95 hover:bg-white text-gray-800 shadow-xs cursor-pointer"
+                              title="Move earlier"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {idx < imagesList.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, idx + 1)}
+                              className="p-1 rounded-md bg-white/95 hover:bg-white text-gray-800 shadow-xs cursor-pointer"
+                              title="Move later"
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {idx !== 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleMakeCover(idx)}
+                            className="px-2 py-1 rounded-md bg-white/95 text-black text-[10px] font-semibold hover:bg-white shadow-xs cursor-pointer"
+                            title="Set as Cover Photo"
+                          >
+                            Set Cover
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {idx !== 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleMakeCover(idx)}
-                        className="px-2 py-1 rounded-md bg-white/95 text-black text-[10px] font-semibold hover:bg-white shadow-xs cursor-pointer"
-                        title="Set as Cover Photo"
+                    {/* Color Assignment Selector */}
+                    <div className="p-1.5 bg-gray-50 border-t border-gray-200">
+                      <select
+                        value={assignedColor}
+                        onChange={(e) => {
+                          const chosenColor = e.target.value;
+                          setColorImages((prev) => {
+                            const copy = { ...prev };
+                            for (const [col, url] of Object.entries(copy)) {
+                              if (url === imgUrl) delete copy[col];
+                            }
+                            if (chosenColor) {
+                              copy[chosenColor] = imgUrl;
+                            }
+                            return copy;
+                          });
+                        }}
+                        className={`w-full text-[11px] font-semibold rounded px-1.5 py-1 border transition-colors cursor-pointer ${
+                          assignedColor
+                            ? "bg-black text-white border-black font-bold"
+                            : "bg-white text-gray-700 border-gray-200"
+                        }`}
+                        title="Link this photo to a garment color"
                       >
-                        Set Cover
-                      </button>
-                    )}
+                        <option value="" className="bg-white text-gray-900">
+                          (General / Cover)
+                        </option>
+                        {selectedColors.map((col) => (
+                          <option key={col} value={col} className="bg-white text-gray-900">
+                            Color: {col}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1646,74 +1793,148 @@ export default function ProductForm({
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 uppercase font-semibold text-[11px] tracking-wider">
                   <tr>
-                    <th className="py-3 px-4">Color Shade</th>
-                    <th className="py-3 px-4 w-48 text-center">Available Sets</th>
-                    <th className="py-3 px-4 text-center">Calculated Pieces</th>
-                    <th className="py-3 px-4 text-right">Inventory Value</th>
+                    <th className="py-3 px-4 w-44">Color Shade</th>
+                    <th className="py-3 px-4">Ratio Breakdown & Available Sets</th>
+                    <th className="py-3 px-4 w-28 text-center">Total Pieces</th>
+                    <th className="py-3 px-4 w-32 text-right">Inventory Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {selectedColors.map((color) => {
                     const clean = cleanColorName(color);
                     const cInfo = getColorHex(color);
-                    const sets = colorStockMap[clean] !== undefined ? colorStockMap[clean] : (colorStockMap[color] ?? 0);
-                    const pcs = sets * (formData.pcsPerSet || 5);
-                    const value = pcs * (formData.price || 0);
+                    const colorRatios = colorRatioStockMap[clean] || { [formData.sizesRatio]: 0 };
+                    const totalColorSets = Object.values(colorRatios).reduce((sum, n) => sum + (n || 0), 0);
+                    const totalColorPcs = totalColorSets * (formData.pcsPerSet || 5);
+                    const totalColorVal = totalColorPcs * (formData.price || 0);
 
                     return (
-                      <tr key={color} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="py-3 px-4">
+                      <tr key={color} className="hover:bg-gray-50/60 transition-colors align-top">
+                        <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
                             <span
                               className="w-4 h-4 rounded-full border border-black/15 shrink-0"
                               style={{ backgroundColor: cInfo.hex }}
                             />
-                            <span className="font-semibold text-gray-900">{color}</span>
-                            {sets === 0 && (
+                            <div>
+                              <span className="font-semibold text-gray-900 block">{color}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">
+                                Total: {totalColorSets} Sets
+                              </span>
+                            </div>
+                            {totalColorSets === 0 && (
                               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                0 Sets (Hidden on Employee Side)
+                                0 Sets (Hidden)
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleColorStockChange(color, Math.max(0, sets - 1))}
-                              className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-100 font-bold"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              value={sets}
-                              onChange={(e) =>
-                                handleColorStockChange(
-                                  color,
-                                  Math.max(0, parseInt(e.target.value, 10) || 0)
-                                )
-                              }
-                              className="w-20 text-center py-1.5 bg-gray-50 border border-gray-300 rounded-lg font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-black"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleColorStockChange(color, sets + 1)}
-                              className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-100 font-bold"
-                            >
-                              +
-                            </button>
+
+                        <td className="py-3.5 px-4">
+                          <div className="space-y-2">
+                            {Object.entries(colorRatios).map(([ratioKey, setsCount]) => {
+                              const ratioPcs = (setsCount || 0) * (formData.pcsPerSet || 5);
+                              return (
+                                <div
+                                  key={ratioKey}
+                                  className="flex items-center gap-2 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/70"
+                                >
+                                  <span className="text-xs font-bold text-gray-800 bg-white px-2 py-1 rounded border border-gray-200 min-w-[75px] text-center">
+                                    {ratioKey}
+                                  </span>
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleColorRatioSetChange(
+                                          color,
+                                          ratioKey,
+                                          Math.max(0, setsCount - 1)
+                                        )
+                                      }
+                                      className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-200 font-bold text-xs cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={setsCount}
+                                      onChange={(e) =>
+                                        handleColorRatioSetChange(
+                                          color,
+                                          ratioKey,
+                                          Math.max(0, parseInt(e.target.value, 10) || 0)
+                                        )
+                                      }
+                                      className="w-16 text-center py-1 bg-white border border-gray-300 rounded font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-black"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleColorRatioSetChange(color, ratioKey, setsCount + 1)
+                                      }
+                                      className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-200 font-bold text-xs cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  <span className="text-[11px] font-mono text-gray-500 font-medium">
+                                    sets ({ratioPcs} pcs)
+                                  </span>
+
+                                  {Object.keys(colorRatios).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveRatioFromColor(color, ratioKey)}
+                                      className="ml-auto p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                      title="Remove this ratio"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {/* + Add Ratio Option */}
+                            <div className="flex items-center gap-2 pt-1">
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleAddRatioToColor(color, e.target.value);
+                                    e.target.value = "";
+                                  }
+                                }}
+                                defaultValue=""
+                                className="text-[11px] font-medium bg-white border border-dashed border-gray-300 hover:border-gray-900 rounded-lg px-2 py-1 text-gray-700 cursor-pointer focus:outline-none"
+                              >
+                                <option value="" disabled>
+                                  + Add Ratio for {color}...
+                                </option>
+                                {STANDARD_SIZE_RATIOS.filter(
+                                  (r) => colorRatios[r.value] === undefined
+                                ).map((r) => (
+                                  <option key={r.value} value={r.value}>
+                                    + {r.value} ({r.pcs} pcs/set)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center font-mono font-medium text-gray-700">
-                          {pcs} PCS
-                          <span className="text-[10px] text-gray-400 block">
-                            ({sets} × {formData.pcsPerSet || 5})
+
+                        <td className="py-3.5 px-4 text-center font-mono font-medium text-gray-700">
+                          <span className="font-bold text-gray-900 text-sm block">
+                            {totalColorPcs} PCS
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            ({totalColorSets} sets)
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-gray-900">
-                          ₹{value.toLocaleString("en-IN")}
+
+                        <td className="py-3.5 px-4 text-right font-mono font-semibold text-gray-900">
+                          ₹{totalColorVal.toLocaleString("en-IN")}
                         </td>
                       </tr>
                     );
@@ -1721,24 +1942,26 @@ export default function ProductForm({
                 </tbody>
                 <tfoot className="bg-gray-50 font-bold border-t border-gray-200 text-gray-900 text-xs">
                   {(() => {
-                    const totalSets = selectedColors.reduce(
-                      (sum, c) => sum + (colorStockMap[c] ?? 0),
-                      0
-                    );
-                    const totalPcs = totalSets * (formData.pcsPerSet || 5);
-                    const totalVal = totalPcs * (formData.price || 0);
+                    let grandSets = 0;
+                    for (const c of selectedColors) {
+                      const clean = cleanColorName(c);
+                      const ratios = colorRatioStockMap[clean] || {};
+                      grandSets += Object.values(ratios).reduce((s, n) => s + (n || 0), 0);
+                    }
+                    const grandPcs = grandSets * (formData.pcsPerSet || 5);
+                    const grandVal = grandPcs * (formData.price || 0);
 
                     return (
                       <tr>
                         <td className="py-3 px-4">Total Inventory</td>
-                        <td className="py-3 px-4 text-center font-mono font-bold text-zinc-900 text-sm">
-                          {totalSets} Sets
+                        <td className="py-3 px-4 font-mono font-bold text-zinc-900 text-sm">
+                          {grandSets} Sets Across Ratios
                         </td>
-                        <td className="py-3 px-4 text-center font-mono text-zinc-800">
-                          {totalPcs} PCS
+                        <td className="py-3 px-4 text-center font-mono text-zinc-800 text-sm">
+                          {grandPcs} PCS
                         </td>
                         <td className="py-3 px-4 text-right font-mono text-emerald-700 text-sm">
-                          ₹{totalVal.toLocaleString("en-IN")}
+                          ₹{grandVal.toLocaleString("en-IN")}
                         </td>
                       </tr>
                     );

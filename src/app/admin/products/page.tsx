@@ -38,7 +38,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [previewGuide, setPreviewGuide] = useState<{ name: string; guide: string; sizesList?: string } | null>(null);
+  const [previewGuide, setPreviewGuide] = useState<{ name: string; guide: string } | null>(null);
   const [previewUnit, setPreviewUnit] = useState<"IN" | "CM">("IN");
   const [categoriesList, setCategoriesList] = useState<string[]>([...PRODUCT_CATEGORIES]);
 
@@ -385,29 +385,29 @@ export default function ProductsPage() {
                     </td>
                     <td className="py-4 px-6 text-xs">
                       <div className="flex flex-col gap-1.5 font-mono">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 uppercase">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 uppercase shrink-0">
                             Retailer
                           </span>
-                          {(p.mrp || p.price) && (
-                            <span className="line-through text-gray-400 text-[11px] font-normal">
-                              MRP ₹{p.mrp || ((p.retailerPrice || p.price) * 2)}
+                          {p.mrp && (
+                            <span className="line-through text-gray-400 text-xs">
+                              MRP ₹{p.mrp}
                             </span>
                           )}
-                          <span className="font-bold text-gray-900">
+                          <span className="font-bold text-gray-900 text-xs">
                             {formatCurrency(p.retailerPrice || p.price)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 uppercase">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 uppercase shrink-0">
                             Wholesaler
                           </span>
-                          {(p.mrp || p.price) && (
-                            <span className="line-through text-gray-400 text-[11px] font-normal">
-                              MRP ₹{p.mrp || ((p.retailerPrice || p.price) * 2)}
+                          {p.mrp && (
+                            <span className="line-through text-gray-400 text-xs">
+                              MRP ₹{p.mrp}
                             </span>
                           )}
-                          <span className="font-bold text-gray-900">
+                          <span className="font-bold text-gray-900 text-xs">
                             {formatCurrency(p.wholesalerPrice || Math.max(0, (p.retailerPrice || p.price) - 100))}
                           </span>
                         </div>
@@ -416,7 +416,7 @@ export default function ProductsPage() {
                     <td className="py-4 px-6">
                       {p.sizeGuide ? (
                         <button
-                          onClick={() => setPreviewGuide({ name: p.name, guide: p.sizeGuide!, sizesList: p.sizesList || p.sizesRatio })}
+                          onClick={() => setPreviewGuide({ name: p.name, guide: p.sizeGuide! })}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition-colors cursor-pointer"
                         >
                           <Ruler size={13} /> View Guide
@@ -476,19 +476,6 @@ export default function ProductsPage() {
             parsedRows = parsed;
           }
         } catch {}
-
-        if (parsedRows && previewGuide.sizesList) {
-          const allowedSizes = previewGuide.sizesList
-            .split(/[,;\s]+/)
-            .map((s) => s.trim().toLowerCase())
-            .filter(Boolean);
-          const filtered = parsedRows.filter((r) =>
-            allowedSizes.includes(r.brandSize.toLowerCase())
-          );
-          if (filtered.length > 0) {
-            parsedRows = filtered;
-          }
-        }
 
         const formatVal = (val: string) => {
           const num = parseFloat(val);

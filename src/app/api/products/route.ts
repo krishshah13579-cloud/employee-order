@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getProductCoverImage } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,6 +11,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const activeOnly = searchParams.get("active_only") === "1";
     const search = searchParams.get("search");
+    const fullGallery = searchParams.get("full_gallery") === "1";
 
     const where: any = {};
 
@@ -29,34 +31,22 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const fullImages = searchParams.get("full_images") === "1";
-
     const products = await prisma.product.findMany({
       where,
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
-    const optimizedProducts = fullImages
+    // Optimize payload size: if full gallery not explicitly requested, return only the primary cover image
+    const optimized = fullGallery
       ? products
-      : products.map((p) => {
-          let cover = p.imageUrl;
-          if (cover && cover.startsWith("[") && cover.endsWith("]")) {
-            try {
-              const arr = JSON.parse(cover);
-              if (Array.isArray(arr) && arr.length > 0) {
-                cover = arr[0];
-              }
-            } catch {}
-          }
-          return {
-            ...p,
-            imageUrl: cover,
-          };
-        });
+      : products.map((p) => ({
+          ...p,
+          imageUrl: getProductCoverImage(p.imageUrl),
+        }));
 
-    return NextResponse.json(optimizedProducts, {
+    return NextResponse.json(optimized, {
       headers: {
-        "Cache-Control": "public, max-age=4, s-maxage=8, stale-while-revalidate=20",
+        "Cache-Control": "public, s-maxage=5, stale-while-revalidate=29",
       },
     });
   } catch (error: any) {
@@ -79,6 +69,9 @@ export async function POST(request: NextRequest) {
       sizesList,
       pcsPerSet,
       price,
+      costPrice,
+      mixPcs,
+      colorImages,
       setsColorwise,
       sizeGuide,
       imageUrl,
@@ -122,6 +115,9 @@ export async function POST(request: NextRequest) {
         retailerPrice: retailerPrice,
         wholesalerPrice: wholesalerPrice,
         price: retailerPrice,
+        costPrice: costPrice !== undefined && costPrice !== null ? parseFloat(costPrice) : null,
+        mixPcs: mixPcs !== undefined && mixPcs !== null ? parseInt(mixPcs, 10) || 0 : 0,
+        colorImages: colorImages ? (typeof colorImages === "string" ? colorImages : JSON.stringify(colorImages)) : null,
         setsColorwise: setsColorwise || null,
         sizeGuide: sizeGuide || null,
         imageUrl: imageUrl || null,

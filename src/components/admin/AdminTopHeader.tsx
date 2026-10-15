@@ -35,6 +35,7 @@ export default function AdminTopHeader({
     if (pathname === "/admin/orders/new") return "Book New Wholesale Order";
     if (pathname.startsWith("/admin/orders/")) return "Wholesale Order Invoice";
     if (pathname.startsWith("/admin/orders")) return "Garment Orders & Invoices";
+    if (pathname.startsWith("/admin/stock")) return "Stock & Inventory Control";
     return "Control Center";
   };
 

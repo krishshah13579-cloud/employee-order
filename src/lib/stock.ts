@@ -27,9 +27,19 @@ export function parseColorwiseSets(raw: string | null | undefined): Record<strin
       const parsed = JSON.parse(trimmed);
       if (typeof parsed === "object" && parsed !== null) {
         for (const [k, v] of Object.entries(parsed)) {
-          const num = parseInt(String(v), 10);
-          if (!isNaN(num)) {
-            result[k.trim()] = Math.max(0, num);
+          if (typeof v === "object" && v !== null) {
+            // Nested ratio breakdown, e.g. {"30 to 38": 5, "32 to 38": 1}
+            let subtotal = 0;
+            for (const rSets of Object.values(v)) {
+              const n = parseInt(String(rSets), 10);
+              if (!isNaN(n)) subtotal += Math.max(0, n);
+            }
+            result[k.trim()] = subtotal;
+          } else {
+            const num = parseInt(String(v), 10);
+            if (!isNaN(num)) {
+              result[k.trim()] = Math.max(0, num);
+            }
           }
         }
         return result;
@@ -63,6 +73,109 @@ export function parseColorwiseSets(raw: string | null | undefined): Record<strin
   }
 
   return result;
+}
+
+/**
+ * Parses detailed ratio breakdown for each color.
+ * Returns: { "Navy Blue": { "30 to 38": 5, "32 to 38": 1 }, ... }
+ */
+export function parseDetailedColorRatioSets(
+  raw: string | null | undefined,
+  defaultRatio: string = "30 to 38"
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {};
+  if (!raw) return result;
+  const trimmed = raw.trim();
+  if (!trimmed) return result;
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && parsed !== null) {
+        for (const [col, val] of Object.entries(parsed)) {
+          const colorKey = cleanColorName(col.trim());
+          if (!colorKey) continue;
+          if (typeof val === "object" && val !== null) {
+            result[colorKey] = {};
+            for (const [ratioKey, count] of Object.entries(val as any)) {
+              result[colorKey][ratioKey.trim()] = Math.max(0, parseInt(String(count), 10) || 0);
+            }
+          } else {
+            const num = parseInt(String(val), 10);
+            result[colorKey] = {
+              [defaultRatio]: Math.max(0, isNaN(num) ? 0 : num),
+            };
+          }
+        }
+        return result;
+      }
+    } catch {}
+  }
+
+  // Fallback to flat map
+  const flat = parseColorwiseSets(raw);
+  for (const [col, num] of Object.entries(flat)) {
+    const colorKey = cleanColorName(col);
+    if (colorKey && colorKey !== "__default__") {
+      result[colorKey] = { [defaultRatio]: num };
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolves the specific photo for a given color of a product.
+ * Checks colorImages mapping, index match with gallery images, or falls back to cover image.
+ */
+export function getProductColorImage(
+  product: { imageUrl?: string | null; colorImages?: string | null; colorsAvailable?: string | null; setsColorwise?: string | null; colorMapping?: string | null } | null | undefined,
+  colorName: string
+): string {
+  if (!product) return "";
+  const cleanTarget = cleanColorName(colorName).toLowerCase();
+
+  // 1. Check colorImages JSON map if present
+  if (product.colorImages) {
+    try {
+      const map = typeof product.colorImages === "string" ? JSON.parse(product.colorImages) : product.colorImages;
+      if (typeof map === "object" && map !== null) {
+        for (const [k, v] of Object.entries(map)) {
+          if (cleanColorName(k).toLowerCase() === cleanTarget && typeof v === "string" && v) {
+            return v;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // Helper to extract all images
+  let images: string[] = [];
+  if (product.imageUrl) {
+    const trimmed = product.imageUrl.trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) images = parsed.filter(Boolean);
+      } catch {}
+    } else if (trimmed.startsWith("data:")) {
+      images = [trimmed];
+    } else if (trimmed.includes(",")) {
+      images = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    } else {
+      images = [trimmed];
+    }
+  }
+
+  // 2. Map by color index to gallery photos
+  const allColors = getAllProductColors(product.colorsAvailable, product.setsColorwise, product.colorMapping);
+  const colorIndex = allColors.findIndex((c) => cleanColorName(c).toLowerCase() === cleanTarget);
+
+  if (colorIndex !== -1 && images[colorIndex]) {
+    return images[colorIndex];
+  }
+
+  // 3. Fallback to first image
+  return images[0] || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'><rect width='400' height='400' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2364748b'>Garment Photo</text></svg>";
 }
 
 /**
@@ -244,36 +357,35 @@ export function stringifyColorwiseSets(stockMap: Record<string, number>): string
  */
 export function deductSetsFromStock(
   setsColorwise: string | null | undefined,
-  orderedColorSets: { color: string; sets: number }[]
+  orderedColorSets: { color: string; sets: number; ratio?: string }[]
 ): string {
-  const stockMap = parseColorwiseSets(setsColorwise);
+  const detailed = parseDetailedColorRatioSets(setsColorwise);
 
   for (const orderItem of orderedColorSets) {
     const targetColor = cleanColorName(orderItem.color.trim());
-    const setsToDeduct = Math.max(0, orderItem.sets);
+    let remainingToDeduct = Math.max(0, orderItem.sets);
 
-    // Find matching key (exact, cleaned, or case-insensitive)
-    let matchedKey: string | null = null;
-    if (stockMap[targetColor] !== undefined) {
-      matchedKey = targetColor;
-    } else {
-      const lower = targetColor.toLowerCase();
-      for (const k of Object.keys(stockMap)) {
-        if (cleanColorName(k).toLowerCase() === lower || k.toLowerCase() === lower) {
-          matchedKey = k;
-          break;
-        }
+    let matchedColor = Object.keys(detailed).find(
+      (c) => c.toLowerCase() === targetColor.toLowerCase()
+    );
+
+    if (matchedColor && detailed[matchedColor]) {
+      const ratios = detailed[matchedColor];
+      if (orderItem.ratio && ratios[orderItem.ratio] !== undefined) {
+        const canDeduct = Math.min(remainingToDeduct, ratios[orderItem.ratio]);
+        ratios[orderItem.ratio] -= canDeduct;
+        remainingToDeduct -= canDeduct;
       }
-    }
-
-    if (matchedKey && stockMap[matchedKey] !== undefined) {
-      stockMap[matchedKey] = Math.max(0, stockMap[matchedKey] - setsToDeduct);
-    } else if (stockMap["__default__"] !== undefined) {
-      stockMap["__default__"] = Math.max(0, stockMap["__default__"] - setsToDeduct);
+      for (const [r, count] of Object.entries(ratios)) {
+        if (remainingToDeduct <= 0) break;
+        const canDeduct = Math.min(remainingToDeduct, count);
+        ratios[r] -= canDeduct;
+        remainingToDeduct -= canDeduct;
+      }
     }
   }
 
-  return stringifyColorwiseSets(stockMap);
+  return JSON.stringify(detailed);
 }
 
 /**
@@ -282,34 +394,27 @@ export function deductSetsFromStock(
  */
 export function restoreSetsToStock(
   setsColorwise: string | null | undefined,
-  returnedColorSets: { color: string; sets: number }[]
+  returnedColorSets: { color: string; sets: number; ratio?: string }[]
 ): string {
-  const stockMap = parseColorwiseSets(setsColorwise);
+  const detailed = parseDetailedColorRatioSets(setsColorwise);
 
   for (const orderItem of returnedColorSets) {
     const targetColor = cleanColorName(orderItem.color.trim());
     const setsToRestore = Math.max(0, orderItem.sets);
     if (setsToRestore === 0) continue;
 
-    let matchedKey: string | null = null;
-    if (stockMap[targetColor] !== undefined) {
-      matchedKey = targetColor;
-    } else {
-      const lower = targetColor.toLowerCase();
-      for (const k of Object.keys(stockMap)) {
-        if (cleanColorName(k).toLowerCase() === lower || k.toLowerCase() === lower) {
-          matchedKey = k;
-          break;
-        }
-      }
+    let matchedColor = Object.keys(detailed).find(
+      (c) => c.toLowerCase() === targetColor.toLowerCase()
+    );
+
+    if (!matchedColor) {
+      matchedColor = targetColor;
+      detailed[matchedColor] = {};
     }
 
-    if (matchedKey && stockMap[matchedKey] !== undefined) {
-      stockMap[matchedKey] += setsToRestore;
-    } else {
-      stockMap[targetColor] = setsToRestore;
-    }
+    const defaultRatioKey = orderItem.ratio || Object.keys(detailed[matchedColor])[0] || "30 to 38";
+    detailed[matchedColor][defaultRatioKey] = (detailed[matchedColor][defaultRatioKey] || 0) + setsToRestore;
   }
 
-  return stringifyColorwiseSets(stockMap);
+  return JSON.stringify(detailed);
 }

@@ -84,7 +84,10 @@ model Product {
   retailerPrice   Float?      // Retailer Selling Price: MRP / 2
   wholesalerPrice Float?      // Wholesaler Selling Price: MRP / 2 - 100
   price           Float       @default(490) // Base / Retailer Price per PC
-  setsColorwise   String?     // Stock/Default Sets colorwise, e.g. "Dark Grey: 25, Navy Blue: 30, Jet Black: 40"
+  costPrice       Float?      // Costing price per PC (e.g. fabric + tailoring + packaging)
+  mixPcs          Int         @default(0) // Mixed / loose single pieces in stock
+  colorImages     String?     // JSON mapping of color -> photo data URL or image index
+  setsColorwise   String?     // Stock/Default Sets colorwise, supporting multi-ratio sets
   sizeGuide       String?     // Size guide instructions / dimensions / image link
   imageUrl        String?
   isActive        Boolean     @default(true)

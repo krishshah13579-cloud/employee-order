@@ -206,11 +206,6 @@ export default function OrderInvoicePage() {
                                 />
                                 <span>
                                   {cs.color}: <strong>{cs.sets} sets</strong>
-                                  {cs.ratioSets && cs.ratioSets.length > 0 && (
-                                    <span className="text-[10px] text-gray-500 font-normal ml-1">
-                                      ({cs.ratioSets.map((r: any) => `${r.ratio}: ${r.sets}s`).join(", ")})
-                                    </span>
-                                  )}
                                 </span>
                               </span>
                             );

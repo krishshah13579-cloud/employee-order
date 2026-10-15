@@ -33,11 +33,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(customers, {
-      headers: {
-        "Cache-Control": "public, max-age=4, s-maxage=8, stale-while-revalidate=20",
-      },
-    });
+    return NextResponse.json(customers);
   } catch (error: any) {
     console.error("Error fetching customers:", error);
     return NextResponse.json(

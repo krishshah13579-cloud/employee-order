@@ -9,7 +9,6 @@ import {
   Home,
   FilePlus,
   Package,
-  Boxes,
   LogOut,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
@@ -23,7 +22,6 @@ export default function Navbar() {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/orders/new", label: "Order Form", icon: FilePlus },
     { href: "/orders", label: "Order Page", icon: Package },
-    { href: "/stock", label: "Stock", icon: Boxes },
   ];
 
   return (

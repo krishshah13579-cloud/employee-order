@@ -125,6 +125,9 @@ export interface ProductData {
   retailerPrice?: number | null; // Retailer Selling Price (MRP / 2)
   wholesalerPrice?: number | null; // Wholesaler Selling Price (MRP / 2 - 100)
   price: number;           // base price per piece
+  costPrice?: number | null; // Costing price per PC
+  mixPcs?: number;          // Mixed / loose pieces in stock
+  colorImages?: string | null; // JSON map of color -> image
   setsColorwise?: string | null; // e.g. "Dark Blue: 20, Jet Black: 25, Grey: 15"
   sizeGuide?: string | null;
   imageUrl?: string | null;
@@ -133,19 +136,9 @@ export interface ProductData {
   updatedAt: string;
 }
 
-export interface ColorRatioEntry {
-  ratio: string;
-  sizes?: string;
-  pcsPerSet?: number;
-  sets: number;
-  pcs?: number;
-}
-
 export interface ColorSetEntry {
   color: string;
   sets: number;
-  pcs?: number;
-  ratioSets?: ColorRatioEntry[];
 }
 
 export interface OrderItemData {

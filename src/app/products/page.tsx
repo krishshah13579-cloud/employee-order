@@ -390,14 +390,25 @@ function ProductsContent() {
                             </span>
                           )}
                         </div>
-                        <div className="text-lg font-black text-slate-900 font-mono">
-                          {(() => {
-                            const isWholesaler = draftInfo?.businessType === "WHOLESALER";
-                            const ret = product.retailerPrice || product.price;
-                            const who = product.wholesalerPrice || Math.max(0, ret - 100);
-                            return formatCurrency(isWholesaler ? who : ret);
-                          })()}
-                        </div>
+                        {(() => {
+                          const isWholesaler = draftInfo?.businessType === "WHOLESALER";
+                          const ret = product.retailerPrice || product.price;
+                          const who = product.wholesalerPrice || Math.max(0, ret - 100);
+                          const activePrice = isWholesaler ? who : ret;
+
+                          return (
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              {product.mrp && product.mrp > activePrice && (
+                                <span className="text-xs text-slate-400 line-through font-mono">
+                                  MRP {formatCurrency(product.mrp)}
+                                </span>
+                              )}
+                              <span className="text-lg font-black text-slate-900 font-mono">
+                                {formatCurrency(activePrice)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <Link
