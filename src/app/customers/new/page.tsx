@@ -582,9 +582,6 @@ function CustomerRegistrationContent() {
                       <span>Type of Business</span>
                       <span className="text-red-500 font-bold">* (Mandatory)</span>
                     </label>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      Sets product rate pricing tier
-                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -597,12 +594,7 @@ function CustomerRegistrationContent() {
                           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                       }`}
                     >
-                      <div>
-                        <div className="font-black text-sm text-blue-900">RETAILER</div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Standard Selling Rate: <strong className="text-blue-700 font-mono">MRP / 2</strong>
-                        </div>
-                      </div>
+                      <div className="font-black text-sm text-blue-900">Retailer</div>
                       {businessType === "RETAILER" && (
                         <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
                       )}
@@ -617,12 +609,7 @@ function CustomerRegistrationContent() {
                           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                       }`}
                     >
-                      <div>
-                        <div className="font-black text-sm text-purple-900">WHOLESALER</div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Wholesale Selling Rate: <strong className="text-purple-700 font-mono">(MRP / 2) - ₹100</strong>
-                        </div>
-                      </div>
+                      <div className="font-black text-sm text-purple-900">Wholesaler</div>
                       {businessType === "WHOLESALER" && (
                         <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
                       )}

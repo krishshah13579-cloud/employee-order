@@ -386,7 +386,7 @@ function ProductsContent() {
                                   : "bg-blue-100 text-blue-800"
                               }`}
                             >
-                              {draftInfo.businessType === "WHOLESALER" ? "Wholesale" : "Retail"}
+                              {draftInfo.businessType === "WHOLESALER" ? "Wholesaler" : "Retailer"}
                             </span>
                           )}
                         </div>

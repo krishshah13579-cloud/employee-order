@@ -305,7 +305,7 @@ export default function OrderFormPage() {
 
     setItems(updatedItems);
     saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit);
-    toast(`Customer selected: ${c.shopName} (${isWholesaler ? "Wholesaler Pricing" : "Retailer Pricing"})`);
+    toast(`Customer selected: ${c.shopName} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
   };
 
   // Handle Remove Item
@@ -809,17 +809,15 @@ export default function OrderFormPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
-                      Business Type / Pricing Tier
+                      Type of Business
                     </span>
                     {selectedCustomer.businessType === "WHOLESALER" ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold">
-                        <span>🟣 WHOLESALER</span>
-                        <span className="font-mono text-[11px] text-purple-700">((MRP / 2) - ₹100 / pc)</span>
+                        <span>Wholesaler</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
-                        <span>🔵 RETAILER</span>
-                        <span className="font-mono text-[11px] text-blue-700">(MRP / 2 / pc)</span>
+                        <span>Retailer</span>
                       </span>
                     )}
                   </div>

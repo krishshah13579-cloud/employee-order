@@ -476,11 +476,7 @@ function ProductDetailContent() {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
-                      {draftCustomer
-                        ? isWholesaler
-                          ? "Wholesaler Selling Rate"
-                          : "Retailer Selling Rate"
-                        : "Selling Rate / PC"}
+                      Selling Rate / PC
                     </span>
                     {draftCustomer && (
                       <span
@@ -490,7 +486,7 @@ function ProductDetailContent() {
                             : "bg-blue-100 text-blue-800 border border-blue-200"
                         }`}
                       >
-                        {draftCustomer.businessType || "RETAILER"}
+                        {isWholesaler ? "Wholesaler" : "Retailer"}
                       </span>
                     )}
                   </div>
@@ -498,16 +494,10 @@ function ProductDetailContent() {
                     <span>{formatCurrency(unitPrice)}</span>
                     <span className="text-xs font-semibold text-slate-500 font-sans">/ pc</span>
                   </div>
-                  {draftCustomer ? (
+                  {draftCustomer && (
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Applied for <strong>{draftCustomer.shopName}</strong> ({isWholesaler ? "MRP/2 - ₹100" : "MRP/2"})
+                      Applied for <strong>{draftCustomer.shopName}</strong>
                     </p>
-                  ) : (
-                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-mono">
-                      <span>Ret: {formatCurrency(retPrice)}</span>
-                      <span>•</span>
-                      <span>Whol: {formatCurrency(whoPrice)}</span>
-                    </div>
                   )}
                 </div>
 
