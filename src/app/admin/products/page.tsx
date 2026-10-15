@@ -384,16 +384,11 @@ export default function ProductsPage() {
                       })()}
                     </td>
                     <td className="py-4 px-6 text-xs">
-                      <div className="flex flex-col gap-1.5 font-mono">
+                      <div className="flex flex-col gap-1 font-mono">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 uppercase shrink-0">
                             Retailer
                           </span>
-                          {p.mrp && (
-                            <span className="line-through text-gray-400 text-xs">
-                              MRP ₹{p.mrp}
-                            </span>
-                          )}
                           <span className="font-bold text-gray-900 text-xs">
                             {formatCurrency(p.retailerPrice || p.price)}
                           </span>
@@ -402,15 +397,15 @@ export default function ProductsPage() {
                           <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 uppercase shrink-0">
                             Wholesaler
                           </span>
-                          {p.mrp && (
-                            <span className="line-through text-gray-400 text-xs">
-                              MRP ₹{p.mrp}
-                            </span>
-                          )}
                           <span className="font-bold text-gray-900 text-xs">
                             {formatCurrency(p.wholesalerPrice || Math.max(0, (p.retailerPrice || p.price) - 100))}
                           </span>
                         </div>
+                        {p.mrp ? (
+                          <div className="text-[10px] text-gray-400 font-sans mt-0.5">
+                            MRP: ₹{p.mrp}
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                     <td className="py-4 px-6">
