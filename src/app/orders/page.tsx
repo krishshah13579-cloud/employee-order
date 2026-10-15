@@ -19,6 +19,7 @@ import {
   Truck,
   Eye,
   MapPin,
+  MessageCircle,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -303,20 +304,44 @@ export default function EmployeeOrdersListPage() {
                           {formatDate(order.orderDate)}
                         </td>
 
-                        {/* Action: View Order */}
+                        {/* Action: View Order & WhatsApp */}
                         <td className="py-4 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/orders/${order.id}`);
-                            }}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-3 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95"
-                            title="View customer product details"
-                          >
-                            <Eye size={13} />
-                            <span>View Order</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/orders/${order.id}`);
+                              }}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-3 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95"
+                              title="View customer product details"
+                            >
+                              <Eye size={13} />
+                              <span>View</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const res = await fetch(`/api/orders/${order.id}/whatsapp`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.whatsappUrl) {
+                                    window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                                  }
+                                } catch {}
+                              }}
+                              className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition"
+                              title="Send invoice & updates on WhatsApp"
+                            >
+                              <MessageCircle size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

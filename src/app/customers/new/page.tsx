@@ -25,6 +25,7 @@ import {
   Check,
   Plus,
   Trash2,
+  Clock,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -619,38 +620,50 @@ function CustomerRegistrationContent() {
                   </div>
                 </div>
 
-                {/* Field: Credit Days Limit */}
-                <div className="space-y-1.5 p-3.5 bg-slate-50/80 rounded-xl border border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                      <span>Credit Days Limit</span>
+                {/* ═══════════════════════════════════════════
+                    CREDIT DAYS TAB (ENTERED MANUALLY)
+                    ═══════════════════════════════════════════ */}
+                <div className="space-y-2 p-4 bg-orange-50/50 rounded-2xl border border-orange-200 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                      <Clock size={15} className="text-orange-600" />
+                      <span>Credit Days (Enter Manually)</span>
+                      <span className="text-slate-400 font-normal text-[11px]">(Keyboard Input)</span>
                     </label>
                     <span className="text-[11px] text-slate-500 font-semibold">
-                      (0 = Advance, 15, 30, 45 Days)
+                      Type days limit e.g. 15, 30, 45, 60 (0 = Advance)
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-44">
+
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                    <div className="relative w-full sm:w-52">
                       <input
                         type="number"
                         min={0}
                         max={180}
+                        step={1}
                         value={creditDays === "" ? "" : creditDays}
                         onChange={(e) => {
                           const val = e.target.value === "" ? "" : parseInt(e.target.value, 10);
                           setCreditDays(isNaN(val as number) ? "" : val);
                         }}
-                        placeholder="0"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                        placeholder="e.g. 45"
+                        className="w-full px-4 py-2.5 bg-white border-2 border-orange-300 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs pr-14"
                       />
                       <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
-                        Days Limit
+                        Days
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-slate-700">
-                      {creditDays ? `${creditDays} Days Credit Limit` : "Advance Payment (0 Days Credit)"}
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-white text-orange-950 border border-orange-200 shadow-xs font-mono">
+                        {creditDays ? `✓ ${creditDays} Days Credit Limit Granted` : "✓ Advance Payment (0 Days Credit)"}
+                      </span>
+                    </div>
                   </div>
+                  <p className="text-[10.5px] text-slate-500">
+                    Credit terms will be auto-applied on all order forms for this customer.
+                  </p>
                 </div>
 
                 {/* Field 1: Firm Name */}

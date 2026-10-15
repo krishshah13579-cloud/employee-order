@@ -12,17 +12,56 @@ import {
   CheckCircle,
   Percent,
   Loader2,
+  MessageCircle,
+  Bell,
+  Clock,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import type { OrderData, ColorSetEntry } from "@/lib/types";
+import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
+import { useToast } from "@/components/ui/Toast";
 
 export default function OrderInvoicePage() {
   const params = useParams();
   const id = params?.id as string;
+  const { toast } = useToast();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+
+  const handleSendWhatsApp = async (type: "ORDER_CONFIRMATION" | "PAYMENT_REMINDER" = "ORDER_CONFIRMATION") => {
+    try {
+      setSendingWhatsApp(true);
+      const res = await fetch(`/api/orders/${id}/whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process WhatsApp");
+
+      if (data.automated) {
+        toast("✅ WhatsApp message dispatched to customer automatically!", "success");
+      } else {
+        toast(
+          type === "PAYMENT_REMINDER"
+            ? "Opening WhatsApp with Payment Reminder..."
+            : "Opening WhatsApp with Order Details...",
+          "success"
+        );
+      }
+
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (err: any) {
+      toast(err.message || "Failed to send WhatsApp", "error");
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -65,8 +104,8 @@ export default function OrderInvoicePage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-16">
-      {/* Top Bar with Back and Print */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-gray-200 print:hidden">
+      {/* Top Bar with Back, WhatsApp, and Print */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-200 print:hidden">
         <Link
           href="/admin/orders"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-black transition-colors"
@@ -75,17 +114,45 @@ export default function OrderInvoicePage() {
           <span>Back to Orders</span>
         </Link>
 
-        <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-        >
-          <Printer size={14} />
-          <span>Print Tax Invoice</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* WhatsApp Order Update */}
+          <button
+            type="button"
+            disabled={sendingWhatsApp}
+            onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Send Tax Invoice PDF link & order confirmation to customer on WhatsApp"
+          >
+            <MessageCircle size={14} />
+            <span>{sendingWhatsApp ? "Sending..." : "Send on WhatsApp"}</span>
+          </button>
+
+          {/* Weekly Payment Reminder */}
+          <button
+            type="button"
+            disabled={sendingWhatsApp}
+            onClick={() => handleSendWhatsApp("PAYMENT_REMINDER")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Send weekly payment due reminder to customer on WhatsApp"
+          >
+            <Bell size={14} />
+            <span>Weekly Reminder</span>
+          </button>
+
+          {/* Print A4 Tax Invoice */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+          >
+            <Printer size={14} />
+            <span>Print A4 Invoice</span>
+          </button>
+        </div>
       </div>
 
-      {/* Tax Invoice Document Container */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0">
+      {/* Interactive Container (Hidden on Print) */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-xs space-y-6 print:hidden">
         {/* Invoice Header */}
         <div className="flex justify-between items-start border-b border-gray-200 pb-6">
           <div>
@@ -281,11 +348,54 @@ export default function OrderInvoicePage() {
 
         {/* Terms & Conditions */}
         <div className="pt-4 border-t border-gray-200 text-[11px] text-gray-500 space-y-1">
-          <div className="font-bold text-gray-700 uppercase tracking-wider">Terms & Conditions:</div>
+          <div className="font-bold text-gray-700 uppercase tracking-wider">Terms &amp; Conditions:</div>
           <div>1. 5% GST applicable on wholesale garments.</div>
           <div>2. Goods once sold will not be taken back or exchanged.</div>
           <div>3. Payment due within agreed wholesale credit terms.</div>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          EXACT A4 TAX INVOICE PRINT VIEW
+          (Krish Clothing Co. format)
+          ═══════════════════════════════════════════ */}
+      <div className="hidden print:block py-2">
+        <TaxInvoiceA4
+          order={{
+            orderNumber: order.orderNumber,
+            orderDate: order.orderDate,
+            status: order.status,
+            customerName: order.customer?.shopName || order.customerName,
+            customerGstPan: order.customer?.gstPanNo || order.customerGstPan,
+            customerPhone: order.customer?.phoneNumber || order.customerPhone,
+            customerAddress: order.customer?.address || order.customerAddress,
+            customerCity: order.customer?.city,
+            customerState: order.customer?.state,
+            businessType: order.businessType || order.customer?.businessType,
+            creditDays:
+              order.creditDays !== undefined ? order.creditDays : order.customer?.creditDays || 45,
+            subtotal: order.subtotal,
+            gstRate: order.gstRate,
+            gstAmount: order.gstAmount,
+            grandTotal: order.grandTotal,
+            totalPcs: order.totalPcs,
+            totalSets: order.totalSets,
+            placedBy: order.placedBy,
+            notes: order.notes,
+            items:
+              order.items?.map((it) => ({
+                id: it.id,
+                productName: it.productName,
+                colorSets: it.colorSets,
+                sizeRatio: it.sizeRatio,
+                pcsPerSet: it.pcsPerSet,
+                totalSets: it.totalSets,
+                totalPcs: it.totalPcs,
+                unitPrice: it.unitPrice,
+                itemSubtotal: it.itemSubtotal,
+              })) || [],
+          }}
+        />
       </div>
     </div>
   );

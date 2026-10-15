@@ -22,6 +22,10 @@ import {
   ShoppingBag,
   RotateCcw,
   Sparkles,
+  MessageCircle,
+  Clock,
+  Bell,
+  Send,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
@@ -30,6 +34,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import { ORDER_STATUSES, STATUS_COLORS, type OrderStatus } from "@/lib/types";
 import type { CustomerData, ProductData, ColorSetEntry } from "@/lib/types";
+import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
 
 interface EditableOrderItem {
   id?: number;
@@ -64,6 +69,10 @@ export default function OrderEditPage() {
   const [status, setStatus] = useState<OrderStatus>("Pending");
   const [placedBy, setPlacedBy] = useState<string>("");
   const [orderNotes, setOrderNotes] = useState<string>("");
+  const [businessType, setBusinessType] = useState<string>("RETAILER");
+  const [creditDays, setCreditDays] = useState<number>(45);
+  const [transportName, setTransportName] = useState<string>("");
+  const [sendingWhatsApp, setSendingWhatsApp] = useState<boolean>(false);
 
   // Customer Details
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -88,6 +97,41 @@ export default function OrderEditPage() {
   const [selectedProductToAdd, setSelectedProductToAdd] = useState<ProductData | null>(null);
   const [colorSetsToAdd, setColorSetsToAdd] = useState<Record<string, number>>({});
 
+  // WhatsApp Sender Handler
+  const handleSendWhatsApp = async (type: "ORDER_CONFIRMATION" | "PAYMENT_REMINDER" = "ORDER_CONFIRMATION") => {
+    try {
+      setSendingWhatsApp(true);
+      const res = await fetch(`/api/orders/${orderId}/whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to process WhatsApp request");
+      }
+
+      if (data.automated) {
+        toast("✅ WhatsApp message dispatched to customer automatically!", "success");
+      } else {
+        toast(
+          type === "PAYMENT_REMINDER"
+            ? "Opening WhatsApp with Payment Reminder..."
+            : "Opening WhatsApp with Tax Invoice & Updates...",
+          "success"
+        );
+      }
+
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (err: any) {
+      toast(err.message || "Could not open WhatsApp", "error");
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
+
   // Fetch Order
   const fetchOrder = async () => {
     try {
@@ -104,6 +148,15 @@ export default function OrderEditPage() {
       setStatus(data.status as OrderStatus);
       setPlacedBy(data.placedBy || "");
       setOrderNotes(data.notes || "");
+      setBusinessType(data.businessType || data.customer?.businessType || "RETAILER");
+      setCreditDays(data.creditDays !== undefined ? data.creditDays : data.customer?.creditDays || 45);
+
+      let transport = data.transportName || "";
+      if (!transport && data.notes) {
+        const match = data.notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
+        if (match && match[1]) transport = match[1].trim();
+      }
+      setTransportName(transport);
 
       setCustomerId(data.customerId);
       setCustomerName(data.customerName || (data.customer?.shopName || ""));
@@ -461,63 +514,62 @@ export default function OrderEditPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* WhatsApp Invoice Button */}
+            <button
+              type="button"
+              disabled={sendingWhatsApp}
+              onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
+              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-900/30 cursor-pointer"
+              title="Send Tax Invoice PDF link & order confirmation to customer on WhatsApp"
+            >
+              <MessageCircle size={15} />
+              <span>{sendingWhatsApp ? "Sending..." : "Send on WhatsApp"}</span>
+            </button>
+
+            {/* Weekly Payment Reminder Button */}
+            <button
+              type="button"
+              disabled={sendingWhatsApp}
+              onClick={() => handleSendWhatsApp("PAYMENT_REMINDER")}
+              className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-amber-900/30 cursor-pointer"
+              title="Send weekly payment due reminder to customer on WhatsApp"
+            >
+              <Bell size={14} />
+              <span>Weekly Reminder</span>
+            </button>
+
+            {/* Print A4 Tax Invoice */}
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm"
+              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Print standard A4 Tax Invoice (Krish Clothing Co.)"
             >
-              <Printer size={16} />
-              <span>Print Order Slip</span>
+              <Printer size={15} />
+              <span>Print A4 Invoice</span>
             </button>
 
+            {/* Save Order Changes */}
             <button
               type="button"
               disabled={saving}
               onClick={handleSaveChanges}
-              className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Save size={16} />
-              <span>{saving ? "Saving Changes..." : "Save Order Changes"}</span>
+              <Save size={15} />
+              <span>{saving ? "Saving..." : "Save Changes"}</span>
             </button>
           </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        {/* ═══════════════════════════════════════════
-            PRINTABLE SLIP HEADER (visible only on print)
-            ═══════════════════════════════════════════ */}
-        <div className="hidden print:block border-b-2 border-slate-900 pb-4 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-900">
-                IQ TROUSERS
-              </h1>
-              <p className="text-xs text-slate-600 font-bold uppercase tracking-wider">
-                Wholesale Garment Order Slip &amp; Tax Invoice
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                GSTIN: 24AAACI1357Q1Z2 • Ring Road Textile Tower, Surat, Gujarat
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-mono font-black text-slate-900">
-                {orderNumber}
-              </div>
-              <div className="text-xs text-slate-500">
-                Date: {formatDate(orderDate)}
-              </div>
-              <div className="text-xs text-slate-500">
-                Status: <strong>{status}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══════════════════════════════════════════
-            1. CUSTOMER & ORDER STATUS DETAILS
-            ═══════════════════════════════════════════ */}
+      {/* Interactive Order Form View (Hidden during print) */}
+      <div className="print:hidden">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+          {/* ═══════════════════════════════════════════
+              1. CUSTOMER & ORDER STATUS DETAILS
+              ═══════════════════════════════════════════ */}
         <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -643,39 +695,41 @@ export default function OrderEditPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
-            {/* Order Status Selector */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-slate-400 block font-semibold text-[10px] uppercase mb-1">
-                Order Status
+            {/* Current Order Status (Read-Only on Employee Side) */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center">
+              <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1.5">
+                Current Order Status
               </span>
-              <select
-                value={status}
-                onChange={(e) => {
-                  const newStatus = e.target.value as OrderStatus;
-                  if (newStatus === "Confirmed" && !isAdmin) {
-                    toast("Only an Admin or Super Admin can confirm orders", "error");
-                    return;
-                  }
-                  setStatus(newStatus);
-                }}
-                className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 print:hidden"
-              >
-                {ORDER_STATUSES.map((st: string) => {
-                  const isRestricted = st === "Confirmed" && !isAdmin;
-                  return (
-                    <option key={st} value={st} disabled={isRestricted}>
-                      {st} {isRestricted ? "(Admin Only)" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-              {!isAdmin && status === "Pending" && (
-                <p className="text-[10px] text-amber-600 mt-1 font-medium">
-                  Note: Order confirmation is restricted to Admin or Super Admin.
-                </p>
-              )}
-              <div className="hidden print:block font-bold text-sm text-slate-900">
-                {status}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black shadow-xs border ${
+                    STATUS_COLORS[status] || "bg-slate-100 text-slate-800 border-slate-200"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                  <span>{status}</span>
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  (Updated by Admin)
+                </span>
+              </div>
+            </div>
+
+            {/* Credit Days & Transport Information */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center">
+              <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1.5">
+                Credit Terms & Transport
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300">
+                  <Clock size={12} className="text-orange-500" />
+                  <span>{creditDays > 0 ? `${creditDays} Days Credit` : "Advance (0 Days)"}</span>
+                </span>
+                {transportName && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-blue-900 border border-blue-200">
+                    <span>🚚 {transportName}</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -915,6 +969,49 @@ export default function OrderEditPage() {
           </div>
         </section>
       </main>
+    </div>
+
+    {/* ═══════════════════════════════════════════
+        EXACT A4 TAX INVOICE PRINT VIEW
+        (Krish Clothing Co. Tax Invoice format)
+        ═══════════════════════════════════════════ */}
+    <div className="hidden print:block py-2">
+      <TaxInvoiceA4
+        order={{
+          orderNumber,
+          orderDate,
+          status,
+          customerName,
+          customerGstPan,
+          customerPhone,
+          customerAddress,
+          customerCity,
+          customerState,
+          businessType,
+          creditDays,
+          transportName,
+          subtotal,
+          gstRate,
+          gstAmount,
+          grandTotal,
+          totalPcs,
+          totalSets,
+          placedBy,
+          notes: orderNotes,
+          items: items.map((it) => ({
+            id: it.id,
+            productName: it.productName,
+            colorSets: it.colorSets,
+            sizeRatio: it.sizeRatio,
+            pcsPerSet: it.pcsPerSet,
+            totalSets: it.totalSets,
+            totalPcs: it.totalPcs,
+            unitPrice: it.unitPrice,
+            itemSubtotal: it.itemSubtotal,
+          })),
+        }}
+      />
+    </div>
 
       {/* ═══════════════════════════════════════════
           ADD PRODUCT MODAL (Quick Add to Existing Order)

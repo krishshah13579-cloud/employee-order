@@ -32,6 +32,7 @@ import {
   Loader2,
   Truck,
   Image as ImageIcon,
+  MessageCircle,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
@@ -508,14 +509,38 @@ export default function OrderFormPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/orders/${confirmedOrder.id}/whatsapp`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
+                    });
+                    const data = await res.json();
+                    if (data.whatsappUrl) {
+                      window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                    }
+                    toast("Opening WhatsApp with order details & invoice link!", "success");
+                  } catch {
+                    toast("Could not open WhatsApp", "error");
+                  }
+                }}
+                className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <MessageCircle size={16} />
+                <span>Send on WhatsApp</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="w-full sm:w-auto px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Printer size={16} />
-                <span>Print Order Slip</span>
+                <span>Print A4 Invoice</span>
               </button>
 
               <button

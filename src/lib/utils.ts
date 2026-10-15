@@ -28,6 +28,51 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
   return classes.filter(Boolean).join(" ");
 }
 
+/** Convert a number into Indian currency words (e.g. 9450 -> "Nine Thousand Four Hundred Fifty Only") */
+export function numberToIndianWords(amount: number): string {
+  if (isNaN(amount) || amount === 0) return "Zero Only";
+
+  const num = Math.round(Math.abs(amount));
+  const units = [
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen",
+  ];
+  const tens = [
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
+  ];
+
+  function convertTwoDigits(n: number): string {
+    if (n === 0) return "";
+    if (n < 20) return units[n];
+    const t = Math.floor(n / 10);
+    const u = n % 10;
+    return `${tens[t]}${u > 0 ? " " + units[u] : ""}`;
+  }
+
+  function convertThreeDigits(n: number): string {
+    const h = Math.floor(n / 100);
+    const rem = n % 100;
+    const parts: string[] = [];
+    if (h > 0) parts.push(`${units[h]} Hundred`);
+    if (rem > 0) parts.push(convertTwoDigits(rem));
+    return parts.join(" ");
+  }
+
+  const crores = Math.floor(num / 10000000);
+  const lakhs = Math.floor((num % 10000000) / 100000);
+  const thousands = Math.floor((num % 100000) / 1000);
+  const hundreds = num % 1000;
+
+  const result: string[] = [];
+  if (crores > 0) result.push(`${convertTwoDigits(crores)} Crore`);
+  if (lakhs > 0) result.push(`${convertTwoDigits(lakhs)} Lakh`);
+  if (thousands > 0) result.push(`${convertTwoDigits(thousands)} Thousand`);
+  if (hundreds > 0) result.push(convertThreeDigits(hundreds));
+
+  return `${result.join(" ")} Only`;
+}
+
 /**
  * Returns an array of all image URLs for a product.
  * Robustly handles:

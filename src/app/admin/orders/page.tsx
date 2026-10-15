@@ -14,6 +14,7 @@ import {
   Trash2,
   RefreshCw,
   Clock,
+  MessageCircle,
 } from "lucide-react";
 import {
   ORDER_STATUSES,
@@ -277,7 +278,27 @@ export default function OrdersPage() {
                         {o.status}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-right space-x-2">
+                    <td className="py-4 px-6 text-right space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/orders/${o.id}/whatsapp`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
+                            });
+                            const data = await res.json();
+                            if (data.whatsappUrl) {
+                              window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                            }
+                          } catch {}
+                        }}
+                        className="p-1.5 inline-flex text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        title="Send Order Updates & Invoice on WhatsApp"
+                      >
+                        <MessageCircle size={15} />
+                      </button>
                       <Link
                         href={`/admin/orders/${o.id}`}
                         className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
