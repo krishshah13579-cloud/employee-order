@@ -713,8 +713,6 @@ export default function OrderEditPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-4">Customer Name</th>
-                  <th className="py-3.5 px-4">GST NO. / PAN NO.</th>
                   <th className="py-3.5 px-4">Product Name</th>
                   <th className="py-3.5 px-4">Colors &amp; Sets</th>
                   <th className="py-3.5 px-4 text-center">PCS</th>
@@ -734,16 +732,7 @@ export default function OrderEditPage() {
                 ) : (
                   items.map((item, itemIdx) => (
                     <tr key={itemIdx} className="hover:bg-slate-50/80 transition-colors">
-                      {/* Customer Name */}
-                      <td className="py-4 px-4 font-bold text-slate-900 max-w-[140px] truncate">
-                        {customerName}
-                      </td>
-
-                      {/* GST / PAN No. */}
-                      <td className="py-4 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
-                        {customerGstPan || "—"}
-                      </td>
-
+                      
                       {/* Product Name */}
                       <td className="py-4 px-4">
                         <div className="font-black text-slate-900 text-sm">
