@@ -473,8 +473,61 @@ function CustomerRegistrationContent() {
                       </span>
                     </button>
                     {showRawText && (
-                      <div className="p-3 bg-white max-h-48 overflow-y-auto font-mono text-[11px] text-slate-600 whitespace-pre-wrap leading-relaxed border-t border-slate-200">
-                        {rawOcrText}
+                      <div className="p-3 bg-white max-h-64 overflow-y-auto space-y-3 border-t border-slate-200">
+                        <div className="text-[10px] text-slate-500 font-semibold">
+                          Detected card lines (tap buttons to quickly assign to form):
+                        </div>
+                        <div className="space-y-1.5">
+                          {rawOcrText
+                            .split(/\r?\n/)
+                            .map((l) => l.trim())
+                            .filter((l) => l.length > 1)
+                            .map((line, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-orange-50/50 hover:border-orange-200 transition"
+                              >
+                                <span className="font-mono text-[11px] text-slate-800 break-all font-semibold">
+                                  {line}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShopName(line);
+                                      setAutoFilledFields((prev) => ({ ...prev, shopName: true }));
+                                      toast(`Set "${line}" as Firm Name`, "success");
+                                    }}
+                                    className="px-2 py-0.5 bg-white border border-slate-300 hover:border-orange-500 hover:text-orange-600 rounded text-[10px] font-bold cursor-pointer transition"
+                                  >
+                                    Firm
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setContactPerson(line);
+                                      setAutoFilledFields((prev) => ({ ...prev, contactPerson: true }));
+                                      toast(`Set "${line}" as Contact Person`, "success");
+                                    }}
+                                    className="px-2 py-0.5 bg-white border border-slate-300 hover:border-orange-500 hover:text-orange-600 rounded text-[10px] font-bold cursor-pointer transition"
+                                  >
+                                    Person
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAddress((prev) => (prev ? `${prev}, ${line}` : line));
+                                      setAutoFilledFields((prev) => ({ ...prev, address: true }));
+                                      toast(`Added to Address`, "success");
+                                    }}
+                                    className="px-2 py-0.5 bg-white border border-slate-300 hover:border-orange-500 hover:text-orange-600 rounded text-[10px] font-bold cursor-pointer transition"
+                                  >
+                                    +Addr
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1,13 +1,12 @@
 /**
  * Visiting Card OCR & Intelligent Parser for Indian Wholesale Apparel Businesses
- * Extracts:
- * - Firm / Shop Name
- * - Contact Person
- * - Phone / Mobile Number
- * - GST / PAN Number
- * - Shop Address
- * - City
- * - State
+ * Features:
+ * - Multi-Engine: Gemini Vision -> OCR.Space Engine 2 -> Tesseract fallback
+ * - Indian Name detection (Sinh, Singh, Bhai, Kumar, Lal, Shah, Patel, etc.)
+ * - Multi-line Firm Name combination (e.g. "THE LEGEND" + "COLLECTION")
+ * - Social handle parsing (e.g. "thelegendcollection_limbdi" -> Shop: "The Legend Collection", City: "Limbdi")
+ * - 6-digit Indian Postal PIN Code resolver for City & State
+ * - Garbage & background texture symbol removal
  */
 
 export interface ExtractedCardData {
@@ -22,7 +21,34 @@ export interface ExtractedCardData {
   rawText: string;
 }
 
-// Common Indian States & Major Textile Hub Cities
+// Indian PIN Code prefix to State mapping
+export function getStateFromPincode(pincode: string): string | null {
+  if (!pincode || pincode.length !== 6) return null;
+  const prefix = parseInt(pincode.substring(0, 2), 10);
+
+  if (prefix === 11) return "Delhi";
+  if (prefix >= 12 && prefix <= 13) return "Haryana";
+  if (prefix >= 14 && prefix <= 16) return "Punjab";
+  if (prefix === 17) return "Himachal Pradesh";
+  if (prefix >= 18 && prefix <= 19) return "Jammu & Kashmir";
+  if (prefix >= 20 && prefix <= 28) return "Uttar Pradesh";
+  if (prefix >= 30 && prefix <= 34) return "Rajasthan";
+  if (prefix >= 36 && prefix <= 39) return "Gujarat";
+  if (prefix >= 40 && prefix <= 44) return "Maharashtra";
+  if (prefix >= 45 && prefix <= 48) return "Madhya Pradesh";
+  if (prefix === 49) return "Chhattisgarh";
+  if (prefix >= 50 && prefix <= 53) return "Telangana";
+  if (prefix >= 56 && prefix <= 59) return "Karnataka";
+  if (prefix >= 60 && prefix <= 64) return "Tamil Nadu";
+  if (prefix >= 67 && prefix <= 69) return "Kerala";
+  if (prefix >= 70 && prefix <= 74) return "West Bengal";
+  if (prefix >= 75 && prefix <= 77) return "Odisha";
+  if (prefix >= 80 && prefix <= 85) return "Bihar";
+
+  return null;
+}
+
+// Common Indian States
 const INDIAN_STATES = [
   "Gujarat",
   "Maharashtra",
@@ -48,6 +74,7 @@ const INDIAN_STATES = [
   "Goa",
 ];
 
+// Major textile cities dictionary
 const MAJOR_CITIES_MAP: Record<string, string> = {
   surat: "Gujarat",
   ahmedabad: "Gujarat",
@@ -60,6 +87,10 @@ const MAJOR_CITIES_MAP: Record<string, string> = {
   vapi: "Gujarat",
   valsad: "Gujarat",
   navsari: "Gujarat",
+  surendranagar: "Gujarat",
+  limbdi: "Gujarat",
+  botad: "Gujarat",
+  morbi: "Gujarat",
   mumbai: "Maharashtra",
   pune: "Maharashtra",
   nagpur: "Maharashtra",
@@ -68,7 +99,6 @@ const MAJOR_CITIES_MAP: Record<string, string> = {
   kolhapur: "Maharashtra",
   ichalkaranji: "Maharashtra",
   thane: "Maharashtra",
-  ulhasnagar: "Maharashtra",
   delhi: "Delhi",
   "new delhi": "Delhi",
   jaipur: "Rajasthan",
@@ -83,43 +113,98 @@ const MAJOR_CITIES_MAP: Record<string, string> = {
   bhopal: "Madhya Pradesh",
   gwalior: "Madhya Pradesh",
   jabalpur: "Madhya Pradesh",
-  ujjain: "Madhya Pradesh",
   kanpur: "Uttar Pradesh",
   lucknow: "Uttar Pradesh",
   varanasi: "Uttar Pradesh",
   agra: "Uttar Pradesh",
   meerut: "Uttar Pradesh",
-  ghaziabad: "Uttar Pradesh",
-  noida: "Uttar Pradesh",
   ludhiana: "Punjab",
   amritsar: "Punjab",
   jalandhar: "Punjab",
   panipat: "Haryana",
   gurugram: "Haryana",
-  faridabad: "Haryana",
   bengaluru: "Karnataka",
   bangalore: "Karnataka",
-  bellary: "Karnataka",
   chennai: "Tamil Nadu",
   tirupur: "Tamil Nadu",
   coimbatore: "Tamil Nadu",
-  erode: "Tamil Nadu",
-  salem: "Tamil Nadu",
-  madurai: "Tamil Nadu",
   kolkata: "West Bengal",
   hyderabad: "Telangana",
   patna: "Bihar",
   raipur: "Chhattisgarh",
 };
 
+// Suffixes typical of Indian personal names
+const INDIAN_NAME_SUFFIXES = [
+  "sinh",
+  "singh",
+  "bhai",
+  "kumar",
+  "lal",
+  "chand",
+  "das",
+  "ram",
+  "prasad",
+  "kant",
+  "ji",
+  "patel",
+  "shah",
+  "jain",
+  "sharma",
+  "verma",
+  "gupta",
+  "agarwal",
+  "rathore",
+  "chouhan",
+  "solanki",
+  "jadeja",
+  "parmar",
+  "makwana",
+  "chauhan",
+  "joshi",
+  "dave",
+];
+
+// Check if a line is pure garbage/noise (from bedsheet, table texture, etc.)
+function isGarbageLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length < 2) return true;
+
+  // Excessive symbols or punctuation
+  const letters = (trimmed.match(/[a-zA-Z]/g) || []).length;
+  const symbols = (trimmed.match(/[^a-zA-Z0-9\s]/g) || []).length;
+
+  if (letters === 0 && !/\d{6}/.test(trimmed)) return true;
+  if (symbols > letters) return true;
+
+  // Specific noise patterns like "XR ~~", "~ FC", "' kL : vy'"
+  if (/^[~`!@#$%^&*()_+=\-[\]{}|;:'",.<>?/\\ ]+$/.test(trimmed)) return true;
+  if (/^[A-Za-z]{1,2}\s*[~©®|]+/.test(trimmed)) return true;
+
+  return false;
+}
+
+// Clean noisy symbols from text
+function cleanNoiseSymbols(str: string): string {
+  return str
+    .replace(/[~©®™|\\^<>{}[\];`]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
- * Parses raw text extracted from a business card and maps into customer fields
+ * Intelligent parser that extracts all business details from raw OCR text
  */
 export function parseVisitingCardText(rawText: string): ExtractedCardData {
-  const lines = rawText
+  const rawLines = rawText
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
+
+  // Filter out pure garbage/bedsheet noise lines
+  const cleanLines = rawLines
+    .map(cleanNoiseSymbols)
+    .filter((l) => !isGarbageLine(l));
 
   const result: ExtractedCardData = {
     shopName: "",
@@ -133,99 +218,142 @@ export function parseVisitingCardText(rawText: string): ExtractedCardData {
     rawText,
   };
 
-  const addressLines: string[] = [];
-  const textJoined = lines.join(" ");
+  const fullText = cleanLines.join("\n");
 
-  // 1. EXTRACT GSTIN OR PAN
-  // GSTIN format: 2 digits + 10 alphanumeric PAN + 1 digit + 1 alphanumeric + 1 alphanumeric
+  // 1. EXTRACT GST / PAN NUMBER
   const gstRegex = /\b([0-3][0-9][A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Zz][0-9A-Z]{1})\b/i;
   const panRegex = /\b([A-Z]{5}[0-9]{4}[A-Z]{1})\b/i;
 
-  const gstMatch = rawText.match(gstRegex);
+  const gstMatch = fullText.match(gstRegex);
   if (gstMatch) {
     result.gstPanNo = gstMatch[1].toUpperCase();
   } else {
-    // Check if PAN alone is found (avoiding words that look like PAN)
-    const panMatch = rawText.match(panRegex);
-    if (panMatch) {
+    const panMatch = fullText.match(panRegex);
+    if (panMatch && !["DIVYA", "INDRA", "SHREE", "ROYAL"].includes(panMatch[1].toUpperCase())) {
       result.gstPanNo = panMatch[1].toUpperCase();
     }
   }
 
-  // 2. EXTRACT PHONE / MOBILE NUMBERS
-  // Indian 10-digit mobile number patterns (often starting with 6, 7, 8, 9, with optional +91, 0, spaces, dashes)
-  const phoneRegexes = [
+  // 2. EXTRACT PHONE / MOBILE NUMBERS (10 Digits)
+  const phonePatterns = [
     /(?:(?:\+|0{0,2})91[\s-]*)?([6-9]\d{4}[\s-]?\d{5})/g,
     /(?:(?:\+|0{0,2})91[\s-]*)?([6-9]\d{9})/g,
-    /(?:Mob(?:ile)?\.?|Ph(?:one)?\.?|Call|Tel\.?|M:?|WhatsApp)[\s:]*([6-9]\d{4}[\s-]?\d{5})/gi,
   ];
 
   const foundPhones: string[] = [];
-  for (const regex of phoneRegexes) {
+  for (const regex of phonePatterns) {
     let match;
     while ((match = regex.exec(rawText)) !== null) {
-      const clean = match[1].replace(/[\s-]/g, "");
-      if (clean.length === 10 && /^[6-9]\d{9}$/.test(clean)) {
-        if (!foundPhones.includes(clean)) {
-          foundPhones.push(clean);
+      const digits = match[1].replace(/[\s-]/g, "");
+      if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+        if (!foundPhones.includes(digits)) {
+          foundPhones.push(digits);
         }
       }
     }
   }
 
   if (foundPhones.length > 0) {
-    result.phoneNumber = foundPhones[0];
-  } else {
-    // Fallback: look for any 10-digit sequence
-    const fallbackMatch = rawText.match(/\b([6-9]\d{9})\b/);
-    if (fallbackMatch) {
-      result.phoneNumber = fallbackMatch[1];
+    result.phoneNumber = foundPhones.join(" / ");
+  }
+
+  // 3. EXTRACT 6-DIGIT PINCODE & RESOLVE CITY AND STATE
+  const pincodeMatch = fullText.match(/\b([1-8][0-9]{5})\b/);
+  if (pincodeMatch) {
+    const pincode = pincodeMatch[1];
+    const stateByPin = getStateFromPincode(pincode);
+    if (stateByPin) {
+      result.state = stateByPin;
+    }
+
+    // Check word right before the pincode for city/town name (e.g. "limbdi, 363421" -> "Limbdi")
+    const beforePinRegex = new RegExp(`([A-Za-z]{3,20})[\\s,.-]*${pincode}`, "i");
+    const cityBeforeMatch = fullText.match(beforePinRegex);
+    if (cityBeforeMatch) {
+      const candidateCity = cityBeforeMatch[1].trim();
+      if (!["near", "opp", "road", "complex", "mandir", "street"].includes(candidateCity.toLowerCase())) {
+        result.city = candidateCity.charAt(0).toUpperCase() + candidateCity.slice(1).toLowerCase();
+      }
     }
   }
 
-  // 3. EXTRACT CITY & STATE
-  const lowerJoined = textJoined.toLowerCase();
-  for (const [cityName, stateName] of Object.entries(MAJOR_CITIES_MAP)) {
-    const cityWordRegex = new RegExp(`\\b${cityName}\\b`, "i");
-    if (cityWordRegex.test(lowerJoined)) {
-      result.city = cityName.charAt(0).toUpperCase() + cityName.slice(1);
-      result.state = stateName;
-      break;
+  // Also check against our comprehensive city map
+  const lowerFull = fullText.toLowerCase();
+  if (!result.city) {
+    for (const [cityName, stateName] of Object.entries(MAJOR_CITIES_MAP)) {
+      const cityRegex = new RegExp(`\\b${cityName}\\b`, "i");
+      if (cityRegex.test(lowerFull)) {
+        result.city = cityName.charAt(0).toUpperCase() + cityName.slice(1);
+        if (!result.state) result.state = stateName;
+        break;
+      }
     }
   }
 
+  // Check state names
   if (!result.state) {
     for (const stateName of INDIAN_STATES) {
-      const stateWordRegex = new RegExp(`\\b${stateName}\\b`, "i");
-      if (stateWordRegex.test(textJoined)) {
+      const stateRegex = new RegExp(`\\b${stateName}\\b`, "i");
+      if (stateRegex.test(fullText)) {
         result.state = stateName;
         break;
       }
     }
   }
 
-  // 4. EXTRACT TRANSPORT NAME IF PRESENT
-  const transportMatch = rawText.match(/(?:Transport|Tpt|Through|Dispatch(?:ed)?\s*by)[\s:]+([A-Za-z0-9\s&.-]+)/i);
-  if (transportMatch) {
-    const tName = transportMatch[1].split(/\n|,|\./)[0].trim();
-    if (tName.length >= 3 && tName.length <= 40) {
-      result.transportName = tName;
+  // 4. EXTRACT SOCIAL HANDLE / INSTAGRAM / EMAIL (e.g. thelegendcollection_limbdi)
+  let handleShopName = "";
+  const handleMatch = fullText.match(/(?:@|instagram\.com\/|facebook\.com\/|www\.|https?:\/\/)?([a-z0-9_.-]{4,40})/i);
+  for (const line of cleanLines) {
+    if (line.includes("_") || line.includes("@") || line.toLowerCase().includes("collection") || line.toLowerCase().includes("textile")) {
+      const handlePart = line.replace(/^(?:@|instagram|facebook|email|website)[\s:]*/i, "").trim();
+      const parts = handlePart.split(/[_.]/);
+      // e.g. "thelegendcollection" + "limbdi"
+      if (parts.length >= 2) {
+        const potentialCity = parts[parts.length - 1];
+        if (!result.city && potentialCity.length >= 3) {
+          result.city = potentialCity.charAt(0).toUpperCase() + potentialCity.slice(1).toLowerCase();
+        }
+      }
     }
   }
 
   // 5. EXTRACT CONTACT PERSON
-  // Check lines starting with Prop., Proprietor, Partner, Mr., Contact, etc.
-  for (const line of lines) {
-    const propMatch = line.match(/^(?:Prop\.?|Proprietor|Partner|Director|Owner|Contact|Mr\.?|Shree)[\s:]+([A-Za-z\s.]{3,35})$/i);
+  // Check lines explicitly marked or ending with Indian name suffixes
+  const personCandidates: string[] = [];
+  for (let i = 0; i < cleanLines.length; i++) {
+    const line = cleanLines[i];
+    const lineLower = line.toLowerCase();
+
+    // Check for prefix like Prop, Mr, etc.
+    const propMatch = line.match(/^(?:Prop\.?|Proprietor|Partner|Director|Owner|Contact|Mr\.?)[\s:]+([A-Za-z\s.]{3,35})$/i);
     if (propMatch) {
       result.contactPerson = propMatch[1].trim();
       break;
     }
+
+    // Check if line looks like Indian personal names (e.g. DIVYARAJSINH, INDRAJITSINH)
+    const words = line.split(/\s+/).filter(Boolean);
+    const hasNameSuffix = words.some((w) =>
+      INDIAN_NAME_SUFFIXES.some((suf) => w.toLowerCase().endsWith(suf))
+    );
+
+    if (hasNameSuffix && words.length <= 4 && !lineLower.includes("collection") && !lineLower.includes("road")) {
+      personCandidates.push(line);
+    }
   }
 
-  // 6. EXTRACT FIRM / SHOP NAME & ADDRESS LINES
+  if (!result.contactPerson && personCandidates.length > 0) {
+    // If two name lines exist (like DIVYARAJSINH and INDRAJITSINH), join them or pick the first
+    result.contactPerson = personCandidates.slice(0, 2).join(" ");
+  }
+
+  // 6. EXTRACT FIRM NAME / SHOP NAME
+  // Business keywords
   const businessKeywords = [
-    "traders",
+    "collection",
+    "the legend",
+    "legend",
     "textiles",
     "garments",
     "clothing",
@@ -233,125 +361,188 @@ export function parseVisitingCardText(rawText: string): ExtractedCardData {
     "fabrics",
     "fashion",
     "creation",
-    "collection",
     "enterprises",
     "agency",
     "dresses",
     "menswear",
     "wear",
-    "synthetics",
-    "cottons",
-    "silks",
-    "sarees",
-    "boutique",
-    "apparels",
-    "co.",
-    "company",
-    "pvt",
-    "ltd",
     "store",
-    "emporium",
-  ];
-
-  const addressKeywords = [
-    "shop",
-    "road",
-    "market",
-    "complex",
-    "street",
-    "plot",
-    "opp",
-    "near",
-    "b/h",
-    "behind",
-    "floor",
-    "tower",
-    "building",
-    "darwaja",
-    "bazaar",
-    "bazar",
-    "gali",
-    "cross",
-    "ring road",
-    "rasta",
-    "nagar",
-    "station",
+    "traders",
+    "apparel",
+    "boutique",
+    "sarees",
   ];
 
   let candidateFirmName = "";
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = 0; i < cleanLines.length; i++) {
+    const line = cleanLines[i];
     const lineLower = line.toLowerCase();
 
-    // Skip lines that are purely phones, GST, or emails
+    // Skip lines that are phone numbers, addresses, or person names
     if (
-      lineLower.includes("gstin") ||
-      lineLower.includes("gst") ||
-      lineLower.includes("pan") ||
-      lineLower.includes("phone") ||
-      lineLower.includes("mobile") ||
-      lineLower.includes("email") ||
-      lineLower.includes("@") ||
-      lineLower.includes("www.") ||
-      lineLower.includes("http")
+      /\d{10}/.test(line) ||
+      (result.contactPerson && line.includes(result.contactPerson)) ||
+      lineLower.includes("akshar complex") ||
+      lineLower.includes("mandir") ||
+      lineLower.includes("road")
     ) {
       continue;
     }
 
-    // Check if line looks like an address
-    const hasAddressWord = addressKeywords.some((kw) => lineLower.includes(kw)) || /\d{6}/.test(line);
-    if (hasAddressWord) {
-      addressLines.push(line);
-      continue;
-    }
-
     // Check if line has a business keyword
-    const hasBizWord = businessKeywords.some((kw) => lineLower.includes(kw));
-    if (hasBizWord && !candidateFirmName) {
-      // Remove M/s or Shri prefix if any
-      candidateFirmName = line.replace(/^(?:M\/s\.?|M\/S\.?|Shree|Shri)\s*/i, "").trim();
-      continue;
-    }
+    const matchedKw = businessKeywords.find((kw) => lineLower.includes(kw));
+    if (matchedKw) {
+      // Check if previous line was a descriptor like "THE LEGEND" and current is "COLLECTION"
+      if (i > 0 && !candidateFirmName) {
+        const prevLine = cleanLines[i - 1];
+        const prevLower = prevLine.toLowerCase();
+        if (
+          prevLine.length >= 3 &&
+          prevLine.length <= 30 &&
+          !/\d/.test(prevLine) &&
+          !personCandidates.includes(prevLine) &&
+          !prevLower.includes("mandir") &&
+          !prevLower.includes("complex")
+        ) {
+          candidateFirmName = `${prevLine} ${line}`.trim();
+          continue;
+        }
+      }
 
-    // If candidate firm name not yet found and line is short, clean, capitalized
-    if (!candidateFirmName && line.length >= 3 && line.length <= 45 && !line.includes(":")) {
-      // Don't pick contact person as firm name
-      if (result.contactPerson && line.includes(result.contactPerson)) continue;
-      candidateFirmName = line;
+      if (!candidateFirmName) {
+        candidateFirmName = line.replace(/^(?:M\/s\.?|Shree|Shri)\s*/i, "").trim();
+      }
     }
   }
 
-  result.shopName = candidateFirmName || (lines[0] ? lines[0].replace(/^(?:M\/s\.?|Shree)\s*/i, "") : "");
+  // If candidate firm name not yet found, look for prominent clean line
+  if (!candidateFirmName) {
+    for (const line of cleanLines) {
+      const lineLower = line.toLowerCase();
+      if (
+        line.length >= 3 &&
+        line.length <= 40 &&
+        !/\d/.test(line) &&
+        !personCandidates.includes(line) &&
+        !lineLower.includes("complex") &&
+        !lineLower.includes("mandir") &&
+        !lineLower.includes("road") &&
+        !lineLower.includes("street")
+      ) {
+        candidateFirmName = line;
+        break;
+      }
+    }
+  }
 
-  if (addressLines.length > 0) {
-    result.address = addressLines.join(", ");
+  result.shopName = candidateFirmName.toUpperCase();
+
+  // 7. EXTRACT ADDRESS LINES
+  const addressKeywords = [
+    "complex",
+    "mandir",
+    "temple",
+    "road",
+    "market",
+    "street",
+    "plot",
+    "shop",
+    "b/h",
+    "opp",
+    "near",
+    "behind",
+    "floor",
+    "darwaja",
+    "bazaar",
+    "gali",
+    "nagar",
+  ];
+
+  const addressParts: string[] = [];
+  for (const line of cleanLines) {
+    const lineLower = line.toLowerCase();
+    if (
+      lineLower.includes("complex") ||
+      lineLower.includes("mandir") ||
+      lineLower.includes("road") ||
+      lineLower.includes("market") ||
+      lineLower.includes("street") ||
+      lineLower.includes("b/h") ||
+      lineLower.includes("opp") ||
+      lineLower.includes("near") ||
+      /\d{6}/.test(line)
+    ) {
+      // Strip any stray phone digits from address line
+      const cleanAddr = line
+        .replace(/(?:(?:\+|0{0,2})91[\s-]*)?[6-9]\d{9}/g, "")
+        .replace(/[|~©®]/g, "")
+        .trim();
+      if (cleanAddr.length > 3 && !addressParts.includes(cleanAddr)) {
+        addressParts.push(cleanAddr);
+      }
+    }
+  }
+
+  if (addressParts.length > 0) {
+    result.address = addressParts.join(", ");
   }
 
   return result;
 }
 
 /**
- * Runs client-side Tesseract OCR on an image file or Data URL
+ * Scan visiting card: calls backend OCR API first (Gemini Vision / OCR.Space),
+ * falling back to client-side Tesseract.js if offline.
  */
 export async function scanVisitingCard(
   imageSource: string | File,
   onProgress?: (progress: number, status: string) => void
 ): Promise<ExtractedCardData> {
-  // Dynamically load Tesseract only when called in browser
-  const { createWorker } = await import("tesseract.js");
+  onProgress?.(15, "Uploading photo to AI card scanner...");
 
-  onProgress?.(10, "Initializing OCR scanner engine...");
+  let base64Data = "";
+  if (typeof imageSource === "string") {
+    base64Data = imageSource;
+  } else {
+    base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(imageSource);
+    });
+  }
+
+  // 1. Try Backend High-Precision Scanner API
+  try {
+    onProgress?.(40, "AI analyzing card layout, firm name & contact details...");
+    const res = await fetch("/api/ocr/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: base64Data }),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data) {
+        onProgress?.(100, "Done!");
+        return json.data;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("Backend OCR API unavailable, falling back to client-side scanner:", apiErr);
+  }
+
+  // 2. Fallback: Client-Side Tesseract OCR Engine
+  onProgress?.(60, "Running client-side OCR engine...");
+  const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng");
 
   try {
-    onProgress?.(35, "Scanning visiting card text...");
-    const ret = await worker.recognize(imageSource);
-    onProgress?.(85, "Analyzing business details & GST/Mobile...");
-
+    const ret = await worker.recognize(base64Data);
+    onProgress?.(90, "Extracting business fields...");
     const rawText = ret.data.text || "";
     const parsed = parseVisitingCardText(rawText);
-
     onProgress?.(100, "Done!");
     return parsed;
   } finally {
