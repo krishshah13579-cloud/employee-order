@@ -843,13 +843,8 @@ export default function OrderFormPage() {
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                       <Clock size={14} className="text-orange-600" />
-                      <span>Credit Days (Enter using keyboard):</span>
+                      <span>Credit Days:</span>
                     </label>
-                    {(orderCreditDays === 45 || isCreditLocked) && (
-                      <span className="text-[10px] font-bold text-red-600 flex items-center gap-1">
-                        <Lock size={11} /> Locked: Cannot be changed from employee side
-                      </span>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -871,9 +866,7 @@ export default function OrderFormPage() {
                         Days
                       </span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-600">
-                      {orderCreditDays > 0 ? `${orderCreditDays} Days` : "Advance (0 Days)"}
-                    </span>
+                    
                   </div>
                 </div>
               </div>
