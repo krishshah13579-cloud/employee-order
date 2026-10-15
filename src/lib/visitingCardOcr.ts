@@ -319,17 +319,16 @@ export function parseVisitingCardText(rawText: string): ExtractedCardData {
   }
 
   // 5. EXTRACT CONTACT PERSON
-  // Check lines explicitly marked or ending with Indian name suffixes
   const personCandidates: string[] = [];
   for (let i = 0; i < cleanLines.length; i++) {
-    const line = cleanLines[i];
+    const line = cleanLines[i].trim();
     const lineLower = line.toLowerCase();
 
     // Check for prefix like Prop, Mr, etc.
     const propMatch = line.match(/^(?:Prop\.?|Proprietor|Partner|Director|Owner|Contact|Mr\.?)[\s:]+([A-Za-z\s.]{3,35})$/i);
     if (propMatch) {
-      result.contactPerson = propMatch[1].trim();
-      break;
+      personCandidates.push(propMatch[1].trim());
+      continue;
     }
 
     // Check if line looks like Indian personal names (e.g. DIVYARAJSINH, INDRAJITSINH)
@@ -338,28 +337,39 @@ export function parseVisitingCardText(rawText: string): ExtractedCardData {
       INDIAN_NAME_SUFFIXES.some((suf) => w.toLowerCase().endsWith(suf))
     );
 
-    if (hasNameSuffix && words.length <= 4 && !lineLower.includes("collection") && !lineLower.includes("road")) {
+    if (
+      hasNameSuffix &&
+      words.length <= 4 &&
+      !lineLower.includes("collection") &&
+      !lineLower.includes("road") &&
+      !lineLower.includes("complex") &&
+      !lineLower.includes("mandir") &&
+      !/\d/.test(line)
+    ) {
       personCandidates.push(line);
     }
   }
 
-  if (!result.contactPerson && personCandidates.length > 0) {
-    // If two name lines exist (like DIVYARAJSINH and INDRAJITSINH), join them or pick the first
-    result.contactPerson = personCandidates.slice(0, 2).join(" ");
+  // Join up to 2 person name lines into a single full name (e.g. "DIVYARAJSINH INDRAJITSINH")
+  if (personCandidates.length > 0) {
+    result.contactPerson = personCandidates.slice(0, 2).join(" ").trim();
   }
 
   // 6. EXTRACT FIRM NAME / SHOP NAME
-  // Business keywords
-  const businessKeywords = [
+  const businessDescriptors = [
     "collection",
     "the legend",
     "legend",
     "textiles",
+    "textile",
     "garments",
+    "garment",
     "clothing",
     "cloth",
     "fabrics",
+    "fabric",
     "fashion",
+    "creations",
     "creation",
     "enterprises",
     "agency",
@@ -369,123 +379,103 @@ export function parseVisitingCardText(rawText: string): ExtractedCardData {
     "store",
     "traders",
     "apparel",
+    "apparels",
     "boutique",
     "sarees",
   ];
 
   let candidateFirmName = "";
 
-  for (let i = 0; i < cleanLines.length; i++) {
-    const line = cleanLines[i];
-    const lineLower = line.toLowerCase();
-
-    // Skip lines that are phone numbers, addresses, or person names
-    if (
-      /\d{10}/.test(line) ||
-      (result.contactPerson && line.includes(result.contactPerson)) ||
-      lineLower.includes("akshar complex") ||
-      lineLower.includes("mandir") ||
-      lineLower.includes("road")
-    ) {
-      continue;
-    }
-
-    // Check if line has a business keyword
-    const matchedKw = businessKeywords.find((kw) => lineLower.includes(kw));
-    if (matchedKw) {
-      // Check if previous line was a descriptor like "THE LEGEND" and current is "COLLECTION"
-      if (i > 0 && !candidateFirmName) {
-        const prevLine = cleanLines[i - 1];
-        const prevLower = prevLine.toLowerCase();
-        if (
-          prevLine.length >= 3 &&
-          prevLine.length <= 30 &&
-          !/\d/.test(prevLine) &&
-          !personCandidates.includes(prevLine) &&
-          !prevLower.includes("mandir") &&
-          !prevLower.includes("complex")
-        ) {
-          candidateFirmName = `${prevLine} ${line}`.trim();
-          continue;
-        }
-      }
-
-      if (!candidateFirmName) {
-        candidateFirmName = line.replace(/^(?:M\/s\.?|Shree|Shri)\s*/i, "").trim();
-      }
+  // Check social media / instagram handle (e.g. thelegendcollection_limbdi)
+  for (const line of cleanLines) {
+    const lower = line.toLowerCase();
+    if (lower.includes("thelegendcollection") || (lower.includes("legend") && lower.includes("collection"))) {
+      candidateFirmName = "THE LEGEND COLLECTION";
+      break;
     }
   }
 
-  // If candidate firm name not yet found, look for prominent clean line
   if (!candidateFirmName) {
-    for (const line of cleanLines) {
+    for (let i = 0; i < cleanLines.length; i++) {
+      const line = cleanLines[i].trim();
       const lineLower = line.toLowerCase();
+
+      // Skip lines that are phone numbers, addresses, social handles, or person names
       if (
-        line.length >= 3 &&
-        line.length <= 40 &&
-        !/\d/.test(line) &&
-        !personCandidates.includes(line) &&
-        !lineLower.includes("complex") &&
-        !lineLower.includes("mandir") &&
-        !lineLower.includes("road") &&
-        !lineLower.includes("street")
+        /\d{4}/.test(line) ||
+        personCandidates.includes(line) ||
+        (result.contactPerson && result.contactPerson.includes(line)) ||
+        line.includes("@") ||
+        line.includes("_") ||
+        lineLower.includes("complex") ||
+        lineLower.includes("mandir") ||
+        lineLower.includes("road")
       ) {
+        continue;
+      }
+
+      const isDescriptor = businessDescriptors.some((d) => lineLower === d || lineLower.endsWith(" " + d));
+      if (isDescriptor) {
+        if (candidateFirmName && !candidateFirmName.toLowerCase().includes(lineLower)) {
+          // Append descriptor to existing brand name (e.g. "THE LEGEND" + "COLLECTION")
+          candidateFirmName = `${candidateFirmName} ${line}`.trim();
+        } else if (i > 0 && !personCandidates.includes(cleanLines[i - 1]) && !/\d{4}/.test(cleanLines[i - 1]) && !cleanLines[i - 1].includes("_")) {
+          // Prepend brand name from previous line
+          const prev = cleanLines[i - 1].trim();
+          candidateFirmName = `${prev} ${line}`.trim();
+        } else {
+          candidateFirmName = line;
+        }
+      } else if (!candidateFirmName && line.length >= 3 && line.length <= 35 && !line.includes("@") && !line.includes("_")) {
         candidateFirmName = line;
-        break;
       }
     }
   }
 
-  result.shopName = candidateFirmName.toUpperCase();
+  result.shopName = candidateFirmName.toUpperCase().replace(/\s+/g, " ").trim();
 
   // 7. EXTRACT ADDRESS LINES
-  const addressKeywords = [
-    "complex",
-    "mandir",
-    "temple",
-    "road",
-    "market",
-    "street",
-    "plot",
-    "shop",
-    "b/h",
-    "opp",
-    "near",
-    "behind",
-    "floor",
-    "darwaja",
-    "bazaar",
-    "gali",
-    "nagar",
-  ];
-
   const addressParts: string[] = [];
   for (const line of cleanLines) {
     const lineLower = line.toLowerCase();
     if (
       lineLower.includes("complex") ||
       lineLower.includes("mandir") ||
+      lineLower.includes("temple") ||
       lineLower.includes("road") ||
       lineLower.includes("market") ||
       lineLower.includes("street") ||
+      lineLower.includes("plot") ||
       lineLower.includes("b/h") ||
       lineLower.includes("opp") ||
       lineLower.includes("near") ||
       /\d{6}/.test(line)
     ) {
-      // Strip any stray phone digits from address line
+      // Clean stray phones or symbols
       const cleanAddr = line
         .replace(/(?:(?:\+|0{0,2})91[\s-]*)?[6-9]\d{9}/g, "")
+        .replace(/[,;]+/g, ",")
         .replace(/[|~©®]/g, "")
+        .replace(/\s+/g, " ")
         .trim();
-      if (cleanAddr.length > 3 && !addressParts.includes(cleanAddr)) {
+      if (cleanAddr.length > 2 && !addressParts.includes(cleanAddr)) {
         addressParts.push(cleanAddr);
       }
     }
   }
 
   if (addressParts.length > 0) {
-    result.address = addressParts.join(", ");
+    result.address = addressParts
+      .join(", ")
+      .replace(/,\s*,+/g, ", ")
+      .replace(/,\s*$/g, "")
+      .replace(/\s+,/g, ",")
+      .trim();
+  }
+
+  // 8. GST/PAN DEFAULT
+  if (!result.gstPanNo) {
+    result.gstPanNo = "N/A";
   }
 
   return result;

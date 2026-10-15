@@ -582,7 +582,7 @@ function CustomerRegistrationContent() {
                       <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                         <CreditCard size={14} className="text-slate-500" />
                         <span>GST / PAN No.</span>
-                        <span className="text-red-500">*</span>
+                        <span className="text-slate-400 text-[10px] font-normal lowercase">(optional)</span>
                       </label>
                       {autoFilledFields.gstPanNo && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
@@ -592,10 +592,9 @@ function CustomerRegistrationContent() {
                     </div>
                     <input
                       type="text"
-                      required
                       value={gstPanNo}
                       onChange={(e) => setGstPanNo(e.target.value.toUpperCase())}
-                      placeholder="e.g. 24ABCDE1234F1Z5 or PAN"
+                      placeholder="e.g. 24ABCDE1234F1Z5, PAN or N/A"
                       className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs"
                     />
                   </div>
