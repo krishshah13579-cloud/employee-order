@@ -1,18 +1,24 @@
+import nodemailer from "nodemailer";
+
 /**
  * Utility to send 2FA OTP security emails.
  * Supports:
- * 1. Resend API (via RESEND_API_KEY)
- * 2. Brevo API (via BREVO_API_KEY)
+ * 1. Gmail SMTP (via GMAIL_USER + GMAIL_APP_PASSWORD)
+ * 2. Generic SMTP (via SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+ * 3. Resend API (via RESEND_API_KEY)
+ * 4. Brevo API (via BREVO_API_KEY)
  */
 export async function sendOtpEmail(
   toEmail: string,
   otpCode: string,
   adminName: string = "Administrator"
 ) {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
   const resendApiKey = process.env.RESEND_API_KEY;
   const brevoApiKey = process.env.BREVO_API_KEY;
   const fromEmail =
-    process.env.EMAIL_FROM || "IQ TROUSERS Security <onboarding@resend.dev>";
+    process.env.EMAIL_FROM || (gmailUser ? `"IQ TROUSERS Security" <${gmailUser}>` : "IQ TROUSERS Security <onboarding@resend.dev>");
 
   console.log(`\n======================================================`);
   console.log(`🔐 [2FA SECURITY EMAIL OTP]`);
@@ -45,7 +51,32 @@ export async function sendOtpEmail(
     </div>
   `;
 
-  // 1. Dispatch via Resend if RESEND_API_KEY is configured
+  // 1. Dispatch via Gmail SMTP if GMAIL_USER and GMAIL_APP_PASSWORD are provided
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser.trim(),
+          pass: gmailAppPassword.replace(/\s+/g, "").trim(), // Strip spaces if copied from Google
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Security" <${gmailUser.trim()}>`,
+        to: toEmail,
+        subject: `🔐 Your 2FA Security Code to Edit Admin Details: ${otpCode}`,
+        html: htmlContent,
+      });
+
+      console.log(`✅ 2FA OTP email successfully dispatched via Gmail to ${toEmail}`);
+      return true;
+    } catch (err: any) {
+      console.error("Failed to dispatch email via Gmail SMTP:", err.message);
+    }
+  }
+
+  // 2. Dispatch via Resend if RESEND_API_KEY is configured
   if (resendApiKey) {
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -74,7 +105,7 @@ export async function sendOtpEmail(
     }
   }
 
-  // 2. Dispatch via Brevo if BREVO_API_KEY is configured
+  // 3. Dispatch via Brevo if BREVO_API_KEY is configured
   if (brevoApiKey) {
     try {
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -103,9 +134,9 @@ export async function sendOtpEmail(
     }
   }
 
-  if (!resendApiKey && !brevoApiKey) {
+  if (!gmailUser && !resendApiKey && !brevoApiKey) {
     console.warn(
-      "⚠️ [Email Notice] Neither RESEND_API_KEY nor BREVO_API_KEY is set in environment variables. Add RESEND_API_KEY in Vercel to receive real emails. Master PIN 135790 is active as fallback."
+      "⚠️ [Email Notice] No email credentials found in environment variables. Add GMAIL_USER & GMAIL_APP_PASSWORD in Vercel to receive real emails. Master PIN 135790 is active as fallback."
     );
   }
 
