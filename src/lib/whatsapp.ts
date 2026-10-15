@@ -44,7 +44,7 @@ export function formatWhatsAppPhone(phone: string | null | undefined): string {
  */
 export function generateOrderWhatsAppMessage(
   order: WhatsAppOrderPayload,
-  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://employee-order.vercel.app"
 ): string {
   const invoiceUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
@@ -82,7 +82,7 @@ export function generateOrderWhatsAppMessage(
  */
 export function generatePaymentReminderWhatsAppMessage(
   order: WhatsAppOrderPayload,
-  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://employee-order.vercel.app"
 ): string {
   const invoiceUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
   const orderDateObj = order.orderDate ? new Date(order.orderDate) : new Date();
@@ -145,8 +145,10 @@ export async function dispatchAutomatedWhatsApp(
   message: string
 ): Promise<{ success: boolean; method: string; error?: string }> {
   const cleanPhone = formatWhatsAppPhone(phone);
-  const metaToken = process.env.WHATSAPP_TOKEN;
-  const metaPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const metaToken =
+    process.env.WHATSAPP_TOKEN ||
+    "EAAevAelNnwkBSs3GQ7wHyRj52ClOHlzgXNR7ycZCZAVUZBjKyrGUdD9ZCGZB32EWSZCi4bnBrImGrrmtWWwMvqZBckRgsWm3ATMBv6ZAZCkeneS5cDgw5ADqxaRU9l1PscZBgDi9MoAqW8abgdPZBTzeUAOCILKNHNqEhxBRwwC7kr9OfNdRCFw7LXIi7EnoipO3ZC6TVQZDZD";
+  const metaPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1435860432936279";
 
   // 1. Meta WhatsApp Cloud API
   if (metaToken && metaPhoneId && cleanPhone) {
