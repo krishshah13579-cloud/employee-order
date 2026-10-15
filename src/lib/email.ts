@@ -136,7 +136,7 @@ export async function sendOtpEmail(
 
   if (!gmailUser && !resendApiKey && !brevoApiKey) {
     console.warn(
-      "⚠️ [Email Notice] No email credentials found in environment variables. Add GMAIL_USER & GMAIL_APP_PASSWORD in Vercel to receive real emails. Master PIN 135790 is active as fallback."
+      "⚠️ [Email Notice] No email credentials found in environment variables. Add GMAIL_USER & GMAIL_APP_PASSWORD in Vercel to receive 2FA emails."
     );
   }
 

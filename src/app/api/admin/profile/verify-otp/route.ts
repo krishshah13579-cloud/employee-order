@@ -23,19 +23,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Check code against Database:
-    // 1. Matches configured twoFactorSecret in DB (e.g. 135790)
-    // 2. OR matches lastOtp stored in DB within validity
-    // 3. OR matches master PIN 135790
-    const isSecretMatch = admin.twoFactorSecret && admin.twoFactorSecret === cleanCode;
-    const isMasterPin = cleanCode === "135790";
+    // 1. Matches generated lastOtp stored in DB within validity
+    // 2. OR matches configured twoFactorSecret in DB
     const isOtpMatch =
       admin.lastOtp &&
       admin.lastOtp === cleanCode &&
       (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
+    const isSecretMatch = admin.twoFactorSecret && admin.twoFactorSecret === cleanCode;
 
-    if (!isSecretMatch && !isOtpMatch && !isMasterPin) {
+    if (!isOtpMatch && !isSecretMatch) {
       return NextResponse.json(
-        { error: "Invalid or expired 2FA code. Please check your email or enter your master PIN." },
+        { error: "Invalid or expired 2FA code. Please check the 6-digit code sent to your email." },
         { status: 401 }
       );
     }

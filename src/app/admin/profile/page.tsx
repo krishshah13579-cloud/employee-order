@@ -745,9 +745,6 @@ export default function AdminProfilePage() {
                 <Mail size={13} />
                 <span>{maskedEmail}</span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-2">
-                (Your master PIN: <strong className="text-orange-400 font-mono">135790</strong> is also accepted as fallback)
-              </p>
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-4">
