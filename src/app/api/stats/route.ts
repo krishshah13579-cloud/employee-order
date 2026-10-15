@@ -21,26 +21,26 @@ export async function GET() {
       revenueAggregation,
       recentOrdersRaw,
     ] = await Promise.all([
-      prisma.order.count(),
+      prisma.order.count().catch(() => 0),
       prisma.order.count({
         where: { createdAt: { gte: startOfToday } },
-      }),
+      }).catch(() => 0),
       prisma.order.aggregate({
         _sum: { grandTotal: true },
         where: {
           createdAt: { gte: startOfToday },
           status: { not: "Cancelled" },
         },
-      }),
-      prisma.order.count({ where: { status: "Pending" } }),
-      prisma.customer.count(),
-      prisma.employee.count({ where: { isActive: true } }),
-      prisma.product.count({ where: { isActive: true } }),
+      }).catch(() => ({ _sum: { grandTotal: 0 } })),
+      prisma.order.count({ where: { status: "Pending" } }).catch(() => 0),
+      prisma.customer.count().catch(() => 0),
+      prisma.employee.count({ where: { isActive: true } }).catch(() => 0),
+      prisma.product.count({ where: { isActive: true } }).catch(() => 0),
       prisma.product.findMany({
         where: { isActive: true },
         select: { id: true, setsColorwise: true },
-      }),
-      prisma.category.findMany({ orderBy: { name: "asc" } }),
+      }).catch(() => []),
+      prisma.category.findMany({ orderBy: { name: "asc" } }).catch(() => []),
       prisma.order.aggregate({
         _sum: {
           grandTotal: true,
@@ -50,21 +50,35 @@ export async function GET() {
             not: "Cancelled",
           },
         },
-      }),
+      }).catch(() => ({ _sum: { grandTotal: 0 } })),
       prisma.order.findMany({
         take: 10,
         orderBy: {
           createdAt: "desc",
         },
         include: {
-          customer: true,
+          customer: {
+            select: {
+              id: true,
+              shopName: true,
+              gstPanNo: true,
+              phoneNumber: true,
+            },
+          },
           items: {
             include: {
-              product: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  category: true,
+                  price: true,
+                },
+              },
             },
           },
         },
-      }),
+      }).catch(() => []),
     ]);
 
     let inStockProductsCount = 0;

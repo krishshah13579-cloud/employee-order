@@ -40,3 +40,5 @@ prisma/*.db*
 # Local uploads (preserve directory with .gitkeep)
 /public/uploads/*
 !/public/uploads/.gitkeep
+.vercel
+.env*

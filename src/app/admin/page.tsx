@@ -44,7 +44,8 @@ export default function AdminDashboardPage() {
       setError(null);
       const res = await fetch("/api/stats");
       if (!res.ok) {
-        throw new Error(`Failed to fetch stats: ${res.statusText}`);
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || `Failed to fetch stats (${res.status})`);
       }
       const data = await res.json();
       setStats(data);

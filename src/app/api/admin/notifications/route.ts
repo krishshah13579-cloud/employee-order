@@ -12,18 +12,30 @@ export async function GET(req: NextRequest) {
     const recentOrders = await prisma.order.findMany({
       take: 10,
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        orderNumber: true,
+        grandTotal: true,
+        status: true,
+        createdAt: true,
         customer: {
           select: { shopName: true, phoneNumber: true },
         },
       },
-    });
+    }).catch(() => []);
 
     // Fetch latest 10 customers
     const recentCustomers = await prisma.customer.findMany({
       take: 10,
       orderBy: { createdAt: "desc" },
-    });
+      select: {
+        id: true,
+        shopName: true,
+        phoneNumber: true,
+        city: true,
+        createdAt: true,
+      },
+    }).catch(() => []);
 
     // Format into combined notification events
     const notifications = [
