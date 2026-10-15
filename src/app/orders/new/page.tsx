@@ -838,37 +838,6 @@ export default function OrderFormPage() {
                   </div>
                 </div>
 
-                {/* Credit Days Keyboard Input (No Preset Option Buttons) */}
-                <div className="bg-white p-3.5 rounded-xl border border-orange-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                      <Clock size={14} className="text-orange-600" />
-                      <span>Credit Days:</span>
-                      <div className="relative w-48">
-                      <input
-                        type="number"
-                        min={0}
-                        max={180}
-                        disabled={isCreditLocked || orderCreditDays === 45}
-                        value={orderCreditDays === 0 ? "" : orderCreditDays}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
-                          handleCreditDaysChange(isNaN(val) ? 0 : val);
-                        }}
-                        className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                      />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
-                        Days
-                      </span>
-                    </div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                                        
-                  </div>
-                </div>
               </div>
             </div>
           )}
