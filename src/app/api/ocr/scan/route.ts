@@ -3,7 +3,12 @@ import { parseVisitingCardText, type ExtractedCardData } from "@/lib/visitingCar
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const { image } = body;
 
     if (!image) {
