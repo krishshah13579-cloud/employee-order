@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { CustomerData } from "@/lib/types";
+import { compressImageFile } from "@/lib/imageCompression";
 
 interface CustomerFormProps {
   initialData?: CustomerData;
@@ -53,27 +54,16 @@ export default function CustomerForm({
     if (!file) return;
 
     setUploading(true);
-    const uploadFormData = new FormData();
-    uploadFormData.append("file", file);
-
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: uploadFormData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setFormData((prev) => ({ ...prev, visitingCardUrl: data.url }));
-        toast("Visiting card photo uploaded successfully!", "success");
-      } else {
-        const err = await res.json();
-        toast(err.error || "Upload failed", "error");
-      }
+      const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
+      setFormData((prev) => ({ ...prev, visitingCardUrl: dataUrl }));
+      toast("Visiting card photo attached successfully!", "success");
     } catch (err: any) {
-      toast("Error uploading file: " + err.message, "error");
+      console.error("Visiting card upload error:", err);
+      toast("Error uploading file: " + (err.message || "Failed to process photo"), "error");
     } finally {
       setUploading(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -309,7 +299,7 @@ export default function CustomerForm({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
               onChange={handleFileUpload}
               className="hidden"
             />

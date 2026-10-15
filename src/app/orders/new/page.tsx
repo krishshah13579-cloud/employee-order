@@ -39,6 +39,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { compressImageFile } from "@/lib/imageCompression";
 
 interface DraftOrderItem {
   productId: number;
@@ -261,26 +262,15 @@ export default function OrderFormPage() {
 
     try {
       setUploadingCard(true);
-      const fd = new FormData();
-      fd.append("file", file);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: fd,
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to upload visiting card");
-      }
-
-      const data = await res.json();
-      setNewVisitingCardUrl(data.url);
-      toast("Visiting card photo uploaded successfully!");
+      const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
+      setNewVisitingCardUrl(dataUrl);
+      toast("Visiting card photo attached successfully!");
     } catch (err: any) {
-      toast(err.message || "Failed to upload visiting card", "error");
+      console.error("Visiting card upload error:", err);
+      toast(err.message || "Failed to process photo", "error");
     } finally {
       setUploadingCard(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -1306,7 +1296,7 @@ export default function OrderFormPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
                   onChange={handleVisitingCardUpload}
                   className="hidden"
                 />

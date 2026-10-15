@@ -15,6 +15,7 @@ import {
   Layers,
   Upload,
 } from "lucide-react";
+import { compressImageFile } from "@/lib/imageCompression";
 
 export interface CategoryItem {
   id: number;
@@ -89,25 +90,14 @@ export default function CategoriesManager({
     if (!file) return;
 
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setImage(data.url);
-      } else {
-        const err = await res.json();
-        setError(err.error || "Failed to upload image");
-      }
+      const dataUrl = await compressImageFile(file, 800, 800, 0.8);
+      setImage(dataUrl);
     } catch (err: any) {
-      setError(err.message || "Failed to upload file");
+      setError(err.message || "Failed to process image");
     } finally {
       setUploadingImage(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -478,7 +468,7 @@ export default function CategoriesManager({
                     <span>{uploadingImage ? "Uploading..." : "Upload"}</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
                       onChange={handleImageUpload}
                       className="hidden"
                     />

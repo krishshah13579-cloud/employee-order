@@ -20,15 +20,22 @@ export async function POST(req: NextRequest) {
     const baseName = path.basename(file.name, path.extname(file.name)).replace(/[^a-zA-Z0-9_-]/g, "_");
     const uniqueName = `${Date.now()}_${baseName}${ext}`;
     const uploadDir = path.join(process.cwd(), "public", "uploads");
+    try {
+      const fs = await import("fs/promises");
+      await fs.mkdir(uploadDir, { recursive: true });
 
-    const fs = await import("fs/promises");
-    await fs.mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, uniqueName);
+      await fs.writeFile(filePath, buffer);
 
-    const filePath = path.join(uploadDir, uniqueName);
-    await fs.writeFile(filePath, buffer);
-
-    const fileUrl = `/uploads/${uniqueName}`;
-    return NextResponse.json({ url: fileUrl, filename: uniqueName }, { status: 201 });
+      const fileUrl = `/uploads/${uniqueName}`;
+      return NextResponse.json({ url: fileUrl, filename: uniqueName }, { status: 201 });
+    } catch (fsErr) {
+      // On serverless/read-only filesystem (like Vercel), fallback to base64 Data URL
+      const mime = file.type || "image/jpeg";
+      const base64Data = buffer.toString("base64");
+      const dataUrl = `data:${mime};base64,${base64Data}`;
+      return NextResponse.json({ url: dataUrl, filename: uniqueName }, { status: 201 });
+    }
   } catch (error: any) {
     console.error("Upload error:", error);
     return NextResponse.json({ error: "Failed to upload file: " + error.message }, { status: 500 });

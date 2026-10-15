@@ -38,6 +38,7 @@ import {
   stringifyColorwiseSets,
   getTotalAvailableSets,
 } from "@/lib/stock";
+import { compressImageFile } from "@/lib/imageCompression";
 
 // Standard Trouser & Formal Apparel Color Presets
 const PRESET_COLORS = [
@@ -351,21 +352,8 @@ export default function ProductForm({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const uploadFormData = new FormData();
-        uploadFormData.append("file", file);
-
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: uploadFormData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          uploadedUrls.push(data.url);
-        } else {
-          const err = await res.json();
-          toast(err.error || `Upload failed for ${file.name}`, "error");
-        }
+        const dataUrl = await compressImageFile(file, 1200, 1200, 0.78);
+        uploadedUrls.push(dataUrl);
       }
 
       if (uploadedUrls.length > 0) {
@@ -376,7 +364,8 @@ export default function ProductForm({
         );
       }
     } catch (err: any) {
-      toast("Error uploading file: " + err.message, "error");
+      console.error("Image upload error:", err);
+      toast("Error uploading photo: " + (err.message || "Failed to process photo"), "error");
     } finally {
       setUploadingImages(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -982,7 +971,7 @@ export default function ProductForm({
               ref={fileInputRef}
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
               onChange={handleFileUpload}
               className="hidden"
             />
