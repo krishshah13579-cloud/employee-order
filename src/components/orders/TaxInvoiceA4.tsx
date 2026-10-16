@@ -20,6 +20,8 @@ export interface TaxInvoiceOrder {
   orderNumber: string;
   orderDate: string | Date;
   status?: string;
+  taxInvoiceNumber?: string | null;
+  taxInvoiceDate?: string | Date | null;
   customerName: string;
   customerGstPan?: string | null;
   customerPhone?: string | null;
@@ -43,11 +45,32 @@ export interface TaxInvoiceOrder {
 interface TaxInvoiceA4Props {
   order: TaxInvoiceOrder;
   copyTitle?: string; // e.g. "Duplicate" or "Original for Recipient"
+  formatType?: "ORDER_FORM" | "TAX_INVOICE";
 }
 
-export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoiceA4Props) {
-  // Parse order date formatted as DD/MM/YYYY
-  const dateObj = order.orderDate ? new Date(order.orderDate) : new Date();
+export default function TaxInvoiceA4({
+  order,
+  copyTitle = "Original",
+  formatType,
+}: TaxInvoiceA4Props) {
+  // Determine whether this document should render as TAX INVOICE or ORDER FORM
+  const isTaxInvoice =
+    formatType === "TAX_INVOICE" ||
+    (!formatType &&
+      (order.status === "Ready" ||
+        order.status === "Dispatched" ||
+        order.status === "Delivered" ||
+        Boolean(order.taxInvoiceNumber)));
+
+  const displayTitle = isTaxInvoice ? "TAX INVOICE" : "ORDER FORM";
+  const numberLabel = isTaxInvoice ? "Invoice No." : "Order No.";
+  const displayDocNumber = isTaxInvoice
+    ? order.taxInvoiceNumber || order.orderNumber
+    : order.orderNumber;
+
+  // Active Date formatted as DD/MM/YYYY
+  const activeDate = isTaxInvoice && order.taxInvoiceDate ? order.taxInvoiceDate : order.orderDate;
+  const dateObj = activeDate ? new Date(activeDate) : new Date();
   const formattedDate = !isNaN(dateObj.getTime())
     ? `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(
         2,
@@ -70,10 +93,6 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
   const sgst = Math.round((gstAmount / 2) * 100) / 100;
   const grandTotal = Number(order.grandTotal) || Math.round(subtotal + gstAmount);
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
-
-  // Once dispatched, label as Invoice No., otherwise Order No.
-  const isDispatched = order.status === "Dispatched" || order.status === "Delivered";
-  const numberLabel = isDispatched ? "Invoice No." : "Order No.";
 
   // Calculate target empty filler rows to create classic invoice look with vertical column lines
   // Standard invoice table should have at least 6 rows of height
@@ -194,7 +213,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
               textTransform: "uppercase",
             }}
           >
-            {isDispatched ? "TAX INVOICE" : "ORDER FORM"}
+            {displayTitle}
           </div>
           <div style={{ width: "25%", textAlign: "right" }}>{copyTitle}</div>
         </div>
@@ -312,7 +331,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
             >
               <span style={{ fontWeight: "bold", width: "95px" }}>{numberLabel}</span>
               <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
-                : {order.orderNumber}
+                : {displayDocNumber}
               </span>
             </div>
 
@@ -376,7 +395,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
                 style={{
                   borderRight: "1px solid #000000",
                   padding: "4px 6px",
-                  width: "27%",
+                  width: "25%",
                   textAlign: "left",
                 }}
               >
@@ -388,7 +407,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
               <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "9%" }}>
                 Size
               </th>
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "11%" }}>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "13%" }}>
                 Color
               </th>
               <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "7%" }}>
@@ -406,9 +425,6 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
                 }}
               >
                 Rate
-              </th>
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "5%" }}>
-                GST %
               </th>
               <th style={{ padding: "4px 6px", width: "9%", textAlign: "right" }}>
                 Amount

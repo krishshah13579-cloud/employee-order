@@ -2,9 +2,10 @@
  * WhatsApp Messaging Integration for Krish Clothing Co. (GarmentPro)
  * Supports:
  * 1. 1-Click WhatsApp Direct URL (opens WhatsApp Web / App with pre-filled message, customer phone, and PDF invoice link)
- * 2. Meta WhatsApp Cloud API (background server-side direct dispatch if WHATSAPP_TOKEN & WHATSAPP_PHONE_NUMBER_ID are provided)
- * 3. UltraMsg API (background dispatch if ULTRAMSG_INSTANCE_ID & ULTRAMSG_TOKEN are provided)
- * 4. Weekly Payment Reminder generation and dispatch
+ * 2. Meta WhatsApp Cloud API (background server-side direct dispatch with PDF document attachment)
+ * 3. UltraMsg API (background dispatch with PDF document attachment)
+ * 4. Two Formats: Order Form PDF & Tax Invoice PDF
+ * 5. Weekly Customer Outstanding Payment Reminder with FIFO ledger summary
  */
 
 export interface WhatsAppOrderPayload {
@@ -22,6 +23,28 @@ export interface WhatsAppOrderPayload {
   transportName?: string | null;
   status?: string;
   placedBy?: string | null;
+  taxInvoiceNumber?: string | null;
+  taxInvoiceDate?: string | Date | null;
+  notes?: string | null;
+}
+
+export interface CustomerOutstandingPayload {
+  customerName: string;
+  customerPhone?: string | null;
+  city?: string | null;
+  gstPanNo?: string | null;
+  creditDays?: number;
+  totalBilled: number;
+  totalPaid: number;
+  totalReturns: number;
+  outstandingBalance: number;
+  pendingBillsCount: number;
+  billsSummary?: Array<{
+    invoiceNo: string;
+    invoiceDate: string | Date;
+    totalAmount: number;
+    balanceAmount: number;
+  }>;
 }
 
 /** Sanitize Indian phone number to international format (e.g., 9426934229 -> 919426934229) */
@@ -40,93 +63,174 @@ export function formatWhatsAppPhone(phone: string | null | undefined): string {
 }
 
 /**
- * Generate formatted WhatsApp message for new order confirmation / tax invoice
+ * Generate formatted WhatsApp message for Order Form (Format 1: When order is placed / confirmed)
  */
 export function generateOrderWhatsAppMessage(
   order: WhatsAppOrderPayload,
-  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://employee-order.vercel.app"
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
 ): string {
-  const invoiceUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
+  const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=order_form`;
+  const viewUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
   const creditTermText =
-    creditDays > 0 ? `Payment within ${creditDays} Days` : "Advance Payment (0 Days Credit)";
+    creditDays > 0 ? `Payment every week & completed within ${creditDays} Days` : "Advance Payment (0 Days Credit)";
 
   let resolvedTransport = order.transportName || "";
-  if (!resolvedTransport && (order as any).notes) {
-    const match = (order as any).notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
+  if (!resolvedTransport && order.notes) {
+    const match = order.notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
     if (match && match[1]) resolvedTransport = match[1].trim();
   }
 
   return (
-    `🧵 *KRISH CLOTHING CO.* — Order Placed Successfully\n\n` +
-    `Dear *${order.customerName}*,\n` +
-    `Thank you for your wholesale order with Krish Clothing Co.! Your order has been registered and is being processed.\n\n` +
-    `📋 *Order & Invoice Summary:*\n` +
-    `• *Invoice No:* #${order.orderNumber}\n` +
+    `🧵 *KRISH CLOTHING CO.* — Order Form Confirmed\n\n` +
+    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `Thank you for your wholesale order with Krish Clothing Co.! Your order has been confirmed.\n\n` +
+    `📋 *Order Form Summary:*\n` +
+    `• *Order No:* #${order.orderNumber}\n` +
     `• *Date:* ${order.orderDate ? new Date(order.orderDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}\n` +
-    `• *Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
-    `• *Taxable Amount:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
+    `• *Total Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
+    `• *Subtotal:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
     `• *GST (5%):* ₹${order.gstAmount.toLocaleString("en-IN")}\n` +
     `• *Grand Total:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
     `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
-    `• *Credit Terms:* ${creditTermText}\n\n` +
-    `🏦 *Bank Account Details for RTGS / NEFT:*\n` +
+    `• *Payment Terms:* ${creditTermText}\n\n` +
+    `🏦 *Bank Account Details for Payment (RTGS / NEFT):*\n` +
     `• *Bank:* ICICI BANK\n` +
     `• *Account No:* 750705000692\n` +
     `• *IFSC Code:* ICIC0007507\n` +
     `• *Beneficiary:* KRISH CLOTHING CO.\n` +
     `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
-    `📄 *View / Download Tax Invoice (A4 PDF):*\n` +
-    `${invoiceUrl}\n\n` +
-    `For any changes or dispatch queries, please reply to this WhatsApp message.\n` +
+    `📄 *Download Order Form PDF:* ${pdfUrl}\n` +
+    `🔗 *View Live Order:* ${viewUrl}\n\n` +
     `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
   );
 }
 
 /**
- * Generate formatted WhatsApp message for weekly payment reminder
+ * Generate formatted WhatsApp message for Tax Invoice (Format 2: After order is ready with admin-updated quantities)
  */
-export function generatePaymentReminderWhatsAppMessage(
+export function generateTaxInvoiceWhatsAppMessage(
   order: WhatsAppOrderPayload,
-  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://employee-order.vercel.app"
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
 ): string {
-  const invoiceUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
-  const orderDateObj = order.orderDate ? new Date(order.orderDate) : new Date();
+  const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
+  const viewUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
+  const invNo = order.taxInvoiceNumber || order.orderNumber;
+  const invDate = order.taxInvoiceDate || order.orderDate;
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
+  const creditTermText =
+    creditDays > 0 ? `Payment every week & completed within ${creditDays} Days` : "Advance Payment";
 
-  // Calculate Due Date
-  const dueDate = new Date(orderDateObj);
-  dueDate.setDate(dueDate.getDate() + creditDays);
-  const now = new Date();
-  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  let resolvedTransport = order.transportName || "";
+  if (!resolvedTransport && order.notes) {
+    const match = order.notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
+    if (match && match[1]) resolvedTransport = match[1].trim();
+  }
 
-  let dueStatusText = "";
-  if (diffDays < 0) {
-    dueStatusText = `⚠️ *OVERDUE by ${Math.abs(diffDays)} Days*`;
-  } else if (diffDays === 0) {
-    dueStatusText = `⏰ *DUE TODAY*`;
-  } else {
-    dueStatusText = `📅 Due in ${diffDays} Days (${dueDate.toLocaleDateString("en-IN")})`;
+  return (
+    `📦 *KRISH CLOTHING CO.* — Tax Invoice (Order Ready for Dispatch)\n\n` +
+    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `Your wholesale order is ready for dispatch! Please find your official Tax Invoice with final quantities and billing below.\n\n` +
+    `📋 *Tax Invoice Details:*\n` +
+    `• *Tax Invoice No:* #${invNo}\n` +
+    `• *Order Reference:* #${order.orderNumber}\n` +
+    `• *Invoice Date:* ${invDate ? new Date(invDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}\n` +
+    `• *Dispatched Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
+    `• *Taxable Value:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
+    `• *GST (5%):* ₹${order.gstAmount.toLocaleString("en-IN")}\n` +
+    `• *Final Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
+    `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
+    `• *Payment Terms:* ${creditTermText}\n\n` +
+    `🏦 *Bank Account Details for Payment (RTGS / NEFT / IMPS):*\n` +
+    `• *Bank:* ICICI BANK\n` +
+    `• *Account No:* 750705000692\n` +
+    `• *IFSC Code:* ICIC0007507\n` +
+    `• *Beneficiary:* KRISH CLOTHING CO.\n` +
+    `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
+    `📄 *Download Tax Invoice PDF:* ${pdfUrl}\n` +
+    `🔗 *View Live Invoice:* ${viewUrl}\n\n` +
+    `Kindly arrange payment as per weekly credit terms. Thank you for your business!\n` +
+    `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
+  );
+}
+
+/**
+ * Generate formatted WhatsApp message for weekly customer outstanding reminder
+ */
+export function generateCustomerOutstandingWhatsAppMessage(
+  payload: CustomerOutstandingPayload,
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
+): string {
+  let billsSection = "";
+  if (payload.billsSummary && payload.billsSummary.length > 0) {
+    billsSection =
+      `📋 *Pending Bills (FIFO Allocation):*\n` +
+      payload.billsSummary
+        .slice(0, 5)
+        .map(
+          (b) =>
+            `• *${b.invoiceNo}* (${new Date(b.invoiceDate).toLocaleDateString("en-IN")}): Total ₹${b.totalAmount.toLocaleString("en-IN")} | Bal: *₹${b.balanceAmount.toLocaleString("en-IN")}*`
+        )
+        .join("\n") +
+      (payload.billsSummary.length > 5 ? `\n• _+ ${payload.billsSummary.length - 5} more bills..._` : "") +
+      `\n\n`;
   }
 
   return (
     `🔔 *KRISH CLOTHING CO.* — Weekly Payment Reminder\n\n` +
-    `Dear *${order.customerName}*,\n` +
-    `This is a gentle weekly reminder regarding your outstanding invoice for wholesale garments:\n\n` +
-    `📋 *Invoice Reference:*\n` +
-    `• *Invoice / Order No:* #${order.orderNumber}\n` +
-    `• *Invoice Date:* ${orderDateObj.toLocaleDateString("en-IN")}\n` +
-    `• *Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
-    `• *Credit Terms:* ${creditDays > 0 ? `${creditDays} Days` : "Advance"}\n` +
-    `• *Payment Status:* ${dueStatusText}\n\n` +
-    `🏦 *Payment Bank Account Details (RTGS / NEFT / IMPS):*\n` +
+    `Dear *${payload.customerName.toUpperCase()}*,\n` +
+    `This is a gentle weekly reminder regarding your outstanding payment balance with Krish Clothing Co.\n\n` +
+    `📊 *Statement of Account:*\n` +
+    `• *Firm Name:* ${payload.customerName.toUpperCase()}\n` +
+    `• *City:* ${payload.city || "Ahmedabad"}\n` +
+    `• *Total Billed:* ₹${payload.totalBilled.toLocaleString("en-IN")}\n` +
+    `• *Total Paid / Received:* ₹${payload.totalPaid.toLocaleString("en-IN")}\n` +
+    (payload.totalReturns > 0 ? `• *Sales Returns Credited:* ₹${payload.totalReturns.toLocaleString("en-IN")}\n` : "") +
+    `• *NET OUTSTANDING BALANCE:* *₹${payload.outstandingBalance.toLocaleString("en-IN")}*\n` +
+    `• *Unpaid Invoices:* ${payload.pendingBillsCount}\n\n` +
+    billsSection +
+    `🏦 *Bank Account Details for Payment (RTGS / NEFT / IMPS):*\n` +
     `• *Bank Name:* ICICI BANK\n` +
     `• *Account No:* 750705000692\n` +
     `• *IFSC Code:* ICIC0007507\n` +
-    `• *Name:* KRISH CLOTHING CO.\n\n` +
-    `📄 *View A4 Tax Invoice:* ${invoiceUrl}\n\n` +
-    `Kindly arrange the payment at your earliest convenience. If already transferred, please share the UTR / payment receipt screenshot here.\n\n` +
-    `Thank you for your valued business!\n` +
+    `• *Beneficiary:* KRISH CLOTHING CO.\n` +
+    `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
+    `Kindly arrange payment at your earliest convenience. If already transferred, please reply with the UTR number or payment screenshot.\n\n` +
+    `Thank you for your cooperation!\n` +
+    `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
+  );
+}
+
+/**
+ * Generate formatted WhatsApp message for single order weekly payment reminder
+ */
+export function generatePaymentReminderWhatsAppMessage(
+  order: WhatsAppOrderPayload,
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || "https://krish-clothing.vercel.app"
+): string {
+  const invoiceUrl = `${baseUrl.replace(/\/$/, "")}/orders/${order.orderNumber}`;
+  const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
+  const orderDateObj = order.orderDate ? new Date(order.orderDate) : new Date();
+  const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
+
+  return (
+    `🔔 *KRISH CLOTHING CO.* — Weekly Payment Reminder\n\n` +
+    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `This is a gentle weekly reminder regarding your outstanding bill:\n\n` +
+    `📋 *Bill Details:*\n` +
+    `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +
+    `• *Date:* ${orderDateObj.toLocaleDateString("en-IN")}\n` +
+    `• *Amount Due:* *₹${order.grandTotal.toLocaleString("en-IN")}*\n` +
+    `• *Payment Terms:* Payment every week & completed within ${creditDays} Days\n\n` +
+    `🏦 *Bank Account Details for RTGS / NEFT / IMPS:*\n` +
+    `• *Bank:* ICICI BANK\n` +
+    `• *Account No:* 750705000692\n` +
+    `• *IFSC Code:* ICIC0007507\n` +
+    `• *Beneficiary:* KRISH CLOTHING CO.\n` +
+    `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
+    `📄 *Download PDF Invoice:* ${pdfUrl}\n` +
+    `🔗 *View Live Invoice:* ${invoiceUrl}\n\n` +
+    `Kindly arrange the payment at your earliest convenience.\n` +
     `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
   );
 }
@@ -144,11 +248,15 @@ export function createWhatsAppDirectLink(phone: string, text: string): string {
 }
 
 /**
- * Dispatch message via Meta Cloud API or UltraMsg if configured
+ * Dispatch message via Meta Cloud API or UltraMsg with optional PDF document attachment
  */
 export async function dispatchAutomatedWhatsApp(
   phone: string,
-  message: string
+  message: string,
+  documentOptions?: {
+    pdfUrl: string;
+    filename: string;
+  }
 ): Promise<{ success: boolean; method: string; error?: string }> {
   const cleanPhone = formatWhatsAppPhone(phone);
   const metaToken =
@@ -159,19 +267,31 @@ export async function dispatchAutomatedWhatsApp(
   // 1. Meta WhatsApp Cloud API
   if (metaToken && metaPhoneId && cleanPhone) {
     try {
+      const payload: any = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanPhone,
+      };
+
+      if (documentOptions?.pdfUrl) {
+        payload.type = "document";
+        payload.document = {
+          link: documentOptions.pdfUrl,
+          filename: documentOptions.filename,
+          caption: message,
+        };
+      } else {
+        payload.type = "text";
+        payload.text = { preview_url: true, body: message };
+      }
+
       const res = await fetch(`https://graph.facebook.com/v19.0/${metaPhoneId}/messages`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${metaToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: cleanPhone,
-          type: "text",
-          text: { preview_url: true, body: message },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -191,18 +311,36 @@ export async function dispatchAutomatedWhatsApp(
   const ultraToken = process.env.ULTRAMSG_TOKEN;
   if (ultraInstance && ultraToken && cleanPhone) {
     try {
-      const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          token: ultraToken,
-          to: cleanPhone,
-          body: message,
-        }),
-      });
-      if (res.ok) {
-        console.log(`✅ WhatsApp message sent via UltraMsg to ${cleanPhone}`);
-        return { success: true, method: "ULTRAMSG" };
+      if (documentOptions?.pdfUrl) {
+        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/document`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: ultraToken,
+            to: cleanPhone,
+            filename: documentOptions.filename,
+            document: documentOptions.pdfUrl,
+            caption: message,
+          }),
+        });
+        if (res.ok) {
+          console.log(`✅ WhatsApp document sent via UltraMsg to ${cleanPhone}`);
+          return { success: true, method: "ULTRAMSG_DOCUMENT" };
+        }
+      } else {
+        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: ultraToken,
+            to: cleanPhone,
+            body: message,
+          }),
+        });
+        if (res.ok) {
+          console.log(`✅ WhatsApp chat sent via UltraMsg to ${cleanPhone}`);
+          return { success: true, method: "ULTRAMSG" };
+        }
       }
     } catch (err: any) {
       console.error("UltraMsg dispatch exception:", err.message);
@@ -212,6 +350,6 @@ export async function dispatchAutomatedWhatsApp(
   return {
     success: false,
     method: "DIRECT_LINK_FALLBACK",
-    error: "No WhatsApp Cloud API credentials configured. Use 1-Click WhatsApp Direct Link.",
+    error: "No WhatsApp Cloud API credentials configured or API call failed. Using 1-Click WhatsApp Direct Link.",
   };
 }

@@ -59,7 +59,17 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { customerId, placedBy, notes, items, orderDate, status } = body;
+    const {
+      customerId,
+      placedBy,
+      notes,
+      items,
+      orderDate,
+      status,
+      taxInvoiceNumber,
+      taxInvoiceDate,
+      taxInvoiceItems,
+    } = body;
 
     if (status === "Confirmed" && existingOrder.status !== "Confirmed") {
       const admin = await getAdminSession(request);
@@ -178,6 +188,24 @@ export async function PUT(
           totalSets: validatedItems.length > 0 ? orderTotalSets : existingOrder.totalSets,
           placedBy: placedBy !== undefined ? placedBy : existingOrder.placedBy,
           notes: notes !== undefined ? notes : existingOrder.notes,
+          taxInvoiceNumber:
+            taxInvoiceNumber !== undefined
+              ? taxInvoiceNumber
+                ? String(taxInvoiceNumber).trim().toUpperCase()
+                : null
+              : existingOrder.taxInvoiceNumber,
+          taxInvoiceDate:
+            taxInvoiceDate !== undefined
+              ? taxInvoiceDate
+                ? new Date(taxInvoiceDate)
+                : null
+              : existingOrder.taxInvoiceDate,
+          taxInvoiceItems:
+            taxInvoiceItems !== undefined
+              ? typeof taxInvoiceItems === "string"
+                ? taxInvoiceItems
+                : JSON.stringify(taxInvoiceItems)
+              : existingOrder.taxInvoiceItems,
         },
         include: {
           customer: true,

@@ -12,6 +12,8 @@ import {
   ShoppingCart,
   FileText,
   Boxes,
+  Receipt,
+  RotateCcw,
   LogOut,
   ExternalLink,
 } from "lucide-react";
@@ -61,6 +63,18 @@ const navItems = [
     name: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+    exact: false,
+  },
+  {
+    name: "Outstanding",
+    href: "/admin/outstanding",
+    icon: Receipt,
+    exact: false,
+  },
+  {
+    name: "Returns",
+    href: "/admin/returns",
+    icon: RotateCcw,
     exact: false,
   },
   {

@@ -17,8 +17,6 @@ import {
   CheckCircle2,
   Filter,
 } from "lucide-react";
-import { Sidebar } from "@/components/admin/Sidebar";
-import AdminTopHeader from "@/components/admin/AdminTopHeader";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
@@ -196,13 +194,7 @@ export default function AdminStockPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
-      <Sidebar activePage="stock" />
-
-      <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
-        <AdminTopHeader />
-
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="space-y-6">
           {/* Top Header & Breadcrumbs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -496,8 +488,6 @@ export default function AdminStockPage() {
               </table>
             </div>
           </div>
-        </main>
-      </div>
 
       {/* ═══════════════════════════════════════════
           EDIT STOCK & RATIO SETS MODAL

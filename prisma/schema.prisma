@@ -66,9 +66,11 @@ model Customer {
   visitingCardUrl String?  // Visiting Card (Photo/Upload)
   contactPerson   String?  // Primary Contact Person Name
   contactPersons  String?  // JSON Array of Multiple Contact Persons [{name, phone, designation}]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   orders          Order[]
+  payments        Payment[]
+  salesReturns    SalesReturn[]
 }
 
 // 5. Product Page (Product Details: Product Name, Colors Available, Sizes, Price, No of Set Colorwise, Size Guide)
@@ -116,12 +118,15 @@ model Order {
   grandTotal      Float       @default(0) // Subtotal + gstAmount
   totalPcs        Int         @default(0) // Total Pieces
   totalSets       Int         @default(0) // Total Sets
-  placedBy        String?     // Booked by employee/admin
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  customer        Customer    @relation(fields: [customerId], references: [id])
-  items           OrderItem[]
+  placedBy         String?     // Booked by employee/admin
+  taxInvoiceNumber String?     // Set by admin once order is ready (e.g. TI-2026-001)
+  taxInvoiceDate   DateTime?   // Tax Invoice date set by admin
+  taxInvoiceItems  String?     // JSON string of updated items with modified quantities/amounts for tax invoice
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  customer         Customer    @relation(fields: [customerId], references: [id])
+  items            OrderItem[]
 }
 
 model OrderItem {
@@ -151,5 +156,40 @@ model Category {
   image       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// 7. Payment Ledger (Track payments received from customers for outstanding settlement)
+model Payment {
+  id           Int      @id @default(autoincrement())
+  customerId   Int
+  customerName String
+  amount       Float
+  paymentDate  DateTime @default(now())
+  paymentMode  String   @default("Bank Transfer") // Bank Transfer, Cash, UPI, Cheque, RTGS
+  referenceNo  String?  // Cheque no, UTR, transaction ID
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// 8. Sales Return / Credit Note (Track product returns and credit against customer outstanding)
+model SalesReturn {
+  id           Int      @id @default(autoincrement())
+  returnNumber String   @unique // e.g. RET-261016-001
+  customerId   Int
+  customerName String
+  orderId      Int?     // Optional reference to original order
+  orderNumber  String?
+  returnDate   DateTime @default(now())
+  totalAmount  Float    // Total credit amount to deduct from outstanding
+  totalPcs     Int      @default(0)
+  totalSets    Int      @default(0)
+  items        String   // JSON: [{ productName, color, sizeRatio, sets, pcs, unitPrice, amount, reason }]
+  reason       String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 

@@ -114,6 +114,41 @@ export async function PUT(
       },
     });
 
+    // Automated WhatsApp trigger on status change to "Confirmed" or "Ready"
+    const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;
+    if (customerPhone && (status === "Confirmed" || status === "Ready")) {
+      try {
+        const origin =
+          request.headers.get("origin") ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "https://krish-clothing.vercel.app";
+
+        const {
+          generateOrderWhatsAppMessage,
+          generateTaxInvoiceWhatsAppMessage,
+          dispatchAutomatedWhatsApp,
+        } = await import("@/lib/whatsapp");
+
+        const isReady = status === "Ready";
+        const pdfDocType = isReady ? "tax_invoice" : "order_form";
+        const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${updatedOrder.id}/pdf?type=${pdfDocType}`;
+        const docNo = (isReady && updatedOrder.taxInvoiceNumber ? updatedOrder.taxInvoiceNumber : updatedOrder.orderNumber).replace(/[^a-zA-Z0-9_-]/g, "_");
+        const pdfFilename = `${isReady ? "Tax_Invoice" : "Order_Form"}_${docNo}.pdf`;
+
+        const messageText = isReady
+          ? generateTaxInvoiceWhatsAppMessage(updatedOrder as any, origin)
+          : generateOrderWhatsAppMessage(updatedOrder as any, origin);
+
+        // Run automated dispatch in background
+        dispatchAutomatedWhatsApp(customerPhone, messageText, {
+          pdfUrl,
+          filename: pdfFilename,
+        }).catch((err) => console.error("Auto WhatsApp status dispatch error:", err));
+      } catch (waErr) {
+        console.error("Auto WhatsApp notification error:", waErr);
+      }
+    }
+
     return NextResponse.json(updatedOrder);
   } catch (error: any) {
     console.error("Error updating order status:", error);

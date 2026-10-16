@@ -80,15 +80,23 @@ export default function OrderEditPage() {
 
   // Items
   const [items, setItems] = useState<EditableOrderItem[]>([]);
+  const [taxInvoiceNumber, setTaxInvoiceNumber] = useState<string>("");
+  const [taxInvoiceDate, setTaxInvoiceDate] = useState<string>("");
+  const [taxInvoiceItems, setTaxInvoiceItems] = useState<EditableOrderItem[]>([]);
+  const [formatType, setFormatType] = useState<"ORDER_FORM" | "TAX_INVOICE">("ORDER_FORM");
 
   // WhatsApp Sender Handler
-  const handleSendWhatsApp = async (type: "ORDER_CONFIRMATION" | "PAYMENT_REMINDER" = "ORDER_CONFIRMATION") => {
+  const handleSendWhatsApp = async (type: "ORDER_CONFIRMATION" | "TAX_INVOICE" | "PAYMENT_REMINDER" = "ORDER_CONFIRMATION") => {
     try {
       setSendingWhatsApp(true);
+      const isTax = type === "TAX_INVOICE" || (type === "ORDER_CONFIRMATION" && formatType === "TAX_INVOICE");
       const res = await fetch(`/api/orders/${orderId}/whatsapp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({
+          type: type === "PAYMENT_REMINDER" ? "PAYMENT_REMINDER" : isTax ? "TAX_INVOICE" : "ORDER_CONFIRMATION",
+          formatType: isTax ? "tax_invoice" : "order_form",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -99,14 +107,16 @@ export default function OrderEditPage() {
         toast(
           type === "PAYMENT_REMINDER"
             ? "Payment reminder sent directly to customer's WhatsApp!"
-            : "Tax Invoice & order updates sent directly to customer's WhatsApp!",
+            : isTax
+            ? "Tax Invoice sent directly to customer's WhatsApp with updated quantities!"
+            : "Order Form sent directly to customer's WhatsApp!",
           "success"
         );
       } else if (data.whatsappUrl) {
         toast(
           type === "PAYMENT_REMINDER"
             ? "Opening WhatsApp with Payment Reminder..."
-            : "Opening WhatsApp with Tax Invoice & Updates...",
+            : "Opening WhatsApp with Document & Details...",
           "success"
         );
         window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
@@ -154,6 +164,9 @@ export default function OrderEditPage() {
       setCustomerState((data.customer?.state || "").toUpperCase());
       setCustomerVisitingCardUrl(data.customer?.visitingCardUrl || "");
 
+      setTaxInvoiceNumber(data.taxInvoiceNumber || "");
+      setTaxInvoiceDate(data.taxInvoiceDate || "");
+
       // Parse order items
       const parsedItems: EditableOrderItem[] = (data.items || []).map((it: any) => {
         let colorSets: ColorSetEntry[] = [];
@@ -185,6 +198,19 @@ export default function OrderEditPage() {
       });
 
       setItems(parsedItems);
+
+      // Parse tax invoice items if available
+      if (data.taxInvoiceItems) {
+        try {
+          const parsedTaxItems = JSON.parse(data.taxInvoiceItems);
+          if (Array.isArray(parsedTaxItems) && parsedTaxItems.length > 0) {
+            setTaxInvoiceItems(parsedTaxItems);
+            if (data.status === "Ready" || data.status === "Dispatched" || data.status === "Delivered" || data.taxInvoiceNumber) {
+              setFormatType("TAX_INVOICE");
+            }
+          }
+        } catch {}
+      }
     } catch (err: any) {
       console.error("Error loading order:", err);
       setError(err.message || "Failed to load order details");
@@ -209,10 +235,13 @@ export default function OrderEditPage() {
 
   }, [orderId]);
 
+  // Active items based on selected format
+  const activeItems = formatType === "TAX_INVOICE" && taxInvoiceItems.length > 0 ? taxInvoiceItems : items;
+
   // Order Totals Calculations
-  const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
-  const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
-  const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
+  const totalSets = activeItems.reduce((sum, it) => sum + (it.totalSets || 0), 0);
+  const totalPcs = activeItems.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
+  const subtotal = activeItems.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
   const gstRate = 5.0; // 5% GST
   const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
@@ -293,16 +322,48 @@ export default function OrderEditPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Format Switcher */}
+            <div className="inline-flex items-center p-1 bg-slate-800 rounded-xl border border-slate-700 mr-1">
+              <button
+                type="button"
+                onClick={() => setFormatType("ORDER_FORM")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  formatType === "ORDER_FORM"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                1. Order Form
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormatType("TAX_INVOICE")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  formatType === "TAX_INVOICE"
+                    ? "bg-orange-600 text-white shadow-xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                2. Tax Invoice {taxInvoiceNumber ? `(#${taxInvoiceNumber})` : ""}
+              </button>
+            </div>
+
             {/* WhatsApp Invoice Button */}
             <button
               type="button"
               disabled={sendingWhatsApp}
-              onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
+              onClick={() => handleSendWhatsApp(formatType === "TAX_INVOICE" ? "TAX_INVOICE" : "ORDER_CONFIRMATION")}
               className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-900/30 cursor-pointer"
-              title="Send Order Form & Tax Invoice to customer on WhatsApp"
+              title={`Send ${formatType === "TAX_INVOICE" ? "Tax Invoice" : "Order Form"} PDF to customer on WhatsApp`}
             >
               <MessageCircle size={15} />
-              <span>{sendingWhatsApp ? "Sending..." : "Send Order Form"}</span>
+              <span>
+                {sendingWhatsApp
+                  ? "Sending..."
+                  : formatType === "TAX_INVOICE"
+                  ? "Send Tax Invoice"
+                  : "Send Order Form"}
+              </span>
             </button>
 
             {/* Weekly Payment Reminder Button */}
@@ -322,10 +383,10 @@ export default function OrderEditPage() {
               type="button"
               onClick={() => setIsPreviewModalOpen(true)}
               className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Preview exact Krish Clothing Co. A4 Tax Invoice format on screen"
+              title="Preview exact A4 format on screen"
             >
               <Eye size={15} />
-              <span>Preview Invoice</span>
+              <span>Preview</span>
             </button>
 
             {/* Print A4 Tax Invoice */}
@@ -333,10 +394,10 @@ export default function OrderEditPage() {
               type="button"
               onClick={() => window.print()}
               className="px-3.5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-orange-900/30 cursor-pointer"
-              title="Print standard A4 Tax Invoice (Krish Clothing Co.)"
+              title="Print standard A4 format"
             >
               <Printer size={15} />
-              <span>Print A4 Invoice</span>
+              <span>Print A4</span>
             </button>
           </div>
         </div>
@@ -504,7 +565,7 @@ export default function OrderEditPage() {
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <span>Wholesale Garment Items</span>
                 <span className="text-xs font-bold text-slate-500">
-                  ({items.length} {items.length === 1 ? "product" : "products"})
+                  ({activeItems.length} {activeItems.length === 1 ? "product" : "products"})
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -526,14 +587,14 @@ export default function OrderEditPage() {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {items.length === 0 ? (
+                {activeItems.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-10 text-center text-slate-500">
                       No items currently in this order.
                     </td>
                   </tr>
                 ) : (
-                  items.map((item, itemIdx) => (
+                  activeItems.map((item, itemIdx) => (
                     <tr key={itemIdx} className="hover:bg-slate-50/80 transition-colors">
                       
                       {/* Product Name */}
@@ -678,9 +739,12 @@ export default function OrderEditPage() {
         ═══════════════════════════════════════════ */}
     <div className="hidden print:block py-1">
       <TaxInvoiceA4
+        formatType={formatType}
         order={{
           orderNumber,
           orderDate,
+          taxInvoiceNumber: formatType === "TAX_INVOICE" ? taxInvoiceNumber : null,
+          taxInvoiceDate: formatType === "TAX_INVOICE" ? taxInvoiceDate : null,
           status,
           customerName,
           customerGstPan,
@@ -699,7 +763,7 @@ export default function OrderEditPage() {
           totalSets,
           placedBy,
           notes: orderNotes,
-          items: items.map((it) => ({
+          items: activeItems.map((it) => ({
             id: it.id,
             productName: it.productName,
             colorSets: it.colorSets,
@@ -756,9 +820,12 @@ export default function OrderEditPage() {
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-300/80 flex justify-center">
             <div className="bg-white shadow-xl p-3 sm:p-5 w-full max-w-[780px] rounded-sm">
               <TaxInvoiceA4
+                formatType={formatType}
                 order={{
                   orderNumber,
                   orderDate,
+                  taxInvoiceNumber: formatType === "TAX_INVOICE" ? taxInvoiceNumber : null,
+                  taxInvoiceDate: formatType === "TAX_INVOICE" ? taxInvoiceDate : null,
                   status,
                   customerName,
                   customerGstPan,
@@ -777,7 +844,7 @@ export default function OrderEditPage() {
                   totalSets,
                   placedBy,
                   notes: orderNotes,
-                  items: items.map((it) => ({
+                  items: activeItems.map((it) => ({
                     id: it.id,
                     productName: it.productName,
                     colorSets: it.colorSets,

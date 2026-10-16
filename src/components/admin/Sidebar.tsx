@@ -11,6 +11,8 @@ import {
   ShoppingCart,
   Boxes,
   FileText,
+  Receipt,
+  RotateCcw,
   ArrowRight,
   LogOut,
   Sparkles,
@@ -56,6 +58,18 @@ const navItems = [
     label: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    id: "outstanding",
+    label: "Outstanding",
+    href: "/admin/outstanding",
+    icon: Receipt,
+  },
+  {
+    id: "returns",
+    label: "Sales Returns",
+    href: "/admin/returns",
+    icon: RotateCcw,
   },
   {
     id: "stock",

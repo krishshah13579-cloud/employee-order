@@ -176,11 +176,58 @@ export interface OrderData {
   totalPcs: number;
   totalSets: number;
   placedBy?: string | null;
+  taxInvoiceNumber?: string | null;
+  taxInvoiceDate?: string | null;
+  taxInvoiceItems?: string | null;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
   customer?: CustomerData;
   items: OrderItemData[];
+}
+
+export interface PaymentData {
+  id: number;
+  customerId: number;
+  customerName: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: string;
+  referenceNo?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer?: CustomerData;
+}
+
+export interface SalesReturnItem {
+  productName: string;
+  color?: string;
+  sizeRatio?: string;
+  sets?: number;
+  pcs: number;
+  unitPrice: number;
+  amount: number;
+  reason?: string;
+}
+
+export interface SalesReturnData {
+  id: number;
+  returnNumber: string;
+  customerId: number;
+  customerName: string;
+  orderId?: number | null;
+  orderNumber?: string | null;
+  returnDate: string;
+  totalAmount: number;
+  totalPcs: number;
+  totalSets: number;
+  items: SalesReturnItem[] | string;
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer?: CustomerData;
 }
 
 export interface DashboardStats {
