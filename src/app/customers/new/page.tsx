@@ -640,11 +640,7 @@ function CustomerRegistrationContent() {
                     <label className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                       <Clock size={15} className="text-orange-600" />
                       <span>Credit Days (Enter Manually)</span>
-                      <span className="text-slate-400 font-normal text-[11px]">(Keyboard Input)</span>
                     </label>
-                    <span className="text-[11px] text-slate-500 font-semibold">
-                      Type days limit e.g. 15, 30, 45, 60 (0 = Advance)
-                    </span>
                   </div>
 
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
