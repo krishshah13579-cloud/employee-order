@@ -138,9 +138,6 @@ export default function HomePage() {
             <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
               Order Collection &amp; Operations
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Real-time daily metrics, registered wholesale customers, and recent customer orders.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
