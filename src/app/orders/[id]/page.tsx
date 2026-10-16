@@ -282,130 +282,25 @@ export default function OrderEditPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
-      {/* Hide header when printing invoice */}
-      <div className="print:hidden">
-        <UserHeader showBack />
-      </div>
-
-      {/* Top Bar */}
-      <div className="bg-slate-900 text-white border-b border-slate-800 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-              <Link href="/" className="hover:text-white transition">
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/orders" className="hover:text-white transition">
-                Orders
-              </Link>
-              <span>/</span>
-              <span className="text-orange-400 font-mono font-bold">
-                {orderNumber || `Order #${orderId}`}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Order Form &amp; Details
-              </h1>
-              <span
-                className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                  STATUS_COLORS[status] || "bg-slate-800 text-slate-200 border-slate-700"
-                }`}
-              >
-                {status}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-              Review customer wholesale order details, status, and print order slips.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Format Switcher */}
-            <div className="inline-flex items-center p-1 bg-slate-800 rounded-xl border border-slate-700 mr-1">
-              <button
-                type="button"
-                onClick={() => setFormatType("ORDER_FORM")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  formatType === "ORDER_FORM"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                1. Order Form
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormatType("TAX_INVOICE")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  formatType === "TAX_INVOICE"
-                    ? "bg-orange-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                2. Tax Invoice {taxInvoiceNumber ? `(#${taxInvoiceNumber})` : ""}
-              </button>
-            </div>
-
-            {/* WhatsApp Invoice Button */}
-            <button
-              type="button"
-              disabled={sendingWhatsApp}
-              onClick={() => handleSendWhatsApp(formatType === "TAX_INVOICE" ? "TAX_INVOICE" : "ORDER_CONFIRMATION")}
-              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-900/30 cursor-pointer"
-              title={`Send ${formatType === "TAX_INVOICE" ? "Tax Invoice" : "Order Form"} PDF to customer on WhatsApp`}
-            >
-              <MessageCircle size={15} />
-              <span>
-                {sendingWhatsApp
-                  ? "Sending..."
-                  : formatType === "TAX_INVOICE"
-                  ? "Send Tax Invoice"
-                  : "Send Order Form"}
-              </span>
-            </button>
-
-            {/* Weekly Payment Reminder Button */}
-            <button
-              type="button"
-              disabled={sendingWhatsApp}
-              onClick={() => handleSendWhatsApp("PAYMENT_REMINDER")}
-              className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-amber-900/30 cursor-pointer"
-              title="Send weekly payment due reminder to customer on WhatsApp"
-            >
-              <Bell size={14} />
-              <span>Weekly Reminder</span>
-            </button>
-
-            {/* Preview A4 Tax Invoice */}
-            <button
-              type="button"
-              onClick={() => setIsPreviewModalOpen(true)}
-              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Preview exact A4 format on screen"
-            >
-              <Eye size={15} />
-              <span>Preview</span>
-            </button>
-
-            {/* Print A4 Tax Invoice */}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="px-3.5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-orange-900/30 cursor-pointer"
-              title="Print standard A4 format"
-            >
-              <Printer size={15} />
-              <span>Print A4</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Interactive Order Form View (Hidden during print) */}
       <div className="print:hidden">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+          {/* Top Header: Only keep H1 tag and Preview button */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Order Form
+            </h1>
+
+            <button
+              type="button"
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer"
+              title="Preview Order Form"
+            >
+              <Eye size={15} />
+              <span>Preview Order Form</span>
+            </button>
+          </div>
           {/* ═══════════════════════════════════════════
               1. CUSTOMER & ORDER STATUS DETAILS
               ═══════════════════════════════════════════ */}
