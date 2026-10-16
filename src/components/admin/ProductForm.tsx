@@ -1296,60 +1296,136 @@ export default function ProductForm({
 
       {/* 2. Mandatory Sizing & Wholesale Packaging Setting */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-xs space-y-6">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Layers className="w-5 h-5 text-gray-700" />
-              <span>Mandatory Size Ratio & Pack Setting</span>
+              <span>Mandatory Size Ratio &amp; Pack Setting</span>
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              In wholesale, each 1 set contains 1 pc of every mandatory size.
+              Select or customize the mandatory sizes in 1 wholesale set. The pieces (PCS) count updates automatically.
             </p>
+          </div>
+          <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 self-start sm:self-auto">
+            1 Set = {formData.pcsPerSet} PCS
+          </span>
+        </div>
+
+        {/* 1. Multiple Preset Size Ratio Packs */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+            Standard Size Ratio Packs (Click to Apply)
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+            {STANDARD_SIZE_RATIOS.map((r) => {
+              const isSelected = formData.sizesRatio === r.value;
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => handleRatioChange(r.value)}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                      : "bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs">{r.value}</span>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        isSelected ? "bg-amber-400 text-black" : "bg-blue-100 text-blue-900"
+                      }`}
+                    >
+                      {r.pcs} PCS
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] truncate block mt-1 ${
+                      isSelected ? "text-slate-300" : "text-gray-500"
+                    }`}
+                  >
+                    {r.sizes}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
+        {/* 2. Interactive Size-Wise Ratio in PCS (Toggle sizes to auto-count PCS) */}
+        <div className="space-y-2 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <span>Size-Wise Ratio in PCS (Click Sizes to Add / Remove)</span>
+            </label>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Active: <strong>{formData.pcsPerSet} Sizes Selected = {formData.pcsPerSet} PCS in 1 Set</strong>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {AVAILABLE_PACK_SIZES.map((sz) => {
+              const activeList = formData.sizesList
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+              const isInPack = activeList.includes(sz);
+
+              return (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => handleToggleSizeInPack(sz)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer flex items-center gap-1 border ${
+                    isInPack
+                      ? "bg-blue-600 text-white border-blue-600 shadow-xs scale-105"
+                      : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
+                  }`}
+                >
+                  <span>{sz}</span>
+                  {isInPack && <Check size={12} />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-500 pt-1">
+            Clicking size chips adds/removes that size and automatically calculates the set size (e.g. 30,32,34,36,38 → 5 PCS, whereas 32,34,36,38 → 4 PCS).
+          </p>
+        </div>
+
+        {/* 3. Inputs & Custom Definition */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
-              Standard Size Ratio
+              Size Ratio Label
             </label>
-            <select
+            <input
+              type="text"
               value={formData.sizesRatio}
-              onChange={(e) => handleRatioChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-black cursor-pointer"
-            >
-              {STANDARD_SIZE_RATIOS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-              <option value="Custom">Custom Size Range...</option>
-            </select>
+              onChange={(e) => setFormData({ ...formData, sizesRatio: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:outline-hidden focus:ring-2 focus:ring-black"
+              placeholder="e.g. 30 to 38 or 32 to 38"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
-              Sizes in 1 Set (All Mandatory) *
+              Mandatory Sizes in 1 Set *
             </label>
             <input
               type="text"
               required
               value={formData.sizesList}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  sizesList: e.target.value,
-                  pcsPerSet: e.target.value.split(",").filter((s) => s.trim()).length,
-                })
-              }
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-black font-mono"
+              onChange={(e) => handleSizesListInput(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-black font-mono font-bold"
               placeholder="30, 32, 34, 36, 38"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
-              Pcs per Set *
+              Counted Pcs per Set (Auto-calculated) *
             </label>
             <input
               type="number"
@@ -1359,13 +1435,13 @@ export default function ProductForm({
               onChange={(e) =>
                 setFormData({ ...formData, pcsPerSet: parseInt(e.target.value, 10) || 1 })
               }
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold text-blue-900 font-mono focus:outline-hidden focus:ring-2 focus:ring-black"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-blue-300 bg-blue-50/50 text-sm font-black text-blue-900 font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-600"
             />
           </div>
         </div>
 
-        <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-950 font-medium">
-          Rule: For <strong>{formData.sizesRatio}</strong>, 1 Set = <strong>{formData.pcsPerSet} Pieces</strong>. An order of 5 sets will automatically calculate: 5 × {formData.pcsPerSet} = <strong>{5 * formData.pcsPerSet} PCS</strong>.
+        <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-950 font-medium">
+          Rule: For <strong>{formData.sizesRatio}</strong> ({formData.sizesList}), 1 Set = <strong>{formData.pcsPerSet} Pieces</strong>. An order of 5 sets will automatically calculate: 5 × {formData.pcsPerSet} = <strong>{5 * formData.pcsPerSet} PCS</strong>.
         </div>
       </div>
 
