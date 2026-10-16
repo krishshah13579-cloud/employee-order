@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
+import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
@@ -75,6 +76,7 @@ export default function OrderEditPage() {
   const [customerCity, setCustomerCity] = useState<string>("");
   const [customerState, setCustomerState] = useState<string>("");
   const [customerVisitingCardUrl, setCustomerVisitingCardUrl] = useState<string>("");
+  const [viewVisitingCard, setViewVisitingCard] = useState<string | null>(null);
 
   // Items
   const [items, setItems] = useState<EditableOrderItem[]>([]);
@@ -143,13 +145,13 @@ export default function OrderEditPage() {
       setTransportName(transport);
 
       setCustomerId(data.customerId);
-      setCustomerName(data.customerName || (data.customer?.shopName || ""));
-      setCustomerGstPan(data.customerGstPan || (data.customer?.gstPanNo || ""));
-      setCustomerPhone(data.customerPhone || (data.customer?.phoneNumber || ""));
-      setCustomerAddress(data.customerAddress || (data.customer?.address || ""));
-      setCustomerContactPerson(data.customer?.contactPerson || "");
-      setCustomerCity(data.customer?.city || "");
-      setCustomerState(data.customer?.state || "");
+      setCustomerName((data.customerName || data.customer?.shopName || "").toUpperCase());
+      setCustomerGstPan((data.customerGstPan || data.customer?.gstPanNo || "").toUpperCase());
+      setCustomerPhone(data.customerPhone || data.customer?.phoneNumber || "");
+      setCustomerAddress((data.customerAddress || data.customer?.address || "").toUpperCase());
+      setCustomerContactPerson((data.customer?.contactPerson || "").toUpperCase());
+      setCustomerCity((data.customer?.city || "").toUpperCase());
+      setCustomerState((data.customer?.state || "").toUpperCase());
       setCustomerVisitingCardUrl(data.customer?.visitingCardUrl || "");
 
       // Parse order items
@@ -363,7 +365,7 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     FIRM NAME
                   </span>
-                  <span className="font-black text-slate-900 text-sm">
+                  <span className="font-black text-slate-900 text-sm uppercase">
                     {customerName}
                   </span>
                 </div>
@@ -372,7 +374,7 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     GST NO. / PAN NO.
                   </span>
-                  <span className="font-mono font-black text-orange-600 text-sm">
+                  <span className="font-mono font-black text-orange-600 text-sm uppercase">
                     {customerGstPan || "—"}
                   </span>
                 </div>
@@ -390,7 +392,7 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     Contact PERSON NAME
                   </span>
-                  <span className="font-semibold text-slate-800 text-xs">
+                  <span className="font-semibold text-slate-800 text-xs uppercase">
                     {customerContactPerson || "—"}
                   </span>
                 </div>
@@ -401,11 +403,10 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
                     VISITING CARD
                   </span>
-                  <a
-                    href={customerVisitingCardUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative block w-16 h-12 rounded-lg overflow-hidden border border-orange-200 shadow-xs hover:ring-2 hover:ring-orange-500 transition"
+                  <button
+                    type="button"
+                    onClick={() => setViewVisitingCard(customerVisitingCardUrl)}
+                    className="group relative block w-16 h-12 rounded-lg overflow-hidden border border-orange-200 shadow-xs hover:ring-2 hover:ring-orange-500 transition cursor-pointer"
                     title="Click to view visiting card full size"
                   >
                     <img
@@ -416,7 +417,7 @@ export default function OrderEditPage() {
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[9px] font-bold">
                       View
                     </div>
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -426,7 +427,7 @@ export default function OrderEditPage() {
                 <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                   Shop Address
                 </span>
-                <span className="font-medium text-slate-800">
+                <span className="font-medium text-slate-800 uppercase">
                   {customerAddress || "Address on File"}
                 </span>
               </div>
@@ -436,7 +437,7 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     CITY
                   </span>
-                  <span className="font-bold text-slate-900">
+                  <span className="font-bold text-slate-900 uppercase">
                     {customerCity || "—"}
                   </span>
                 </div>
@@ -444,7 +445,7 @@ export default function OrderEditPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     STATE
                   </span>
-                  <span className="font-bold text-slate-900">
+                  <span className="font-bold text-slate-900 uppercase">
                     {customerState || "—"}
                   </span>
                 </div>
@@ -484,7 +485,7 @@ export default function OrderEditPage() {
                   <span>{creditDays > 0 ? `${creditDays} Days Credit` : "Advance (0 Days)"}</span>
                 </span>
                 {transportName && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-blue-900 border border-blue-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-blue-900 border border-blue-200 uppercase">
                     <span>🚚 {transportName}</span>
                   </span>
                 )}
@@ -794,6 +795,33 @@ export default function OrderEditPage() {
         </div>
       </div>
     )}
+
+      {/* Visiting Card Lightbox Modal */}
+      <Modal
+        isOpen={!!viewVisitingCard}
+        onClose={() => setViewVisitingCard(null)}
+        title="Visiting Card Preview"
+        size="lg"
+      >
+        <div className="flex flex-col items-center justify-center p-2 bg-slate-100 rounded-xl">
+          {viewVisitingCard && (
+            <img
+              src={viewVisitingCard}
+              alt="Customer Visiting Card"
+              className="max-h-[75vh] w-auto max-w-full object-contain rounded-lg shadow-md"
+            />
+          )}
+          <div className="mt-4 flex justify-end w-full">
+            <button
+              type="button"
+              onClick={() => setViewVisitingCard(null)}
+              className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );

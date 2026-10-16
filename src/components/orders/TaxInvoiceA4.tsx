@@ -240,6 +240,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
                   lineHeight: "1.25",
                   color: "#111",
                   marginTop: "1px",
+                  textTransform: "uppercase",
                 }}
               >
                 {order.customerAddress || "Direct Delivery"}
@@ -250,6 +251,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoi
                   fontSize: "10px",
                   fontWeight: "600",
                   marginTop: "1px",
+                  textTransform: "uppercase",
                 }}
               >
                 {order.customerCity || "AHMEDABAD"}{" "}

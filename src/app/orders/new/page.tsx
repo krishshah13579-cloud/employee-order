@@ -953,21 +953,16 @@ export default function OrderFormPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (!selectedCustomer) {
-                  toast("Customer selection is mandatory! Please select a customer from dropdown first before adding products.", "error");
-                  setCustomerDropdownOpen(true);
-                  return;
-                }
-                router.push("/products?returnTo=/orders/new");
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>Add Product to Form</span>
-            </button>
+            {selectedCustomer && (
+              <button
+                type="button"
+                onClick={() => router.push("/products?returnTo=/orders/new")}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>Add Product to Form</span>
+              </button>
+            )}
           </div>
 
           {/* Table */}
@@ -998,23 +993,18 @@ export default function OrderFormPage() {
                         <p className="text-xs text-slate-500 mt-1 max-w-xs">
                           {selectedCustomer
                             ? "Click Add Product to Form to browse products, pick multiple colors and sets at once."
-                            : "Customer selection is mandatory. Please select a customer above first to start adding products."}
+                            : "Customer selection is mandatory. Please select a customer above first to view and add products."}
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!selectedCustomer) {
-                              toast("Customer selection is mandatory! Please select a customer from dropdown first before adding products.", "error");
-                              setCustomerDropdownOpen(true);
-                              return;
-                            }
-                            router.push("/products?returnTo=/orders/new");
-                          }}
-                          className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus size={14} />
-                          <span>Add Product to Form</span>
-                        </button>
+                        {selectedCustomer && (
+                          <button
+                            type="button"
+                            onClick={() => router.push("/products?returnTo=/orders/new")}
+                            className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus size={14} />
+                            <span>Add Product to Form</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
