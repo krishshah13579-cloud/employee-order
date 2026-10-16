@@ -468,6 +468,8 @@ export default function ProductForm({
     toast(`Set ${sets} stock sets for all ${selectedColors.length} colors`, "success");
   };
 
+  const AVAILABLE_PACK_SIZES = ["26", "28", "30", "32", "34", "36", "38", "40", "42", "44"];
+
   const handleRatioChange = (ratioVal: string) => {
     const found = STANDARD_SIZE_RATIOS.find((r) => r.value === ratioVal);
     if (found) {
@@ -480,6 +482,62 @@ export default function ProductForm({
     } else {
       setFormData((prev) => ({ ...prev, sizesRatio: ratioVal }));
     }
+  };
+
+  const handleToggleSizeInPack = (sz: string) => {
+    const currentSizes = formData.sizesList
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    let nextSizes: string[];
+    if (currentSizes.includes(sz)) {
+      if (currentSizes.length <= 1) {
+        toast("A pack must contain at least 1 mandatory size", "error");
+        return;
+      }
+      nextSizes = currentSizes.filter((s) => s !== sz);
+    } else {
+      nextSizes = [...currentSizes, sz];
+    }
+
+    // Sort numerically if numeric
+    nextSizes.sort((a, b) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+
+    const count = nextSizes.length;
+    const minSize = nextSizes[0];
+    const maxSize = nextSizes[nextSizes.length - 1];
+    const ratioName = `${minSize} to ${maxSize}`;
+
+    setFormData((prev) => ({
+      ...prev,
+      sizesRatio: ratioName,
+      sizesList: nextSizes.join(", "),
+      pcsPerSet: count,
+    }));
+  };
+
+  const handleSizesListInput = (val: string) => {
+    const parsed = val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const count = Math.max(1, parsed.length);
+    let ratio = formData.sizesRatio;
+    if (parsed.length >= 2) {
+      ratio = `${parsed[0]} to ${parsed[parsed.length - 1]}`;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      sizesList: val,
+      pcsPerSet: count,
+      sizesRatio: ratio,
+    }));
   };
 
   // Color management
