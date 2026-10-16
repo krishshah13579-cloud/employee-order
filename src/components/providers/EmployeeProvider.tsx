@@ -10,6 +10,8 @@ export interface EmployeeSession {
   designation: string;
   isTeamLeader?: boolean;
   mobileNumber?: string;
+  email?: string;
+  address?: string;
 }
 
 interface EmployeeContextType {

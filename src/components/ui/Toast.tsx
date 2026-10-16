@@ -1,17 +1,17 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
-import { CheckCircle, AlertCircle, X } from "lucide-react";
+import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
 
 /* ─── Toast Types ────────────────────────── */
 interface Toast {
   id: string;
   message: string;
-  type: "success" | "error";
+  type: "success" | "error" | "info";
 }
 
 interface ToastContextType {
-  toast: (message: string, type?: "success" | "error") => void;
+  toast: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 const ToastContext = createContext<ToastContextType>({
@@ -24,12 +24,12 @@ export const useToast = () => useContext(ToastContext);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = useCallback((message: string, type: "success" | "error" = "success") => {
+  const toast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
+    }, 4000);
   }, []);
 
   const dismiss = (id: string) => {
@@ -45,11 +45,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             className={`pointer-events-auto flex items-center gap-3 px-5 py-3.5 bg-white rounded-xl shadow-lg border-l-4 min-w-[300px] toast-enter ${
-              t.type === "error" ? "border-red-500" : "border-green-500"
+              t.type === "error"
+                ? "border-red-500"
+                : t.type === "info"
+                ? "border-blue-500"
+                : "border-green-500"
             }`}
           >
             {t.type === "error" ? (
               <AlertCircle size={20} className="text-red-500 shrink-0" />
+            ) : t.type === "info" ? (
+              <Info size={20} className="text-blue-500 shrink-0" />
             ) : (
               <CheckCircle size={20} className="text-green-500 shrink-0" />
             )}

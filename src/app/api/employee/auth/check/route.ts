@@ -29,6 +29,8 @@ export async function GET(_req: NextRequest) {
       select: {
         id: true,
         name: true,
+        email: true,
+        address: true,
         designation: true,
         isTeamLeader: true,
         mobileNumber: true,

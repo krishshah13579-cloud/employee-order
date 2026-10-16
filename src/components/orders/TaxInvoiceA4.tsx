@@ -71,72 +71,87 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
   const grandTotal = Number(order.grandTotal) || Math.round(subtotal + gstAmount);
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
 
+  // Once dispatched, label as Invoice No., otherwise Order No.
+  const isDispatched = order.status === "Dispatched" || order.status === "Delivered";
+  const numberLabel = isDispatched ? "Invoice No." : "Order No.";
+
   return (
-    <div className="a4-invoice-wrapper bg-white text-black font-sans leading-tight text-[11px] print:text-[10.5px]">
+    <div className="a4-invoice-wrapper bg-white text-black font-sans leading-tight text-[11px] print:text-[10px]">
       <style jsx global>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 6mm 8mm 6mm 8mm;
+            margin: 4mm 6mm;
           }
           body {
             background: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
-          .no-print {
+          nav, header, footer, .print\\:hidden, #toast-container, .toast-container {
             display: none !important;
+          }
+          .a4-invoice-wrapper {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
           }
         }
       `}</style>
 
       {/* Main Single Border Box */}
-      <div className="border border-black max-w-[800px] mx-auto shadow-xs print:shadow-none bg-white">
+      <div className="border border-black max-w-[780px] mx-auto shadow-xs print:shadow-none bg-white">
         {/* 1. TOP HEADER: KRISH CLOTHING CO. */}
-        <div className="border-b border-black text-center py-2 px-3">
-          <h1 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-black font-serif">
+        <div className="border-b border-black text-center py-1.5 px-3">
+          <h1 className="text-xl font-black tracking-wider uppercase text-black font-serif">
             KRISH CLOTHING CO.
           </h1>
-          <p className="text-[10px] sm:text-[11px] font-semibold text-black mt-0.5 tracking-tight">
+          <p className="text-[10px] font-semibold text-black mt-0.5 tracking-tight">
             2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,
           </p>
-          <p className="text-[10px] sm:text-[11px] font-semibold text-black tracking-tight">
+          <p className="text-[10px] font-semibold text-black tracking-tight">
             AHMEDABAD - 380008 (M) : 8128756632
           </p>
         </div>
 
         {/* 2. SUB-HEADER BAR: Debit Memo | TAX INVOICE | Duplicate */}
         <div className="border-b border-black grid grid-cols-3 items-center py-1 px-3 text-xs font-bold">
-          <div className="text-left font-semibold text-[11px]">Debit Memo</div>
-          <div className="text-center font-black text-sm tracking-widest uppercase">TAX INVOICE</div>
-          <div className="text-right font-semibold text-[11px]">{copyTitle}</div>
+          <div className="text-left font-semibold text-[10.5px]">Debit Memo</div>
+          <div className="text-center font-black text-sm tracking-widest uppercase">
+            {isDispatched ? "TAX INVOICE" : "ORDER FORM / TAX INVOICE"}
+          </div>
+          <div className="text-right font-semibold text-[10.5px]">{copyTitle}</div>
         </div>
 
         {/* 3. RECEIVER (LEFT) & INVOICE / TRANSPORT DETAILS (RIGHT) */}
         <div className="border-b border-black grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-black">
           {/* Left Column: Receiver / Customer Info */}
-          <div className="p-2 space-y-0.5 text-[11px]">
+          <div className="p-2 space-y-0.5 text-[10.5px]">
             <div className="flex items-start gap-1">
               <span className="font-bold shrink-0">M/s. :</span>
               <span className="font-black text-xs uppercase tracking-wide">
                 {order.customerName || "WALK-IN CUSTOMER"}
               </span>
             </div>
-            <div className="text-[10.5px] pl-4 text-neutral-800 leading-snug">
+            <div className="text-[10px] pl-4 text-neutral-800 leading-snug">
               {order.customerAddress || "Direct Delivery"}
             </div>
-            <div className="text-[10.5px] pl-4 font-semibold">
+            <div className="text-[10px] pl-4 font-semibold">
               {order.customerCity || "AHMEDABAD"}{" "}
               {order.customerState ? `- ${order.customerState}` : "- 363001"}
             </div>
-            <div className="pt-1 flex items-center justify-between text-[10.5px]">
+            <div className="pt-0.5 flex items-center justify-between text-[10px]">
               <div>
                 <span className="font-semibold">Place of Supply :</span>{" "}
                 <span className="font-bold">24-Gujarat</span>
               </div>
             </div>
-            <div className="flex items-center justify-between text-[10.5px]">
+            <div className="flex items-center justify-between text-[10px]">
               <div>
                 <span className="font-semibold">GSTIN No. :</span>{" "}
                 <span className="font-bold font-mono">
@@ -144,46 +159,34 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
                 </span>
               </div>
               {order.customerPhone && (
-                <div className="font-bold font-mono text-[11px] text-blue-900 print:text-black">
+                <div className="font-bold font-mono text-[10.5px] text-black">
                   Mob No. {order.customerPhone}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column: Invoice No, Date, Transport */}
-          <div className="text-[11px] divide-y divide-black">
-            <div className="grid grid-cols-2 p-1.5 px-2">
-              <div>
-                <span className="font-bold">Invoice No.</span>{" "}
-                <span className="font-mono font-bold ml-1">: {order.orderNumber}</span>
-              </div>
+          {/* Right Column: Order No / Invoice No, Date, Transport (No GST or LR No) */}
+          <div className="text-[10.5px] divide-y divide-black">
+            <div className="p-1 px-2">
+              <span className="font-bold">{numberLabel}</span>{" "}
+              <span className="font-mono font-bold ml-1">: {order.orderNumber}</span>
             </div>
-            <div className="grid grid-cols-2 p-1.5 px-2">
-              <div>
-                <span className="font-bold">Date</span>{" "}
-                <span className="font-mono font-semibold ml-1">: {formattedDate}</span>
-              </div>
+            <div className="p-1 px-2">
+              <span className="font-bold">Date</span>{" "}
+              <span className="font-mono font-semibold ml-1">: {formattedDate}</span>
             </div>
-            <div className="p-1.5 px-2">
+            <div className="p-1 px-2">
               <span className="font-bold">TRANSPORT</span>{" "}
-              <span className="font-black ml-1 uppercase text-blue-900 print:text-black">
-                : {resolvedTransport || "Self / Direct Parcel"}
+              <span className="font-black ml-1 uppercase text-black">
+                : {resolvedTransport || "Self Delivery / Direct Parcel"}
               </span>
-            </div>
-            <div className="grid grid-cols-2 divide-x divide-black">
-              <div className="p-1 px-2">
-                <span className="font-semibold text-[10px]">TRANS. GST No :</span>
-              </div>
-              <div className="p-1 px-2">
-                <span className="font-semibold text-[10px]">L.R.NO. :</span>
-              </div>
             </div>
           </div>
         </div>
 
         {/* 4. PRODUCT DETAILS TABLE */}
-        <div className="overflow-x-auto min-h-[220px]">
+        <div className="overflow-x-auto min-h-[140px]">
           <table className="w-full text-left border-collapse text-[10.5px]">
             <thead>
               <tr className="border-b border-black text-center font-bold bg-neutral-50/80 print:bg-transparent text-[10px]">
@@ -269,18 +272,18 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
               })}
 
               {/* Empty placeholder rows to maintain standard invoice height on print */}
-              {Array.from({ length: Math.max(0, 4 - order.items.length) }).map((_, emptyIdx) => (
-                <tr key={`empty-${emptyIdx}`} className="h-6">
-                  <td className="border-r border-black py-1 px-1">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-1">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-1.5">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-1.5">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-1 px-1">&nbsp;</td>
-                  <td className="py-1 px-2">&nbsp;</td>
+              {Array.from({ length: Math.max(0, 2 - order.items.length) }).map((_, emptyIdx) => (
+                <tr key={`empty-${emptyIdx}`} className="h-5">
+                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-1.5">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-1.5">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
+                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
+                  <td className="py-0.5 px-2">&nbsp;</td>
                 </tr>
               ))}
             </tbody>
@@ -289,22 +292,22 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
 
         {/* 5. SUB TOTAL ROW */}
         <div className="border-t border-b border-black grid grid-cols-12 font-bold py-1 px-2 bg-neutral-50/60 print:bg-transparent">
-          <div className="col-span-6 font-mono text-[10.5px]">
+          <div className="col-span-6 font-mono text-[10px]">
             <span className="font-bold">GSTIN No.:</span> 24LAAPS9916E1ZD
           </div>
-          <div className="col-span-2 text-center font-mono text-[10.5px]">
+          <div className="col-span-2 text-center font-mono text-[10px]">
             {order.totalPcs.toFixed(3)}
           </div>
-          <div className="col-span-2 text-right uppercase text-[10.5px]">Sub Total</div>
-          <div className="col-span-2 text-right font-mono text-[11px]">
+          <div className="col-span-2 text-right uppercase text-[10px]">Sub Total</div>
+          <div className="col-span-2 text-right font-mono text-[10.5px]">
             {subtotal.toFixed(2)}
           </div>
         </div>
 
         {/* 6. BANK DETAILS (LEFT) & TAX BREAKDOWN (RIGHT) */}
         <div className="border-b border-black grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-black">
-          {/* Left: Bank Details & Amount in Words */}
-          <div className="md:col-span-7 p-2 space-y-1 text-[10.5px]">
+          {/* Left: Bank Details (Amount in words removed as requested) */}
+          <div className="md:col-span-7 p-2 space-y-1 text-[10px]">
             <div className="grid grid-cols-3">
               <span className="font-bold">Bank Name</span>
               <span className="col-span-2 font-mono font-semibold">: ICICI BANK</span>
@@ -317,18 +320,10 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
               <span className="font-bold">RTGS/IFSC Code</span>
               <span className="col-span-2 font-mono font-bold">: ICIC0007507</span>
             </div>
-            <div className="pt-1 border-t border-neutral-300">
-              <span className="font-bold">Total GST :</span>{" "}
-              <span className="italic font-medium">{numberToIndianWords(gstAmount)}</span>
-            </div>
-            <div>
-              <span className="font-bold">Bill Amount :</span>{" "}
-              <span className="italic font-black">{numberToIndianWords(grandTotal)}</span>
-            </div>
           </div>
 
           {/* Right: Tax Breakdown */}
-          <div className="md:col-span-5 p-2 space-y-1 text-[10.5px]">
+          <div className="md:col-span-5 p-2 space-y-0.5 text-[10px]">
             <div className="flex justify-between">
               <span className="font-bold">Taxable Amount</span>
               <span className="font-mono font-bold">{subtotal.toFixed(2)}</span>
@@ -341,18 +336,18 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
               <span>State/UT Tax 2.50%</span>
               <span className="font-mono">{sgst.toFixed(2)}</span>
             </div>
-            <div className="pt-1.5 border-t border-black flex justify-between font-black text-xs">
+            <div className="pt-1 border-t border-black flex justify-between font-black text-xs">
               <span className="uppercase tracking-wider">Grand Total</span>
               <span className="font-mono text-sm">{formatCurrency(grandTotal)}</span>
             </div>
           </div>
         </div>
 
-        {/* 7. NOTE: PAYMENT WITHIN X DAYS */}
-        <div className="border-b border-black py-1 px-3 text-[11px] font-bold">
+        {/* 7. NOTE: PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN X DAYS */}
+        <div className="border-b border-black py-1 px-3 text-[10px] font-bold">
           <span className="uppercase">Note : </span>
-          <span className="underline uppercase tracking-wide">
-            {creditDays > 0 ? `PAYMENT WITHIN ${creditDays} DAYS.` : "ADVANCE PAYMENT (0 DAYS CREDIT)."}
+          <span className="uppercase tracking-wide">
+            PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN {creditDays > 0 ? `${creditDays} DAYS` : "_____ DAYS"}.
           </span>
         </div>
 

@@ -5,8 +5,10 @@ import { getTotalAvailableSets } from "@/lib/stock";
 
 export async function GET() {
   try {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    // Calculate today's start and end accurately in Indian Standard Time (IST)
+    const istDateString = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    const startOfToday = new Date(`${istDateString}T00:00:00+05:30`);
+    const endOfToday = new Date(`${istDateString}T23:59:59.999+05:30`);
 
     const [
       totalOrders,
@@ -23,12 +25,20 @@ export async function GET() {
     ] = await Promise.all([
       prisma.order.count().catch(() => 0),
       prisma.order.count({
-        where: { createdAt: { gte: startOfToday } },
+        where: {
+          OR: [
+            { createdAt: { gte: startOfToday, lte: endOfToday } },
+            { orderDate: { gte: startOfToday, lte: endOfToday } },
+          ],
+        },
       }).catch(() => 0),
       prisma.order.aggregate({
         _sum: { grandTotal: true },
         where: {
-          createdAt: { gte: startOfToday },
+          OR: [
+            { createdAt: { gte: startOfToday, lte: endOfToday } },
+            { orderDate: { gte: startOfToday, lte: endOfToday } },
+          ],
           status: { not: "Cancelled" },
         },
       }).catch(() => ({ _sum: { grandTotal: 0 } })),
@@ -91,10 +101,28 @@ export async function GET() {
       }
     }
 
+    let todayRevenue = Math.round((todayRevenueAgg._sum.grandTotal || 0) * 100) / 100;
+    if (todayRevenue === 0 && todayOrders > 0) {
+      const todayOrdersList = await prisma.order.findMany({
+        where: {
+          OR: [
+            { createdAt: { gte: startOfToday, lte: endOfToday } },
+            { orderDate: { gte: startOfToday, lte: endOfToday } },
+          ],
+          status: { not: "Cancelled" },
+        },
+        select: { grandTotal: true, subtotal: true, gstAmount: true },
+      }).catch(() => []);
+      todayRevenue = todayOrdersList.reduce(
+        (acc, o) => acc + (o.grandTotal || ((o.subtotal || 0) + (o.gstAmount || 0)) || 0),
+        0
+      );
+    }
+
     const stats = {
       totalOrders,
       todayOrders,
-      todayRevenue: Math.round((todayRevenueAgg._sum.grandTotal || 0) * 100) / 100,
+      todayRevenue,
       pendingOrders,
       totalCustomers,
       totalEmployees,

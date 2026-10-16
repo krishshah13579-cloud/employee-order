@@ -1,39 +1,28 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Users,
   Printer,
-  Save,
-  Trash2,
-  Plus,
-  Edit3,
   Calendar,
-  CheckCircle2,
   AlertCircle,
   FileText,
   Building,
-  CreditCard,
   Phone,
-  Layers,
-  ShoppingBag,
-  RotateCcw,
-  Sparkles,
   MessageCircle,
-  Clock,
   Bell,
-  Send,
+  Truck,
+  Clock,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
-import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
-import { ORDER_STATUSES, STATUS_COLORS, type OrderStatus } from "@/lib/types";
-import type { CustomerData, ProductData, ColorSetEntry } from "@/lib/types";
+import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
+import type { ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
 
 interface EditableOrderItem {
@@ -59,7 +48,6 @@ export default function OrderEditPage() {
   const orderId = params?.id as string;
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Order Details
@@ -85,17 +73,8 @@ export default function OrderEditPage() {
   const [customerState, setCustomerState] = useState<string>("");
   const [customerVisitingCardUrl, setCustomerVisitingCardUrl] = useState<string>("");
 
-  // Customers list for customer switcher
-  const [customers, setCustomers] = useState<CustomerData[]>([]);
-
   // Items
   const [items, setItems] = useState<EditableOrderItem[]>([]);
-
-  // Add Product Modal
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [allProducts, setAllProducts] = useState<ProductData[]>([]);
-  const [selectedProductToAdd, setSelectedProductToAdd] = useState<ProductData | null>(null);
-  const [colorSetsToAdd, setColorSetsToAdd] = useState<Record<string, number>>({});
 
   // WhatsApp Sender Handler
   const handleSendWhatsApp = async (type: "ORDER_CONFIRMATION" | "PAYMENT_REMINDER" = "ORDER_CONFIRMATION") => {
@@ -223,158 +202,7 @@ export default function OrderEditPage() {
       })
       .catch(() => {});
 
-    // Load customers
-    fetch("/api/customers")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setCustomers(data);
-      })
-      .catch(() => {});
-
-    // Load active products for quick adding
-    fetch("/api/products?active_only=1")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setAllProducts(data);
-      })
-      .catch(() => {});
   }, [orderId]);
-
-  // Recalculate item totals
-  const recalculateItem = (item: EditableOrderItem): EditableOrderItem => {
-    const totalSets = item.colorSets.reduce((sum, cs) => sum + (cs.sets || 0), 0);
-    const pcsPerSet = item.pcsPerSet || 5;
-    const totalPcs = totalSets * pcsPerSet;
-    const itemSubtotal = totalPcs * (item.unitPrice || 0);
-
-    return {
-      ...item,
-      totalSets,
-      totalPcs,
-      itemSubtotal,
-    };
-  };
-
-  // Handle color set count update for an item
-  const handleColorSetChange = (
-    itemIndex: number,
-    color: string,
-    newSets: number
-  ) => {
-    const updatedItems = [...items];
-    const targetItem = { ...updatedItems[itemIndex] };
-    const validCount = Math.max(0, newSets);
-
-    const existingIndex = targetItem.colorSets.findIndex(
-      (cs) => cs.color.toLowerCase() === color.toLowerCase()
-    );
-
-    if (existingIndex >= 0) {
-      if (validCount === 0) {
-        targetItem.colorSets = targetItem.colorSets.filter((_, idx) => idx !== existingIndex);
-      } else {
-        targetItem.colorSets[existingIndex] = { color, sets: validCount };
-      }
-    } else if (validCount > 0) {
-      targetItem.colorSets.push({ color, sets: validCount });
-    }
-
-    updatedItems[itemIndex] = recalculateItem(targetItem);
-    setItems(updatedItems);
-  };
-
-  // Handle unit price change for an item
-  const handlePriceChange = (itemIndex: number, newPrice: number) => {
-    const updatedItems = [...items];
-    const targetItem = { ...updatedItems[itemIndex], unitPrice: Math.max(0, newPrice) };
-    updatedItems[itemIndex] = recalculateItem(targetItem);
-    setItems(updatedItems);
-  };
-
-  // Handle Remove Item
-  const handleRemoveItem = (itemIndex: number) => {
-    if (confirm("Remove this product item from the order form?")) {
-      const updated = items.filter((_, idx) => idx !== itemIndex);
-      setItems(updated);
-      toast("Item removed");
-    }
-  };
-
-  // Switch Customer
-  const handleCustomerChange = (newCustId: number) => {
-    const cust = customers.find((c) => c.id === newCustId);
-    if (cust) {
-      setCustomerId(cust.id);
-      setCustomerName(cust.shopName);
-      setCustomerGstPan(cust.gstPanNo);
-      setCustomerPhone(cust.phoneNumber);
-      setCustomerAddress(cust.address);
-      setCustomerContactPerson(cust.contactPerson || "");
-      setCustomerCity(cust.city || "");
-      setCustomerState(cust.state || "");
-      setCustomerVisitingCardUrl(cust.visitingCardUrl || "");
-      toast(`Customer updated to ${cust.shopName}`);
-    }
-  };
-
-  // Open Add Product Modal
-  const handleOpenAddProduct = () => {
-    if (allProducts.length > 0) {
-      setSelectedProductToAdd(allProducts[0]);
-      const initial: Record<string, number> = {};
-      const colors = (allProducts[0].colorsAvailable || "").split(",").map((c) => c.trim()).filter(Boolean);
-      colors.forEach((c) => (initial[c] = 0));
-      setColorSetsToAdd(initial);
-    }
-    setIsAddModalOpen(true);
-  };
-
-  // Switch product in modal
-  const handleModalProductSelect = (p: ProductData) => {
-    setSelectedProductToAdd(p);
-    const initial: Record<string, number> = {};
-    const colors = (p.colorsAvailable || "").split(",").map((c) => c.trim()).filter(Boolean);
-    colors.forEach((c) => (initial[c] = 0));
-    setColorSetsToAdd(initial);
-  };
-
-  // Add product from modal to order items
-  const handleAddProductSubmit = () => {
-    if (!selectedProductToAdd) return;
-
-    const entries: ColorSetEntry[] = Object.entries(colorSetsToAdd)
-      .filter(([_, sets]) => sets > 0)
-      .map(([color, sets]) => ({ color, sets }));
-
-    if (entries.length === 0) {
-      toast("Please select at least 1 set of any color", "error");
-      return;
-    }
-
-    const pcsPerSet = selectedProductToAdd.pcsPerSet || 5;
-    const totalSets = entries.reduce((sum, cs) => sum + cs.sets, 0);
-    const totalPcs = totalSets * pcsPerSet;
-    const unitPrice = selectedProductToAdd.price || 0;
-    const itemSubtotal = totalPcs * unitPrice;
-
-    const newItem: EditableOrderItem = {
-      productId: selectedProductToAdd.id,
-      productName: selectedProductToAdd.name,
-      category: selectedProductToAdd.category,
-      colorSets: entries,
-      sizeRatio: selectedProductToAdd.sizesRatio,
-      sizesList: selectedProductToAdd.sizesList,
-      pcsPerSet: pcsPerSet,
-      totalSets: totalSets,
-      totalPcs: totalPcs,
-      unitPrice: unitPrice,
-      itemSubtotal: itemSubtotal,
-    };
-
-    setItems([...items, newItem]);
-    setIsAddModalOpen(false);
-    toast(`Added ${selectedProductToAdd.name} (${totalSets} sets, ${totalPcs} pcs)`);
-  };
 
   // Order Totals Calculations
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
@@ -383,63 +211,6 @@ export default function OrderEditPage() {
   const gstRate = 5.0; // 5% GST
   const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
-
-  // Save Order Changes (`PUT /api/orders/[id]`)
-  const handleSaveChanges = async () => {
-    if (!customerName.trim() || !customerGstPan.trim()) {
-      toast("Customer Shop Name and GST/PAN are mandatory", "error");
-      return;
-    }
-
-    if (status === "Confirmed" && !isAdmin) {
-      toast("Order confirmation is strictly restricted to Admin / Super Admin", "error");
-      return;
-    }
-
-    if (items.length === 0) {
-      toast("Order must contain at least 1 product item", "error");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const payload = {
-        customerId,
-        status,
-        placedBy: placedBy.trim() || "Employee",
-        notes: orderNotes.trim(),
-        items: items.map((it) => ({
-          productId: it.productId,
-          colorSets: it.colorSets,
-          sizeRatio: it.sizeRatio,
-          sizesList: it.sizesList,
-          pcsPerSet: it.pcsPerSet,
-          totalSets: it.totalSets,
-          unitPrice: it.unitPrice,
-          notes: it.notes,
-        })),
-      };
-
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || `Failed to update order (${res.status})`);
-      }
-
-      toast("Order form updated successfully!");
-      fetchOrder();
-    } catch (err: any) {
-      console.error("Save order error:", err);
-      toast(err.message || "Failed to update order", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -512,7 +283,7 @@ export default function OrderEditPage() {
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-              Review, edit product items/colors, adjust quantities, update status, and print order slips.
+              Review customer wholesale order details, status, and print order slips.
             </p>
           </div>
 
@@ -551,17 +322,6 @@ export default function OrderEditPage() {
               <Printer size={15} />
               <span>Print A4 Invoice</span>
             </button>
-
-            {/* Save Order Changes */}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSaveChanges}
-              className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Save size={15} />
-              <span>{saving ? "Saving..." : "Save Changes"}</span>
-            </button>
           </div>
         </div>
       </div>
@@ -579,24 +339,6 @@ export default function OrderEditPage() {
               <h2 className="text-base font-black text-slate-900">
                 Customer &amp; Order Information
               </h2>
-            </div>
-
-            {/* Switch customer dropdown */}
-            <div className="flex items-center gap-2 print:hidden">
-              <label className="text-xs font-semibold text-slate-500">
-                Switch Customer:
-              </label>
-              <select
-                value={customerId || ""}
-                onChange={(e) => handleCustomerChange(parseInt(e.target.value, 10))}
-                className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.shopName} ({c.gstPanNo})
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -751,18 +493,9 @@ export default function OrderEditPage() {
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Adjust sets for any color or edit prices directly in this order form.
+                Itemized wholesale product breakdown, color sets, and pieces in this order.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={handleOpenAddProduct}
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 print:hidden self-start sm:self-auto"
-            >
-              <Plus size={16} />
-              <span>+ Add More Product</span>
-            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -774,15 +507,14 @@ export default function OrderEditPage() {
                   <th className="py-3.5 px-4 text-center">PCS</th>
                   <th className="py-3.5 px-4 text-right">Price (₹/pc)</th>
                   <th className="py-3.5 px-4 text-right">Total Amount (₹)</th>
-                  <th className="py-3.5 px-4 text-center print:hidden">Action</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-slate-500">
-                      No items currently in this order. Click &quot;+ Add More Product&quot; to add.
+                    <td colSpan={5} className="py-10 text-center text-slate-500">
+                      No items currently in this order.
                     </td>
                   </tr>
                 ) : (
@@ -799,30 +531,21 @@ export default function OrderEditPage() {
                         </div>
                       </td>
 
-                      {/* Colors & Sets Editable */}
+                      {/* Colors & Sets (Read-Only) */}
                       <td className="py-4 px-4">
                         <div className="space-y-1.5">
                           {item.colorSets && item.colorSets.length > 0 ? (
                             item.colorSets.map((cs) => (
                               <div
                                 key={cs.color}
-                                className="inline-flex items-center gap-2 mr-2 mb-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs"
+                                className="inline-flex items-center gap-1.5 mr-2 mb-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs"
                               >
                                 <span
                                   className="w-2.5 h-2.5 rounded-full inline-block"
                                   style={{ backgroundColor: getColorHex(cs.color).hex }}
                                 />
                                 <span className="font-bold text-slate-800">{cs.color}:</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={cs.sets}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value, 10);
-                                    handleColorSetChange(itemIdx, cs.color, isNaN(val) ? 0 : val);
-                                  }}
-                                  className="w-12 px-1.5 py-0.5 text-center font-bold text-orange-600 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 print:border-none print:w-auto"
-                                />
+                                <span className="font-mono font-black text-orange-600">{cs.sets}</span>
                                 <span className="text-[10px] text-slate-500">sets</span>
                               </div>
                             ))
@@ -843,38 +566,16 @@ export default function OrderEditPage() {
                         <span className="text-[10px] text-slate-500 block">Pcs</span>
                       </td>
 
-                      {/* Price (Editable) */}
+                      {/* Price (Read-Only) */}
                       <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-slate-500">₹</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.unitPrice}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              handlePriceChange(itemIdx, isNaN(val) ? 0 : val);
-                            }}
-                            className="w-16 px-1.5 py-0.5 text-right font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded focus:outline-none focus:bg-white print:border-none print:w-auto print:bg-transparent"
-                          />
-                        </div>
+                        <span className="font-mono font-bold text-slate-900 text-sm">
+                          {formatCurrency(item.unitPrice)}
+                        </span>
                       </td>
 
                       {/* Total Amount */}
                       <td className="py-4 px-4 text-right font-black text-slate-900 text-sm whitespace-nowrap">
                         {formatCurrency(item.itemSubtotal)}
-                      </td>
-
-                      {/* Action */}
-                      <td className="py-4 px-4 text-center print:hidden">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(itemIdx)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Remove product item"
-                        >
-                          <Trash2 size={15} />
-                        </button>
                       </td>
                     </tr>
                   ))
@@ -895,27 +596,21 @@ export default function OrderEditPage() {
             </h3>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Placed By (Employee Name)
-              </label>
-              <input
-                type="text"
-                value={placedBy}
-                onChange={(e) => setPlacedBy(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-              />
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Placed By
+              </span>
+              <div className="font-bold text-slate-900 text-sm">
+                {placedBy || "Admin / Sales Employee"}
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Order Notes
-              </label>
-              <textarea
-                rows={3}
-                value={orderNotes}
-                onChange={(e) => setOrderNotes(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-              />
+              </span>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap min-h-[60px]">
+                {orderNotes || "No special instructions provided."}
+              </div>
             </div>
           </div>
 
@@ -957,17 +652,6 @@ export default function OrderEditPage() {
                 </span>
               </div>
             </div>
-
-            {/* Save Button */}
-            <button
-              type="button"
-              disabled={saving || items.length === 0}
-              onClick={handleSaveChanges}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 text-white font-black text-sm rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 print:hidden"
-            >
-              <Save size={18} />
-              <span>{saving ? "Saving Changes..." : "Save Order Changes"}</span>
-            </button>
           </div>
         </section>
       </main>
@@ -1015,106 +699,6 @@ export default function OrderEditPage() {
       />
     </div>
 
-      {/* ═══════════════════════════════════════════
-          ADD PRODUCT MODAL (Quick Add to Existing Order)
-          ═══════════════════════════════════════════ */}
-      <Modal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        title="Add Product to Order"
-        size="lg"
-        footer={
-          <div className="flex items-center justify-end gap-2 w-full">
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleAddProductSubmit}
-              className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-md transition"
-            >
-              Add to Order Form
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4 text-xs">
-          {/* Select Product */}
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              Select Product Style
-            </label>
-            <select
-              value={selectedProductToAdd?.id || ""}
-              onChange={(e) => {
-                const prod = allProducts.find((p) => p.id === parseInt(e.target.value, 10));
-                if (prod) handleModalProductSelect(prod);
-              }}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 font-bold"
-            >
-              {allProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {p.category} ({formatCurrency(p.price)}/pc)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedProductToAdd && (
-            <div className="space-y-3 pt-2">
-              <div className="text-xs font-bold text-slate-700">
-                Pick Sets for Available Colors (5 pcs / set):
-              </div>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {(selectedProductToAdd.colorsAvailable || "")
-                  .split(",")
-                  .map((c) => c.trim())
-                  .filter(Boolean)
-                  .map((color) => {
-                    const currentSets = colorSetsToAdd[color] || 0;
-                    return (
-                      <div
-                        key={color}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-4 h-4 rounded-full border border-slate-300 inline-block"
-                            style={{ backgroundColor: getColorHex(color).hex }}
-                          />
-                          <span className="font-bold text-slate-900">{color}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min={0}
-                            value={currentSets === 0 ? "" : currentSets}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
-                              setColorSetsToAdd((prev) => ({
-                                ...prev,
-                                [color]: isNaN(val) ? 0 : Math.max(0, val),
-                              }));
-                            }}
-                            className="w-16 px-2 py-1 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
-                          />
-                          <span className="text-[11px] text-slate-500">Sets</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 }

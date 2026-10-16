@@ -99,11 +99,8 @@ export default function EmployeeOrdersListPage() {
               <span className="text-orange-400 font-bold">Orders Collection</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Customer Wholesale Orders
+              Customer Orders
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-              Review and open any order form to edit details, adjust sets/colors, or print wholesale order slips.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -228,7 +225,7 @@ export default function EmployeeOrdersListPage() {
                             : "No wholesale orders placed in this status"}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          No wholesale customer orders recorded in this status.
+                          No customer orders recorded in this status.
                         </p>
                       </div>
                     </td>
@@ -334,7 +331,7 @@ export default function EmployeeOrdersListPage() {
                                   });
                                   const data = await res.json();
                                   if (data.automated) {
-                                    toast("✅ Order confirmation & invoice sent directly to customer's WhatsApp!", "success");
+                                    toast("Order confirmation sent to customer's WhatsApp!", "success");
                                   } else if (data.whatsappUrl) {
                                     window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
                                   }

@@ -66,6 +66,8 @@ export async function POST(req: NextRequest) {
     const sessionData = {
       id: employee.id,
       name: employee.name,
+      email: employee.email || undefined,
+      address: employee.address || undefined,
       designation: employee.designation,
       isTeamLeader: isTL,
       mobileNumber: employee.mobileNumber,
@@ -86,6 +88,8 @@ export async function POST(req: NextRequest) {
       employee: {
         id: employee.id,
         name: employee.name,
+        email: employee.email,
+        address: employee.address,
         designation: employee.designation,
         isTeamLeader: isTL,
         mobileNumber: employee.mobileNumber,
