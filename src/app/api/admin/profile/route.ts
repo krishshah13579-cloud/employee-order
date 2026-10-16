@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin, verifyToken } from "@/lib/auth-security";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     let profile = await prisma.adminProfile.findFirst();
     if (!profile) {
       profile = await prisma.adminProfile.create({
@@ -29,6 +35,11 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await req.json();
 
     // 2FA Security Guard Check
@@ -41,22 +52,10 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    try {
-      const decoded = JSON.parse(Buffer.from(unlockToken, "base64").toString("utf-8"));
-      if (
-        !decoded ||
-        decoded.action !== "unlock_profile_edit" ||
-        !decoded.expiresAt ||
-        Date.now() > decoded.expiresAt
-      ) {
-        return NextResponse.json(
-          { error: "2FA Unlock session expired. Please verify with 2FA email again." },
-          { status: 403 }
-        );
-      }
-    } catch {
+    const decoded = verifyToken<{ action: string }>(unlockToken);
+    if (!decoded || decoded.action !== "unlock_profile_edit") {
       return NextResponse.json(
-        { error: "Invalid 2FA authorization token. Please authenticate with 2FA email." },
+        { error: "Invalid or expired 2FA authorization token. Please authenticate with 2FA email again." },
         { status: 403 }
       );
     }

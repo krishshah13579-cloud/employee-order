@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getAdminSession, requireAdmin } from "@/lib/auth-security";
 
 export async function GET(
   _request: NextRequest,
@@ -61,21 +62,8 @@ export async function PUT(
     const { customerId, placedBy, notes, items, orderDate, status } = body;
 
     if (status === "Confirmed" && existingOrder.status !== "Confirmed") {
-      const sessionCookie = request.cookies.get("iq_admin_session");
-      let isAdmin = false;
-      if (sessionCookie?.value) {
-        try {
-          const decoded = JSON.parse(Buffer.from(sessionCookie.value, "base64").toString("utf-8"));
-          if (decoded?.username) {
-            const admin = await prisma.adminAccount.findUnique({
-              where: { username: decoded.username },
-            });
-            if (admin) isAdmin = true;
-          }
-        } catch {}
-      }
-
-      if (!isAdmin) {
+      const admin = await getAdminSession(request);
+      if (!admin) {
         return NextResponse.json(
           { error: "Permission Denied: Only Admin or Super Admin can confirm orders." },
           { status: 403 }
@@ -210,6 +198,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdmin(_request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { id } = await params;
     const orderId = parseInt(id, 10);
 

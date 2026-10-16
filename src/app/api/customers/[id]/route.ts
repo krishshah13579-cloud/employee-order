@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getAdminSession, requireAdmin } from "@/lib/auth-security";
 
 export async function GET(
   request: NextRequest,
@@ -63,16 +64,8 @@ export async function PUT(
 
     // Check Super Admin permission for modifying creditDays
     if (body.creditDays !== undefined) {
-      const sessionCookie = request.cookies.get("iq_admin_session");
-      let isSuperAdmin = false;
-      if (sessionCookie?.value) {
-        try {
-          const decoded = JSON.parse(Buffer.from(sessionCookie.value, "base64").toString("utf-8"));
-          if (decoded?.username === "krishshah13579@gmail.com") {
-            isSuperAdmin = true;
-          }
-        } catch {}
-      }
+      const admin = await getAdminSession(request);
+      const isSuperAdmin = admin?.isSuperAdmin || false;
 
       if (isSuperAdmin) {
         updateData.creditDays = parseInt(body.creditDays, 10) || 0;
@@ -107,6 +100,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { id } = await params;
     const customerId = parseInt(id, 10);
 

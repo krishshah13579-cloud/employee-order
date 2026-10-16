@@ -1,34 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { getAdminSession } from "@/lib/auth-security";
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get("iq_admin_session");
+    const admin = await getAdminSession(req);
 
-    if (!sessionCookie || !sessionCookie.value) {
-      return NextResponse.json({ authenticated: false });
-    }
-
-    try {
-      const decoded = JSON.parse(
-        Buffer.from(sessionCookie.value, "base64").toString("utf-8")
-      );
-      if (decoded && decoded.username) {
-        const admin = await prisma.adminAccount.findUnique({
-          where: { username: decoded.username },
-          select: { username: true, id: true },
-        });
-
-        if (admin) {
-          const isSuperAdmin = admin.username.toLowerCase() === "krishshah13579@gmail.com";
-          return NextResponse.json({
-            authenticated: true,
-            user: { username: admin.username, isSuperAdmin },
-          });
-        }
-      }
-    } catch {
-      // Cookie corrupted
+    if (admin) {
+      return NextResponse.json({
+        authenticated: true,
+        user: { username: admin.username, isSuperAdmin: admin.isSuperAdmin },
+      });
     }
 
     return NextResponse.json({ authenticated: false });

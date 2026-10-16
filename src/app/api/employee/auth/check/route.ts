@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
+import { verifyToken } from "@/lib/auth-security";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -12,14 +13,10 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ authenticated: false });
     }
 
-    let session: any = null;
-    try {
-      session = JSON.parse(sessionCookie.value);
-    } catch {
-      return NextResponse.json({ authenticated: false });
-    }
+    const session = verifyToken<{ id: number; name: string }>(sessionCookie.value);
 
     if (!session?.id) {
+      cookieStore.delete("garmentpro_emp_session");
       return NextResponse.json({ authenticated: false });
     }
 

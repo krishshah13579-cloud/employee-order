@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-security";
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get("iq_admin_session");
-    if (!sessionCookie || !sessionCookie.value) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
     }
 
     // Fetch latest 10 orders

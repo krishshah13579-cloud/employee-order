@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
+import { signToken } from "@/lib/auth-security";
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,21 +63,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Set employee session cookie
-    const sessionData = {
+    // Set cryptographically signed employee session cookie (HMAC-SHA256)
+    const sessionToken = signToken({
       id: employee.id,
       name: employee.name,
-      email: employee.email || undefined,
-      address: employee.address || undefined,
-      designation: employee.designation,
-      isTeamLeader: isTL,
-      mobileNumber: employee.mobileNumber,
       loggedInAt: new Date().toISOString(),
-    };
+    }, 60 * 60 * 24 * 30); // 30 days
 
     const cookieStore = await cookies();
-    cookieStore.set("garmentpro_emp_session", JSON.stringify(sessionData), {
-      httpOnly: false, // Accessible to client for instant reactive state
+    cookieStore.set("garmentpro_emp_session", sessionToken, {
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",

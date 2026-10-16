@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { signToken } from "@/lib/auth-security";
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,15 +47,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Generate Unlock Token valid for 15 minutes
+    // Generate HMAC-signed Unlock Token valid for 15 minutes
     const tokenPayload = {
       adminId: admin.id,
       action: "unlock_profile_edit",
       timestamp: Date.now(),
-      expiresAt: Date.now() + 15 * 60 * 1000,
     };
 
-    const unlockToken = Buffer.from(JSON.stringify(tokenPayload)).toString("base64");
+    const unlockToken = signToken(tokenPayload, 15 * 60);
 
     return NextResponse.json({
       success: true,

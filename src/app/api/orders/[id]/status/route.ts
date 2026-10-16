@@ -2,12 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/types";
 import { restoreSetsToStock, deductSetsFromStock } from "@/lib/stock";
+import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = await getAdminSession(request);
+    const employee = !admin ? await getEmployeeSession(request) : null;
+
+    if (!admin && !employee) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in to update order status." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const orderId = parseInt(id, 10);
 
@@ -25,27 +36,11 @@ export async function PUT(
       );
     }
 
-    if (status === "Confirmed") {
-      const sessionCookie = request.cookies.get("iq_admin_session");
-      let isAdmin = false;
-      if (sessionCookie?.value) {
-        try {
-          const decoded = JSON.parse(Buffer.from(sessionCookie.value, "base64").toString("utf-8"));
-          if (decoded?.username) {
-            const admin = await prisma.adminAccount.findUnique({
-              where: { username: decoded.username },
-            });
-            if (admin) isAdmin = true;
-          }
-        } catch {}
-      }
-
-      if (!isAdmin) {
-        return NextResponse.json(
-          { error: "Permission Denied: Only Admin or Super Admin can confirm orders." },
-          { status: 403 }
-        );
-      }
+    if (status === "Confirmed" && !admin) {
+      return NextResponse.json(
+        { error: "Permission Denied: Only Admin or Super Admin can confirm orders." },
+        { status: 403 }
+      );
     }
 
     // Fetch existing order with items to handle stock adjustment

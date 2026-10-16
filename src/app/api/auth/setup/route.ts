@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { signToken } from "@/lib/auth-security";
 
 export async function GET() {
   try {
@@ -84,14 +85,12 @@ export async function POST(req: NextRequest) {
       return { admin, profile };
     });
 
-    // Create session token and log in immediately
-    const sessionToken = Buffer.from(
-      JSON.stringify({
-        id: result.admin.id,
-        username: result.admin.username,
-        authenticatedAt: Date.now(),
-      })
-    ).toString("base64");
+    // Create cryptographically signed session token and log in immediately
+    const sessionToken = signToken({
+      id: result.admin.id,
+      username: result.admin.username,
+      authenticatedAt: Date.now(),
+    });
 
     const response = NextResponse.json({
       success: true,
@@ -102,7 +101,8 @@ export async function POST(req: NextRequest) {
     response.cookies.set({
       name: "iq_admin_session",
       value: sessionToken,
-      httpOnly: false,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: "lax",

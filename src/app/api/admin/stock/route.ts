@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseColorwiseSets, getTotalAvailableSets, getAllProductColors, parseDetailedColorRatioSets } from "@/lib/stock";
 import { getProductCoverImage } from "@/lib/utils";
+import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const products = await prisma.product.findMany({
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
@@ -84,6 +90,11 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await request.json();
     const { productId, mixPcs, costPrice, setsColorwise } = body;
 

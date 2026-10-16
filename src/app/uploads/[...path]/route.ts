@@ -61,7 +61,14 @@ export async function GET(
       }
     }
 
-    // 4. If still not found, return clean SVG fallback placeholder
+    // 4. Ensure target path is strictly within the public directory
+    const publicRoot = path.resolve(process.cwd(), "public");
+    const resolvedTargetPath = path.resolve(targetPath);
+    if (!resolvedTargetPath.startsWith(publicRoot)) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    // 5. If still not found, return clean SVG fallback placeholder
     if (!fs.existsSync(targetPath) || fs.statSync(targetPath).isDirectory()) {
       const svgPlaceholder = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
         <rect width="400" height="400" fill="#f1f5f9"/>

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getEmployeeSession, getAdminSession } from "@/lib/auth-security";
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get("garmentpro_emp_session");
-    if (!sessionCookie || !sessionCookie.value) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const isEmployee = await getEmployeeSession(req);
+    const isAdmin = !isEmployee ? await getAdminSession(req) : null;
+
+    if (!isEmployee && !isAdmin) {
+      return NextResponse.json({ error: "Unauthorized: Please log in." }, { status: 401 });
     }
 
     // Fetch the 15 most recently updated orders

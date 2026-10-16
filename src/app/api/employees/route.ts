@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-security";
+
+// Safe fields to expose to frontend (never expose secret pin)
+const SAFE_EMPLOYEE_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  mobileNumber: true,
+  address: true,
+  proofUrl: true,
+  designation: true,
+  isTeamLeader: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,6 +36,7 @@ export async function GET(req: NextRequest) {
 
     const employees = await prisma.employee.findMany({
       where,
+      select: SAFE_EMPLOYEE_SELECT,
       orderBy: { createdAt: "desc" },
     });
 
@@ -31,6 +48,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Only logged-in Admin can create new employees
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await req.json();
     const { name, email, mobileNumber, address, proofUrl, designation, isActive, pin } = body;
 
@@ -53,6 +76,7 @@ export async function POST(req: NextRequest) {
         isTeamLeader: Boolean(body.isTeamLeader),
         isActive: isActive !== undefined ? isActive : true,
       },
+      select: SAFE_EMPLOYEE_SELECT,
     });
 
     return NextResponse.json(employee, { status: 201 });

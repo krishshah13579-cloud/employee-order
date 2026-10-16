@@ -3,16 +3,29 @@ import prisma from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
+    // Security check: Emergency reset is restricted and requires the recovery secret key
+    const recoveryKey = req.headers.get("x-admin-recovery-key") || "";
+    const expectedKey =
+      process.env.ADMIN_RECOVERY_KEY ||
+      process.env.SESSION_SECRET ||
+      process.env.ADMIN_2FA_SECRET;
+
+    if (!expectedKey || recoveryKey !== expectedKey) {
+      return NextResponse.json(
+        { error: "Forbidden: Invalid or missing administrator recovery authorization key." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
-    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is permitted
     const username = "krishshah13579@gmail.com";
-    const password = (body.password || "Krish@2000").trim();
+    const password = (body.password || "").trim();
     const fullName = (body.fullName || "Krish Shah").trim();
     const companyName = (body.companyName || "IQ TROUSERS").trim();
 
-    if (!password) {
+    if (!password || password.length < 6) {
       return NextResponse.json(
-        { error: "Password is required for reset." },
+        { error: "Password must be at least 6 characters long." },
         { status: 400 }
       );
     }
@@ -25,7 +38,7 @@ export async function POST(req: NextRequest) {
     } catch {}
 
     // Upsert or update master admin account
-    const adminRecord = await prisma.adminAccount.upsert({
+    await prisma.adminAccount.upsert({
       where: { username },
       update: {
         password,
@@ -41,7 +54,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Also ensure AdminProfile exists or updated
     const existingProfile = await prisma.adminProfile.findFirst();
     if (existingProfile) {
       await prisma.adminProfile.update({
@@ -62,13 +74,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Do NOT return the password in response
     return NextResponse.json({
       success: true,
       message: "Admin credentials successfully reset for krishshah13579@gmail.com!",
-      credentials: {
-        username: adminRecord.username,
-        password: adminRecord.password,
-      },
     });
   } catch (error: any) {
     console.error("Admin reset error:", error);

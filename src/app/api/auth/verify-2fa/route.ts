@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { checkOtpRateLimit, recordFailedOtpAttempt, resetOtpAttempts, signToken } from "@/lib/auth-security";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Rate Limit / Brute-force protection
+    const rateCheck = checkOtpRateLimit(cleanUser);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const admin = await prisma.adminAccount.findUnique({
       where: { username: cleanUser },
     });
@@ -41,6 +48,7 @@ export async function POST(req: NextRequest) {
       (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
 
     if (!isOtpMatch) {
+      recordFailedOtpAttempt(cleanUser);
       return NextResponse.json(
         {
           error:
@@ -49,6 +57,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Reset failed attempts on success
+    resetOtpAttempts(cleanUser);
 
     // Clear one-time OTP so it cannot be reused
     await prisma.adminAccount.update({
@@ -59,14 +70,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Generate Session Token
-    const sessionToken = Buffer.from(
-      JSON.stringify({
-        id: admin.id,
-        username: admin.username,
-        authenticatedAt: Date.now(),
-      })
-    ).toString("base64");
+    // Generate Cryptographically Signed Session Token (HMAC-SHA256)
+    const sessionToken = signToken({
+      id: admin.id,
+      username: admin.username,
+      authenticatedAt: Date.now(),
+    });
 
     const response = NextResponse.json({
       success: true,
@@ -74,11 +83,12 @@ export async function POST(req: NextRequest) {
       message: "2FA Verification successful! Welcome to IQ TROUSERS Admin.",
     });
 
-    // Set HTTP cookie for session
+    // Set secure HTTP-only cookie for session
     response.cookies.set({
       name: "iq_admin_session",
       value: sessionToken,
-      httpOnly: false,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: "lax",

@@ -5,9 +5,18 @@ import {
   createWhatsAppDirectLink,
   dispatchAutomatedWhatsApp,
 } from "@/lib/whatsapp";
+import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
 export async function GET(request: NextRequest) {
   try {
+    const admin = await getAdminSession(request);
+    const employee = !admin ? await getEmployeeSession(request) : null;
+    const authHeader = request.headers.get("authorization");
+    const isCron = process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+    if (!admin && !employee && !isCron) {
+      return NextResponse.json({ error: "Unauthorized: Please log in." }, { status: 401 });
+    }
     const origin =
       request.headers.get("origin") ||
       request.headers.get("referer") ||
@@ -78,6 +87,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get("authorization");
+    const isCron = process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const admin = !isCron ? await getAdminSession(request) : null;
+
+    if (!isCron && !admin) {
+      return NextResponse.json(
+        { error: "Unauthorized: Administrator or cron authorization required." },
+        { status: 401 }
+      );
+    }
+
     const origin =
       request.headers.get("origin") ||
       request.headers.get("referer") ||

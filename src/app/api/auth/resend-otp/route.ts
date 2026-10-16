@@ -23,6 +23,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Admin account not found" }, { status: 404 });
     }
 
+    // Cooldown check: Prevent email bombing (at least 60 seconds between resends)
+    if (admin.otpExpiresAt) {
+      const remainingMs = admin.otpExpiresAt.getTime() - Date.now();
+      if (remainingMs > 9 * 60 * 1000) {
+        const secondsToWait = Math.ceil((remainingMs - 9 * 60 * 1000) / 1000);
+        return NextResponse.json(
+          { error: `Please wait ${secondsToWait} second(s) before requesting another code.` },
+          { status: 429 }
+        );
+      }
+    }
+
     // Generate fresh 6-digit OTP code (Valid for 10 minutes)
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000);

@@ -1,10 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { DashboardStats } from "@/lib/types";
 import { getTotalAvailableSets } from "@/lib/stock";
+import { getEmployeeSession, getAdminSession } from "@/lib/auth-security";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const isEmployee = await getEmployeeSession(req);
+    const isAdmin = !isEmployee ? await getAdminSession(req) : null;
+
+    if (!isEmployee && !isAdmin) {
+      return NextResponse.json({ error: "Unauthorized: Please log in." }, { status: 401 });
+    }
     // Calculate today's start and end accurately in Indian Standard Time (IST)
     const istDateString = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
     const startOfToday = new Date(`${istDateString}T00:00:00+05:30`);
