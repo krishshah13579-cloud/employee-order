@@ -432,9 +432,6 @@ function CustomerRegistrationContent() {
                     <h3 className="text-sm font-bold text-slate-800">
                       Capture or Upload Visiting Card
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-                      Use your phone camera or select a card image from gallery to auto-fill customer details.
-                    </p>
                   </div>
                 )}
 
