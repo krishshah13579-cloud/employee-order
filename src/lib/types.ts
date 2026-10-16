@@ -261,9 +261,12 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const STANDARD_SIZE_RATIOS = [
-  { label: "28 to 36 (28, 30, 32, 34, 36)", value: "28 to 36", sizes: "28, 30, 32, 34, 36", pcs: 5 },
   { label: "30 to 38 (30, 32, 34, 36, 38)", value: "30 to 38", sizes: "30, 32, 34, 36, 38", pcs: 5 },
   { label: "32 to 38 (32, 34, 36, 38)", value: "32 to 38", sizes: "32, 34, 36, 38", pcs: 4 },
+  { label: "28 to 36 (28, 30, 32, 34, 36)", value: "28 to 36", sizes: "28, 30, 32, 34, 36", pcs: 5 },
+  { label: "28 to 38 (28, 30, 32, 34, 36, 38)", value: "28 to 38", sizes: "28, 30, 32, 34, 36, 38", pcs: 6 },
+  { label: "30 to 40 (30, 32, 34, 36, 38, 40)", value: "30 to 40", sizes: "30, 32, 34, 36, 38, 40", pcs: 6 },
+  { label: "32 to 40 (32, 34, 36, 38, 40)", value: "32 to 40", sizes: "32, 34, 36, 38, 40", pcs: 5 },
   { label: "28 to 40 (28, 30, 32, 34, 36, 38, 40)", value: "28 to 40", sizes: "28, 30, 32, 34, 36, 38, 40", pcs: 7 },
   { label: "32 to 42 (32, 34, 36, 38, 40, 42)", value: "32 to 42", sizes: "32, 34, 36, 38, 40, 42", pcs: 6 },
   { label: "S to XXL (S, M, L, XL, XXL)", value: "S to XXL", sizes: "S, M, L, XL, XXL", pcs: 5 },
