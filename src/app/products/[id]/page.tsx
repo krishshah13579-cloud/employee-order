@@ -27,6 +27,7 @@ import {
   formatCurrency,
   getProductCoverImage,
   getProductAllImages,
+  isGstPanRegistered,
 } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import {
@@ -306,6 +307,7 @@ function ProductDetailContent() {
   const [draftCustomer, setDraftCustomer] = useState<{
     id?: number;
     shopName?: string;
+    gstPanNo?: string;
     businessType?: string;
   } | null>(null);
 
@@ -343,6 +345,15 @@ function ProductDetailContent() {
     if (!draftCustomer && !storedCustomerId) {
       toast(
         "Mandatory: Customer selection is required before adding products to the order form. Please select a customer.",
+        "error"
+      );
+      router.push("/orders/new");
+      return;
+    }
+
+    if (draftCustomer && !isGstPanRegistered(draftCustomer.gstPanNo)) {
+      toast(
+        "Customer is NOT GST/PAN registered! Please enter and save GST/PAN details in the order form before adding products.",
         "error"
       );
       router.push("/orders/new");

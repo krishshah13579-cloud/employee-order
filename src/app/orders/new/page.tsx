@@ -37,7 +37,7 @@ import {
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, isGstPanRegistered } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
@@ -88,6 +88,11 @@ export default function OrderFormPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState<boolean>(false);
+
+  // Customer GST/PAN Inline Edit State (for unregistered customers)
+  const [isEditingGstPan, setIsEditingGstPan] = useState<boolean>(false);
+  const [customGstPan, setCustomGstPan] = useState<string>("");
+  const [isSavingGstPan, setIsSavingGstPan] = useState<boolean>(false);
 
   // Credit Days on Order Form (Locks permanently if 45 days is selected)
   const [orderCreditDays, setOrderCreditDays] = useState<number>(0);
@@ -246,6 +251,28 @@ export default function OrderFormPage() {
     return customers.find((c) => c.id === selectedCustomerId) || null;
   }, [customers, selectedCustomerId]);
 
+  // Check whether the selected customer is registered with GST/PAN
+  const isCustomerGstRegistered = useMemo(() => {
+    if (!selectedCustomer) return false;
+    return isGstPanRegistered(selectedCustomer.gstPanNo);
+  }, [selectedCustomer]);
+
+  // Automatically open editable GST/PAN field if customer is NOT registered
+  useEffect(() => {
+    if (selectedCustomer) {
+      if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
+        setIsEditingGstPan(true);
+        setCustomGstPan("");
+      } else {
+        setCustomGstPan(selectedCustomer.gstPanNo.toUpperCase());
+        setIsEditingGstPan(false);
+      }
+    } else {
+      setIsEditingGstPan(false);
+      setCustomGstPan("");
+    }
+  }, [selectedCustomer]);
+
   // Handle Credit Days Change with permanent lock when set to 45 Days
   const handleCreditDaysChange = (days: number) => {
     if (isCreditLocked || orderCreditDays === 45) {
@@ -278,6 +305,8 @@ export default function OrderFormPage() {
     setSelectedCustomerId(null);
     setOrderCreditDays(0);
     setIsCreditLocked(false);
+    setIsEditingGstPan(false);
+    setCustomGstPan("");
     try {
       localStorage.removeItem("garmentpro_selected_customer_id");
     } catch {}
@@ -296,6 +325,17 @@ export default function OrderFormPage() {
     setSelectedCustomerId(c.id);
     setCustomerDropdownOpen(false);
     setCustomerSearchQuery("");
+
+    // GST/PAN check: if not registered, open the field immediately and warn
+    const isRegistered = isGstPanRegistered(c.gstPanNo);
+    if (!isRegistered) {
+      setIsEditingGstPan(true);
+      setCustomGstPan("");
+      toast(`⚠️ Customer ${c.shopName.toUpperCase()} is NOT GST/PAN registered. Please enter & save GST/PAN details below to unlock product addition.`, "error");
+    } else {
+      setIsEditingGstPan(false);
+      setCustomGstPan(c.gstPanNo.toUpperCase());
+    }
 
     // Credit Days handling: if set to 45, lock permanently
     const custCredit = c.creditDays || 0;
@@ -326,7 +366,55 @@ export default function OrderFormPage() {
 
     setItems(updatedItems);
     saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit);
-    toast(`Customer selected: ${c.shopName.toUpperCase()} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
+    if (isRegistered) {
+      toast(`Customer selected: ${c.shopName.toUpperCase()} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
+    }
+  };
+
+  // Handle Save / Register Customer GST/PAN (registers customer and unlocks adding products)
+  const handleSaveCustomerGstPan = async () => {
+    if (!selectedCustomer) {
+      toast("Please select a customer first.", "error");
+      return;
+    }
+
+    const cleaned = customGstPan.trim().toUpperCase();
+    if (!cleaned || !isGstPanRegistered(cleaned)) {
+      toast("Mandatory: Please enter a valid GST No. (15 characters) or PAN No. (10 characters)", "error");
+      return;
+    }
+    if (cleaned.length < 10) {
+      toast("GST No. / PAN No. must be at least 10 characters long.", "error");
+      return;
+    }
+
+    try {
+      setIsSavingGstPan(true);
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gstPanNo: cleaned }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update GST/PAN");
+      }
+
+      // Update customers state locally
+      setCustomers((prev) =>
+        prev.map((c) => (c.id === selectedCustomer.id ? { ...c, gstPanNo: cleaned } : c))
+      );
+
+      // Update draft in localStorage
+      saveDraft(items, selectedCustomer.id, orderNotes, placedBy);
+
+      setIsEditingGstPan(false);
+      toast(`Customer GST/PAN saved as ${cleaned}! You can now add products to the form.`, "success");
+    } catch (err: any) {
+      toast(err.message || "Failed to save GST/PAN", "error");
+    } finally {
+      setIsSavingGstPan(false);
+    }
   };
 
   // Handle Remove Item
@@ -364,6 +452,13 @@ export default function OrderFormPage() {
     if (!selectedCustomerId || !selectedCustomer) {
       toast("Mandatory: Customer selection is required. Please select a Customer / Shop Name from the dropdown.", "error");
       setCustomerDropdownOpen(true);
+      return;
+    }
+
+    // 1b. Mandatory GST/PAN Registration Check
+    if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
+      toast("Mandatory: Customer is NOT GST/PAN registered. Please enter and save GST/PAN details before booking order.", "error");
+      setIsEditingGstPan(true);
       return;
     }
 
@@ -788,8 +883,15 @@ export default function OrderFormPage() {
                           <div className="text-xs font-bold text-slate-900 uppercase">
                             {cust.shopName.toUpperCase()}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono uppercase">
-                            GST/PAN: {cust.gstPanNo.toUpperCase()} • Ph: {cust.phoneNumber}
+                          <div className="text-[11px] text-slate-500 font-mono uppercase flex items-center gap-1.5 flex-wrap">
+                            {!isGstPanRegistered(cust.gstPanNo) ? (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1 py-0.2 rounded">
+                                ⚠️ NOT GST/PAN REGISTERED
+                              </span>
+                            ) : (
+                              <span>GST/PAN: {cust.gstPanNo.toUpperCase()}</span>
+                            )}
+                            <span>• Ph: {cust.phoneNumber}</span>
                           </div>
                         </div>
 
@@ -818,13 +920,79 @@ export default function OrderFormPage() {
                     </span>
                   </div>
 
-                  <div>
-                    <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
-                      GST NO. / PAN NO.
-                    </span>
-                    <span className="font-mono font-black text-orange-600 text-sm uppercase">
-                      {selectedCustomer.gstPanNo.toUpperCase()}
-                    </span>
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    {!isCustomerGstRegistered || isEditingGstPan ? (
+                      <div className="bg-amber-50/90 border-2 border-amber-400 p-3 rounded-xl space-y-1.5 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-amber-900 block font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                            <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                            GST NO. / PAN NO. (MANDATORY TO ADD PRODUCTS)
+                          </span>
+                          {!isCustomerGstRegistered && (
+                            <span className="text-[9px] bg-red-100 text-red-700 font-black px-1.5 py-0.5 rounded uppercase">
+                              Not Registered
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={customGstPan}
+                            onChange={(e) => setCustomGstPan(e.target.value.toUpperCase())}
+                            placeholder="ENTER 15-DIGIT GSTIN OR 10-DIGIT PAN"
+                            className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black uppercase text-slate-900 focus:ring-2 focus:ring-amber-500 outline-none placeholder:normal-case placeholder:font-normal"
+                          />
+                          <button
+                            type="button"
+                            disabled={isSavingGstPan || !customGstPan.trim()}
+                            onClick={handleSaveCustomerGstPan}
+                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-black shadow-xs shrink-0 cursor-pointer transition flex items-center gap-1"
+                          >
+                            {isSavingGstPan ? <Loader2 size={12} className="animate-spin" /> : null}
+                            <span>Save &amp; Unlock</span>
+                          </button>
+                          {isCustomerGstRegistered && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEditingGstPan(false);
+                                setCustomGstPan(selectedCustomer.gstPanNo);
+                              }}
+                              className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 font-bold cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                        {!isCustomerGstRegistered && (
+                          <p className="text-[10px] text-amber-800 font-medium">
+                            ⚠️ This customer does not have a registered GST/PAN. Adding products is locked until GST/PAN is entered &amp; saved above.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
+                            GST NO. / PAN NO.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomGstPan(selectedCustomer.gstPanNo);
+                              setIsEditingGstPan(true);
+                            }}
+                            className="text-[10px] text-orange-600 hover:text-orange-700 font-bold uppercase cursor-pointer hover:underline"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                        <span className="font-mono font-black text-orange-600 text-sm uppercase">
+                          {selectedCustomer.gstPanNo.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -953,7 +1121,7 @@ export default function OrderFormPage() {
               </p>
             </div>
 
-            {selectedCustomer && (
+            {selectedCustomer && isCustomerGstRegistered && (
               <button
                 type="button"
                 onClick={() => router.push("/products?returnTo=/orders/new")}
@@ -962,6 +1130,13 @@ export default function OrderFormPage() {
                 <Plus size={16} />
                 <span>Add Product to Form</span>
               </button>
+            )}
+
+            {selectedCustomer && !isCustomerGstRegistered && (
+              <div className="px-3 py-1.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                <span>Enter GST/PAN above to unlock adding products</span>
+              </div>
             )}
           </div>
 
@@ -991,11 +1166,13 @@ export default function OrderFormPage() {
                           No Products in Order Form Yet
                         </p>
                         <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                          {selectedCustomer
-                            ? "Click Add Product to Form to browse products, pick multiple colors and sets at once."
-                            : "Customer selection is mandatory. Please select a customer above first to view and add products."}
+                          {!selectedCustomer
+                            ? "Customer selection is mandatory. Please select a customer above first to view and add products."
+                            : !isCustomerGstRegistered
+                            ? "Customer is NOT GST/PAN registered. Adding products is disabled until GST/PAN details are entered & saved in the customer card above."
+                            : "Click Add Product to Form to browse products, pick multiple colors and sets at once."}
                         </p>
-                        {selectedCustomer && (
+                        {selectedCustomer && isCustomerGstRegistered && (
                           <button
                             type="button"
                             onClick={() => router.push("/products?returnTo=/orders/new")}
@@ -1003,6 +1180,19 @@ export default function OrderFormPage() {
                           >
                             <Plus size={14} />
                             <span>Add Product to Form</span>
+                          </button>
+                        )}
+                        {selectedCustomer && !isCustomerGstRegistered && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingGstPan(true);
+                              toast("Please enter GST/PAN details in the field opened above.", "info");
+                            }}
+                            className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <AlertCircle size={14} />
+                            <span>Enter GST/PAN Above</span>
                           </button>
                         )}
                       </div>

@@ -43,16 +43,15 @@ export async function PUT(
     const customerId = parseInt(id, 10);
     const body = await request.json();
 
-    const updateData: any = {
-      shopName: body.firmName || body.shopName,
-      gstPanNo: body.gstPanNo,
-      address: body.address,
-      city: body.city !== undefined ? body.city : undefined,
-      state: body.state !== undefined ? body.state : undefined,
-      phoneNumber: body.phoneNumber,
-      visitingCardUrl: body.visitingCardUrl,
-      contactPerson: body.contactPerson,
-    };
+    const updateData: any = {};
+    if (body.firmName || body.shopName) updateData.shopName = (body.firmName || body.shopName).trim();
+    if (body.gstPanNo !== undefined) updateData.gstPanNo = String(body.gstPanNo).trim().toUpperCase();
+    if (body.address !== undefined) updateData.address = body.address;
+    if (body.city !== undefined) updateData.city = body.city;
+    if (body.state !== undefined) updateData.state = body.state;
+    if (body.phoneNumber !== undefined) updateData.phoneNumber = body.phoneNumber;
+    if (body.visitingCardUrl !== undefined) updateData.visitingCardUrl = body.visitingCardUrl;
+    if (body.contactPerson !== undefined) updateData.contactPerson = body.contactPerson;
 
     if (body.businessType) {
       updateData.businessType = String(body.businessType).trim().toUpperCase();

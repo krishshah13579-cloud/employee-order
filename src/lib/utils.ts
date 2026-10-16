@@ -124,3 +124,33 @@ export function getProductCoverImage(
   const images = getProductAllImages(imageUrl);
   return images.length > 0 ? images[0] : fallback;
 }
+
+/**
+ * Checks whether a given GST/PAN string represents a registered tax ID.
+ * Returns false for empty, null, "N/A", "URP", "UNREGISTERED", or dash values.
+ */
+export function isGstPanRegistered(gstPan?: string | null): boolean {
+  if (!gstPan) return false;
+  const val = gstPan.trim().toUpperCase();
+  if (!val) return false;
+  if (
+    val === "N/A" ||
+    val === "NA" ||
+    val === "N / A" ||
+    val === "URP" ||
+    val.startsWith("URP") ||
+    val === "UNREGISTERED" ||
+    val === "NOT REGISTERED" ||
+    val === "NOT APPLICABLE" ||
+    val === "NONE" ||
+    val === "NIL" ||
+    val === "NULL" ||
+    val === "UNDEFINED" ||
+    val === "—" ||
+    val === "-"
+  ) {
+    return false;
+  }
+  return true;
+}
+

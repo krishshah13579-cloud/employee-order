@@ -17,7 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
-import { formatCurrency, getProductCoverImage } from "@/lib/utils";
+import { formatCurrency, getProductCoverImage, isGstPanRegistered } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import {
   getTotalAvailableSets,
@@ -49,6 +49,7 @@ function ProductsContent() {
   // Active draft info
   const [draftInfo, setDraftInfo] = useState<{
     customerName?: string;
+    customerGstPan?: string;
     businessType?: string;
     itemsCount: number;
   } | null>(null);
@@ -62,6 +63,7 @@ function ProductsContent() {
         if (parsed && (parsed.customer || (parsed.items && parsed.items.length > 0))) {
           setDraftInfo({
             customerName: parsed.customer?.shopName || parsed.customerName,
+            customerGstPan: parsed.customer?.gstPanNo,
             businessType: parsed.customer?.businessType,
             itemsCount: parsed.items?.length || 0,
           });
@@ -178,6 +180,29 @@ function ProductsContent() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {/* Unregistered Customer GST/PAN warning */}
+        {draftInfo && draftInfo.customerName && !isGstPanRegistered(draftInfo.customerGstPan) && (
+          <div className="p-4 bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle size={20} className="text-amber-600 shrink-0" />
+              <div>
+                <p className="font-black text-sm uppercase">
+                  Customer {draftInfo.customerName} is NOT GST/PAN registered
+                </p>
+                <p className="text-xs text-amber-800">
+                  Adding products is locked. Please enter and save GST/PAN details in the Order Form before adding products.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={returnTo}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-xs shrink-0 text-center transition"
+            >
+              Go to Order Form →
+            </Link>
+          </div>
+        )}
+
         {/* Error notification */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center justify-between">
