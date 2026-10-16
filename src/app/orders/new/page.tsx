@@ -1116,9 +1116,6 @@ export default function OrderFormPage() {
                   ({items.length} {items.length === 1 ? "style" : "styles"} selected)
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Formula: PCS = Total Sets × Pcs per Set (e.g. 5 sets × 5 pcs = 25 pcs).
-              </p>
             </div>
 
             {selectedCustomer && isCustomerGstRegistered && (
