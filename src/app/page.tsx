@@ -264,9 +264,6 @@ export default function HomePage() {
                   Recent Orders (10 Customer Orders Shown)
                 </h2>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Click on any customer order row below to open and edit the Order Form.
-              </p>
             </div>
 
             <div className="flex items-center gap-3">
