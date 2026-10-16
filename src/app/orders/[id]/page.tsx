@@ -16,6 +16,8 @@ import {
   Bell,
   Truck,
   Clock,
+  Eye,
+  X,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -61,6 +63,7 @@ export default function OrderEditPage() {
   const [creditDays, setCreditDays] = useState<number>(45);
   const [transportName, setTransportName] = useState<string>("");
   const [sendingWhatsApp, setSendingWhatsApp] = useState<boolean>(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
 
   // Customer Details
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -312,11 +315,22 @@ export default function OrderEditPage() {
               <span>Weekly Reminder</span>
             </button>
 
+            {/* Preview A4 Tax Invoice */}
+            <button
+              type="button"
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Preview exact Krish Clothing Co. A4 Tax Invoice format on screen"
+            >
+              <Eye size={15} />
+              <span>Preview Invoice</span>
+            </button>
+
             {/* Print A4 Tax Invoice */}
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-3.5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-orange-900/30 cursor-pointer"
               title="Print standard A4 Tax Invoice (Krish Clothing Co.)"
             >
               <Printer size={15} />
@@ -661,7 +675,7 @@ export default function OrderEditPage() {
         EXACT A4 TAX INVOICE PRINT VIEW
         (Krish Clothing Co. Tax Invoice format)
         ═══════════════════════════════════════════ */}
-    <div className="hidden print:block py-2">
+    <div className="hidden print:block py-1">
       <TaxInvoiceA4
         order={{
           orderNumber,
@@ -698,6 +712,88 @@ export default function OrderEditPage() {
         }}
       />
     </div>
+
+    {/* ═══════════════════════════════════════════
+        ON-SCREEN A4 TAX INVOICE PREVIEW MODAL
+        ═══════════════════════════════════════════ */}
+    {isPreviewModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4 overflow-y-auto print:hidden">
+        <div className="bg-slate-100 rounded-2xl w-full max-w-4xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900 text-white shrink-0">
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-orange-500" />
+              <div>
+                <span className="font-bold text-sm block">Krish Clothing Co. — A4 Tax Invoice Preview</span>
+                <span className="text-[10px] text-slate-400 font-mono">Format matches physical tax invoice sample</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewModalOpen(false);
+                  setTimeout(() => window.print(), 100);
+                }}
+                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              >
+                <Printer size={14} />
+                <span>Print / Save PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Close Preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Body: A4 Paper Preview */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-300/80 flex justify-center">
+            <div className="bg-white shadow-xl p-3 sm:p-5 w-full max-w-[780px] rounded-sm">
+              <TaxInvoiceA4
+                order={{
+                  orderNumber,
+                  orderDate,
+                  status,
+                  customerName,
+                  customerGstPan,
+                  customerPhone,
+                  customerAddress,
+                  customerCity,
+                  customerState,
+                  businessType,
+                  creditDays,
+                  transportName,
+                  subtotal,
+                  gstRate,
+                  gstAmount,
+                  grandTotal,
+                  totalPcs,
+                  totalSets,
+                  placedBy,
+                  notes: orderNotes,
+                  items: items.map((it) => ({
+                    id: it.id,
+                    productName: it.productName,
+                    colorSets: it.colorSets,
+                    sizeRatio: it.sizeRatio,
+                    pcsPerSet: it.pcsPerSet,
+                    totalSets: it.totalSets,
+                    totalPcs: it.totalPcs,
+                    unitPrice: it.unitPrice,
+                    itemSubtotal: it.itemSubtotal,
+                  })),
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     </div>
   );

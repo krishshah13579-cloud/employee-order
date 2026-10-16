@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { numberToIndianWords, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 export interface TaxInvoiceItem {
   id?: number;
@@ -75,15 +75,20 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
   const isDispatched = order.status === "Dispatched" || order.status === "Delivered";
   const numberLabel = isDispatched ? "Invoice No." : "Order No.";
 
+  // Calculate target empty filler rows to create classic invoice look with vertical column lines
+  // Standard invoice table should have at least 6 rows of height
+  const itemsCount = order.items?.length || 0;
+  const emptyRowsCount = Math.max(0, 6 - itemsCount);
+
   return (
-    <div className="a4-invoice-wrapper bg-white text-black font-sans leading-tight text-[11px] print:text-[10px]">
+    <div className="a4-invoice-wrapper font-sans text-black leading-tight text-[11px] print:text-[10px]">
       <style jsx global>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 4mm 6mm;
+            margin: 5mm 7mm;
           }
-          body {
+          html, body {
             background: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
@@ -91,7 +96,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
             margin: 0 !important;
             padding: 0 !important;
           }
-          nav, header, footer, .print\\:hidden, #toast-container, .toast-container {
+          nav, header, footer, aside, .print\\:hidden, #toast-container, .toast-container {
             display: none !important;
           }
           .a4-invoice-wrapper {
@@ -100,290 +105,718 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 auto !important;
+            padding: 0 !important;
+          }
+          .a4-invoice-box {
+            border: 1.5px solid #000 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
 
-      {/* Main Single Border Box */}
-      <div className="border border-black max-w-[780px] mx-auto shadow-xs print:shadow-none bg-white">
+      {/* Main Single Border Box matching physical invoice */}
+      <div
+        className="a4-invoice-box mx-auto bg-white"
+        style={{
+          border: "1.5px solid #000000",
+          maxWidth: "780px",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
         {/* 1. TOP HEADER: KRISH CLOTHING CO. */}
-        <div className="border-b border-black text-center py-1.5 px-3">
-          <h1 className="text-xl font-black tracking-wider uppercase text-black font-serif">
+        <div
+          style={{
+            borderBottom: "1px solid #000000",
+            textAlign: "center",
+            padding: "6px 12px",
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "'Times New Roman', Times, serif",
+              fontSize: "22px",
+              fontWeight: "900",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+              margin: 0,
+              lineHeight: "1.1",
+            }}
+          >
             KRISH CLOTHING CO.
           </h1>
-          <p className="text-[10px] font-semibold text-black mt-0.5 tracking-tight">
+          <p
+            style={{
+              fontSize: "10px",
+              fontWeight: "700",
+              margin: "2px 0 0 0",
+              letterSpacing: "-0.2px",
+            }}
+          >
             2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,
           </p>
-          <p className="text-[10px] font-semibold text-black tracking-tight">
+          <p
+            style={{
+              fontSize: "10px",
+              fontWeight: "700",
+              margin: "1px 0 0 0",
+              letterSpacing: "-0.2px",
+            }}
+          >
             AHMEDABAD - 380008 (M) : 8128756632
           </p>
         </div>
 
         {/* 2. SUB-HEADER BAR: Debit Memo | TAX INVOICE | Duplicate */}
-        <div className="border-b border-black grid grid-cols-3 items-center py-1 px-3 text-xs font-bold">
-          <div className="text-left font-semibold text-[10.5px]">Debit Memo</div>
-          <div className="text-center font-black text-sm tracking-widest uppercase">
+        <div
+          style={{
+            borderBottom: "1px solid #000000",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "3px 10px",
+            fontSize: "11px",
+            fontWeight: "bold",
+          }}
+        >
+          <div style={{ width: "25%", textAlign: "left" }}>Debit Memo</div>
+          <div
+            style={{
+              width: "50%",
+              textAlign: "center",
+              fontWeight: "900",
+              fontSize: "13px",
+              letterSpacing: "2px",
+              textTransform: "uppercase",
+            }}
+          >
             {isDispatched ? "TAX INVOICE" : "ORDER FORM / TAX INVOICE"}
           </div>
-          <div className="text-right font-semibold text-[10.5px]">{copyTitle}</div>
+          <div style={{ width: "25%", textAlign: "right" }}>{copyTitle}</div>
         </div>
 
-        {/* 3. RECEIVER (LEFT) & INVOICE / TRANSPORT DETAILS (RIGHT) */}
-        <div className="border-b border-black grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-black">
+        {/* 3. RECEIVER (LEFT ~58%) & INVOICE / TRANSPORT DETAILS (RIGHT ~42%) */}
+        <div
+          style={{
+            borderBottom: "1px solid #000000",
+            display: "flex",
+            minHeight: "86px",
+          }}
+        >
           {/* Left Column: Receiver / Customer Info */}
-          <div className="p-2 space-y-0.5 text-[10.5px]">
-            <div className="flex items-start gap-1">
-              <span className="font-bold shrink-0">M/s. :</span>
-              <span className="font-black text-xs uppercase tracking-wide">
-                {order.customerName || "WALK-IN CUSTOMER"}
-              </span>
-            </div>
-            <div className="text-[10px] pl-4 text-neutral-800 leading-snug">
-              {order.customerAddress || "Direct Delivery"}
-            </div>
-            <div className="text-[10px] pl-4 font-semibold">
-              {order.customerCity || "AHMEDABAD"}{" "}
-              {order.customerState ? `- ${order.customerState}` : "- 363001"}
-            </div>
-            <div className="pt-0.5 flex items-center justify-between text-[10px]">
-              <div>
-                <span className="font-semibold">Place of Supply :</span>{" "}
-                <span className="font-bold">24-Gujarat</span>
+          <div
+            style={{
+              width: "58%",
+              borderRight: "1px solid #000000",
+              padding: "5px 10px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              fontSize: "10.5px",
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                <span style={{ fontWeight: "bold", flexShrink: 0 }}>M/s. :</span>
+                <span
+                  style={{
+                    fontWeight: "900",
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.3px",
+                  }}
+                >
+                  {order.customerName || "WALK-IN CUSTOMER"}
+                </span>
+              </div>
+              <div
+                style={{
+                  paddingLeft: "34px",
+                  fontSize: "10px",
+                  lineHeight: "1.25",
+                  color: "#111",
+                  marginTop: "1px",
+                }}
+              >
+                {order.customerAddress || "Direct Delivery"}
+              </div>
+              <div
+                style={{
+                  paddingLeft: "34px",
+                  fontSize: "10px",
+                  fontWeight: "600",
+                  marginTop: "1px",
+                }}
+              >
+                {order.customerCity || "AHMEDABAD"}{" "}
+                {order.customerState ? `- ${order.customerState}` : "- 363001"}
               </div>
             </div>
-            <div className="flex items-center justify-between text-[10px]">
-              <div>
-                <span className="font-semibold">GSTIN No. :</span>{" "}
-                <span className="font-bold font-mono">
+
+            <div style={{ marginTop: "4px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "10px",
+                }}
+              >
+                <div>
+                  <span style={{ fontWeight: "600" }}>Place of Supply :</span>{" "}
+                  <strong>24-Gujarat</strong>
+                </div>
+                {order.customerPhone && (
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      fontFamily: "monospace",
+                      fontSize: "11px",
+                      color: "#000",
+                    }}
+                  >
+                    Mob No. {order.customerPhone}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: "10px", marginTop: "1px" }}>
+                <span style={{ fontWeight: "600" }}>GSTIN No. :</span>{" "}
+                <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
                   {order.customerGstPan || "URP (Unregistered)"}
                 </span>
               </div>
-              {order.customerPhone && (
-                <div className="font-bold font-mono text-[10.5px] text-black">
-                  Mob No. {order.customerPhone}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Right Column: Order No / Invoice No, Date, Transport (No GST or LR No) */}
-          <div className="text-[10.5px] divide-y divide-black">
-            <div className="p-1 px-2">
-              <span className="font-bold">{numberLabel}</span>{" "}
-              <span className="font-mono font-bold ml-1">: {order.orderNumber}</span>
+          {/* Right Column: Order No / Invoice No, Date, Transport (Clean: NO GST or LR) */}
+          <div
+            style={{
+              width: "42%",
+              display: "flex",
+              flexDirection: "column",
+              fontSize: "10.5px",
+            }}
+          >
+            <div
+              style={{
+                borderBottom: "1px solid #000000",
+                padding: "5px 10px",
+                display: "flex",
+              }}
+            >
+              <span style={{ fontWeight: "bold", width: "95px" }}>{numberLabel}</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
+                : {order.orderNumber}
+              </span>
             </div>
-            <div className="p-1 px-2">
-              <span className="font-bold">Date</span>{" "}
-              <span className="font-mono font-semibold ml-1">: {formattedDate}</span>
+
+            <div
+              style={{
+                borderBottom: "1px solid #000000",
+                padding: "5px 10px",
+                display: "flex",
+              }}
+            >
+              <span style={{ fontWeight: "bold", width: "95px" }}>Date</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "600" }}>
+                : {formattedDate}
+              </span>
             </div>
-            <div className="p-1 px-2">
-              <span className="font-bold">TRANSPORT</span>{" "}
-              <span className="font-black ml-1 uppercase text-black">
-                : {resolvedTransport || "Self Delivery / Direct Parcel"}
+
+            <div
+              style={{
+                padding: "5px 10px",
+                display: "flex",
+                flex: 1,
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontWeight: "bold", width: "95px" }}>TRANSPORT</span>
+              <span
+                style={{
+                  fontWeight: "900",
+                  textTransform: "uppercase",
+                  color: "#000",
+                }}
+              >
+                : {resolvedTransport || "Patel Transport Co."}
               </span>
             </div>
           </div>
         </div>
 
-        {/* 4. PRODUCT DETAILS TABLE */}
-        <div className="overflow-x-auto min-h-[140px]">
-          <table className="w-full text-left border-collapse text-[10.5px]">
-            <thead>
-              <tr className="border-b border-black text-center font-bold bg-neutral-50/80 print:bg-transparent text-[10px]">
-                <th className="border-r border-black py-1.5 px-1 w-8">SrNo</th>
-                <th className="border-r border-black py-1.5 px-2 text-left">Product Design No.</th>
-                <th className="border-r border-black py-1.5 px-1 w-14">HSN/SAC</th>
-                <th className="border-r border-black py-1.5 px-1.5 w-16">Size</th>
-                <th className="border-r border-black py-1.5 px-2">Color</th>
-                <th className="border-r border-black py-1.5 px-1.5 w-12">Set</th>
-                <th className="border-r border-black py-1.5 px-2 w-16">Qty</th>
-                <th className="border-r border-black py-1.5 px-2 w-16 text-right">Rate</th>
-                <th className="border-r border-black py-1.5 px-1 w-12">GST %</th>
-                <th className="py-1.5 px-2 w-20 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/30 font-sans">
-              {order.items.map((it, idx) => {
-                // Parse color sets
-                let colorSummary = "";
-                let totalSets = it.totalSets || 0;
-                let colorArr: { color: string; sets: number }[] = [];
-                try {
-                  if (Array.isArray(it.colorSets)) {
-                    colorArr = it.colorSets;
-                  } else if (typeof it.colorSets === "string") {
-                    colorArr = JSON.parse(it.colorSets || "[]");
-                  }
-                } catch {
-                  colorArr = [];
+        {/* 4. PRODUCT DETAILS TABLE (Exact 10 columns matching physical sample) */}
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "10.5px",
+          }}
+        >
+          <thead>
+            <tr
+              style={{
+                borderBottom: "1px solid #000000",
+                fontSize: "10px",
+                fontWeight: "bold",
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+              }}
+            >
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "5%" }}>
+                SrNo
+              </th>
+              <th
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 6px",
+                  width: "27%",
+                  textAlign: "left",
+                }}
+              >
+                Product Design No.
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "8%" }}>
+                HSN/SAC
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "9%" }}>
+                Size
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "11%" }}>
+                Color
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "7%" }}>
+                Set
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "11%" }}>
+                Qty
+              </th>
+              <th
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 4px",
+                  width: "8%",
+                  textAlign: "right",
+                }}
+              >
+                Rate
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "5%" }}>
+                GST %
+              </th>
+              <th style={{ padding: "4px 6px", width: "9%", textAlign: "right" }}>
+                Amount
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {order.items.map((it, idx) => {
+              // Parse color sets
+              let colorSummary = "";
+              let totalSets = it.totalSets || 0;
+              let colorArr: { color: string; sets: number }[] = [];
+              try {
+                if (Array.isArray(it.colorSets)) {
+                  colorArr = it.colorSets;
+                } else if (typeof it.colorSets === "string") {
+                  colorArr = JSON.parse(it.colorSets || "[]");
                 }
+              } catch {
+                colorArr = [];
+              }
 
-                if (colorArr.length > 0) {
-                  colorSummary = colorArr
-                    .filter((c) => c.sets > 0)
-                    .map((c) => `${c.color} (${c.sets}s)`)
-                    .join(", ");
-                  if (!totalSets) {
-                    totalSets = colorArr.reduce((acc, c) => acc + (Number(c.sets) || 0), 0);
-                  }
+              if (colorArr.length > 0) {
+                colorSummary = colorArr
+                  .filter((c) => c.sets > 0)
+                  .map((c) => `${c.color} (${c.sets}s)`)
+                  .join(", ");
+                if (!totalSets) {
+                  totalSets = colorArr.reduce((acc, c) => acc + (Number(c.sets) || 0), 0);
                 }
+              }
 
-                const totalPcs = it.totalPcs || totalSets * (it.pcsPerSet || 5);
-                const unitPrice = Number(it.unitPrice) || 0;
-                const itemAmount = Number(it.itemSubtotal) || totalPcs * unitPrice;
+              const totalPcs = it.totalPcs || totalSets * (it.pcsPerSet || 5);
+              const unitPrice = Number(it.unitPrice) || 0;
+              const itemAmount = Number(it.itemSubtotal) || totalPcs * unitPrice;
 
-                return (
-                  <tr key={idx} className="align-top">
-                    <td className="border-r border-black py-1.5 px-1 text-center font-mono">
-                      {idx + 1}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-2">
-                      <div className="font-bold text-black">{it.productName}</div>
-                      {it.sizeRatio && (
-                        <div className="text-[9.5px] text-neutral-600 font-mono">
-                          Ratio: {it.sizeRatio}
-                        </div>
-                      )}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-1 text-center font-mono text-[10px]">
-                      {it.hsnCode || "6203"}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-1.5 text-center font-mono">
-                      {it.sizeRatio || "30-38"}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-2 text-[10px] font-medium leading-tight">
-                      {colorSummary || "Standard Mix"}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-1.5 text-center font-bold font-mono">
-                      {totalSets ? totalSets.toFixed(2) : "1.00"}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-2 text-center font-bold font-mono">
-                      {totalPcs.toFixed(2)} PCS
-                    </td>
-                    <td className="border-r border-black py-1.5 px-2 text-right font-mono">
-                      {unitPrice.toFixed(2)}
-                    </td>
-                    <td className="border-r border-black py-1.5 px-1 text-center font-mono">5.00</td>
-                    <td className="py-1.5 px-2 text-right font-bold font-mono">
-                      {itemAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {/* Empty placeholder rows to maintain standard invoice height on print */}
-              {Array.from({ length: Math.max(0, 2 - order.items.length) }).map((_, emptyIdx) => (
-                <tr key={`empty-${emptyIdx}`} className="h-5">
-                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-1.5">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-1.5">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-2">&nbsp;</td>
-                  <td className="border-r border-black py-0.5 px-1">&nbsp;</td>
-                  <td className="py-0.5 px-2">&nbsp;</td>
+              return (
+                <tr key={idx} style={{ verticalAlign: "top" }}>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 2px",
+                      textAlign: "center",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {idx + 1}
+                  </td>
+                  <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
+                    <div style={{ fontWeight: "bold", color: "#000" }}>{it.productName}</div>
+                    {it.sizeRatio && (
+                      <div
+                        style={{
+                          fontSize: "9px",
+                          color: "#444",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        Ratio: {it.sizeRatio}
+                      </div>
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 2px",
+                      textAlign: "center",
+                      fontFamily: "monospace",
+                      fontSize: "10px",
+                    }}
+                  >
+                    {it.hsnCode || "6203"}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 2px",
+                      textAlign: "center",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {it.sizeRatio || "28-36"}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 4px",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      lineHeight: "1.2",
+                    }}
+                  >
+                    {colorSummary || "Standard Mix"}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 2px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {totalSets ? totalSets.toFixed(2) : "1.00"}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 4px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {totalPcs.toFixed(2)} PCS
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 4px",
+                      textAlign: "right",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {unitPrice.toFixed(2)}
+                  </td>
+                  <td
+                    style={{
+                      borderRight: "1px solid #000000",
+                      padding: "4px 2px",
+                      textAlign: "center",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    5.00
+                  </td>
+                  <td
+                    style={{
+                      padding: "4px 6px",
+                      textAlign: "right",
+                      fontWeight: "bold",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {itemAmount.toFixed(2)}
+                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
 
-        {/* 5. SUB TOTAL ROW */}
-        <div className="border-t border-b border-black grid grid-cols-12 font-bold py-1 px-2 bg-neutral-50/60 print:bg-transparent">
-          <div className="col-span-6 font-mono text-[10px]">
-            <span className="font-bold">GSTIN No.:</span> 24LAAPS9916E1ZD
-          </div>
-          <div className="col-span-2 text-center font-mono text-[10px]">
-            {order.totalPcs.toFixed(3)}
-          </div>
-          <div className="col-span-2 text-right uppercase text-[10px]">Sub Total</div>
-          <div className="col-span-2 text-right font-mono text-[10.5px]">
-            {subtotal.toFixed(2)}
-          </div>
-        </div>
+            {/* Empty filler rows with vertical grid borders to match physical tax invoice layout */}
+            {Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
+              <tr key={`empty-${emptyIdx}`} style={{ height: "24px" }}>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
+                <td>&nbsp;</td>
+              </tr>
+            ))}
+          </tbody>
 
-        {/* 6. BANK DETAILS (LEFT) & TAX BREAKDOWN (RIGHT) */}
-        <div className="border-b border-black grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-black">
-          {/* Left: Bank Details (Amount in words removed as requested) */}
-          <div className="md:col-span-7 p-2 space-y-1 text-[10px]">
-            <div className="grid grid-cols-3">
-              <span className="font-bold">Bank Name</span>
-              <span className="col-span-2 font-mono font-semibold">: ICICI BANK</span>
+          {/* 5. SUB TOTAL ROW (Aligned perfectly with table columns) */}
+          <tfoot>
+            <tr
+              style={{
+                borderTop: "1px solid #000000",
+                borderBottom: "1px solid #000000",
+                fontWeight: "bold",
+                backgroundColor: "#fafafa",
+                fontSize: "10px",
+              }}
+            >
+              <td
+                colSpan={6}
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 8px",
+                  fontFamily: "monospace",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>GSTIN No.:</span> 24LAAPS9916E1ZD
+              </td>
+              <td
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 4px",
+                  textAlign: "center",
+                  fontFamily: "monospace",
+                  fontWeight: "bold",
+                }}
+              >
+                {order.totalPcs.toFixed(3)}
+              </td>
+              <td
+                colSpan={2}
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 6px",
+                  textAlign: "right",
+                  textTransform: "uppercase",
+                  fontWeight: "bold",
+                }}
+              >
+                SUB TOTAL
+              </td>
+              <td
+                style={{
+                  padding: "4px 6px",
+                  textAlign: "right",
+                  fontFamily: "monospace",
+                  fontWeight: "bold",
+                  fontSize: "10.5px",
+                }}
+              >
+                {subtotal.toFixed(2)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* 6. BANK DETAILS (LEFT ~58%) & TAX BREAKDOWN (RIGHT ~42%) */}
+        <div
+          style={{
+            borderBottom: "1px solid #000000",
+            display: "flex",
+            fontSize: "10px",
+          }}
+        >
+          {/* Left Column: Bank Details (No amounts in words as requested) */}
+          <div
+            style={{
+              width: "58%",
+              borderRight: "1px solid #000000",
+              padding: "6px 10px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-around",
+              minHeight: "70px",
+            }}
+          >
+            <div style={{ display: "flex" }}>
+              <span style={{ fontWeight: "bold", width: "110px" }}>Bank Name</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "600" }}>: ICICI BANK</span>
             </div>
-            <div className="grid grid-cols-3">
-              <span className="font-bold">Bank A/c. No.</span>
-              <span className="col-span-2 font-mono font-bold">: 750705000692</span>
+            <div style={{ display: "flex" }}>
+              <span style={{ fontWeight: "bold", width: "110px" }}>Bank A/c. No.</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>: 750705000692</span>
             </div>
-            <div className="grid grid-cols-3">
-              <span className="font-bold">RTGS/IFSC Code</span>
-              <span className="col-span-2 font-mono font-bold">: ICIC0007507</span>
+            <div style={{ display: "flex" }}>
+              <span style={{ fontWeight: "bold", width: "110px" }}>RTGS/IFSC Code</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>: ICIC0007507</span>
             </div>
           </div>
 
-          {/* Right: Tax Breakdown */}
-          <div className="md:col-span-5 p-2 space-y-0.5 text-[10px]">
-            <div className="flex justify-between">
-              <span className="font-bold">Taxable Amount</span>
-              <span className="font-mono font-bold">{subtotal.toFixed(2)}</span>
+          {/* Right Column: Tax Breakdown */}
+          <div
+            style={{
+              width: "42%",
+              display: "flex",
+              flexDirection: "column",
+              fontSize: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "3px 10px",
+              }}
+            >
+              <span>Taxable Amount</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
+                {subtotal.toFixed(2)}
+              </span>
             </div>
-            <div className="flex justify-between text-neutral-800">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "2px 10px",
+                color: "#222",
+              }}
+            >
               <span>Central Tax 2.50%</span>
-              <span className="font-mono">{cgst.toFixed(2)}</span>
+              <span style={{ fontFamily: "monospace" }}>{cgst.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-neutral-800">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "2px 10px",
+                color: "#222",
+              }}
+            >
               <span>State/UT Tax 2.50%</span>
-              <span className="font-mono">{sgst.toFixed(2)}</span>
+              <span style={{ fontFamily: "monospace" }}>{sgst.toFixed(2)}</span>
             </div>
-            <div className="pt-1 border-t border-black flex justify-between font-black text-xs">
-              <span className="uppercase tracking-wider">Grand Total</span>
-              <span className="font-mono text-sm">{formatCurrency(grandTotal)}</span>
+            <div
+              style={{
+                borderTop: "1px solid #000000",
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "4px 10px",
+                fontWeight: "900",
+                fontSize: "11.5px",
+              }}
+            >
+              <span style={{ textTransform: "uppercase", letterSpacing: "1px" }}>
+                Grand Total
+              </span>
+              <span style={{ fontFamily: "monospace", fontSize: "13px" }}>
+                {formatCurrency(grandTotal)}
+              </span>
             </div>
           </div>
         </div>
 
         {/* 7. NOTE: PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN X DAYS */}
-        <div className="border-b border-black py-1 px-3 text-[10px] font-bold">
-          <span className="uppercase">Note : </span>
-          <span className="uppercase tracking-wide">
-            PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN {creditDays > 0 ? `${creditDays} DAYS` : "_____ DAYS"}.
+        <div
+          style={{
+            borderBottom: "1px solid #000000",
+            padding: "4px 10px",
+            fontSize: "10px",
+            fontWeight: "bold",
+          }}
+        >
+          <span style={{ textTransform: "uppercase" }}>Note : </span>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.4px" }}>
+            PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN{" "}
+            {creditDays > 0 ? `${creditDays} DAYS` : "_____ DAYS"}.
           </span>
         </div>
 
-        {/* 8. TERMS & CONDITIONS (LEFT) & SIGNATURE (RIGHT) */}
-        <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-black min-h-[105px]">
+        {/* 8. TERMS & CONDITIONS (LEFT ~65%) & SIGNATURE (RIGHT ~35%) */}
+        <div
+          style={{
+            display: "flex",
+            minHeight: "95px",
+          }}
+        >
           {/* Terms & Conditions */}
-          <div className="md:col-span-7 p-2 text-[9.5px] leading-tight space-y-0.5">
-            <div className="font-bold underline uppercase text-[10px] mb-1">
+          <div
+            style={{
+              width: "65%",
+              borderRight: "1px solid #000000",
+              padding: "5px 10px",
+              fontSize: "9px",
+              lineHeight: "1.35",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                textDecoration: "underline",
+                textTransform: "uppercase",
+                fontSize: "9.5px",
+                marginBottom: "2px",
+              }}
+            >
               Terms &amp; Condition :
             </div>
             <div>1. Goods once sold will not be taken back.</div>
             <div>2. Interest @18% p.a. will be charged if payment is not made within due date.</div>
             <div>3. Our risk and responsibility ceases as soon as the goods leave our premises.</div>
             <div>4. &ldquo;Subject to &apos;AHMEDABAD&apos; Jurisdiction only. E.&amp;.O.E&rdquo;</div>
-            <div className="font-semibold underline">
+            <div style={{ fontWeight: "700", textDecoration: "underline" }}>
               5. Any damages or problem in any products should be informed within 7 days of purchase.
             </div>
           </div>
 
           {/* Signature Area */}
-          <div className="md:col-span-5 p-2 flex flex-col justify-between text-right">
-            <div className="font-bold text-[11px] uppercase tracking-wider">
+          <div
+            style={{
+              width: "35%",
+              padding: "5px 10px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              textAlign: "right",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
               For, KRISH CLOTHING CO.
             </div>
-            <div className="py-1 flex justify-end">
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "1px 0" }}>
               <img
                 src="/images/krish-clothing-signature.png"
-                alt="Krish Signature"
-                className="h-12 object-contain"
+                alt="Authorised Signatory"
+                style={{ height: "45px", objectFit: "contain" }}
                 onError={(e) => {
-                  // Fallback if image not rendered
                   (e.target as HTMLElement).style.display = "none";
                 }}
               />
             </div>
-            <div className="text-[10px] font-bold text-neutral-800">
+            <div style={{ fontSize: "10px", fontWeight: "bold", color: "#111" }}>
               (Authorised Signatory)
             </div>
           </div>

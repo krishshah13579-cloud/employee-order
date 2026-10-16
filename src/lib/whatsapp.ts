@@ -58,7 +58,7 @@ export function generateOrderWhatsAppMessage(
   }
 
   return (
-    `🧵 *KRISH CLOTHING CO.* — Tax Invoice & Order Confirmation\n\n` +
+    `🧵 *KRISH CLOTHING CO.* — Order Placed Successfully\n\n` +
     `Dear *${order.customerName}*,\n` +
     `Thank you for your wholesale order with Krish Clothing Co.! Your order has been registered and is being processed.\n\n` +
     `📋 *Order & Invoice Summary:*\n` +

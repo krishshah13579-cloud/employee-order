@@ -73,8 +73,10 @@ export default function StoreLayoutShell({
   // 5. Authenticated employee side: Navbar at top, Welcome Breadcrumb with motivation message, main body
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900">
-      <Navbar />
-      <EmployeeWelcomeBreadcrumb />
+      <div className="print:hidden">
+        <Navbar />
+        <EmployeeWelcomeBreadcrumb />
+      </div>
       <main className="flex-1">{children}</main>
     </div>
   );
