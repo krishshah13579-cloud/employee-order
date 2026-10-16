@@ -463,9 +463,6 @@ export default function OrderEditPage() {
                   ({activeItems.length} {activeItems.length === 1 ? "product" : "products"})
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Itemized wholesale product breakdown, color sets, and pieces in this order.
-              </p>
             </div>
           </div>
 
