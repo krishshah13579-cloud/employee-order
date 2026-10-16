@@ -19,9 +19,7 @@ import {
   Truck,
   Eye,
   MapPin,
-  MessageCircle,
 } from "lucide-react";
-import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ORDER_STATUSES, STATUS_COLORS, type OrderStatus } from "@/lib/types";
@@ -85,39 +83,22 @@ export default function EmployeeOrdersListPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
-      <UserHeader />
-
-      {/* Top Banner */}
-      <div className="bg-slate-900 text-white border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-              <Link href="/" className="hover:text-white transition">
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-orange-400 font-bold">Orders Collection</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Customer Orders
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={fetchOrders}
-              disabled={loading}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition"
-              title="Refresh orders list"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {/* Page Title */}
+        <div className="flex items-center justify-between pb-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Customer Order
+          </h1>
+          <button
+            type="button"
+            onClick={fetchOrders}
+            disabled={loading}
+            className="p-2.5 bg-white hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-200 transition shadow-xs cursor-pointer"
+            title="Refresh orders list"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
         {/* Error notification */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center justify-between">
@@ -303,46 +284,20 @@ export default function EmployeeOrdersListPage() {
                           {formatDate(order.orderDate)}
                         </td>
 
-                        {/* Action: View Order & WhatsApp */}
+                        {/* Action: View Order */}
                         <td className="py-4 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 router.push(`/orders/${order.id}`);
                               }}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-3 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95"
-                              title="View customer product details"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-3.5 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                              title="View order details"
                             >
                               <Eye size={13} />
                               <span>View</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  const res = await fetch(`/api/orders/${order.id}/whatsapp`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
-                                  });
-                                  const data = await res.json();
-                                  if (data.automated) {
-                                    toast("Order confirmation sent to customer's WhatsApp!", "success");
-                                  } else if (data.whatsappUrl) {
-                                    window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
-                                  }
-                                } catch {
-                                  toast("Could not send WhatsApp message", "error");
-                                }
-                              }}
-                              className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition"
-                              title="Send invoice & updates on WhatsApp"
-                            >
-                              <MessageCircle size={14} />
                             </button>
                           </div>
                         </td>

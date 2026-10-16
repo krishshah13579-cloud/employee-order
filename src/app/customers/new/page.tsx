@@ -123,11 +123,11 @@ function CustomerRegistrationContent() {
       const filled: Record<string, boolean> = {};
 
       if (extracted.shopName) {
-        setShopName(extracted.shopName);
+        setShopName(extracted.shopName.toUpperCase());
         filled.shopName = true;
       }
       if (extracted.gstPanNo) {
-        setGstPanNo(extracted.gstPanNo);
+        setGstPanNo(extracted.gstPanNo.toUpperCase());
         filled.gstPanNo = true;
       }
       if (extracted.phoneNumber) {
@@ -135,15 +135,15 @@ function CustomerRegistrationContent() {
         filled.phoneNumber = true;
       }
       if (extracted.contactPerson) {
-        setContactPerson(extracted.contactPerson);
+        setContactPerson(extracted.contactPerson.toUpperCase());
         filled.contactPerson = true;
       }
       if (extracted.address) {
-        setAddress(extracted.address);
+        setAddress(extracted.address.toUpperCase());
         filled.address = true;
       }
       if (extracted.city) {
-        setCity(extracted.city);
+        setCity(extracted.city.toUpperCase());
         filled.city = true;
       }
       if (extracted.state) {
@@ -151,7 +151,7 @@ function CustomerRegistrationContent() {
         filled.state = true;
       }
       if (extracted.transportName) {
-        setTransportName(extracted.transportName);
+        setTransportName(extracted.transportName.toUpperCase());
         filled.transportName = true;
       }
 
@@ -197,11 +197,11 @@ function CustomerRegistrationContent() {
       const filled: Record<string, boolean> = {};
 
       if (extracted.shopName) {
-        setShopName(extracted.shopName);
+        setShopName(extracted.shopName.toUpperCase());
         filled.shopName = true;
       }
       if (extracted.gstPanNo) {
-        setGstPanNo(extracted.gstPanNo);
+        setGstPanNo(extracted.gstPanNo.toUpperCase());
         filled.gstPanNo = true;
       }
       if (extracted.phoneNumber) {
@@ -209,15 +209,15 @@ function CustomerRegistrationContent() {
         filled.phoneNumber = true;
       }
       if (extracted.contactPerson) {
-        setContactPerson(extracted.contactPerson);
+        setContactPerson(extracted.contactPerson.toUpperCase());
         filled.contactPerson = true;
       }
       if (extracted.address) {
-        setAddress(extracted.address);
+        setAddress(extracted.address.toUpperCase());
         filled.address = true;
       }
       if (extracted.city) {
-        setCity(extracted.city);
+        setCity(extracted.city.toUpperCase());
         filled.city = true;
       }
       if (extracted.state) {
@@ -225,7 +225,7 @@ function CustomerRegistrationContent() {
         filled.state = true;
       }
       if (extracted.transportName) {
-        setTransportName(extracted.transportName);
+        setTransportName(extracted.transportName.toUpperCase());
         filled.transportName = true;
       }
 
@@ -258,28 +258,46 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please select Type of Business (Retailer or Wholesaler)", "error");
       return;
     }
+    if (!address.trim()) {
+      toast("Mandatory: Please enter Shop / Delivery Address", "error");
+      return;
+    }
+    if (!city.trim()) {
+      toast("Mandatory: Please enter City", "error");
+      return;
+    }
+    if (!state.trim()) {
+      toast("Mandatory: Please select State", "error");
+      return;
+    }
 
     setSavingCustomer(true);
 
     try {
       const allContacts = [
         ...(contactPerson.trim()
-          ? [{ name: contactPerson.trim(), phone: phoneNumber.trim(), designation: "Primary Contact" }]
+          ? [{ name: contactPerson.trim().toUpperCase(), phone: phoneNumber.trim(), designation: "PRIMARY CONTACT" }]
           : []),
-        ...additionalContacts.filter((c) => c.name.trim()),
+        ...additionalContacts
+          .filter((c) => c.name.trim())
+          .map((c) => ({
+            name: c.name.trim().toUpperCase(),
+            phone: c.phone.trim(),
+            designation: c.designation.trim().toUpperCase() || "STAFF",
+          })),
       ];
 
       const payload = {
-        shopName: shopName.trim(),
+        shopName: shopName.trim().toUpperCase(),
         gstPanNo: gstPanNo.trim().toUpperCase(),
         businessType: businessType,
         creditDays: Number(creditDays) || 0,
         phoneNumber: phoneNumber.trim(),
-        contactPerson: contactPerson.trim() || undefined,
+        contactPerson: contactPerson.trim().toUpperCase() || undefined,
         contactPersons: allContacts.length > 0 ? allContacts : undefined,
-        address: address.trim() || "Direct Delivery",
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
+        address: (address.trim() || "DIRECT DELIVERY").toUpperCase(),
+        city: (city.trim() || "").toUpperCase() || undefined,
+        state: (state.trim() || "").toUpperCase() || undefined,
         visitingCardUrl: visitingCardUrl.trim() || undefined,
       };
 
@@ -520,9 +538,9 @@ function CustomerRegistrationContent() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setShopName(line);
+                                      setShopName(line.toUpperCase());
                                       setAutoFilledFields((prev) => ({ ...prev, shopName: true }));
-                                      toast(`Set "${line}" as Firm Name`, "success");
+                                      toast(`Set "${line.toUpperCase()}" as Firm Name`, "success");
                                     }}
                                     className="px-2 py-0.5 bg-white border border-slate-300 hover:border-orange-500 hover:text-orange-600 rounded text-[10px] font-bold cursor-pointer transition"
                                   >
@@ -531,9 +549,9 @@ function CustomerRegistrationContent() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setContactPerson(line);
+                                      setContactPerson(line.toUpperCase());
                                       setAutoFilledFields((prev) => ({ ...prev, contactPerson: true }));
-                                      toast(`Set "${line}" as Contact Person`, "success");
+                                      toast(`Set "${line.toUpperCase()}" as Contact Person`, "success");
                                     }}
                                     className="px-2 py-0.5 bg-white border border-slate-300 hover:border-orange-500 hover:text-orange-600 rounded text-[10px] font-bold cursor-pointer transition"
                                   >
@@ -542,7 +560,7 @@ function CustomerRegistrationContent() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setAddress((prev) => (prev ? `${prev}, ${line}` : line));
+                                      setAddress((prev) => (prev ? `${prev}, ${line.toUpperCase()}` : line.toUpperCase()));
                                       setAutoFilledFields((prev) => ({ ...prev, address: true }));
                                       toast(`Added to Address`, "success");
                                     }}
@@ -683,9 +701,9 @@ function CustomerRegistrationContent() {
                     type="text"
                     required
                     value={shopName}
-                    onChange={(e) => setShopName(e.target.value)}
+                    onChange={(e) => setShopName(e.target.value.toUpperCase())}
                     placeholder="e.g. SHREE RAM CLOTH STORE / V-MART"
-                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition shadow-xs"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition shadow-xs uppercase placeholder:normal-case"
                   />
                 </div>
 
@@ -710,7 +728,7 @@ function CustomerRegistrationContent() {
                       value={gstPanNo}
                       onChange={(e) => setGstPanNo(e.target.value.toUpperCase())}
                       placeholder="e.g. 24ABCDE1234F1Z5 or PAN"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs placeholder:normal-case"
                     />
                   </div>
 
@@ -768,9 +786,9 @@ function CustomerRegistrationContent() {
                     <input
                       type="text"
                       value={contactPerson}
-                      onChange={(e) => setContactPerson(e.target.value)}
+                      onChange={(e) => setContactPerson(e.target.value.toUpperCase())}
                       placeholder="e.g. Rajesh Kumar (Proprietor)"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs uppercase placeholder:normal-case"
                     />
                   </div>
 
@@ -804,7 +822,7 @@ function CustomerRegistrationContent() {
                               type="text"
                               value={contact.name}
                               onChange={(e) => {
-                                const val = e.target.value;
+                                const val = e.target.value.toUpperCase();
                                 setAdditionalContacts((prev) => {
                                   const copy = [...prev];
                                   copy[idx] = { ...copy[idx], name: val };
@@ -812,7 +830,7 @@ function CustomerRegistrationContent() {
                                 });
                               }}
                               placeholder="Full Name *"
-                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 uppercase placeholder:normal-case"
                             />
                             <input
                               type="tel"
@@ -832,7 +850,7 @@ function CustomerRegistrationContent() {
                               type="text"
                               value={contact.designation}
                               onChange={(e) => {
-                                const val = e.target.value;
+                                const val = e.target.value.toUpperCase();
                                 setAdditionalContacts((prev) => {
                                   const copy = [...prev];
                                   copy[idx] = { ...copy[idx], designation: val };
@@ -840,7 +858,7 @@ function CustomerRegistrationContent() {
                                 });
                               }}
                               placeholder="Designation (e.g. Manager)"
-                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 uppercase placeholder:normal-case"
                             />
                           </div>
                         </div>
@@ -867,9 +885,9 @@ function CustomerRegistrationContent() {
                     rows={2}
                     required
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => setAddress(e.target.value.toUpperCase())}
                     placeholder="e.g. Shop No. 42, New Textile Market, Ring Road"
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs uppercase placeholder:normal-case"
                   />
                 </div>
 
@@ -890,9 +908,9 @@ function CustomerRegistrationContent() {
                       type="text"
                       required
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      onChange={(e) => setCity(e.target.value.toUpperCase())}
                       placeholder="e.g. Surat / Mumbai"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs uppercase placeholder:normal-case"
                     />
                   </div>
 
@@ -910,11 +928,11 @@ function CustomerRegistrationContent() {
                     <select
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs uppercase"
                     >
                       {INDIAN_STATES.map((st) => (
                         <option key={st} value={st}>
-                          {st}
+                          {st.toUpperCase()}
                         </option>
                       ))}
                     </select>
@@ -937,9 +955,9 @@ function CustomerRegistrationContent() {
                   <input
                     type="text"
                     value={transportName}
-                    onChange={(e) => setTransportName(e.target.value)}
+                    onChange={(e) => setTransportName(e.target.value.toUpperCase())}
                     placeholder="e.g. V-Trans, Navata Road Transport, Shree Ram Transport"
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-xs uppercase placeholder:normal-case"
                   />
                 </div>
 

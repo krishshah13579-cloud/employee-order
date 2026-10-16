@@ -336,8 +336,21 @@ function ProductDetailContent() {
   const handleAddToOrderForm = () => {
     if (!product) return;
 
+    const storedCustomerId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("garmentpro_selected_customer_id")
+        : null;
+    if (!draftCustomer && !storedCustomerId) {
+      toast(
+        "Mandatory: Customer selection is required before adding products to the order form. Please select a customer.",
+        "error"
+      );
+      router.push("/orders/new");
+      return;
+    }
+
     if (totalSets === 0 || selectedEntries.length === 0) {
-      toast("Please select at least 1 set of any color", "error");
+      toast("Mandatory: Please select at least 1 set of any color before adding to order form", "error");
       return;
     }
 

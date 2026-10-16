@@ -273,8 +273,26 @@ export default function OrderFormPage() {
     );
   }, [customers, customerSearchQuery]);
 
-  // Handle customer selection
+  // Handle customer unselection / clear
+  const handleUnselectCustomer = () => {
+    setSelectedCustomerId(null);
+    setOrderCreditDays(0);
+    setIsCreditLocked(false);
+    try {
+      localStorage.removeItem("garmentpro_selected_customer_id");
+    } catch {}
+    saveDraft(items, null, orderNotes, placedBy, 0);
+    toast("Customer unselected. Customer selection is mandatory to add products.", "info");
+  };
+
+  // Handle customer selection (allows select & unselect)
   const handleSelectCustomer = (c: CustomerData) => {
+    if (selectedCustomerId === c.id) {
+      handleUnselectCustomer();
+      setCustomerDropdownOpen(false);
+      return;
+    }
+
     setSelectedCustomerId(c.id);
     setCustomerDropdownOpen(false);
     setCustomerSearchQuery("");
@@ -308,7 +326,7 @@ export default function OrderFormPage() {
 
     setItems(updatedItems);
     saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit);
-    toast(`Customer selected: ${c.shopName} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
+    toast(`Customer selected: ${c.shopName.toUpperCase()} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
   };
 
   // Handle Remove Item
@@ -344,26 +362,27 @@ export default function OrderFormPage() {
   const handleSubmitOrder = () => {
     // 1. Mandatory Customer Selection Check
     if (!selectedCustomerId || !selectedCustomer) {
-      toast("Mandatory: Please select a Customer / Shop Name with GST/PAN No.", "error");
+      toast("Mandatory: Customer selection is required. Please select a Customer / Shop Name from the dropdown.", "error");
+      setCustomerDropdownOpen(true);
       return;
     }
 
     // 2. Mandatory Items Check
     if (items.length === 0) {
-      toast("Please add at least 1 product item to the order form", "error");
+      toast("Mandatory: Please add at least 1 product item to the order form before booking.", "error");
       return;
     }
 
     // 3. Mandatory Placed By Check
     const finalPlacedBy = (employee?.name || placedBy).trim();
     if (!finalPlacedBy) {
-      toast("Mandatory: Please log in as an employee to place orders", "error");
+      toast("Mandatory: Employee Name is required. Please log in as an employee to place orders.", "error");
       return;
     }
 
     // Auto-fill transport station with customer city if available
     if (!transportStation && selectedCustomer.city) {
-      setTransportStation(selectedCustomer.city);
+      setTransportStation(selectedCustomer.city.toUpperCase());
     }
 
     // Open Transport Popup
@@ -597,43 +616,24 @@ export default function OrderFormPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
-      <UserHeader />
-
-      {/* Page Header */}
-      <div className="bg-slate-900 text-white border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-              <Link href="/" className="hover:text-white transition">
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-orange-400">Order Form</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Wholesale Order Form
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-              Select customer, add products with multiple colors, and review wholesale calculations.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearDraft}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <RotateCcw size={14} />
-                <span>Clear Form</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {/* Page Title: Only keep H1 tag for Order Form */}
+        <div className="flex items-center justify-between pb-1">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Order Form
+          </h1>
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <RotateCcw size={14} />
+              <span>Clear Form</span>
+            </button>
+          )}
+        </div>
+
         {/* ═══════════════════════════════════════════
             1. CUSTOMER SELECTION (MANDATORY)
             ═══════════════════════════════════════════ */}
@@ -646,19 +646,33 @@ export default function OrderFormPage() {
               </h2>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  saveDraft(items, selectedCustomerId, orderNotes, placedBy);
-                }
-                router.push("/customers/new?returnTo=/orders/new");
-              }}
-              className="self-start sm:self-auto text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-xl border border-orange-200 transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:border-orange-300"
-            >
-              <Plus size={14} />
-              <span>Add New Customer</span>
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {selectedCustomer && (
+                <button
+                  type="button"
+                  onClick={handleUnselectCustomer}
+                  className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Unselect customer"
+                >
+                  <X size={13} />
+                  <span>Unselect Customer</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    saveDraft(items, selectedCustomerId, orderNotes, placedBy);
+                  }
+                  router.push("/customers/new?returnTo=/orders/new");
+                }}
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-xl border border-orange-200 transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:border-orange-300"
+              >
+                <Plus size={14} />
+                <span>Add New Customer</span>
+              </button>
+            </div>
           </div>
 
           {/* Searchable Customer Dropdown */}
@@ -672,27 +686,42 @@ export default function OrderFormPage() {
               }`}
             >
               {selectedCustomer ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center font-black text-sm shrink-0">
-                    {selectedCustomer.shopName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-black text-slate-900 text-sm">
-                      {selectedCustomer.shopName}
+                <div className="flex items-center justify-between w-full pr-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                      {selectedCustomer.shopName.charAt(0).toUpperCase()}
                     </div>
-                    <div className="text-xs text-slate-600 flex items-center gap-3">
-                      <span>
-                        GST/PAN: <strong className="font-mono text-slate-900">{selectedCustomer.gstPanNo}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>Ph: {selectedCustomer.phoneNumber}</span>
+                    <div>
+                      <div className="font-black text-slate-900 text-sm uppercase">
+                        {selectedCustomer.shopName.toUpperCase()}
+                      </div>
+                      <div className="text-xs text-slate-600 flex items-center gap-3 uppercase">
+                        <span>
+                          GST/PAN: <strong className="font-mono text-slate-900">{selectedCustomer.gstPanNo.toUpperCase()}</strong>
+                        </span>
+                        <span>•</span>
+                        <span>Ph: {selectedCustomer.phoneNumber}</span>
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUnselectCustomer();
+                    }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    title="Unselect customer"
+                  >
+                    <X size={15} />
+                    <span className="hidden sm:inline">Unselect</span>
+                  </button>
                 </div>
               ) : (
                 <div className="text-xs font-semibold text-slate-500 flex items-center gap-2">
                   <Search size={16} className="text-slate-400" />
-                  <span>Select existing customer or search by shop name, GST/PAN, phone...</span>
+                  <span>Select customer from dropdown (Mandatory to add products)...</span>
                 </div>
               )}
 
@@ -719,12 +748,25 @@ export default function OrderFormPage() {
                     placeholder="Search customer by shop name or GST/PAN..."
                     value={customerSearchQuery}
                     onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white uppercase placeholder:normal-case"
                   />
                 </div>
 
                 {/* Customers list */}
                 <div className="divide-y divide-slate-100 max-h-52 overflow-y-auto">
+                  {selectedCustomer && (
+                    <div
+                      onClick={() => {
+                        handleUnselectCustomer();
+                        setCustomerDropdownOpen(false);
+                      }}
+                      className="p-2.5 rounded-xl cursor-pointer hover:bg-red-50 text-red-600 text-xs font-bold flex items-center gap-2 border-b border-red-100 transition"
+                    >
+                      <X size={14} />
+                      <span>✕ Unselect / Clear Customer Selection</span>
+                    </div>
+                  )}
+
                   {loadingCustomers ? (
                     <div className="p-4 text-center text-xs text-slate-500">
                       Loading customers...
@@ -743,16 +785,16 @@ export default function OrderFormPage() {
                         }`}
                       >
                         <div>
-                          <div className="text-xs font-bold text-slate-900">
-                            {cust.shopName}
+                          <div className="text-xs font-bold text-slate-900 uppercase">
+                            {cust.shopName.toUpperCase()}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            GST/PAN: {cust.gstPanNo} • Ph: {cust.phoneNumber}
+                          <div className="text-[11px] text-slate-500 font-mono uppercase">
+                            GST/PAN: {cust.gstPanNo.toUpperCase()} • Ph: {cust.phoneNumber}
                           </div>
                         </div>
 
                         {selectedCustomerId === cust.id && (
-                          <span className="text-xs font-bold text-orange-600">✓ Selected</span>
+                          <span className="text-xs font-bold text-orange-600">✓ Selected (Click to unselect)</span>
                         )}
                       </div>
                     ))
@@ -771,8 +813,8 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                       FIRM NAME
                     </span>
-                    <span className="font-black text-slate-900 text-sm">
-                      {selectedCustomer.shopName}
+                    <span className="font-black text-slate-900 text-sm uppercase">
+                      {selectedCustomer.shopName.toUpperCase()}
                     </span>
                   </div>
 
@@ -780,8 +822,8 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                       GST NO. / PAN NO.
                     </span>
-                    <span className="font-mono font-black text-orange-600 text-sm">
-                      {selectedCustomer.gstPanNo}
+                    <span className="font-mono font-black text-orange-600 text-sm uppercase">
+                      {selectedCustomer.gstPanNo.toUpperCase()}
                     </span>
                   </div>
 
@@ -798,8 +840,8 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                       Contact PERSON NAME
                     </span>
-                    <span className="font-semibold text-slate-800 text-xs">
-                      {selectedCustomer.contactPerson || "—"}
+                    <span className="font-semibold text-slate-800 text-xs uppercase">
+                      {(selectedCustomer.contactPerson || "—").toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -833,8 +875,8 @@ export default function OrderFormPage() {
                   <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                     Shop Address
                   </span>
-                  <span className="font-medium text-slate-800">
-                    {selectedCustomer.address || "Address on File"}
+                  <span className="font-medium text-slate-800 uppercase">
+                    {(selectedCustomer.address || "Address on File").toUpperCase()}
                   </span>
                 </div>
 
@@ -843,16 +885,16 @@ export default function OrderFormPage() {
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                       CITY
                     </span>
-                    <span className="font-bold text-slate-900">
-                      {selectedCustomer.city || "—"}
+                    <span className="font-bold text-slate-900 uppercase">
+                      {(selectedCustomer.city || "—").toUpperCase()}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                       STATE
                     </span>
-                    <span className="font-bold text-slate-900">
-                      {selectedCustomer.state || "—"}
+                    <span className="font-bold text-slate-900 uppercase">
+                      {(selectedCustomer.state || "—").toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -911,20 +953,21 @@ export default function OrderFormPage() {
               </p>
             </div>
 
-            {selectedCustomer ? (
-              <Link
-                href="/products?returnTo=/orders/new"
-                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-              >
-                <Plus size={16} />
-                <span>Add Product to Form</span>
-              </Link>
-            ) : (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold self-start sm:self-auto">
-                <AlertCircle size={14} className="text-amber-600 shrink-0" />
-                <span>Select customer above to add products</span>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedCustomer) {
+                  toast("Customer selection is mandatory! Please select a customer from dropdown first before adding products.", "error");
+                  setCustomerDropdownOpen(true);
+                  return;
+                }
+                router.push("/products?returnTo=/orders/new");
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+            >
+              <Plus size={16} />
+              <span>Add Product to Form</span>
+            </button>
           </div>
 
           {/* Table */}
@@ -955,17 +998,23 @@ export default function OrderFormPage() {
                         <p className="text-xs text-slate-500 mt-1 max-w-xs">
                           {selectedCustomer
                             ? "Click Add Product to Form to browse products, pick multiple colors and sets at once."
-                            : "Please select a customer above first to start adding products."}
+                            : "Customer selection is mandatory. Please select a customer above first to start adding products."}
                         </p>
-                        {selectedCustomer && (
-                          <Link
-                            href="/products?returnTo=/orders/new"
-                            className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5"
-                          >
-                            <Plus size={14} />
-                            <span>Add Product Now</span>
-                          </Link>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedCustomer) {
+                              toast("Customer selection is mandatory! Please select a customer from dropdown first before adding products.", "error");
+                              setCustomerDropdownOpen(true);
+                              return;
+                            }
+                            router.push("/products?returnTo=/orders/new");
+                          }}
+                          className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus size={14} />
+                          <span>Add Product to Form</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1244,9 +1293,9 @@ export default function OrderFormPage() {
                 type="text"
                 autoFocus
                 value={transportName}
-                onChange={(e) => setTransportName(e.target.value)}
+                onChange={(e) => setTransportName(e.target.value.toUpperCase())}
                 placeholder="Enter transport name (e.g. VRL Logistics, TCI, Navkar Roadways...)"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white uppercase placeholder:normal-case"
               />
             </div>
 
@@ -1257,17 +1306,17 @@ export default function OrderFormPage() {
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  "VRL Logistics",
-                  "TCI Express",
-                  "Navkar Roadways",
-                  "Shree Maruti Courier",
-                  "Ghatge Patil",
-                  "Self Delivery / Hand Delivery",
+                  "VRL LOGISTICS",
+                  "TCI EXPRESS",
+                  "NAVKAR ROADWAYS",
+                  "SHREE MARUTI COURIER",
+                  "GHATGE PATIL",
+                  "SELF DELIVERY / HAND DELIVERY",
                 ].map((chip) => (
                   <button
                     key={chip}
                     type="button"
-                    onClick={() => setTransportName(chip)}
+                    onClick={() => setTransportName(chip.toUpperCase())}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${
                       transportName === chip
                         ? "bg-orange-600 text-white border-orange-600 shadow-xs"
@@ -1288,9 +1337,9 @@ export default function OrderFormPage() {
               <input
                 type="text"
                 value={transportStation}
-                onChange={(e) => setTransportStation(e.target.value)}
+                onChange={(e) => setTransportStation(e.target.value.toUpperCase())}
                 placeholder="e.g. Ahmedabad, Mumbai, Surat, Rajkot, Indore..."
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white uppercase placeholder:normal-case"
               />
             </div>
           </div>

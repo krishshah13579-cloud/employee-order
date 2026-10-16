@@ -297,10 +297,10 @@ export default function OrderEditPage() {
               disabled={sendingWhatsApp}
               onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
               className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-900/30 cursor-pointer"
-              title="Send Tax Invoice PDF link & order confirmation to customer on WhatsApp"
+              title="Send Order Form & Tax Invoice to customer on WhatsApp"
             >
               <MessageCircle size={15} />
-              <span>{sendingWhatsApp ? "Sending..." : "Send on WhatsApp"}</span>
+              <span>{sendingWhatsApp ? "Sending..." : "Send Order Form"}</span>
             </button>
 
             {/* Weekly Payment Reminder Button */}
