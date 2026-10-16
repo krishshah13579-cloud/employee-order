@@ -364,9 +364,6 @@ function CustomerRegistrationContent() {
               <h1 className="text-xl sm:text-2xl font-black tracking-tight">
                 Register New Wholesale Customer
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Take a photo or upload the client’s visiting card. All details (Firm Name, GST/PAN, Phone, Address, City) are automatically detected and populated without manual error.
-              </p>
             </div>
             <div className="hidden lg:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 border border-white/15 text-orange-400 shrink-0">
               <Users size={32} />
