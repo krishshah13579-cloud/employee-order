@@ -45,7 +45,7 @@ interface TaxInvoiceA4Props {
   copyTitle?: string; // e.g. "Duplicate" or "Original for Recipient"
 }
 
-export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvoiceA4Props) {
+export default function TaxInvoiceA4({ order, copyTitle = "Original" }: TaxInvoiceA4Props) {
   // Parse order date formatted as DD/MM/YYYY
   const dateObj = order.orderDate ? new Date(order.orderDate) : new Date();
   const formattedDate = !isNaN(dateObj.getTime())
@@ -194,7 +194,7 @@ export default function TaxInvoiceA4({ order, copyTitle = "Duplicate" }: TaxInvo
               textTransform: "uppercase",
             }}
           >
-            {isDispatched ? "TAX INVOICE" : "ORDER FORM / TAX INVOICE"}
+            {isDispatched ? "TAX INVOICE" : "ORDER FORM"}
           </div>
           <div style={{ width: "25%", textAlign: "right" }}>{copyTitle}</div>
         </div>

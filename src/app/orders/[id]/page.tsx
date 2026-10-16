@@ -96,8 +96,8 @@ export default function OrderEditPage() {
       if (data.automated) {
         toast(
           type === "PAYMENT_REMINDER"
-            ? "✅ Payment reminder sent directly to customer's WhatsApp!"
-            : "✅ Tax Invoice & order updates sent directly to customer's WhatsApp!",
+            ? "Payment reminder sent directly to customer's WhatsApp!"
+            : "Tax Invoice & order updates sent directly to customer's WhatsApp!",
           "success"
         );
       } else if (data.whatsappUrl) {
