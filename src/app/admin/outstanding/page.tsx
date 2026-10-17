@@ -242,6 +242,8 @@ export default function AdminOutstandingPage() {
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp reminder", "error");
     } finally {
+      setSendingWhatsAppFor(null);
+    }
   };
 
   // Send Weekly Reminders to ALL customers with outstanding balance
