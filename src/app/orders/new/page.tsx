@@ -658,9 +658,9 @@ export default function OrderFormPage() {
                       throw new Error(data.error || "Failed to dispatch WhatsApp");
                     }
                     if (data.automated) {
-                      toast("✅ Sent directly to customer's WhatsApp via Meta Cloud API!", "success");
-                    } else if (data.whatsappUrl) {
-                      window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                      toast("✅ Sent directly to customer's WhatsApp!", "success");
+                    } else if (data.whatsappUrl || data.nativeUrl) {
+                      openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
                       toast("Opening WhatsApp with order details & invoice link!", "success");
                     }
                   } catch (err: any) {
