@@ -231,8 +231,12 @@ export default function AdminOutstandingPage() {
       if (data.automated) {
         toast("✅ Weekly payment reminder sent directly to customer WhatsApp!", "success");
       } else if (data.whatsappUrl || data.nativeUrl) {
-        toast("Opening WhatsApp with total outstanding reminder...", "success");
-        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
+        await shareOrOpenWhatsAppWithPdf({
+          whatsappUrl: data.whatsappUrl,
+          nativeUrl: data.nativeUrl,
+          text: data.message,
+          onToast: toast,
+        });
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp reminder", "error");
