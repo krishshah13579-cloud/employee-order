@@ -199,10 +199,59 @@ export default function OrderInvoicePage() {
       setIsTaxInvoiceModalOpen(false);
       setFormatType("TAX_INVOICE");
       loadOrder();
+
+      // Automated WhatsApp dispatch on marking as Ready
+      if (data.whatsapp?.customerPhone && data.whatsapp?.message) {
+        sendAutomatedWhatsAppDirect({
+          phone: data.whatsapp.customerPhone,
+          message: data.whatsapp.message,
+          pdfUrl: data.whatsapp.pdfUrl,
+          filename: data.whatsapp.filename,
+          nativeUrl: data.whatsapp.nativeUrl,
+          whatsappUrl: data.whatsapp.directUrl,
+          onToast: toast,
+        }).catch((e) => console.error("Auto WhatsApp status error:", e));
+      }
     } catch (err: any) {
       toast(err.message || "Failed to save tax invoice", "error");
     } finally {
       setSavingTaxInvoice(false);
+    }
+  };
+
+  // Direct Status Update Handler
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const handleDirectStatusChange = async (newStatus: string) => {
+    if (!order || newStatus === order.status) return;
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update status");
+
+      toast(`✅ Order status updated to "${newStatus}"!`, "success");
+      loadOrder();
+
+      // Automated background WhatsApp dispatch to customer
+      if (data.whatsapp?.customerPhone && data.whatsapp?.message) {
+        sendAutomatedWhatsAppDirect({
+          phone: data.whatsapp.customerPhone,
+          message: data.whatsapp.message,
+          pdfUrl: data.whatsapp.pdfUrl,
+          filename: data.whatsapp.filename,
+          nativeUrl: data.whatsapp.nativeUrl,
+          whatsappUrl: data.whatsapp.directUrl,
+          onToast: toast,
+        }).catch((e) => console.error("Auto WhatsApp status error:", e));
+      }
+    } catch (err: any) {
+      toast(err.message || "Failed to update status", "error");
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
