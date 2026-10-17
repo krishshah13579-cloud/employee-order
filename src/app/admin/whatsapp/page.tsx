@@ -101,13 +101,79 @@ export default function AdminWhatsAppPage() {
     } finally {
       setLoading(false);
     }
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/admin/whatsapp/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setSettings((prev) => ({ ...prev, ...data }));
+      }
+    } catch (e) {}
   };
 
   useEffect(() => {
     fetchStatus();
+    fetchSettings();
     const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/admin/whatsapp/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save settings");
+      toast(`✅ Weekly reminder schedule set to Every ${settings.weeklyReminderDay} at ${settings.weeklyReminderTime}!`, "success");
+    } catch (err: any) {
+      toast(err.message || "Failed to save settings", "error");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleTriggerWeeklyRemindersNow = async () => {
+    if (!confirm(`Are you sure you want to send weekly payment reminders to ALL customers with outstanding balances now?`)) {
+      return;
+    }
+    setDispatchingWeeklyNow(true);
+    try {
+      // Try local gateway cron endpoint first
+      let triggered = false;
+      try {
+        const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
+          method: "POST",
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => null);
+        if (localRes && localRes.ok) {
+          const localData = await localRes.json();
+          toast(`✅ Weekly payment reminders sent directly to ${localData.count || 0} customers via WhatsApp (8128756632)!`, "success");
+          triggered = true;
+        }
+      } catch {}
+
+      if (!triggered) {
+        const res = await fetch("/api/admin/outstanding/whatsapp-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ autoDispatch: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to dispatch weekly reminders");
+        toast(`✅ Weekly payment reminders dispatched to ${data.count || 0} customers with outstanding balances!`, "success");
+      }
+      fetchSettings();
+    } catch (err: any) {
+      toast(err.message || "Could not dispatch weekly reminders", "error");
+    } finally {
+      setDispatchingWeeklyNow(false);
+    }
+  };
 
   const handleSendTest = async (e: React.FormEvent) => {
     e.preventDefault();
