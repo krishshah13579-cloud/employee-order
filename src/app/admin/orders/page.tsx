@@ -86,9 +86,23 @@ export default function OrdersPage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         toast(`Order ${statusModalOrder.orderNumber} status updated to ${newStatus}`, "success");
         setStatusModalOrder(null);
         fetchOrders();
+
+        // Automated background WhatsApp dispatch to customer
+        if (data.whatsapp?.customerPhone && data.whatsapp?.message) {
+          sendAutomatedWhatsAppDirect({
+            phone: data.whatsapp.customerPhone,
+            message: data.whatsapp.message,
+            pdfUrl: data.whatsapp.pdfUrl,
+            filename: data.whatsapp.filename,
+            nativeUrl: data.whatsapp.nativeUrl,
+            whatsappUrl: data.whatsapp.directUrl,
+            onToast: toast,
+          }).catch((e) => console.error("Auto WhatsApp status error:", e));
+        }
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update status", "error");
