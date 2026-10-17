@@ -129,6 +129,178 @@ export function parseDetailedColorRatioSets(
   return result;
 }
 
+export interface ColorStockDetail {
+  ratios: Record<string, number>;
+  loosePcs: Record<string, number>;
+}
+
+/**
+ * Parses full color breakdown including both ratio sets and single size loose pieces.
+ * Returns: { "Indigo": { ratios: { "30 to 38": 5, "32 to 38": 1 }, loosePcs: { "34": 3, "36": 2 } } }
+ */
+export function parseDetailedColorStockWithLoose(
+  raw: string | null | undefined,
+  defaultRatio: string = "30 to 38"
+): Record<string, ColorStockDetail> {
+  const result: Record<string, ColorStockDetail> = {};
+  if (!raw) return result;
+  const trimmed = raw.trim();
+  if (!trimmed) return result;
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && parsed !== null) {
+        for (const [col, val] of Object.entries(parsed)) {
+          const colorKey = cleanColorName(col.trim());
+          if (!colorKey) continue;
+          result[colorKey] = { ratios: {}, loosePcs: {} };
+
+          if (typeof val === "object" && val !== null) {
+            if ((val as any).ratios || (val as any).loosePcs) {
+              const rMap = (val as any).ratios || {};
+              for (const [rK, cnt] of Object.entries(rMap)) {
+                result[colorKey].ratios[rK.trim()] = Math.max(0, parseInt(String(cnt), 10) || 0);
+              }
+              const lMap = (val as any).loosePcs || (val as any).loose || {};
+              for (const [sK, cnt] of Object.entries(lMap)) {
+                result[colorKey].loosePcs[sK.trim()] = Math.max(0, parseInt(String(cnt), 10) || 0);
+              }
+            } else {
+              // Flat object e.g. {"30 to 38": 5, "32 to 38": 1}
+              for (const [k, v] of Object.entries(val)) {
+                if (k === "loose" || k === "loosePcs") {
+                  if (typeof v === "object" && v !== null) {
+                    for (const [sK, cnt] of Object.entries(v as any)) {
+                      result[colorKey].loosePcs[sK.trim()] = Math.max(0, parseInt(String(cnt), 10) || 0);
+                    }
+                  }
+                } else {
+                  result[colorKey].ratios[k.trim()] = Math.max(0, parseInt(String(v), 10) || 0);
+                }
+              }
+            }
+          } else {
+            const num = parseInt(String(val), 10);
+            result[colorKey].ratios[defaultRatio] = Math.max(0, isNaN(num) ? 0 : num);
+          }
+        }
+        return result;
+      }
+    } catch {}
+  }
+
+  // Fallback to flat map
+  const flat = parseColorwiseSets(raw);
+  for (const [col, num] of Object.entries(flat)) {
+    const colorKey = cleanColorName(col);
+    if (colorKey && colorKey !== "__default__") {
+      result[colorKey] = {
+        ratios: { [defaultRatio]: num },
+        loosePcs: {},
+      };
+    }
+  }
+  return result;
+}
+
+/**
+ * Extracts mandatory sizes from a size ratio string.
+ * Supports "30 to 38", "30x38", "32 to 38", "28 to 36", etc.
+ */
+export function getSizesFromRatio(ratio: string): string[] {
+  const clean = ratio.trim().toLowerCase();
+  if (clean === "30 to 38" || clean === "30x38") return ["30", "32", "34", "36", "38"];
+  if (clean === "32 to 38" || clean === "32x38") return ["32", "34", "36", "38"];
+  if (clean === "28 to 36" || clean === "28x36") return ["28", "30", "32", "34", "36"];
+  if (clean === "28 to 38" || clean === "28x38") return ["28", "30", "32", "34", "36", "38"];
+  if (clean === "30 to 40" || clean === "30x40") return ["30", "32", "34", "36", "38", "40"];
+  if (clean === "32 to 40" || clean === "32x40") return ["32", "34", "36", "38", "40"];
+  if (clean === "28 to 40" || clean === "28x40") return ["28", "30", "32", "34", "36", "38", "40"];
+  if (clean === "32 to 42" || clean === "32x42") return ["32", "34", "36", "38", "40", "42"];
+  if (clean === "s to xxl") return ["S", "M", "L", "XL", "XXL"];
+  if (clean === "m to 3xl") return ["M", "L", "XL", "XXL", "3XL"];
+
+  // Generic numeric range "X to Y" or "XxY"
+  const match = clean.match(/^(\d+)\s*(?:to|x|-)\s*(\d+)$/);
+  if (match) {
+    const start = parseInt(match[1], 10);
+    const end = parseInt(match[2], 10);
+    if (!isNaN(start) && !isNaN(end) && start <= end) {
+      const sizes: string[] = [];
+      for (let s = start; s <= end; s += 2) {
+        sizes.push(String(s));
+      }
+      return sizes;
+    }
+  }
+  return [ratio];
+}
+
+/**
+ * Calculates real-time single size piece counts for a color from its sets and loose pieces.
+ * e.g. Indigo: 5 sets of 30-38 + 1 set of 32-38 + loose: { 34: 3, 36: 2 }
+ * Returns: { "30": 5, "32": 6, "34": 9, "36": 8, "38": 6 }
+ */
+export function calculateColorSizesBreakdown(
+  ratios: Record<string, number>,
+  loosePcs: Record<string, number> = {}
+): Record<string, number> {
+  const sizeStock: Record<string, number> = {};
+
+  // 1. Add pieces from sets
+  for (const [ratio, setCount] of Object.entries(ratios)) {
+    const count = Math.max(0, setCount || 0);
+    if (count <= 0) continue;
+    const sizes = getSizesFromRatio(ratio);
+    for (const sz of sizes) {
+      sizeStock[sz] = (sizeStock[sz] || 0) + count;
+    }
+  }
+
+  // 2. Add loose pieces for each size
+  for (const [sz, looseCount] of Object.entries(loosePcs)) {
+    const count = Math.max(0, looseCount || 0);
+    if (count <= 0) continue;
+    sizeStock[sz] = (sizeStock[sz] || 0) + count;
+  }
+
+  return sizeStock;
+}
+
+/**
+ * Calculates total piece statistics for a color:
+ * Set pieces + Loose pieces = Total pieces.
+ */
+export function calculateTotalColorPieces(
+  ratios: Record<string, number>,
+  loosePcs: Record<string, number> = {},
+  fallbackPcsPerSet: number = 5
+): { setPcs: number; loosePcs: number; totalPcs: number; totalSets: number } {
+  let setPcs = 0;
+  let totalSets = 0;
+
+  for (const [ratio, setCount] of Object.entries(ratios)) {
+    const count = Math.max(0, setCount || 0);
+    totalSets += count;
+    const sizes = getSizesFromRatio(ratio);
+    const pcsInSet = sizes.length > 0 ? sizes.length : fallbackPcsPerSet;
+    setPcs += count * pcsInSet;
+  }
+
+  let totalLoose = 0;
+  for (const count of Object.values(loosePcs)) {
+    totalLoose += Math.max(0, count || 0);
+  }
+
+  return {
+    setPcs,
+    loosePcs: totalLoose,
+    totalPcs: setPcs + totalLoose,
+    totalSets,
+  };
+}
+
 /**
  * Resolves the specific photo for a given color of a product.
  * Checks colorImages mapping, index match with gallery images, or falls back to cover image.
