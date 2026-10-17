@@ -327,6 +327,13 @@ export default function OrdersPage() {
                         <MessageCircle size={15} />
                       </button>
                       <Link
+                        href={`/admin/orders/${o.id}?edit=true`}
+                        className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Order Form (Adjust items, sets, prices, customer details)"
+                      >
+                        <Edit size={15} />
+                      </Link>
+                      <Link
                         href={`/admin/orders/${o.id}`}
                         className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
                         title="View Full Tax Invoice (Opens dedicated page)"
