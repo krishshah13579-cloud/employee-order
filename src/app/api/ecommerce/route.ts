@@ -28,8 +28,10 @@ export const revalidate = 0;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get("action") || "products";
-    const inStockOnly = searchParams.get("in_stock_only") !== "0"; // Default: only show in-stock products
+    // For products feed, default to in-stock only. For inventory sync feed, default to all products (to detect 0-stock)
+    const inStockOnly = action === "inventory"
+      ? searchParams.get("in_stock_only") === "1"
+      : searchParams.get("in_stock_only") !== "0";
     const category = searchParams.get("category");
 
     const where: any = { isActive: true };
