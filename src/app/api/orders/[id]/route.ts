@@ -229,12 +229,18 @@ export async function PUT(
       });
     });
 
-    // Automated WhatsApp trigger on status change in full order update
+    // Automated WhatsApp trigger on status change or order edit for Confirmed / Ready
     const effectiveStatus = updatedOrder.status;
     const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;
     let whatsappPayload: any = null;
 
-    if (customerPhone && (status && status !== existingOrder.status)) {
+    const shouldNotify = Boolean(
+      body.notifyCustomer ||
+      (status && status !== existingOrder.status) ||
+      ((effectiveStatus === "Confirmed" || effectiveStatus === "Ready") && body.sendWhatsApp !== false)
+    );
+
+    if (customerPhone && shouldNotify) {
       try {
         const origin =
           request.headers.get("origin") ||
