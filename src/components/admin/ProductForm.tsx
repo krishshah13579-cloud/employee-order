@@ -121,7 +121,7 @@ export default function ProductForm({
       initialData?.colorMapping
     );
     if (list.length > 0) return list;
-    return ["Dark Indigo", "Light Blue", "Jet Black", "Charcoal Grey"];
+    return isEdit ? ["Dark Indigo", "Light Blue", "Jet Black", "Charcoal Grey"] : [];
   };
 
   const [selectedColors, setSelectedColors] = useState<string[]>(parseInitialColors);
