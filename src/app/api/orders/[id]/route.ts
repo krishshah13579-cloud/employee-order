@@ -240,16 +240,19 @@ export async function PUT(
           origin
         );
 
+        const effectivePdfUrl = statusMsgConfig.hasDocument ? statusMsgConfig.pdfUrl : undefined;
+        const effectiveFilename = statusMsgConfig.hasDocument ? statusMsgConfig.filename : undefined;
+
         const autoResult = await dispatchAutomatedWhatsApp(customerPhone, statusMsgConfig.message, {
-          pdfUrl: statusMsgConfig.pdfUrl,
-          filename: statusMsgConfig.filename || "Invoice.pdf",
+          pdfUrl: effectivePdfUrl,
+          filename: effectiveFilename || "Invoice.pdf",
         }).catch((err) => ({ success: false, method: "ERROR", error: err.message }));
 
         whatsappPayload = {
           customerPhone,
           message: statusMsgConfig.message,
-          pdfUrl: statusMsgConfig.pdfUrl,
-          filename: statusMsgConfig.filename,
+          pdfUrl: effectivePdfUrl,
+          filename: effectiveFilename,
           hasDocument: statusMsgConfig.hasDocument,
           directUrl: createWhatsAppDirectLink(customerPhone, statusMsgConfig.message),
           nativeUrl: createWhatsAppNativeLink(customerPhone, statusMsgConfig.message),
