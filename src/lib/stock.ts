@@ -301,6 +301,82 @@ export function calculateTotalColorPieces(
   };
 }
 
+/**
+ * Calculates pieces and breakdown for a requested number of sets of a specific color,
+ * allocating the requested sets across available ratio packs in stock.
+ * E.g., if stock has 4 sets of 30 to 38 (5 pcs) and 1 set of 30 to 36 (4 pcs),
+ * requesting 5 sets gives: 4*5 + 1*4 = 24 pcs, with breakdown "4×[30 to 38] + 1×[30 to 36]".
+ */
+export function calculateOrderedColorSetsPieces(
+  setsColorwise: string | null | undefined,
+  color: string,
+  requestedSets: number,
+  fallbackPcsPerSet: number = 5
+): {
+  totalPcs: number;
+  breakdownText: string;
+  allocations: { ratio: string; sets: number; pcsPerSet: number; pcs: number }[];
+} {
+  const safeSets = Math.max(0, requestedSets || 0);
+  if (safeSets === 0) {
+    return { totalPcs: 0, breakdownText: "", allocations: [] };
+  }
+
+  const detailed = parseDetailedColorRatioSets(setsColorwise);
+  const clean = cleanColorName(color);
+  const matchedKey = Object.keys(detailed).find(
+    (k) => cleanColorName(k).toLowerCase() === clean.toLowerCase()
+  );
+  const ratios = matchedKey ? detailed[matchedKey] : {};
+
+  let remaining = safeSets;
+  let totalPcs = 0;
+  const allocations: { ratio: string; sets: number; pcsPerSet: number; pcs: number }[] = [];
+
+  // Allocate across available ratio packs
+  for (const [ratioKey, availableCount] of Object.entries(ratios)) {
+    if (remaining <= 0) break;
+    const count = Math.max(0, availableCount || 0);
+    if (count <= 0) continue;
+
+    const takeSets = Math.min(remaining, count);
+    const sizes = getSizesFromRatio(ratioKey);
+    const pcsInSet = sizes.length > 0 ? sizes.length : fallbackPcsPerSet;
+    const pieces = takeSets * pcsInSet;
+
+    totalPcs += pieces;
+    remaining -= takeSets;
+    allocations.push({
+      ratio: ratioKey,
+      sets: takeSets,
+      pcsPerSet: pcsInSet,
+      pcs: pieces,
+    });
+  }
+
+  // If requested more sets than configured in ratio packs, or if no ratio packs exist
+  if (remaining > 0) {
+    const pieces = remaining * fallbackPcsPerSet;
+    totalPcs += pieces;
+    allocations.push({
+      ratio: "Standard",
+      sets: remaining,
+      pcsPerSet: fallbackPcsPerSet,
+      pcs: pieces,
+    });
+  }
+
+  const breakdownText = allocations
+    .map((a) => `${a.sets}×[${a.ratio}]`)
+    .join(" + ");
+
+  return {
+    totalPcs,
+    breakdownText,
+    allocations,
+  };
+}
+
 export interface SellSingleSizeResult {
   success: boolean;
   method: "loose" | "set_converted" | "set_unpacked" | "out_of_stock";
