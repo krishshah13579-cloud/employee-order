@@ -263,7 +263,8 @@ export async function dispatchAutomatedWhatsApp(
   phone: string,
   message: string,
   documentOptions?: {
-    pdfUrl: string;
+    pdfUrl?: string;
+    pdfBase64?: string;
     filename: string;
   }
 ): Promise<{ success: boolean; method: string; error?: string }> {
@@ -277,15 +278,16 @@ export async function dispatchAutomatedWhatsApp(
   const ultraToken = process.env.ULTRAMSG_TOKEN;
   if (ultraInstance && ultraToken) {
     try {
-      if (documentOptions?.pdfUrl) {
+      const docPayload = documentOptions?.pdfBase64 || documentOptions?.pdfUrl;
+      if (docPayload) {
         const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/document`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             token: ultraToken,
             to: cleanPhone,
-            filename: documentOptions.filename,
-            document: documentOptions.pdfUrl,
+            filename: documentOptions!.filename,
+            document: docPayload,
             caption: message,
           }),
         });
