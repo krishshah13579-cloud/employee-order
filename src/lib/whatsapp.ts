@@ -228,24 +228,38 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       return { message: msg, hasDocument: false };
     }
 
-    // READY FOR DISPATCH -> TEXT ONLY (NO PDF)
+    // READY FOR DISPATCH / TAX INVOICE GENERATED -> PDF ATTACHED
     case "Ready": {
+      const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
+      const filename = `Tax_Invoice_${cleanTaxNum}.pdf`;
       const msg =
         `📦 *KRISH CLOTHING CO.* — Order Status: *READY FOR DISPATCH*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
-        `Your wholesale order *#${order.orderNumber}* status has been updated to: *READY FOR DISPATCH*!\n\n` +
-        `📋 *Order Summary:*\n` +
-        `• *Order / Invoice No:* #${cleanTaxNum}\n` +
+        `Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* has been processed, packed, and is *READY FOR DISPATCH*!\n\n` +
+        `📋 *Tax Invoice & Pack Details:*\n` +
+        `• *Invoice / Order No:* #${cleanTaxNum}\n` +
         `• *Current Status:* 📦 *Ready for Dispatch*\n` +
+        `• *Date:* ${order.orderDate ? new Date(order.orderDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}\n` +
         `• *Packed Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
+        `• *Subtotal:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
+        `• *GST (5%):* ₹${order.gstAmount.toLocaleString("en-IN")}\n` +
         `• *Total Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
         `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
         `• *Payment Terms:* ${creditTermText}\n\n` +
-        `Your goods have been packed and are waiting for transport dispatch.\n\n` +
+        `🏦 *Bank Account Details for RTGS / NEFT / IMPS:*\n` +
+        `• *Bank:* ICICI BANK\n` +
+        `• *Account No:* 750705000692\n` +
+        `• *IFSC Code:* ICIC0007507\n` +
+        `• *Beneficiary:* KRISH CLOTHING CO.\n` +
+        `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
+        `📄 *Official Tax Invoice Attached (PDF)*\n\n` +
         `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return {
         message: msg,
-        hasDocument: false,
+        pdfUrl,
+        filename,
+        pdfType: "tax_invoice",
+        hasDocument: true,
       };
     }
 
