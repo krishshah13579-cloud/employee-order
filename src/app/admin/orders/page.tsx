@@ -293,7 +293,14 @@ export default function OrdersPage() {
                             if (data.automated) {
                               toast("✅ Invoice & details sent directly to customer WhatsApp!", "success");
                             } else if (data.whatsappUrl || data.nativeUrl) {
-                              openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
+                              await shareOrOpenWhatsAppWithPdf({
+                                whatsappUrl: data.whatsappUrl,
+                                nativeUrl: data.nativeUrl,
+                                pdfUrl: data.pdfUrl || `/api/orders/${o.id}/pdf?type=order_form`,
+                                filename: `Order_Form_${o.orderNumber}.pdf`,
+                                text: data.message,
+                                onToast: toast,
+                              });
                             }
                           } catch {
                             toast("Could not send WhatsApp message", "error");
