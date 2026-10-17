@@ -520,6 +520,21 @@ export default function ProductForm({
     return Object.values(ratios).reduce((sum, count) => sum + (count || 0), 0);
   };
 
+  const [activeStockColor, setActiveStockColor] = useState<string>(() => {
+    const initial = parseInitialColors();
+    return initial[0] || "Dark Indigo";
+  });
+
+  const [customRatioInput, setCustomRatioInput] = useState<string>("");
+  const [customLooseSizeInput, setCustomLooseSizeInput] = useState<string>("");
+
+  // Keep activeStockColor valid when selectedColors changes
+  useEffect(() => {
+    if (selectedColors.length > 0 && !selectedColors.includes(activeStockColor)) {
+      setActiveStockColor(selectedColors[0]);
+    }
+  }, [selectedColors, activeStockColor]);
+
   const handleBulkSetStock = (sets: number) => {
     setColorRatioStockMap((prev) => {
       const next: Record<string, Record<string, number>> = { ...prev };
@@ -527,8 +542,8 @@ export default function ProductForm({
         const clean = cleanColorName(c);
         const existing = next[clean] || {};
         const keys = Object.keys(existing);
-        if (keys.length <= 1) {
-          next[clean] = { [formData.sizesRatio]: Math.max(0, sets) };
+        if (keys.length === 0) {
+          next[clean] = { "30 to 38": Math.max(0, sets) };
         } else {
           const updated: Record<string, number> = {};
           keys.forEach((k, idx) => {
@@ -542,206 +557,71 @@ export default function ProductForm({
     toast(`Set ${sets} stock sets for all ${selectedColors.length} colors`, "success");
   };
 
-  const BASE_PACK_SIZES = ["26", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46", "S", "M", "L", "XL", "XXL", "3XL"];
-  const [customPackSizes, setCustomPackSizes] = useState<string[]>([]);
-  const [customSizeInput, setCustomSizeInput] = useState<string>("");
-  const [isCustomRatioMode, setIsCustomRatioMode] = useState<boolean>(() => {
-    return !STANDARD_SIZE_RATIOS.some((r) => r.value === initialData?.sizesRatio);
-  });
+  // Copy one color's stock and ratios to all colors
+  const handleCopyColorToAll = (sourceColor: string) => {
+    const srcClean = cleanColorName(sourceColor);
+    const srcRatios = colorRatioStockMap[srcClean] || {};
+    const srcLoose = colorLooseStockMap[srcClean] || {};
 
-  const AVAILABLE_PACK_SIZES = Array.from(new Set([...BASE_PACK_SIZES, ...customPackSizes]));
-
-  // Helper to sync ratio changes to formData and all colors in colorRatioStockMap
-  const updateRatioEverywhere = (newRatio: string, newSizesList: string, newPcs: number) => {
-    const oldRatio = formData.sizesRatio;
-
-    setFormData((prev) => ({
-      ...prev,
-      sizesRatio: newRatio,
-      sizesList: newSizesList,
-      pcsPerSet: newPcs,
-    }));
-
-    // Replace ratio across ALL selected colors in colorRatioStockMap
     setColorRatioStockMap((prev) => {
-      const next: Record<string, Record<string, number>> = {};
-      const allColors = Array.from(
-        new Set([...Object.keys(prev), ...selectedColors.map(cleanColorName)])
-      );
-
-      for (const col of allColors) {
-        const ratios = prev[col] || {};
-        next[col] = {};
-        const keys = Object.keys(ratios);
-
-        if (keys.length <= 1) {
-          // Single ratio (or 0 ratios) -> migrate to newRatio preserving the count
-          const count = keys.length === 1 ? ratios[keys[0]] ?? 0 : 0;
-          next[col][newRatio] = count;
-        } else {
-          // Multiple ratios: replace oldRatio or "30 to 38"
-          let replaced = false;
-          for (const [rKey, count] of Object.entries(ratios)) {
-            if (rKey === oldRatio || rKey === "30 to 38") {
-              next[col][newRatio] = count;
-              replaced = true;
-            } else {
-              next[col][rKey] = count;
-            }
-          }
-          if (!replaced && next[col][newRatio] === undefined) {
-            next[col][newRatio] = 0;
-          }
-        }
+      const next = { ...prev };
+      for (const c of selectedColors) {
+        const clean = cleanColorName(c);
+        next[clean] = { ...srcRatios };
       }
       return next;
     });
+
+    setColorLooseStockMap((prev) => {
+      const next = { ...prev };
+      for (const c of selectedColors) {
+        const clean = cleanColorName(c);
+        next[clean] = { ...srcLoose };
+      }
+      return next;
+    });
+
+    toast(`Copied stock setup from "${sourceColor}" to all ${selectedColors.length} colors!`, "success");
   };
 
-  const prevRatioRef = useRef(formData.sizesRatio);
-
-  // Active synchronization hook: ensures colorRatioStockMap stays in sync whenever sizesRatio or selectedColors change
-  useEffect(() => {
-    const newRatio = formData.sizesRatio;
-    const oldRatio = prevRatioRef.current;
-    if (!newRatio) return;
-
+  // Set or add a ratio pack for a specific color
+  const handleSetRatioForColor = (color: string, ratioName: string) => {
+    const clean = cleanColorName(color);
     setColorRatioStockMap((prev) => {
-      let changed = false;
-      const next: Record<string, Record<string, number>> = {};
-      const allColors = Array.from(
-        new Set([...Object.keys(prev), ...selectedColors.map(cleanColorName)])
-      );
+      const current = prev[clean] || {};
+      const keys = Object.keys(current);
 
-      for (const col of allColors) {
-        const ratios = prev[col] || {};
-        next[col] = {};
-        const keys = Object.keys(ratios);
-
-        if (keys.length === 0) {
-          next[col][newRatio] = 0;
-          changed = true;
-        } else if (keys.length === 1) {
-          const onlyKey = keys[0];
-          const onlyCount = ratios[onlyKey] ?? 0;
-          next[col][newRatio] = onlyCount;
-          if (onlyKey !== newRatio) {
-            changed = true;
-          }
-        } else {
-          let replaced = false;
-          for (const [rKey, count] of Object.entries(ratios)) {
-            if (rKey === oldRatio || (rKey === "30 to 38" && oldRatio !== "30 to 38")) {
-              next[col][newRatio] = count;
-              replaced = true;
-              changed = true;
-            } else {
-              next[col][rKey] = count;
-            }
-          }
-          if (!replaced && next[col][newRatio] === undefined) {
-            next[col][newRatio] = 0;
-            changed = true;
-          }
-        }
+      // If only 1 ratio with 0 sets, replace it seamlessly
+      if (keys.length === 1 && current[keys[0]] === 0) {
+        return {
+          ...prev,
+          [clean]: { [ratioName]: 0 },
+        };
       }
 
-      return changed ? next : prev;
-    });
-
-    prevRatioRef.current = newRatio;
-  }, [formData.sizesRatio, selectedColors]);
-
-  const handleRatioChange = (ratioVal: string) => {
-    setIsCustomRatioMode(false);
-    const found = STANDARD_SIZE_RATIOS.find((r) => r.value === ratioVal);
-    if (found) {
-      updateRatioEverywhere(found.value, found.sizes, found.pcs);
-    } else {
-      updateRatioEverywhere(ratioVal, formData.sizesList, formData.pcsPerSet);
-    }
-  };
-
-  const handleSelectAddAnySizeRatio = () => {
-    setIsCustomRatioMode(true);
-  };
-
-  const handleAddCustomSizeToPack = () => {
-    const trimmed = customSizeInput.trim().toUpperCase();
-    if (!trimmed) return;
-    setIsCustomRatioMode(true);
-    if (!customPackSizes.includes(trimmed)) {
-      setCustomPackSizes((prev) => [...prev, trimmed]);
-    }
-    const currentSizes = formData.sizesList.split(",").map((s) => s.trim()).filter(Boolean);
-    if (!currentSizes.includes(trimmed)) {
-      const nextSizes = [...currentSizes, trimmed];
-      nextSizes.sort((a, b) => {
-        const numA = parseInt(a, 10);
-        const numB = parseInt(b, 10);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.localeCompare(b);
-      });
-      const count = nextSizes.length;
-      const ratioName = count === 1 ? nextSizes[0] : `${nextSizes[0]} to ${nextSizes[nextSizes.length - 1]}`;
-      updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
-    }
-    setCustomSizeInput("");
-  };
-
-  const handleToggleSizeInPack = (sz: string) => {
-    setIsCustomRatioMode(true);
-    const currentSizes = formData.sizesList
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    let nextSizes: string[];
-    if (currentSizes.includes(sz)) {
-      if (currentSizes.length <= 1) {
-        toast("A pack must contain at least 1 mandatory size", "error");
-        return;
+      // If ratio already exists, don't duplicate
+      if (current[ratioName] !== undefined) {
+        return prev;
       }
-      nextSizes = currentSizes.filter((s) => s !== sz);
-    } else {
-      nextSizes = [...currentSizes, sz];
-    }
 
-    // Sort numerically if numeric
-    nextSizes.sort((a, b) => {
-      const numA = parseInt(a, 10);
-      const numB = parseInt(b, 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      return a.localeCompare(b);
+      // If no ratios exist, add with 0 sets
+      if (keys.length === 0) {
+        return {
+          ...prev,
+          [clean]: { [ratioName]: 0 },
+        };
+      }
+
+      // Add as additional ratio pack with 1 set
+      return {
+        ...prev,
+        [clean]: {
+          ...current,
+          [ratioName]: 1,
+        },
+      };
     });
-
-    const count = nextSizes.length;
-    const minSize = nextSizes[0];
-    const maxSize = nextSizes[nextSizes.length - 1];
-    const ratioName = count === 1 ? minSize : `${minSize} to ${maxSize}`;
-
-    updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
-  };
-
-  const handleSizesListInput = (val: string) => {
-    setIsCustomRatioMode(true);
-    const parsed = val
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const count = Math.max(1, parsed.length);
-    let ratio = val.trim();
-    if (parsed.length >= 2) {
-      ratio = `${parsed[0]} to ${parsed[parsed.length - 1]}`;
-    } else if (parsed.length === 1) {
-      ratio = parsed[0];
-    }
-    updateRatioEverywhere(ratio, val, count);
-  };
-
-  const handleRatioLabelChange = (val: string) => {
-    setIsCustomRatioMode(true);
-    updateRatioEverywhere(val, formData.sizesList, formData.pcsPerSet);
+    toast(`Added "${ratioName}" pack to ${color}`, "success");
   };
 
   const handleSellSingleSize = (color: string, size: string) => {
