@@ -226,8 +226,7 @@ export function generatePaymentReminderWhatsAppMessage(
     `• *IFSC Code:* ICIC0007507\n` +
     `• *Beneficiary:* KRISH CLOTHING CO.\n` +
     `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
-    `📄 *Download PDF Invoice:* ${pdfUrl}\n` +
-    `🔗 *View Live Invoice:* ${invoiceUrl}\n\n` +
+    `📄 *Statement / Invoice PDF Attached*\n\n` +
     `Kindly arrange the payment at your earliest convenience.\n` +
     `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
   );
