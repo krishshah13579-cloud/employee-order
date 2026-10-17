@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession, requireAdmin } from "@/lib/auth-security";
+import { calculateOrderedColorSetsPieces } from "@/lib/stock";
 
 export async function GET(
   _request: NextRequest,
