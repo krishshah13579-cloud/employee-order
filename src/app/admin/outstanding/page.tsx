@@ -230,9 +230,9 @@ export default function AdminOutstandingPage() {
 
       if (data.automated) {
         toast("✅ Weekly payment reminder sent directly to customer WhatsApp!", "success");
-      } else if (data.whatsappUrl) {
+      } else if (data.whatsappUrl || data.nativeUrl) {
         toast("Opening WhatsApp with total outstanding reminder...", "success");
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp reminder", "error");
