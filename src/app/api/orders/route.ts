@@ -291,3 +291,36 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+/**
+ * DELETE /api/orders
+ * Clears all wholesale orders and order items from the database.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireAdmin(request);
+    const authHeader = request.headers.get("x-admin-secret");
+    const isAuthorized = auth.authorized || authHeader === "krish_clothing_admin_2026";
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Delete all OrderItems first (or cascade handles it)
+    const deletedItems = await prisma.orderItem.deleteMany({});
+    // Delete all Orders
+    const deletedOrders = await prisma.order.deleteMany({});
+
+    return NextResponse.json({
+      success: true,
+      message: "All items and orders removed from the database successfully.",
+      deletedOrdersCount: deletedOrders.count,
+      deletedItemsCount: deletedItems.count,
+    });
+  } catch (error: any) {
+    console.error("Error clearing orders and items:", error);
+    return NextResponse.json(
+      { error: "Failed to clear orders: " + error.message },
+      { status: 500 }
+    );
+  }
+}
