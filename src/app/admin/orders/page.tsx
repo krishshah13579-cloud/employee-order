@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Eye,
+  Edit,
   Trash2,
   RefreshCw,
   Clock,
