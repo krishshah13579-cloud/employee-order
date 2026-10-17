@@ -85,22 +85,41 @@ export async function GET(request: NextRequest) {
         const totalSets = getTotalAvailableSets(p.setsColorwise);
         const pcsPerSet = p.pcsPerSet || 5;
         const mixPcs = (p as any).mixPcs || 0;
-        const totalPcs = totalSets * pcsPerSet + mixPcs;
-        const inStock = totalPcs > 0;
 
         const colors = getAllProductColors(p.colorsAvailable, p.setsColorwise, p.colorMapping);
-        const colorwiseSets = parseColorwiseSets(p.setsColorwise);
+        const detailedStock = parseDetailedColorStockWithLoose(p.setsColorwise, p.sizesRatio || "30 to 38");
 
-        // Build color breakdown with real-time PCS
+        // Build color breakdown with real-time PCS and retail size matrix
+        let computedTotalPcs = 0;
+        let computedTotalSets = 0;
+        let computedTotalLoose = 0;
+
         const colorBreakdown = colors.map((col) => {
-          const sets = colorwiseSets[col] !== undefined ? colorwiseSets[col] : 0;
+          const clean = cleanColorName(col);
+          const detail = detailedStock[clean] || detailedStock[col] || { ratios: {}, loosePcs: {} };
+          const colorCalc = calculateTotalColorPieces(detail.ratios, detail.loosePcs, pcsPerSet);
+          const sizesBreakdown = calculateColorSizesBreakdown(detail.ratios, detail.loosePcs);
+
+          computedTotalPcs += colorCalc.totalPcs;
+          computedTotalSets += colorCalc.totalSets;
+          computedTotalLoose += colorCalc.loosePcs;
+
           return {
             color: col,
-            setsInStock: sets,
-            pcsInStock: sets * pcsPerSet,
-            inStock: sets > 0,
+            setsInStock: colorCalc.totalSets,
+            loosePcsInStock: colorCalc.loosePcs,
+            pcsInStock: colorCalc.totalPcs,
+            inStock: colorCalc.totalPcs > 0,
+            ratios: detail.ratios,
+            loosePcs: detail.loosePcs,
+            sizesBreakdown,
           };
         });
+
+        const finalTotalPcs = computedTotalPcs > 0 ? computedTotalPcs : (totalSets * pcsPerSet + mixPcs);
+        const finalTotalSets = computedTotalSets > 0 ? computedTotalSets : totalSets;
+        const finalTotalLoose = computedTotalLoose > 0 ? computedTotalLoose : mixPcs;
+        const inStock = finalTotalPcs > 0;
 
         const allImages = getProductAllImages(p.imageUrl);
         const coverImage = getProductCoverImage(p.imageUrl);
@@ -124,9 +143,9 @@ export async function GET(request: NextRequest) {
           sizesRatio: p.sizesRatio || "30 to 38",
           sizesList: p.sizesList || "30, 32, 34, 36, 38",
           pcsPerSet,
-          totalSets,
-          mixPcs,
-          totalPcs,
+          totalSets: finalTotalSets,
+          mixPcs: finalTotalLoose,
+          totalPcs: finalTotalPcs,
           inStock,
           images: allImages,
           coverImage,
