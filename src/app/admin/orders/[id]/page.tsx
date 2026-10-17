@@ -232,8 +232,14 @@ export default function OrderInvoicePage() {
           "success"
         );
       } else if (data.whatsappUrl || data.nativeUrl) {
-        toast("Opening WhatsApp with message and PDF attachment...", "success");
-        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
+        await shareOrOpenWhatsAppWithPdf({
+          whatsappUrl: data.whatsappUrl,
+          nativeUrl: data.nativeUrl,
+          pdfUrl: data.pdfUrl || `/api/orders/${id}/pdf?type=${isTax ? "tax_invoice" : "order_form"}`,
+          filename: `${isTax ? "Tax_Invoice" : "Order_Form"}_${order?.orderNumber || id}.pdf`,
+          text: data.message,
+          onToast: toast,
+        });
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp", "error");
