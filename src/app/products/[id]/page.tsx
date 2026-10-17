@@ -882,8 +882,7 @@ function ProductDetailContent() {
                                 <span>{color}</span>
                                 {currentSets > 0 && (
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-600 text-white">
-                                    {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs
-                                    {pcsInfo.breakdownText ? `: ${pcsInfo.breakdownText}` : ""})
+                                    {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs)
                                   </span>
                                 )}
                               </div>
@@ -990,12 +989,7 @@ function ProductDetailContent() {
                           />
                           <span className="font-bold text-white">{entry.color}:</span>
                           <span className="text-orange-400 font-bold">
-                            {entry.sets} {entry.sets === 1 ? "set" : "sets"} (
-                            {colorPiecesMap[entry.color]?.totalPcs ?? entry.sets * pcsPerSet} pcs
-                            {colorPiecesMap[entry.color]?.breakdownText
-                              ? `: ${colorPiecesMap[entry.color].breakdownText}`
-                              : ""}
-                            )
+                            {entry.sets} {entry.sets === 1 ? "set" : "sets"} ({colorPiecesMap[entry.color]?.totalPcs ?? entry.sets * pcsPerSet} pcs)
                           </span>
                         </span>
                       ))}
