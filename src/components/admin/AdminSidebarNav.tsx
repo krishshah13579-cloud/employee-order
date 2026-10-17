@@ -90,6 +90,12 @@ const navItems = [
     icon: FileText,
     exact: false,
   },
+  {
+    name: "WhatsApp Gateway",
+    href: "/admin/whatsapp",
+    icon: MessageCircle,
+    exact: false,
+  },
 ];
 
 export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
