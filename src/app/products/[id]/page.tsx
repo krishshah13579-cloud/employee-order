@@ -836,7 +836,13 @@ function ProductDetailContent() {
                     const hex = getColorHex(color).hex;
                     const stock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
                     const currentSets = colorSetsSelection[color] || 0;
-                    const calculatedColorPcs = currentSets * pcsPerSet;
+                    const pcsInfo = calculateOrderedColorSetsPieces(
+                      product.setsColorwise,
+                      color,
+                      currentSets,
+                      pcsPerSet
+                    );
+                    const calculatedColorPcs = pcsInfo.totalPcs;
                     const isOutOfStock = stock <= 0;
                     const isPhotoActive = activeColor.toLowerCase() === color.toLowerCase();
 
@@ -876,7 +882,8 @@ function ProductDetailContent() {
                                 <span>{color}</span>
                                 {currentSets > 0 && (
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-600 text-white">
-                                    {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs)
+                                    {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs
+                                    {pcsInfo.breakdownText ? `: ${pcsInfo.breakdownText}` : ""})
                                   </span>
                                 )}
                               </div>
