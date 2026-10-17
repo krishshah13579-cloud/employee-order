@@ -236,15 +236,27 @@ export function generatePaymentReminderWhatsAppMessage(
 }
 
 /**
- * Generate WhatsApp Web/App clickable deep link
+ * Generate WhatsApp Web direct link (bypasses api.whatsapp.com landing page)
  */
 export function createWhatsAppDirectLink(phone: string, text: string): string {
   const cleanPhone = formatWhatsAppPhone(phone);
   const encodedText = encodeURIComponent(text);
   if (cleanPhone) {
-    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
   }
-  return `https://api.whatsapp.com/send?text=${encodedText}`;
+  return `https://web.whatsapp.com/send?text=${encodedText}`;
+}
+
+/**
+ * Generate WhatsApp Native App deep link (opens native WhatsApp or WhatsApp Business application directly)
+ */
+export function createWhatsAppNativeLink(phone: string, text: string): string {
+  const cleanPhone = formatWhatsAppPhone(phone);
+  const encodedText = encodeURIComponent(text);
+  if (cleanPhone) {
+    return `whatsapp://send?phone=${cleanPhone}&text=${encodedText}`;
+  }
+  return `whatsapp://send?text=${encodedText}`;
 }
 
 /**
