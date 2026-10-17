@@ -69,7 +69,7 @@ try {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       runGitPush();
-    }, 3500); // 3.5s debounce to allow multiple saves or formatters to settle
+    }, 60000); // 60s debounce to batch saves and avoid hitting Vercel's 100 deployments/day limit
   });
 } catch (err) {
   console.error("Watch error:", err);
