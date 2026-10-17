@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
 
       const message = generatePaymentReminderWhatsAppMessage(ord as any, origin);
       const whatsappUrl = phone ? createWhatsAppDirectLink(phone, message) : "";
+      const nativeUrl = phone ? createWhatsAppNativeLink(phone, message) : "";
 
       reminders.push({
         orderId: ord.id,
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
         isOverdue: daysDiff < 0,
         status: ord.status,
         whatsappUrl,
+        nativeUrl,
         message,
       });
     }
