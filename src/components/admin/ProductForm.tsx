@@ -1897,23 +1897,23 @@ export default function ProductForm({
         )}
       </div>
 
-      {/* 5. Stock Breakdown & Storefront Status */}
+      {/* 3. Colorwise Inventory: Size Ratios & Loose Pieces */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Package className="w-5 h-5 text-gray-700" />
-              <span>Stock Sets Colorwise & Publishing</span>
+              <Layers className="w-5 h-5 text-zinc-800" />
+              <span>Colorwise Inventory (Ratios &amp; Loose Pieces)</span>
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Set available stock sets for each selected color. Employees cannot exceed these available sets when placing orders.
+            <p className="text-xs text-gray-500 mt-1">
+              Select each color tab to separately configure wholesale size packs and single loose pieces for retail storefront sales.
             </p>
           </div>
 
-          {/* Quick Bulk Fill Tool */}
+          {/* Quick Bulk Tools */}
           {selectedColors.length > 0 && (
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2 rounded-xl">
-              <span className="text-xs font-semibold text-gray-600">Bulk Fill:</span>
+              <span className="text-xs font-semibold text-gray-600">Bulk Sets:</span>
               <input
                 type="number"
                 min="0"
@@ -1941,393 +1941,613 @@ export default function ProductForm({
         </div>
 
         {selectedColors.length === 0 ? (
-          <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center text-xs text-gray-500">
-            Please select at least one color in the &quot;Available Colors Palette&quot; section above to configure stock sets.
+          <div className="p-8 bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-center space-y-2">
+            <Palette className="w-8 h-8 text-gray-400 mx-auto" />
+            <div className="text-sm font-semibold text-gray-700">No Colors Selected</div>
+            <p className="text-xs text-gray-500 max-w-md mx-auto">
+              Please select at least one color in the &quot;Available Colors Palette&quot; above to configure size ratios and loose inventory.
+            </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="overflow-x-auto border border-gray-200 rounded-xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 uppercase font-semibold text-[11px] tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4 w-44">Color Shade</th>
-                    <th className="py-3 px-4">Ratio Sets & Single Size Loose Stock</th>
-                    <th className="py-3 px-4 w-32 text-center">Total Pieces</th>
-                    <th className="py-3 px-4 w-32 text-right">Inventory Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {selectedColors.map((color) => {
-                    const clean = cleanColorName(color);
-                    const cInfo = getColorHex(color);
-                    const rawColorRatios = colorRatioStockMap[clean] || {};
-                    let colorRatios: Record<string, number> = { ...rawColorRatios };
-                    if (Object.keys(colorRatios).length === 0) {
-                      colorRatios = { [formData.sizesRatio]: 0 };
-                    } else if (
-                      Object.keys(colorRatios).length === 1 &&
-                      formData.sizesRatio &&
-                      colorRatios[formData.sizesRatio] === undefined
-                    ) {
-                      const singleCount = Object.values(colorRatios)[0] ?? 0;
-                      colorRatios = { [formData.sizesRatio]: singleCount };
-                    }
-                    const colorLoose = colorLooseStockMap[clean] || {};
-                    const stockCalc = calculateTotalColorPieces(colorRatios, colorLoose, formData.pcsPerSet || 5);
-                    const sizeBreakdown = calculateColorSizesBreakdown(colorRatios, colorLoose);
-                    const totalColorVal = stockCalc.totalPcs * (formData.price || 0);
+          <div className="space-y-6">
+            {/* Color Navigation Tabs */}
+            <div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">
+                Choose Color to Configure:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedColors.map((color) => {
+                  const clean = cleanColorName(color);
+                  const ratios = colorRatioStockMap[clean] || {};
+                  const loose = colorLooseStockMap[clean] || {};
+                  const calc = calculateTotalColorPieces(ratios, loose, formData.pcsPerSet || 5);
+                  const colorPreset = PRESET_COLORS.find(
+                    (c) => c.name.toLowerCase() === color.toLowerCase()
+                  );
+                  const hex = colorPreset?.hex || getColorHex(color);
+                  const isLight = colorPreset?.border || false;
+                  const isActive = (activeStockColor || selectedColors[0]) === color;
 
-                    return (
-                      <tr key={color} className="hover:bg-gray-50/60 transition-colors align-top">
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-4 h-4 rounded-full border border-black/15 shrink-0"
-                              style={{ backgroundColor: cInfo.hex }}
-                            />
-                            <div>
-                              <span className="font-semibold text-gray-900 block">{color}</span>
-                              <span className="text-[10px] text-gray-500 font-mono block">
-                                {stockCalc.totalSets} Sets + {stockCalc.loosePcs} Loose
-                              </span>
-                            </div>
-                            {stockCalc.totalPcs === 0 && (
-                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                0 Stock (Hidden)
-                              </span>
-                            )}
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setActiveStockColor(color)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border shrink-0"
+                        style={{
+                          backgroundColor: hex,
+                          borderColor: isLight ? "#cbd5e1" : "rgba(0,0,0,0.15)",
+                        }}
+                      />
+                      <span>{color}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {calc.totalSets} Sets · {calc.loosePcs} Loose
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Color Workspace Card */}
+            {(() => {
+              const currentColor = selectedColors.includes(activeStockColor)
+                ? activeStockColor
+                : selectedColors[0];
+              const clean = cleanColorName(currentColor);
+              const ratios = colorRatioStockMap[clean] || {};
+              const loose = colorLooseStockMap[clean] || {};
+              const calc = calculateTotalColorPieces(ratios, loose, formData.pcsPerSet || 5);
+              const breakdown = calculateColorSizesBreakdown(ratios, loose);
+              const colorPreset = PRESET_COLORS.find(
+                (c) => c.name.toLowerCase() === currentColor.toLowerCase()
+              );
+              const hex = colorPreset?.hex || getColorHex(currentColor);
+              const isLight = colorPreset?.border || false;
+
+              // Default sizes list for loose piece stepper
+              const standardLooseSizes = ["28", "30", "32", "34", "36", "38", "40", "42"];
+              const allLooseSizes = Array.from(
+                new Set([...standardLooseSizes, ...Object.keys(loose)])
+              ).sort((a, b) => {
+                const numA = parseInt(a, 10);
+                const numB = parseInt(b, 10);
+                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                return a.localeCompare(b);
+              });
+
+              return (
+                <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6">
+                  {/* Top Bar of Active Color */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-5 h-5 rounded-full border shrink-0 shadow-2xs"
+                        style={{
+                          backgroundColor: hex,
+                          borderColor: isLight ? "#cbd5e1" : "rgba(0,0,0,0.15)",
+                        }}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{currentColor}</span>
+                          <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            Total: {calc.totalPcs} PCS
+                          </span>
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            ₹{(calc.totalPcs * (formData.price || 0)).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {calc.totalSets} Wholesale Pack Sets + {calc.loosePcs} Loose Single Pieces
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedColors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyColorToAll(currentColor)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 hover:border-gray-900 bg-white text-gray-700 hover:text-black text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                        title={`Copy ${currentColor}'s size ratios and loose inventory to all other colors`}
+                      >
+                        <Copy className="w-3.5 h-3.5 text-gray-500" />
+                        <span>Copy Setup to All Colors</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 2-Column Responsive Layout: Left = Ratios, Right = Loose Pieces */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* LEFT COLUMN: Wholesale Size Ratio Packs */}
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-blue-600" />
+                          <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            Wholesale Size Ratio Packs
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                          {calc.totalSets} Sets ({calc.setPieces} Pcs)
+                        </span>
+                      </div>
+
+                      {/* Standard Ratio Pack Quick Buttons */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-medium text-gray-500 block">
+                          Add Standard Pack (Click to Apply / Add):
+                        </span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {STANDARD_SIZE_RATIOS.map((std) => {
+                            const isPresent = ratios[std.value] !== undefined;
+                            return (
+                              <button
+                                key={std.value}
+                                type="button"
+                                onClick={() => handleSetRatioForColor(currentColor, std.value)}
+                                className={`px-2.5 py-2 rounded-xl text-center text-xs font-semibold border transition-all cursor-pointer ${
+                                  isPresent
+                                    ? "bg-blue-50/80 border-blue-400 text-blue-900 shadow-2xs"
+                                    : "bg-gray-50 border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50/40"
+                                }`}
+                              >
+                                <div className="font-bold">{std.value}</div>
+                                <div className="text-[10px] text-gray-500 font-normal">{std.pcs} pcs/set</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Add Custom Ratio Pack */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Or Custom Ratio: e.g. 28 to 34"
+                          value={customRatioInput}
+                          onChange={(e) => setCustomRatioInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (customRatioInput.trim()) {
+                                handleSetRatioForColor(currentColor, customRatioInput.trim());
+                                setCustomRatioInput("");
+                              }
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (customRatioInput.trim()) {
+                              handleSetRatioForColor(currentColor, customRatioInput.trim());
+                              setCustomRatioInput("");
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Pack</span>
+                        </button>
+                      </div>
+
+                      {/* Configured Ratios List */}
+                      <div className="space-y-2.5 pt-2 border-t border-gray-100">
+                        <span className="text-[11px] font-bold text-gray-700 block">
+                          Configured Sets for {currentColor}:
+                        </span>
+
+                        {Object.keys(ratios).length === 0 ? (
+                          <div className="p-3 bg-gray-50 rounded-lg text-center text-xs text-gray-400 italic">
+                            No ratio packs configured. Click a standard pack above.
                           </div>
-                        </td>
-
-                        <td className="py-3.5 px-4 space-y-3">
-                          {/* 1. Wholesale Ratio Sets */}
-                          <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-blue-600" /> Wholesale Ratio Sets
-                              </span>
-                              <span className="text-[10px] text-gray-500 font-mono">
-                                {stockCalc.totalSets} sets ({stockCalc.setPcs} pcs)
-                              </span>
-                            </div>
-                            <div className="space-y-1.5">
-                              {Object.entries(colorRatios).map(([ratioKey, setsCount]) => {
-                                const ratioSizes = getSizesFromRatio(ratioKey);
-                                const ratioPcs = (setsCount || 0) * (ratioSizes.length > 0 ? ratioSizes.length : (formData.pcsPerSet || 5));
-                                return (
-                                  <div
-                                    key={ratioKey}
-                                    className="flex items-center gap-2 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/70"
-                                  >
-                                    <span className="text-xs font-bold text-gray-800 bg-white px-2 py-1 rounded border border-gray-200 min-w-[75px] text-center">
+                        ) : (
+                          Object.entries(ratios).map(([ratioKey, setsCount]) => {
+                            const ratioSizes = getSizesFromRatio(ratioKey);
+                            return (
+                              <div
+                                key={ratioKey}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gray-50/80 border border-gray-200 p-2.5 rounded-xl"
+                              >
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-xs text-gray-900 font-mono">
                                       {ratioKey}
                                     </span>
-                                    <div className="inline-flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleColorRatioSetChange(
-                                            color,
-                                            ratioKey,
-                                            Math.max(0, setsCount - 1)
-                                          )
-                                        }
-                                        className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-200 font-bold text-xs cursor-pointer"
-                                      >
-                                        -
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={setsCount}
-                                        onChange={(e) =>
-                                          handleColorRatioSetChange(
-                                            color,
-                                            ratioKey,
-                                            Math.max(0, parseInt(e.target.value, 10) || 0)
-                                          )
-                                        }
-                                        className="w-16 text-center py-1 bg-white border border-gray-300 rounded font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-black"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleColorRatioSetChange(color, ratioKey, setsCount + 1)
-                                        }
-                                        className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-200 font-bold text-xs cursor-pointer"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                    <span className="text-[11px] font-mono text-gray-500 font-medium">
-                                      sets ({ratioPcs} pcs)
+                                    <span className="text-[10px] text-gray-500 font-normal">
+                                      ({ratioSizes.length} pcs/set: {ratioSizes.join(", ")})
                                     </span>
+                                  </div>
+                                </div>
 
-                                    {Object.keys(colorRatios).length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveRatioFromColor(color, ratioKey)}
-                                        className="ml-auto p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                                        title="Remove this ratio"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-
-                                    {/* Unpack 1 Set into Loose Pieces Button */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {/* Stepper */}
+                                  <div className="inline-flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden shadow-2xs">
                                     <button
                                       type="button"
-                                      onClick={() => handleUnpackSet(color, ratioKey)}
-                                      disabled={setsCount <= 0}
-                                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                      title={`Unpack 1 set of '${ratioKey}' into loose pieces`}
-                                    >
-                                      <PackageOpen className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-
-                              {/* + Add Ratio Option */}
-                              <div className="flex items-center gap-2 pt-1">
-                                <select
-                                  onChange={(e) => {
-                                    if (e.target.value === "__custom__") {
-                                      const customR = prompt(`Enter ratio name for ${color} (e.g. 28 to 34 or 30 to 40):`);
-                                      if (customR && customR.trim()) {
-                                        handleAddRatioToColor(color, customR.trim());
+                                      onClick={() =>
+                                        handleColorRatioSetChange(
+                                          currentColor,
+                                          ratioKey,
+                                          setsCount - 1
+                                        )
                                       }
-                                      e.target.value = "";
-                                      return;
-                                    }
-                                    if (e.target.value) {
-                                      handleAddRatioToColor(color, e.target.value);
-                                      e.target.value = "";
-                                    }
-                                  }}
-                                  defaultValue=""
-                                  className="text-[11px] font-medium bg-white border border-dashed border-gray-300 hover:border-gray-900 rounded-lg px-2 py-1 text-gray-700 cursor-pointer focus:outline-none"
-                                >
-                                  <option value="" disabled>
-                                    + Add Ratio for {color}...
-                                  </option>
-                                  {colorRatios[formData.sizesRatio] === undefined && (
-                                    <option value={formData.sizesRatio}>
-                                      + {formData.sizesRatio} (Selected Pack • {formData.pcsPerSet} pcs)
-                                    </option>
-                                  )}
-                                  {STANDARD_SIZE_RATIOS.filter(
-                                    (r) => colorRatios[r.value] === undefined && r.value !== formData.sizesRatio
-                                  ).map((r) => (
-                                    <option key={r.value} value={r.value}>
-                                      + {r.value} ({r.pcs} pcs/set)
-                                    </option>
-                                  ))}
-                                  <option value="__custom__">+ Enter Custom Ratio...</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 2. Single Size Loose Pieces (Retail Stock) */}
-                          <div className="pt-2 border-t border-gray-100">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1.5">
-                                <Package className="w-3.5 h-3.5 text-emerald-600" /> Single Size Loose Pieces (Retail Stock)
-                              </span>
-                              <span className="text-[10px] text-emerald-700 font-mono font-medium">
-                                {stockCalc.loosePcs} loose pcs
-                              </span>
-                            </div>
-
-                            {Object.keys(colorLoose).length === 0 ? (
-                              <div className="text-[11px] text-gray-400 italic py-1">
-                                No loose single size pieces added. All stock is in sets.
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                {Object.entries(colorLoose).map(([sizeKey, count]) => (
-                                  <div
-                                    key={sizeKey}
-                                    className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-900 px-2 py-1 rounded-lg text-xs"
-                                  >
-                                    <span className="font-bold font-mono">Size {sizeKey}:</span>
-                                    <div className="inline-flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleColorLoosePieceChange(color, sizeKey, count - 1)}
-                                        className="w-5 h-5 rounded border border-emerald-300 bg-white flex items-center justify-center text-emerald-800 hover:bg-emerald-100 font-bold text-xs cursor-pointer"
-                                      >
-                                        -
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={count}
-                                        onChange={(e) =>
-                                          handleColorLoosePieceChange(
-                                            color,
-                                            sizeKey,
-                                            parseInt(e.target.value, 10) || 0
-                                          )
-                                        }
-                                        className="w-12 text-center py-0.5 bg-white border border-emerald-300 rounded font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleColorLoosePieceChange(color, sizeKey, count + 1)}
-                                        className="w-5 h-5 rounded border border-emerald-300 bg-white flex items-center justify-center text-emerald-800 hover:bg-emerald-100 font-bold text-xs cursor-pointer"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                    <span className="text-[10px] font-mono text-emerald-700">pcs</span>
+                                      className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-sm cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={setsCount}
+                                      onChange={(e) =>
+                                        handleColorRatioSetChange(
+                                          currentColor,
+                                          ratioKey,
+                                          parseInt(e.target.value, 10) || 0
+                                        )
+                                      }
+                                      className="w-12 h-7 text-center font-mono font-bold text-xs bg-transparent border-x border-gray-200 focus:outline-none"
+                                    />
                                     <button
                                       type="button"
-                                      onClick={() => handleRemoveLooseSizeFromColor(color, sizeKey)}
-                                      className="ml-1 text-emerald-500 hover:text-red-600 transition-colors cursor-pointer"
-                                      title="Remove this loose size"
+                                      onClick={() =>
+                                        handleColorRatioSetChange(
+                                          currentColor,
+                                          ratioKey,
+                                          setsCount + 1
+                                        )
+                                      }
+                                      className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-sm cursor-pointer"
                                     >
-                                      <Trash2 className="w-3 h-3" />
+                                      +
                                     </button>
                                   </div>
-                                ))}
+
+                                  {/* Unpack 1 Set */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnpackSet(currentColor, ratioKey)}
+                                    disabled={setsCount <= 0}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                                    title="Unpacks 1 set into loose pieces so you can sell individual sizes"
+                                  >
+                                    <PackageOpen className="w-3.5 h-3.5" />
+                                    <span>Unpack Set</span>
+                                  </button>
+
+                                  {/* Remove Ratio */}
+                                  {Object.keys(ratios).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemoveRatioFromColor(currentColor, ratioKey)
+                                      }
+                                      className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                                      title="Remove this ratio pack"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            )}
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
 
-                            {/* + Add Loose Size Selector */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <select
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    handleAddLooseSizeToColor(color, e.target.value);
-                                    e.target.value = "";
-                                  }
-                                }}
-                                defaultValue=""
-                                className="text-[11px] font-medium bg-emerald-50/60 border border-dashed border-emerald-300 hover:border-emerald-600 rounded-lg px-2 py-1 text-emerald-800 cursor-pointer focus:outline-none"
-                              >
-                                <option value="" disabled>
-                                  + Add Single Size Loose Pcs for {color}...
-                                </option>
-                                {AVAILABLE_PACK_SIZES.filter(
-                                  (sz) => colorLoose[sz] === undefined
-                                ).map((sz) => (
-                                  <option key={sz} value={sz}>
-                                    + Size {sz}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                    {/* RIGHT COLUMN: Single Size Loose Pieces (Retail Storefront) */}
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Scissors className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            Single Size Loose Pieces (Retail)
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          {calc.loosePcs} Loose Pcs
+                        </span>
+                      </div>
 
-                            {/* 3. Sell / Deduct 1 Pc (Auto-convert set if no loose pieces) */}
-                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
-                              <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
-                                <Scissors className="w-3.5 h-3.5 text-blue-600" /> Sell / Deduct 1 Pc:
-                              </span>
-                              <select
-                                id={`sell-select-${clean}`}
-                                className="text-[11px] font-semibold bg-white border border-gray-300 rounded-lg px-2 py-1 text-gray-800 focus:outline-none"
-                                defaultValue=""
-                              >
-                                <option value="" disabled>Select Size to Sell...</option>
-                                {Object.keys(sizeBreakdown).map((sz) => (
-                                  <option key={sz} value={sz} disabled={sizeBreakdown[sz] <= 0}>
-                                    Size {sz} ({sizeBreakdown[sz]} available{colorLoose[sz] ? ` • ${colorLoose[sz]} loose` : " • in set"})
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const el = document.getElementById(`sell-select-${clean}`) as HTMLSelectElement;
-                                  if (el && el.value) {
-                                    handleSellSingleSize(color, el.value);
-                                  } else {
-                                    toast("Please select a size to sell", "error");
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-black hover:bg-gray-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
-                                title="If no loose pcs exist, automatically removes from set and converts or unpacks set"
-                              >
-                                <span>Sell 1 Pc</span>
-                              </button>
-                              <span className="text-[10px] text-gray-400 italic">
-                                (Auto-unpacks or converts set if loose stock is 0)
-                              </span>
-                            </div>
-                          </div>
+                      <p className="text-xs text-gray-500">
+                        Adjust individual sizes directly or use &quot;Unpack Set&quot; on the left when a set is broken.
+                      </p>
 
-                          {/* 3. Real-time Retail Size Breakdown Matrix */}
-                          <div className="pt-2 border-t border-gray-100">
-                            <div className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-1">
-                              Retail Website Inventory Breakdown (Sets + Loose):
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(sizeBreakdown).map(([sz, qty]) => (
-                                <span
-                                  key={sz}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-[11px] font-mono"
-                                >
-                                  <span className="font-bold text-gray-700">{sz}:</span>
-                                  <span className={qty > 0 ? "text-blue-700 font-bold" : "text-gray-400"}>
-                                    {qty} pcs
-                                  </span>
+                      {/* Loose Sizes Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {allLooseSizes.map((size) => {
+                          const count = loose[size] || 0;
+                          return (
+                            <div
+                              key={size}
+                              className={`p-2 rounded-xl border text-center transition-all ${
+                                count > 0
+                                  ? "bg-emerald-50/60 border-emerald-300 shadow-2xs"
+                                  : "bg-gray-50/60 border-gray-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-gray-800 font-mono">
+                                  Size {size}
                                 </span>
-                              ))}
+                                {count > 0 && (
+                                  <span className="text-[9px] font-bold font-mono text-emerald-700 bg-emerald-100 px-1 rounded">
+                                    {count} pcs
+                                  </span>
+                                )}
+                              </div>
+                              <div className="inline-flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden shadow-2xs w-full justify-between">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleColorLoosePieceChange(currentColor, size, count - 1)
+                                  }
+                                  className="w-6 h-6 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-xs cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={count}
+                                  onChange={(e) =>
+                                    handleColorLoosePieceChange(
+                                      currentColor,
+                                      size,
+                                      parseInt(e.target.value, 10) || 0
+                                    )
+                                  }
+                                  className="w-8 h-6 text-center font-mono font-bold text-xs bg-transparent focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleColorLoosePieceChange(currentColor, size, count + 1)
+                                  }
+                                  className="w-6 h-6 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-xs cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          );
+                        })}
+                      </div>
 
-                        <td className="py-3.5 px-4 text-center font-mono font-medium text-gray-700">
-                          <span className="font-bold text-gray-900 text-sm block">
-                            {stockCalc.totalPcs} PCS
-                          </span>
-                          <span className="text-[10px] text-gray-400 block">
-                            ({stockCalc.totalSets} sets + {stockCalc.loosePcs} loose)
-                          </span>
-                        </td>
+                      {/* Add Custom Loose Size */}
+                      <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                        <input
+                          type="text"
+                          placeholder="Custom Size (e.g. 26 or 44)"
+                          value={customLooseSizeInput}
+                          onChange={(e) => setCustomLooseSizeInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (customLooseSizeInput.trim()) {
+                                handleAddLooseSizeToColor(
+                                  currentColor,
+                                  customLooseSizeInput.trim()
+                                );
+                                setCustomLooseSizeInput("");
+                              }
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (customLooseSizeInput.trim()) {
+                              handleAddLooseSizeToColor(
+                                currentColor,
+                                customLooseSizeInput.trim()
+                              );
+                              setCustomLooseSizeInput("");
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Size</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-                        <td className="py-3.5 px-4 text-right font-mono font-semibold text-gray-900">
-                          ₹{totalColorVal.toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-gray-50 font-bold border-t border-gray-200 text-gray-900 text-xs">
-                  {(() => {
-                    let grandSets = 0;
-                    let grandLoose = 0;
-                    let grandPcs = 0;
-                    for (const c of selectedColors) {
-                      const clean = cleanColorName(c);
+                  {/* BOTTOM: Live Storefront Available Inventory for Active Color */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-800">
+                        Live Storefront Inventory Breakdown for {currentColor}:
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        (What retail &amp; online customers can purchase)
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {Object.keys(breakdown).length === 0 ||
+                      Object.values(breakdown).every((v) => v === 0) ? (
+                        <div className="text-xs text-gray-400 italic">
+                          0 pieces available in stock for {currentColor}.
+                        </div>
+                      ) : (
+                        Object.entries(breakdown).map(([sizeKey, totalPcs]) => {
+                          const looseCount = loose[sizeKey] || 0;
+                          const fromSets = Math.max(0, totalPcs - looseCount);
+
+                          return (
+                            <div
+                              key={sizeKey}
+                              className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-medium flex items-center gap-2 ${
+                                totalPcs > 0
+                                  ? "bg-slate-50 border-slate-300 text-slate-800"
+                                  : "bg-gray-50 border-gray-200 text-gray-400 opacity-50"
+                              }`}
+                            >
+                              <span className="font-bold">Size {sizeKey}:</span>
+                              <span className="font-bold text-zinc-900">{totalPcs} pcs</span>
+                              {looseCount > 0 && (
+                                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-200">
+                                  {looseCount} loose
+                                </span>
+                              )}
+                              {fromSets > 0 && (
+                                <span className="text-[10px] text-blue-700 bg-blue-50 px-1 rounded border border-blue-200">
+                                  {fromSets} in sets
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* All Colors Inventory Summary Table */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                  All Colors Inventory Summary
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {selectedColors.length} colors active
+                </span>
+              </div>
+
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Color</th>
+                      <th className="py-2.5 px-3">Wholesale Sets</th>
+                      <th className="py-2.5 px-3">Loose Pieces</th>
+                      <th className="py-2.5 px-3 text-center">Total Pcs</th>
+                      <th className="py-2.5 px-3 text-right">Value (₹)</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedColors.map((color) => {
+                      const clean = cleanColorName(color);
                       const ratios = colorRatioStockMap[clean] || {};
                       const loose = colorLooseStockMap[clean] || {};
                       const calc = calculateTotalColorPieces(ratios, loose, formData.pcsPerSet || 5);
-                      grandSets += calc.totalSets;
-                      grandLoose += calc.loosePcs;
-                      grandPcs += calc.totalPcs;
-                    }
-                    const grandVal = grandPcs * (formData.price || 0);
+                      const colorPreset = PRESET_COLORS.find(
+                        (c) => c.name.toLowerCase() === color.toLowerCase()
+                      );
+                      const hex = colorPreset?.hex || getColorHex(color);
+                      const isLight = colorPreset?.border || false;
+                      const val = calc.totalPcs * (formData.price || 0);
 
-                    return (
-                      <tr>
-                        <td className="py-3 px-4">Total Inventory</td>
-                        <td className="py-3 px-4 font-mono font-bold text-zinc-900 text-xs">
-                          {grandSets} Sets across ratios + {grandLoose} Loose Pieces
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono text-zinc-800 text-sm">
-                          {grandPcs} PCS
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-emerald-700 text-sm">
-                          ₹{grandVal.toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-                </tfoot>
-              </table>
+                      const ratiosSummary = Object.entries(ratios)
+                        .filter(([_, count]) => count > 0)
+                        .map(([r, count]) => `${r}: ${count} sets`)
+                        .join(", ") || "0 sets";
+
+                      const looseSummary = Object.entries(loose)
+                        .filter(([_, count]) => count > 0)
+                        .map(([sz, count]) => `${sz}: ${count} pcs`)
+                        .join(", ") || "—";
+
+                      return (
+                        <tr key={color} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-2.5 px-3 font-medium text-gray-900">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-3.5 h-3.5 rounded-full border shrink-0"
+                                style={{
+                                  backgroundColor: hex,
+                                  borderColor: isLight ? "#cbd5e1" : "rgba(0,0,0,0.15)",
+                                }}
+                              />
+                              <span>{color}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-gray-700">
+                            {ratiosSummary}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-emerald-800">
+                            {looseSummary}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-gray-900">
+                            {calc.totalPcs}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-emerald-700">
+                            ₹{val.toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setActiveStockColor(color)}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-gray-50 border-t border-gray-200 font-bold">
+                    {(() => {
+                      let grandSets = 0;
+                      let grandLoose = 0;
+                      let grandPcs = 0;
+                      for (const c of selectedColors) {
+                        const clean = cleanColorName(c);
+                        const ratios = colorRatioStockMap[clean] || {};
+                        const loose = colorLooseStockMap[clean] || {};
+                        const calc = calculateTotalColorPieces(ratios, loose, formData.pcsPerSet || 5);
+                        grandSets += calc.totalSets;
+                        grandLoose += calc.loosePcs;
+                        grandPcs += calc.totalPcs;
+                      }
+                      const grandVal = grandPcs * (formData.price || 0);
+
+                      return (
+                        <tr>
+                          <td className="py-2.5 px-3">Total Inventory</td>
+                          <td className="py-2.5 px-3 font-mono text-zinc-900 text-xs">
+                            {grandSets} Sets
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-emerald-800 text-xs">
+                            {grandLoose} Loose Pcs
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-zinc-900 text-sm">
+                            {grandPcs} PCS
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-sm">
+                            ₹{grandVal.toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2.5 px-3"></td>
+                        </tr>
+                      );
+                    })()}
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -2342,7 +2562,7 @@ export default function ProductForm({
             />
             <div>
               <span className="text-sm font-semibold text-gray-900 block">
-                Active (Visible in Employee & Customer Order Catalog)
+                Active (Visible in Employee &amp; Customer Order Catalog)
               </span>
               <span className="text-xs text-gray-500">
                 When enabled, employees can take orders and book sets for this garment up to available stock.
@@ -2351,6 +2571,7 @@ export default function ProductForm({
           </label>
         </div>
       </div>
+
 
       {/* Footer Controls */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
