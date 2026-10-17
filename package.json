@@ -15,7 +15,8 @@
     "db:use-postgres": "node scripts/switch-db.js postgresql && prisma generate",
     "db:use-sqlite": "node scripts/switch-db.js sqlite && prisma generate",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
-    "auto-push": "node scripts/auto-git-push.js"
+    "auto-push": "node scripts/auto-git-push.js",
+    "whatsapp:gateway": "node scripts/whatsapp-gateway.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
