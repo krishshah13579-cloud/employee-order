@@ -146,8 +146,7 @@ export function generateTaxInvoiceWhatsAppMessage(
     `• *IFSC Code:* ICIC0007507\n` +
     `• *Beneficiary:* KRISH CLOTHING CO.\n` +
     `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
-    `📄 *Download Tax Invoice PDF:* ${pdfUrl}\n` +
-    `🔗 *View Live Invoice:* ${viewUrl}\n\n` +
+    `📄 *Official Tax Invoice PDF Attached*\n\n` +
     `Kindly arrange payment as per weekly credit terms. Thank you for your business!\n` +
     `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
   );
