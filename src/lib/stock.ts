@@ -100,8 +100,11 @@ export function parseDetailedColorRatioSets(
           if (!colorKey) continue;
           if (typeof val === "object" && val !== null) {
             result[colorKey] = {};
-            for (const [ratioKey, count] of Object.entries(val as any)) {
-              result[colorKey][ratioKey.trim()] = Math.max(0, parseInt(String(count), 10) || 0);
+            const ratioSource = (val as any).ratios && typeof (val as any).ratios === "object" ? (val as any).ratios : val;
+            for (const [ratioKey, count] of Object.entries(ratioSource)) {
+              if (ratioKey !== "loose" && ratioKey !== "loosePcs") {
+                result[colorKey][ratioKey.trim()] = Math.max(0, parseInt(String(count), 10) || 0);
+              }
             }
           } else {
             const num = parseInt(String(val), 10);
