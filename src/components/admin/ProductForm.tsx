@@ -27,7 +27,9 @@ import {
   Plus,
   PackageOpen,
   Scissors,
+  Copy,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
 import {
