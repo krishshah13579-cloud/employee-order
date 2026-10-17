@@ -70,6 +70,27 @@ export default function AdminStockPage() {
   const [editCostPrice, setEditCostPrice] = useState<string>("");
   const [editColorRatios, setEditColorRatios] = useState<Record<string, Record<string, number>>>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  const [syncingStore, setSyncingStore] = useState(false);
+
+  const handleSyncStore = async () => {
+    try {
+      setSyncingStore(true);
+      const res = await fetch("https://iq-trousers-store-uge4.vercel.app/api/sync-stock");
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast(
+          `Synced ${data.syncedStylesCount || 0} styles with E-Commerce Storefront! Out-of-stock items hidden automatically.`,
+          "success"
+        );
+      } else {
+        toast(data.error || "Storefront sync encountered an issue", "error");
+      }
+    } catch (e: any) {
+      toast("Storefront sync error: " + e.message, "error");
+    } finally {
+      setSyncingStore(false);
+    }
+  };
 
   const fetchStock = async () => {
     try {
