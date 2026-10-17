@@ -203,14 +203,66 @@ export async function POST(request: NextRequest) {
       const updatedProducts: any[] = [];
 
       await prisma.$transaction(async (tx) => {
-        for (const item of items) {
+        for (const item of items as any) {
           const product = await tx.product.findUnique({
             where: { id: item.productId },
           });
 
-          if (!product) continue;
+          if (!product || !product.setsColorwise || product.setsColorwise.trim() === "") continue;
 
-          if (product.setsColorwise && product.setsColorwise.trim() !== "") {
+          // 1. Single-size sale (e.g. retail order specifying size)
+          if (item.size) {
+            const detailed = parseDetailedColorStockWithLoose(product.setsColorwise, product.sizesRatio || "30 to 38");
+            const cleanCol = cleanColorName(item.color);
+            const colorStock = detailed[cleanCol] || { ratios: {}, loosePcs: {} };
+
+            const qty = Number(item.quantity || item.pcs || 1);
+            let curRatios = { ...colorStock.ratios };
+            let curLoose = { ...colorStock.loosePcs };
+
+            for (let q = 0; q < qty; q++) {
+              const res = sellSingleSizeFromColorStock(curRatios, curLoose, String(item.size));
+              if (res.success) {
+                curRatios = res.ratios;
+                curLoose = res.loosePcs;
+              }
+            }
+
+            detailed[cleanCol] = {
+              ratios: curRatios,
+              loosePcs: curLoose,
+            };
+
+            let totalLooseAcrossColors = 0;
+            for (const d of Object.values(detailed)) {
+              for (const cnt of Object.values(d.loosePcs)) {
+                totalLooseAcrossColors += cnt;
+              }
+            }
+
+            const updated = await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                setsColorwise: JSON.stringify(detailed),
+                mixPcs: totalLooseAcrossColors,
+              },
+            });
+
+            const newTotalSets = getTotalAvailableSets(updated.setsColorwise);
+            const newTotalPcs = newTotalSets * (updated.pcsPerSet || 5) + ((updated as any).mixPcs || 0);
+
+            updatedProducts.push({
+              productId: updated.id,
+              name: updated.name,
+              color: item.color,
+              size: item.size,
+              quantityDeducted: qty,
+              remainingSets: newTotalSets,
+              remainingPcs: newTotalPcs,
+              inStock: newTotalPcs > 0,
+            });
+          } else {
+            // 2. Whole sets wholesale order
             const deductMap = [{ color: item.color, sets: Number(item.sets) || 1 }];
             const updatedStockStr = deductSetsFromStock(product.setsColorwise, deductMap);
 
