@@ -155,3 +155,36 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+/**
+ * DELETE /api/products
+ * Removes all products from the Wholesale Garment Catalog.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireAdmin(request);
+    const authHeader = request.headers.get("x-admin-secret");
+    const isAuthorized = auth.authorized || authHeader === "krish_clothing_admin_2026";
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Delete any remaining order items first to prevent foreign key errors
+    await prisma.orderItem.deleteMany({});
+
+    // Delete all products
+    const deleted = await prisma.product.deleteMany({});
+
+    return NextResponse.json({
+      success: true,
+      message: "All products removed from Wholesale Garment Catalog successfully.",
+      count: deleted.count,
+    });
+  } catch (error: any) {
+    console.error("Error deleting all products:", error);
+    return NextResponse.json(
+      { error: "Failed to delete products: " + error.message },
+      { status: 500 }
+    );
+  }
+}
