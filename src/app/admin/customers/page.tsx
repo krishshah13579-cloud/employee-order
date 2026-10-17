@@ -219,7 +219,7 @@ export default function CustomersPage() {
               Super Admin: Credit Days Editing Authorized
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-600 border border-gray-200 rounded-xl text-[11px] font-medium" title="Only Super Admin krishshah13579@gmail.com can modify Credit Days">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-600 border border-gray-200 rounded-xl text-[11px] font-medium" title="Only Super Admin can modify Credit Days">
               <Lock size={12} className="text-gray-400" />
               Credit Days: Super Admin Managed
             </span>

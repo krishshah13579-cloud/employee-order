@@ -10,7 +10,17 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const month = body.month ? parseInt(body.month, 10) : now.getMonth() + 1; // 1-12
     const year = body.year ? parseInt(body.year, 10) : now.getFullYear();
-    const recipientEmail = body.recipientEmail || "krishshah13579@gmail.com";
+    const profile = await prisma.adminProfile.findFirst({ select: { email: true } });
+    const admin = await prisma.adminAccount.findFirst({ select: { username: true } });
+    const defaultAdminEmail = profile?.email || admin?.username || process.env.ADMIN_EMAIL || process.env.GMAIL_USER || "";
+    const recipientEmail = body.recipientEmail || defaultAdminEmail;
+
+    if (!recipientEmail) {
+      return NextResponse.json(
+        { error: "No administrator email address found in profile or database." },
+        { status: 400 }
+      );
+    }
 
     const monthNames = [
       "January", "February", "March", "April", "May", "June",

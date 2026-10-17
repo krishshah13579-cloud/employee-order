@@ -18,10 +18,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const username = "krishshah13579@gmail.com";
+    let username = (body.username || "").trim().toLowerCase();
     const password = (body.password || "").trim();
-    const fullName = (body.fullName || "Krish Shah").trim();
+    const fullName = (body.fullName || "Administrator").trim();
     const companyName = (body.companyName || "IQ TROUSERS").trim();
+
+    if (!username) {
+      const existingAdmin = await prisma.adminAccount.findFirst();
+      if (existingAdmin) {
+        username = existingAdmin.username;
+      } else {
+        return NextResponse.json(
+          { error: "Username is required." },
+          { status: 400 }
+        );
+      }
+    }
 
     if (!password || password.length < 6) {
       return NextResponse.json(
@@ -30,14 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Purge any unauthorized admin accounts
-    try {
-      await prisma.adminAccount.deleteMany({
-        where: { username: { not: "krishshah13579@gmail.com" } },
-      });
-    } catch {}
-
-    // Upsert or update master admin account
+    // Upsert or update admin account
     await prisma.adminAccount.upsert({
       where: { username },
       update: {
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
       create: {
         username,
         password,
-        twoFactorSecret: "135790",
+        twoFactorSecret: (body.twoFactorSecret || Math.floor(100000 + Math.random() * 900000).toString()).trim(),
         twoFactorEnabled: true,
       },
     });
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Do NOT return the password in response
     return NextResponse.json({
       success: true,
-      message: "Admin credentials successfully reset for krishshah13579@gmail.com!",
+      message: `Admin credentials successfully reset for ${username}!`,
     });
   } catch (error: any) {
     console.error("Admin reset error:", error);

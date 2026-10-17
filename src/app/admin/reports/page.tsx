@@ -138,7 +138,7 @@ export default function AdminReportsPage() {
     const monthNum = selectedMonth === "all" ? currentDate.getMonth() + 1 : parseInt(selectedMonth, 10);
     const monthName = MONTH_NAMES[monthNum - 1] || "Monthly";
 
-    if (!confirm(`Generate and email the ${monthName} ${selectedYear} Processed Orders Report to krishshah13579@gmail.com?`)) {
+    if (!confirm(`Generate and email the ${monthName} ${selectedYear} Processed Orders Report to your registered admin email?`)) {
       return;
     }
 
@@ -150,13 +150,12 @@ export default function AdminReportsPage() {
         body: JSON.stringify({
           month: monthNum,
           year: parseInt(selectedYear, 10),
-          recipientEmail: "krishshah13579@gmail.com",
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast(`✅ Monthly report for ${monthName} successfully emailed to krishshah13579@gmail.com!`, "success");
+        toast(`✅ Monthly report for ${monthName} successfully emailed!`, "success");
         setLastEmailSentAt(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
       } else {
         throw new Error(data.error || "Failed to send email");
@@ -209,7 +208,7 @@ export default function AdminReportsPage() {
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-2.5 rounded-xl flex items-center justify-between">
           <span className="flex items-center gap-1.5 font-medium">
             <CheckCircle2 size={14} className="text-emerald-600" />
-            Last monthly report dispatched to <strong>krishshah13579@gmail.com</strong> at {lastEmailSentAt} IST.
+            Last monthly report successfully dispatched to registered email at {lastEmailSentAt} IST.
           </span>
         </div>
       )}

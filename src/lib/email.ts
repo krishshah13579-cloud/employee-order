@@ -1,4 +1,16 @@
 import nodemailer from "nodemailer";
+import prisma from "@/lib/prisma";
+
+async function getAdminRecipientEmail(): Promise<string> {
+  if (process.env.ADMIN_EMAIL) return process.env.ADMIN_EMAIL;
+  try {
+    const profile = await prisma.adminProfile.findFirst({ select: { email: true } });
+    if (profile?.email) return profile.email;
+    const admin = await prisma.adminAccount.findFirst({ select: { username: true } });
+    if (admin?.username) return admin.username;
+  } catch {}
+  return process.env.GMAIL_USER || "";
+}
 
 /**
  * Utility to send 2FA OTP security emails.
@@ -115,7 +127,7 @@ export async function sendOtpEmail(
           "api-key": brevoApiKey,
         },
         body: JSON.stringify({
-          sender: { name: "IQ TROUSERS Security", email: "krishshah13579@gmail.com" },
+          sender: { name: "IQ TROUSERS Security", email: gmailUser || "security@iqtrousers.com" },
           to: [{ email: toEmail, name: adminName }],
           subject: `🔐 Your 2FA Security Code to Edit Admin Details: ${otpCode}`,
           htmlContent: htmlContent,
@@ -158,7 +170,8 @@ export async function sendNewOrderNotification(order: {
 }) {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
-  const adminEmail = "krishshah13579@gmail.com";
+  const adminEmail = await getAdminRecipientEmail();
+  if (!adminEmail) return;
 
   console.log(`\n📢 [NEW ORDER NOTIFICATION ALERT]`);
   console.log(`Order Number : ${order.orderNumber}`);
@@ -244,7 +257,8 @@ export async function sendNewCustomerNotification(customer: {
 }) {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
-  const adminEmail = "krishshah13579@gmail.com";
+  const adminEmail = await getAdminRecipientEmail();
+  if (!adminEmail) return;
 
   console.log(`\n👥 [NEW CUSTOMER NOTIFICATION ALERT]`);
   console.log(`Shop Name : ${customer.shopName}`);
@@ -342,10 +356,13 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
     orderDate: string;
   }[];
   generatedAt?: string;
-}, recipientEmail = "krishshah13579@gmail.com") {
+}, recipientEmail?: string) {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
-  const adminEmail = recipientEmail || "krishshah13579@gmail.com";
+  const adminEmail = recipientEmail || await getAdminRecipientEmail();
+  if (!adminEmail) {
+    return { success: false, error: "No admin recipient email configured." };
+  }
 
   console.log(`\n📊 [MONTHLY ORDERS REPORT DISPATCH]`);
   console.log(`Period       : ${reportData.monthName} ${reportData.year}`);

@@ -8,8 +8,15 @@ export async function POST(req: NextRequest) {
     const admin = await prisma.adminAccount.findFirst();
     const profile = await prisma.adminProfile.findFirst();
 
-    const targetEmail = profile?.email || admin?.username || "krishshah13579@gmail.com";
-    const adminName = profile?.fullName || "Krish Shah";
+    const targetEmail = profile?.email || admin?.username || process.env.ADMIN_EMAIL || process.env.GMAIL_USER || "";
+    const adminName = profile?.fullName || "Administrator";
+
+    if (!targetEmail) {
+      return NextResponse.json(
+        { error: "No administrator email address found in profile or database." },
+        { status: 400 }
+      );
+    }
 
     // 2. Generate a fresh 6-digit OTP code
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();

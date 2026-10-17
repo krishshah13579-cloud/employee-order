@@ -38,7 +38,7 @@ export default function AdminProfilePage() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
-  const [maskedEmail, setMaskedEmail] = useState("krishshah13579@gmail.com");
+  const [maskedEmail, setMaskedEmail] = useState("");
 
   const [formData, setFormData] = useState<AdminProfileData>({
     fullName: "",
@@ -95,7 +95,7 @@ export default function AdminProfilePage() {
       const res = await fetch("/api/admin/profile/send-otp", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.success) {
-        setMaskedEmail(data.email || data.fullEmail || "krishshah13579@gmail.com");
+        setMaskedEmail(data.email || data.fullEmail || "");
         toast("2FA Security code dispatched to your email!", "success");
       } else {
         toast(data.error || "Failed to dispatch 2FA email", "error");
@@ -365,7 +365,7 @@ export default function AdminProfilePage() {
                             ? "bg-gray-100 text-gray-600 border border-gray-200 cursor-not-allowed select-none font-medium"
                             : "bg-white border border-gray-300 text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                         }`}
-                        placeholder="krishshah13579@gmail.com"
+                        placeholder="admin@iqtrousers.com"
                       />
                     </div>
                   </div>
@@ -673,7 +673,7 @@ export default function AdminProfilePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail size={14} className="text-orange-400 shrink-0" />
-                  <span>{formData.email || "krishshah13579@gmail.com"}</span>
+                  <span>{formData.email || "Not set"}</span>
                 </div>
               </div>
 

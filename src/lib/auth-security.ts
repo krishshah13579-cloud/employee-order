@@ -82,7 +82,12 @@ export async function getAdminSession(req: NextRequest) {
 
     if (!admin) return null;
 
-    const isSuperAdmin = admin.username.toLowerCase() === "krishshah13579@gmail.com";
+    // Super Admin is dynamically determined by the primary master admin account in database
+    const primaryAdmin = await prisma.adminAccount.findFirst({
+      orderBy: { id: "asc" },
+      select: { id: true },
+    });
+    const isSuperAdmin = !primaryAdmin || admin.id === primaryAdmin.id;
     return {
       id: admin.id,
       username: admin.username,

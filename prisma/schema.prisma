@@ -10,9 +10,9 @@ datasource db {
 // Admin Authentication & 2FA Credentials Stored in Database
 model AdminAccount {
   id               Int       @id @default(autoincrement())
-  username         String    @unique // krishshah13579@gmail.com
-  password         String    // Krish@2000
-  twoFactorSecret  String    @default("135790") // 6-digit 2FA secret/PIN stored in DB
+  username         String    @unique
+  password         String
+  twoFactorSecret  String    @default("") // 2FA secret stored in DB
   twoFactorEnabled Boolean   @default(true)
   lastOtp          String?   // Latest generated 2FA OTP stored in DB
   otpExpiresAt     DateTime?
@@ -22,8 +22,8 @@ model AdminAccount {
 // 1. Admin Page (Admin Details)
 model AdminProfile {
   id          Int      @id @default(autoincrement())
-  fullName    String   @default("Krish Shah")
-  email       String   @default("krishshah13579@gmail.com")
+  fullName    String   @default("Administrator")
+  email       String   @default("")
   phone       String   @default("+91 98250 13579")
   companyName String   @default("IQ TROUSERS")
   gstNo       String   @default("24AAACI1357Q1Z2")

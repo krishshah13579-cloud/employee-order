@@ -76,7 +76,7 @@ export async function PUT(
         const requestedVal = parseInt(body.creditDays, 10) || 0;
         if (existing && existing.creditDays !== requestedVal) {
           return NextResponse.json(
-            { error: "Permission Denied: Only Super Admin (krishshah13579@gmail.com) can modify Customer Credit Days." },
+            { error: "Permission Denied: Only Super Admin can modify Customer Credit Days." },
             { status: 403 }
           );
         }

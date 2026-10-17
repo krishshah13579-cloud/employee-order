@@ -16,17 +16,6 @@ export async function POST(req: NextRequest) {
     const cleanUser = username.trim().toLowerCase();
     const cleanCode = code.toString().trim();
 
-    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is authorized
-    if (cleanUser !== "krishshah13579@gmail.com") {
-      return NextResponse.json(
-        {
-          error:
-            "Access Denied: Only krishshah13579@gmail.com is authorized to access the Admin Panel.",
-        },
-        { status: 403 }
-      );
-    }
-
     // Rate Limit / Brute-force protection
     const rateCheck = checkOtpRateLimit(cleanUser);
     if (!rateCheck.allowed) {
@@ -38,7 +27,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!admin) {
-      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+      return NextResponse.json({ error: "Administrator account not found." }, { status: 404 });
     }
 
     // STRICT VALIDATION: Code must match the fresh 6-digit OTP sent to email
@@ -51,8 +40,7 @@ export async function POST(req: NextRequest) {
       recordFailedOtpAttempt(cleanUser);
       return NextResponse.json(
         {
-          error:
-            "Invalid or expired 2FA code. Please enter the 6-digit code sent to krishshah13579@gmail.com.",
+          error: "Invalid or expired 2FA code. Please enter the 6-digit code sent to your email.",
         },
         { status: 401 }
       );

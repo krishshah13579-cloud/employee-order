@@ -286,7 +286,7 @@ export default function CustomerForm({
               </div>
             ) : (
               <p className="text-[11px] text-amber-700 mt-1.5 flex items-center gap-1">
-                <Lock size={12} /> Only Super Admin (krishshah13579@gmail.com) is authorized to modify Credit Days.
+                <Lock size={12} /> Only Super Admin is authorized to modify Credit Days.
               </p>
             )}
           </div>

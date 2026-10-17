@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -101,6 +102,21 @@ const navItems = [
 export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [adminUser, setAdminUser] = useState({ name: "Administrator", email: "" });
+
+  useEffect(() => {
+    fetch("/api/admin/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.fullName) {
+          setAdminUser({
+            name: data.fullName || "Administrator",
+            email: data.email || "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     if (onItemClick) onItemClick();
@@ -190,15 +206,21 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
         <div className="p-3 rounded-xl bg-zinc-50 border border-gray-200/80">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 rounded-full bg-zinc-900 text-amber-400 flex items-center justify-center font-bold text-xs uppercase shadow-xs">
-              K
+              {adminUser.name[0] || "A"}
             </div>
             <div className="min-w-0 flex-1">
               <span className="block text-xs font-bold text-zinc-900 truncate">
-                Krish Sandip Shah
+                {adminUser.name}
               </span>
-              <span className="block text-[10px] text-zinc-500 truncate">
-                krishshah13579@gmail.com
-              </span>
+              {adminUser.email ? (
+                <span className="block text-[10px] text-zinc-500 truncate">
+                  {adminUser.email}
+                </span>
+              ) : (
+                <span className="block text-[10px] text-zinc-500 truncate">
+                  Master Administrator
+                </span>
+              )}
             </div>
           </div>
 

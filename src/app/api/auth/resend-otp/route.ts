@@ -7,12 +7,8 @@ export async function POST(req: NextRequest) {
     const { username } = await req.json();
     const cleanUser = (username || "").trim().toLowerCase();
 
-    // STRICT ACCESS CONTROL
-    if (cleanUser !== "krishshah13579@gmail.com") {
-      return NextResponse.json(
-        { error: "Access Denied: Only krishshah13579@gmail.com is authorized." },
-        { status: 403 }
-      );
+    if (!cleanUser) {
+      return NextResponse.json({ error: "Username is required." }, { status: 400 });
     }
 
     const admin = await prisma.adminAccount.findUnique({
@@ -47,12 +43,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send real OTP email to krishshah13579@gmail.com via Gmail SMTP
-    await sendOtpEmail("krishshah13579@gmail.com", generatedOtp, "Krish Shah");
+    // Lookup profile for greeting name
+    const profile = await prisma.adminProfile.findFirst();
+    const recipientEmail = admin.username;
+    const recipientName = profile?.fullName || "Administrator";
+
+    // Send real OTP email to the admin email stored in database
+    await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
 
     return NextResponse.json({
       success: true,
-      message: "A fresh 6-digit 2FA login code has been emailed to krishshah13579@gmail.com.",
+      message: `A fresh 6-digit 2FA login code has been emailed to ${recipientEmail}.`,
     });
   } catch (error: any) {
     console.error("Resend OTP error:", error);

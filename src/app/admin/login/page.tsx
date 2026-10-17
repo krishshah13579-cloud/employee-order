@@ -34,10 +34,11 @@ export default function AdminLoginPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [username, setUsername] = useState("krishshah13579@gmail.com");
-  const [password, setPassword] = useState("Krish@2000");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
   const [loginError, setLoginError] = useState("");
 
   // Check if admin account exists in database
@@ -65,9 +66,9 @@ export default function AdminLoginPage() {
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (username.trim().toLowerCase() !== "krishshah13579@gmail.com") {
-      setLoginError("Access Denied: Only krishshah13579@gmail.com is authorized to access the Admin Panel.");
-      toast("Access Denied: Only krishshah13579@gmail.com is authorized.", "error");
+    if (!username.trim() || !password) {
+      setLoginError("Please enter your administrator email and password.");
+      toast("Email and password are required.", "error");
       return;
     }
 
@@ -78,13 +79,14 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "krishshah13579@gmail.com", password }),
+        body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.requires2FA) {
-        toast("6-digit 2FA login code emailed to krishshah13579@gmail.com!", "success");
+        setMaskedEmail(data.email || username.trim());
+        toast(`6-digit 2FA login code emailed to ${data.email || "your registered email"}!`, "success");
         setStep(2);
       } else {
         const errMsg = data.error || "Authentication failed. Check your password.";
@@ -107,7 +109,7 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/auth/resend-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "krishshah13579@gmail.com" }),
+        body: JSON.stringify({ username: username.trim().toLowerCase() }),
       });
 
       const data = await res.json();
@@ -134,7 +136,7 @@ export default function AdminLoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: "krishshah13579@gmail.com",
+          username: username.trim().toLowerCase(),
           code: twoFactorCode.trim(),
         }),
       });
@@ -236,24 +238,29 @@ export default function AdminLoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Authorized Admin Email
+                  Administrator Email / Username
                 </label>
                 <span className="text-[10px] bg-slate-800 text-orange-400 font-semibold px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1">
-                  <Lock size={10} /> Exclusive Access
+                  <Lock size={10} /> Secure Login
                 </span>
               </div>
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-3.5 text-orange-400" />
                 <input
                   type="email"
-                  readOnly
-                  value="krishshah13579@gmail.com"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/60 border border-slate-700/80 rounded-xl text-sm font-semibold text-white cursor-not-allowed select-none outline-none"
-                  title="Only krishshah13579@gmail.com is authorized to log in"
+                  required
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    setLoginError("");
+                  }}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500 outline-none transition"
+                  placeholder="Enter administrator email"
+                  autoFocus
                 />
               </div>
               <p className="text-[10px] text-slate-500 mt-1">
-                Security Policy: Only the master owner account is permitted access.
+                Enter your registered administrator email address to log in.
               </p>
             </div>
 
@@ -326,7 +333,7 @@ export default function AdminLoginPage() {
                 We have emailed a 6-digit security code to:
               </p>
               <div className="inline-block mt-1 font-mono text-xs font-bold text-orange-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
-                krishshah13579@gmail.com
+                {maskedEmail || username}
               </div>
             </div>
 

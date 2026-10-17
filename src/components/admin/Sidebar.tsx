@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -87,6 +88,21 @@ const navItems = [
 
 export function Sidebar({ activePage }: SidebarProps) {
   const router = useRouter();
+  const [adminUser, setAdminUser] = useState({ name: "Administrator", email: "" });
+
+  useEffect(() => {
+    fetch("/api/admin/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.fullName) {
+          setAdminUser({
+            name: data.fullName || "Administrator",
+            email: data.email || "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -154,8 +170,12 @@ export function Sidebar({ activePage }: SidebarProps) {
       <div className="p-3 border-t border-slate-800/80 bg-slate-900/30 space-y-2">
         <div className="px-3 py-2 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center justify-between">
           <div className="flex flex-col min-w-0">
-            <span className="text-[11px] font-bold text-slate-200 truncate">Krish Shah</span>
-            <span className="text-[10px] text-slate-400 truncate font-mono">krishshah13579@gmail.com</span>
+            <span className="text-[11px] font-bold text-slate-200 truncate">{adminUser.name}</span>
+            {adminUser.email ? (
+              <span className="text-[10px] text-slate-400 truncate font-mono">{adminUser.email}</span>
+            ) : (
+              <span className="text-[10px] text-slate-400 truncate font-mono">Master Admin</span>
+            )}
           </div>
           <button
             onClick={handleLogout}

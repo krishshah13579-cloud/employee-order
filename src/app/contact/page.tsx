@@ -57,7 +57,7 @@ export default function ContactPage() {
                 <Mail className="w-5 h-5 text-orange-600 shrink-0" />
                 <div className="text-sm text-neutral-700">
                   <p className="font-bold text-neutral-900">Email Inquiries</p>
-                  <p className="text-xs text-neutral-500 font-mono">krishshah13579@gmail.com</p>
+                  <p className="text-xs text-neutral-500 font-mono">orders@iqtrousers.com</p>
                 </div>
               </div>
 

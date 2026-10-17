@@ -11,10 +11,12 @@ export async function GET(req: NextRequest) {
 
     let profile = await prisma.adminProfile.findFirst();
     if (!profile) {
+      const adminAcc = await prisma.adminAccount.findFirst();
+      const defaultEmail = auth.user?.username || adminAcc?.username || process.env.GMAIL_USER || "";
       profile = await prisma.adminProfile.create({
         data: {
-          fullName: "Krish Shah",
-          email: "krishshah13579@gmail.com",
+          fullName: "Administrator",
+          email: defaultEmail,
           phone: "+91 98250 13579",
           companyName: "IQ TROUSERS",
           gstNo: "24AAACI1357Q1Z2",

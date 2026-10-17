@@ -16,62 +16,22 @@ export async function POST(req: NextRequest) {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // STRICT ACCESS CONTROL: Only krishshah13579@gmail.com is authorized.
-    // Reject any other email like krishclothingco3@gmail.com immediately.
-    if (cleanUser !== "krishshah13579@gmail.com") {
-      return NextResponse.json(
-        {
-          error:
-            "Access Denied: Only krishshah13579@gmail.com is authorized to access the Admin Panel.",
-        },
-        { status: 403 }
-      );
-    }
-
-    // Automatically purge any unauthorized admin accounts that may have been created
-    try {
-      await prisma.adminAccount.deleteMany({
-        where: {
-          username: {
-            not: "krishshah13579@gmail.com",
-          },
-        },
-      });
-    } catch (e) {
-      // Continue even if purge encounters a minor issue
-    }
-
-    // Check if master admin exists in database, or initialize it
-    let admin = await prisma.adminAccount.findUnique({
+    // Find admin account from database
+    const admin = await prisma.adminAccount.findUnique({
       where: { username: cleanUser },
     });
 
     if (!admin) {
-      admin = await prisma.adminAccount.create({
-        data: {
-          username: "krishshah13579@gmail.com",
-          password: "Krish@2000",
-          twoFactorSecret: "135790",
-          twoFactorEnabled: true,
-        },
-      });
-
-      const profileCount = await prisma.adminProfile.count();
-      if (profileCount === 0) {
-        await prisma.adminProfile.create({
-          data: {
-            fullName: "Krish Shah",
-            email: "krishshah13579@gmail.com",
-            companyName: "IQ TROUSERS",
-          },
-        });
-      }
+      return NextResponse.json(
+        { error: "Invalid administrator email or password." },
+        { status: 401 }
+      );
     }
 
-    // Verify password
+    // Verify password against stored password in database
     if (admin.password.trim() !== cleanPass) {
       return NextResponse.json(
-        { error: "Invalid password. Please check your credentials." },
+        { error: "Invalid administrator email or password." },
         { status: 401 }
       );
     }
@@ -89,15 +49,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send real OTP email to krishshah13579@gmail.com via Gmail SMTP
-    await sendOtpEmail("krishshah13579@gmail.com", generatedOtp, "Krish Shah");
+    // Lookup Admin Profile for greeting name and contact info
+    const profile = await prisma.adminProfile.findFirst();
+    const recipientEmail = admin.username;
+    const recipientName = profile?.fullName || "Administrator";
+
+    // Send real OTP email to the admin email stored in database
+    await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
+
+    // Mask email for UI display
+    const [userPart, domain] = recipientEmail.split("@");
+    const maskedUser =
+      userPart && userPart.length > 2
+        ? `${userPart[0]}****${userPart[userPart.length - 1]}`
+        : userPart;
+    const maskedEmail = domain ? `${maskedUser}@${domain}` : recipientEmail;
 
     return NextResponse.json({
       requires2FA: true,
       username: admin.username,
-      email: "krishshah13579@gmail.com",
-      message:
-        "Credentials verified! A 6-digit 2FA login code has been sent to your email (krishshah13579@gmail.com).",
+      email: maskedEmail,
+      message: `Credentials verified! A 6-digit 2FA login code has been sent to your email (${maskedEmail}).`,
     });
   } catch (error: any) {
     console.error("Login error:", error);
