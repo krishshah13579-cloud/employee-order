@@ -242,7 +242,66 @@ export default function AdminOutstandingPage() {
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp reminder", "error");
     } finally {
-      setSendingWhatsAppFor(null);
+  };
+
+  // Send Weekly Reminders to ALL customers with outstanding balance
+  const [sendingToAll, setSendingToAll] = useState(false);
+  const handleSendWeeklyRemindersToAll = async () => {
+    if (summaryStats.customersWithOutstandingCount === 0) {
+      toast("No customers currently have an outstanding balance.", "info");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Send weekly payment reminders to all ${summaryStats.customersWithOutstandingCount} pending customers (Total: ${formatCurrency(
+          summaryStats.totalOutstandingAll
+        )}) directly via WhatsApp (+918128756632)?`
+      )
+    ) {
+      return;
+    }
+
+    setSendingToAll(true);
+    try {
+      let dispatchedCount = 0;
+      let usedGateway = false;
+
+      // 1. Try local gateway first
+      try {
+        const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
+          method: "POST",
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => null);
+
+        if (localRes && localRes.ok) {
+          const localData = await localRes.json();
+          dispatchedCount = localData.count || 0;
+          usedGateway = true;
+        }
+      } catch {}
+
+      // 2. Fallback to API route
+      if (!usedGateway) {
+        const res = await fetch("/api/admin/outstanding/whatsapp-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ autoDispatch: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to dispatch reminders");
+        dispatchedCount = data.count || 0;
+      }
+
+      toast(
+        `✅ Weekly payment reminders dispatched to ${dispatchedCount} customers directly from WhatsApp (8128756632)!`,
+        "success"
+      );
+      loadOutstandingData();
+    } catch (err: any) {
+      toast(err.message || "Could not dispatch reminders", "error");
+    } finally {
+      setSendingToAll(false);
     }
   };
 
