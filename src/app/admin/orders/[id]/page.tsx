@@ -620,6 +620,17 @@ export default function OrderInvoicePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Edit Order Form Button */}
+          <button
+            type="button"
+            onClick={() => setIsEditOrderModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Edit customer order items, sets, prices, notes, or status"
+          >
+            <Edit3 size={14} className="text-white" />
+            <span>Edit Order Form</span>
+          </button>
+
           {/* Generate / Edit Tax Invoice Button */}
           <button
             type="button"
