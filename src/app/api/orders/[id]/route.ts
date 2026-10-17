@@ -136,7 +136,21 @@ export async function PUT(
           colorSetsArray = [{ color: it.color || "Standard", sets: itemTotalSets }];
         }
 
-        const itemTotalPcs = itemTotalSets * pcsPerSet;
+        let itemTotalPcs = 0;
+        for (const cs of colorSetsArray) {
+          const requested = parseInt(cs.sets, 10) || 0;
+          const pcsCalc = calculateOrderedColorSetsPieces(
+            product ? product.setsColorwise : null,
+            cs.color,
+            requested,
+            pcsPerSet
+          );
+          itemTotalPcs += pcsCalc.totalPcs;
+        }
+        if (itemTotalPcs === 0) {
+          itemTotalPcs = it.totalPcs || (itemTotalSets * pcsPerSet);
+        }
+
         const unitPrice = parseFloat(it.unitPrice) || product?.price || 0;
         const itemSubtotal = itemTotalPcs * unitPrice;
 
