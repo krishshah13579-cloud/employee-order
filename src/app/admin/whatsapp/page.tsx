@@ -101,6 +101,8 @@ export default function AdminWhatsAppPage() {
     } finally {
       setLoading(false);
     }
+  };
+
   const fetchSettings = async () => {
     try {
       const res = await fetch("/api/admin/whatsapp/settings");
