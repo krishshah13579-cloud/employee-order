@@ -1501,22 +1501,22 @@ export default function ProductForm({
           </span>
         </div>
 
-        {/* 1. Multiple Preset Size Ratio Packs */}
+        {/* 1. Exactly 3 Preset Size Ratio Packs + ADD ANY SIZE RATIO */}
         <div className="space-y-2">
           <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
             Standard Size Ratio Packs (Click to Apply)
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {STANDARD_SIZE_RATIOS.map((r) => {
-              const isSelected = formData.sizesRatio === r.value;
+              const isSelected = !isCustomRatioMode && formData.sizesRatio === r.value;
               return (
                 <button
                   key={r.value}
                   type="button"
                   onClick={() => handleRatioChange(r.value)}
-                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                     isSelected
-                      ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900 ring-offset-1"
                       : "bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200"
                   }`}
                 >
@@ -1531,7 +1531,7 @@ export default function ProductForm({
                     </span>
                   </div>
                   <span
-                    className={`text-[10px] truncate block mt-1 ${
+                    className={`text-[10px] truncate block mt-1.5 ${
                       isSelected ? "text-slate-300" : "text-gray-500"
                     }`}
                   >
@@ -1540,20 +1540,46 @@ export default function ProductForm({
                 </button>
               );
             })}
+
+            {/* 4th Card: ADD ANY SIZE RATIO */}
+            <button
+              type="button"
+              onClick={() => handleSelectAddAnySizeRatio()}
+              className={`p-3 rounded-xl border-2 border-dashed text-left transition cursor-pointer flex flex-col justify-between ${
+                isCustomRatioMode
+                  ? "bg-blue-50 border-blue-600 text-blue-900 shadow-md ring-2 ring-blue-600 ring-offset-1"
+                  : "bg-white hover:bg-blue-50/50 border-gray-300 hover:border-blue-500 text-gray-800"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5 text-blue-600" /> ADD ANY SIZE RATIO
+                </span>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                  Custom
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-500 block mt-1.5">
+                Customize any ratio &amp; sizes in set
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* 2. Interactive Size-Wise Ratio in PCS (Toggle sizes to auto-count PCS) */}
-        <div className="space-y-2 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+        {/* 2. Interactive Size Picker & Custom Ratio Configuration */}
+        <div className={`space-y-3 p-4 rounded-2xl border transition-all ${
+          isCustomRatioMode ? "bg-blue-50/50 border-blue-300 shadow-xs" : "bg-slate-50/80 border-slate-200"
+        }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <span>Size-Wise Ratio in PCS (Click Sizes to Add / Remove)</span>
+              <span>Sizes Available in 1 Set (Click Sizes to Add / Remove)</span>
             </label>
-            <span className="text-[11px] text-slate-500 font-medium">
-              Active: <strong>{formData.pcsPerSet} Sizes Selected = {formData.pcsPerSet} PCS in 1 Set</strong>
+            <span className="text-[11px] text-slate-600 font-medium font-mono">
+              Active: <strong>{formData.pcsPerSet} Sizes = {formData.pcsPerSet} PCS in 1 Set</strong>
             </span>
           </div>
 
+          {/* Size Chips */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {AVAILABLE_PACK_SIZES.map((sz) => {
               const activeList = formData.sizesList
@@ -1579,8 +1605,34 @@ export default function ProductForm({
               );
             })}
           </div>
-          <p className="text-[11px] text-slate-500 pt-1">
-            Clicking size chips adds/removes that size and automatically calculates the set size (e.g. 30,32,34,36,38 → 5 PCS, whereas 32,34,36,38 → 4 PCS).
+
+          {/* Add Any Custom Size Input */}
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-200/70">
+            <span className="text-xs font-semibold text-gray-600">Add Any Other Size:</span>
+            <input
+              type="text"
+              value={customSizeInput}
+              onChange={(e) => setCustomSizeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddCustomSizeToPack();
+                }
+              }}
+              placeholder="e.g. 24, 48, 50, Free Size"
+              className="w-48 px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-black"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustomSizeToPack}
+              className="px-3 py-1 bg-zinc-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition cursor-pointer"
+            >
+              + Add Size
+            </button>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            Selected sizes are packed into 1 wholesale set. Changing sizes automatically updates the ratio name and syncs across color stock below.
           </p>
         </div>
 
@@ -1593,9 +1645,9 @@ export default function ProductForm({
             <input
               type="text"
               value={formData.sizesRatio}
-              onChange={(e) => setFormData({ ...formData, sizesRatio: e.target.value })}
+              onChange={(e) => handleRatioLabelChange(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:outline-hidden focus:ring-2 focus:ring-black"
-              placeholder="e.g. 30 to 38 or 32 to 38"
+              placeholder="e.g. 28 to 36, 30 to 38, or 32 to 38"
             />
           </div>
 
@@ -1609,7 +1661,7 @@ export default function ProductForm({
               value={formData.sizesList}
               onChange={(e) => handleSizesListInput(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-black font-mono font-bold"
-              placeholder="30, 32, 34, 36, 38"
+              placeholder="28, 30, 32, 34, 36"
             />
           </div>
 
@@ -1623,7 +1675,11 @@ export default function ProductForm({
               required
               value={formData.pcsPerSet}
               onChange={(e) =>
-                setFormData({ ...formData, pcsPerSet: parseInt(e.target.value, 10) || 1 })
+                updateRatioEverywhere(
+                  formData.sizesRatio,
+                  formData.sizesList,
+                  parseInt(e.target.value, 10) || 1
+                )
               }
               className="w-full px-3.5 py-2.5 rounded-xl border border-blue-300 bg-blue-50/50 text-sm font-black text-blue-900 font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-600"
             />
@@ -1631,7 +1687,7 @@ export default function ProductForm({
         </div>
 
         <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-950 font-medium">
-          Rule: For <strong>{formData.sizesRatio}</strong> ({formData.sizesList}), 1 Set = <strong>{formData.pcsPerSet} Pieces</strong>. An order of 5 sets will automatically calculate: 5 × {formData.pcsPerSet} = <strong>{5 * formData.pcsPerSet} PCS</strong>.
+          Active Ratio: <strong>{formData.sizesRatio}</strong> ({formData.sizesList}) = <strong>{formData.pcsPerSet} PCS in 1 Set</strong>. This ratio is automatically configured in Stock Sets Colorwise &amp; Publishing below.
         </div>
       </div>
 
