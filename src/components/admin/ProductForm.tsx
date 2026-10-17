@@ -802,14 +802,27 @@ export default function ProductForm({
         return row;
       });
 
-      // Generate clean setsColorwise from colorRatioStockMap for selectedColors
-      const finalStockMap: Record<string, Record<string, number>> = {};
+      // Generate clean setsColorwise from colorRatioStockMap and colorLooseStockMap for selectedColors
+      let totalLoosePcs = 0;
+      const finalStockMap: Record<string, { ratios: Record<string, number>; loosePcs: Record<string, number> }> = {};
       for (const c of selectedColors) {
         const clean = cleanColorName(c);
         const ratios = colorRatioStockMap[clean] || { [formData.sizesRatio]: 0 };
-        finalStockMap[clean] = {};
+        const loose = colorLooseStockMap[clean] || {};
+
+        finalStockMap[clean] = {
+          ratios: {},
+          loosePcs: {},
+        };
         for (const [r, count] of Object.entries(ratios)) {
-          finalStockMap[clean][r] = Math.max(0, parseInt(String(count), 10) || 0);
+          finalStockMap[clean].ratios[r] = Math.max(0, parseInt(String(count), 10) || 0);
+        }
+        for (const [sz, count] of Object.entries(loose)) {
+          const num = Math.max(0, parseInt(String(count), 10) || 0);
+          if (num > 0) {
+            finalStockMap[clean].loosePcs[sz] = num;
+            totalLoosePcs += num;
+          }
         }
       }
       const serializedStock = JSON.stringify(finalStockMap);
@@ -834,7 +847,7 @@ export default function ProductForm({
         wholesalerPrice: whoPrice,
         price: retPrice,
         costPrice: formData.costPrice !== undefined && String(formData.costPrice).trim() !== "" ? parseFloat(String(formData.costPrice)) : null,
-        mixPcs: formData.mixPcs !== undefined ? parseInt(String(formData.mixPcs), 10) || 0 : 0,
+        mixPcs: totalLoosePcs,
         colorImages: Object.keys(colorImages).length > 0 ? JSON.stringify(colorImages) : null,
         setsColorwise: serializedStock || null,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
