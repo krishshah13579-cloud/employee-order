@@ -525,7 +525,7 @@ export default function ProductForm({
         const clean = cleanColorName(c);
         const existing = next[clean] || {};
         const keys = Object.keys(existing);
-        if (keys.length === 0) {
+        if (keys.length <= 1) {
           next[clean] = { [formData.sizesRatio]: Math.max(0, sets) };
         } else {
           const updated: Record<string, number> = {};
