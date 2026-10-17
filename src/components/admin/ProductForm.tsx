@@ -917,13 +917,20 @@ export default function ProductForm({
         ? parseFloat(String(formData.wholesalerPrice))
         : Math.max(0, retPrice - 100);
 
+      // Derive primary sizesRatio, sizesList, and pcsPerSet from activeStockColor or first color
+      const primaryClean = cleanColorName(activeStockColor || selectedColors[0] || "");
+      const primaryRatios = colorRatioStockMap[primaryClean] || {};
+      const primaryRatioName = Object.keys(primaryRatios)[0] || formData.sizesRatio || "30 to 38";
+      const primarySizes = getSizesFromRatio(primaryRatioName);
+      const primaryPcs = primarySizes.length > 0 ? primarySizes.length : (formData.pcsPerSet || 5);
+
       const payload = {
         name: formData.name.trim(),
         category: formData.category,
         colorsAvailable: selectedColors.join(", "),
-        sizesRatio: formData.sizesRatio,
-        sizesList: formData.sizesList,
-        pcsPerSet: formData.pcsPerSet,
+        sizesRatio: primaryRatioName,
+        sizesList: primarySizes.join(", ") || formData.sizesList,
+        pcsPerSet: primaryPcs,
         mrp: numMrp,
         retailerPrice: retPrice,
         wholesalerPrice: whoPrice,
