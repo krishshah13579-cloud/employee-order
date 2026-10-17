@@ -26,6 +26,24 @@ export async function GET(
       return new NextResponse("Not Found", { status: 404 });
     }
 
+    // Explicit rejection of directory traversal attempts
+    for (const segment of pathSegments) {
+      const decoded = decodeURIComponent(segment);
+      if (
+        segment.includes("..") ||
+        decoded.includes("..") ||
+        decoded.includes("/") ||
+        decoded.includes("\\") ||
+        decoded.startsWith(".") ||
+        decoded.includes("\0")
+      ) {
+        return new NextResponse(
+          JSON.stringify({ error: "Forbidden", message: "Directory traversal is blocked." }),
+          { status: 403, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Sanitize path segments to prevent directory traversal
     const safeSegments = pathSegments.map((s) => path.basename(decodeURIComponent(s)));
     const requestedFileName = safeSegments.join(path.sep);
