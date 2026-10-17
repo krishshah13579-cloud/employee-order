@@ -560,27 +560,95 @@ export default function ProductForm({
       pcsPerSet: newPcs,
     }));
 
-    // Replace oldRatio or "30 to 38" with newRatio across all colors in colorRatioStockMap
+    // Replace ratio across ALL selected colors in colorRatioStockMap
     setColorRatioStockMap((prev) => {
       const next: Record<string, Record<string, number>> = {};
-      for (const [col, ratios] of Object.entries(prev)) {
+      const allColors = Array.from(
+        new Set([...Object.keys(prev), ...selectedColors.map(cleanColorName)])
+      );
+
+      for (const col of allColors) {
+        const ratios = prev[col] || {};
         next[col] = {};
-        let replaced = false;
-        for (const [rKey, count] of Object.entries(ratios)) {
-          if (rKey === oldRatio || (rKey === "30 to 38" && oldRatio !== "30 to 38")) {
-            next[col][newRatio] = count;
-            replaced = true;
-          } else {
-            next[col][rKey] = count;
+        const keys = Object.keys(ratios);
+
+        if (keys.length <= 1) {
+          // Single ratio (or 0 ratios) -> migrate to newRatio preserving the count
+          const count = keys.length === 1 ? ratios[keys[0]] ?? 0 : 0;
+          next[col][newRatio] = count;
+        } else {
+          // Multiple ratios: replace oldRatio or "30 to 38"
+          let replaced = false;
+          for (const [rKey, count] of Object.entries(ratios)) {
+            if (rKey === oldRatio || rKey === "30 to 38") {
+              next[col][newRatio] = count;
+              replaced = true;
+            } else {
+              next[col][rKey] = count;
+            }
           }
-        }
-        if (!replaced && Object.keys(next[col]).length === 0) {
-          next[col][newRatio] = 0;
+          if (!replaced && next[col][newRatio] === undefined) {
+            next[col][newRatio] = 0;
+          }
         }
       }
       return next;
     });
   };
+
+  const prevRatioRef = useRef(formData.sizesRatio);
+
+  // Active synchronization hook: ensures colorRatioStockMap stays in sync whenever sizesRatio or selectedColors change
+  useEffect(() => {
+    const newRatio = formData.sizesRatio;
+    const oldRatio = prevRatioRef.current;
+    if (!newRatio) return;
+
+    setColorRatioStockMap((prev) => {
+      let changed = false;
+      const next: Record<string, Record<string, number>> = {};
+      const allColors = Array.from(
+        new Set([...Object.keys(prev), ...selectedColors.map(cleanColorName)])
+      );
+
+      for (const col of allColors) {
+        const ratios = prev[col] || {};
+        next[col] = {};
+        const keys = Object.keys(ratios);
+
+        if (keys.length === 0) {
+          next[col][newRatio] = 0;
+          changed = true;
+        } else if (keys.length === 1) {
+          const onlyKey = keys[0];
+          const onlyCount = ratios[onlyKey] ?? 0;
+          next[col][newRatio] = onlyCount;
+          if (onlyKey !== newRatio) {
+            changed = true;
+          }
+        } else {
+          let replaced = false;
+          for (const [rKey, count] of Object.entries(ratios)) {
+            if (rKey === oldRatio || (rKey === "30 to 38" && oldRatio !== "30 to 38")) {
+              next[col][newRatio] = count;
+              replaced = true;
+              changed = true;
+            } else {
+              next[col][rKey] = count;
+            }
+          }
+          if (!replaced && next[col][newRatio] === undefined) {
+            next[col][newRatio] = 0;
+            changed = true;
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+
+    prevRatioRef.current = newRatio;
+  }, [formData.sizesRatio, selectedColors]);
 
   const handleRatioChange = (ratioVal: string) => {
     setIsCustomRatioMode(false);
@@ -599,23 +667,28 @@ export default function ProductForm({
   const handleAddCustomSizeToPack = () => {
     const trimmed = customSizeInput.trim().toUpperCase();
     if (!trimmed) return;
+    setIsCustomRatioMode(true);
     if (!customPackSizes.includes(trimmed)) {
       setCustomPackSizes((prev) => [...prev, trimmed]);
     }
     const currentSizes = formData.sizesList.split(",").map((s) => s.trim()).filter(Boolean);
     if (!currentSizes.includes(trimmed)) {
       const nextSizes = [...currentSizes, trimmed];
+      nextSizes.sort((a, b) => {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b);
+      });
       const count = nextSizes.length;
-      let ratioName = formData.sizesRatio;
-      if (nextSizes.length >= 2) {
-        ratioName = `${nextSizes[0]} to ${nextSizes[nextSizes.length - 1]}`;
-      }
+      const ratioName = count === 1 ? nextSizes[0] : `${nextSizes[0]} to ${nextSizes[nextSizes.length - 1]}`;
       updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
     }
     setCustomSizeInput("");
   };
 
   const handleToggleSizeInPack = (sz: string) => {
+    setIsCustomRatioMode(true);
     const currentSizes = formData.sizesList
       .split(",")
       .map((s) => s.trim())
@@ -643,25 +716,29 @@ export default function ProductForm({
     const count = nextSizes.length;
     const minSize = nextSizes[0];
     const maxSize = nextSizes[nextSizes.length - 1];
-    const ratioName = `${minSize} to ${maxSize}`;
+    const ratioName = count === 1 ? minSize : `${minSize} to ${maxSize}`;
 
     updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
   };
 
   const handleSizesListInput = (val: string) => {
+    setIsCustomRatioMode(true);
     const parsed = val
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     const count = Math.max(1, parsed.length);
-    let ratio = formData.sizesRatio;
+    let ratio = val.trim();
     if (parsed.length >= 2) {
       ratio = `${parsed[0]} to ${parsed[parsed.length - 1]}`;
+    } else if (parsed.length === 1) {
+      ratio = parsed[0];
     }
     updateRatioEverywhere(ratio, val, count);
   };
 
   const handleRatioLabelChange = (val: string) => {
+    setIsCustomRatioMode(true);
     updateRatioEverywhere(val, formData.sizesList, formData.pcsPerSet);
   };
 
