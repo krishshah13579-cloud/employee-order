@@ -16,16 +16,22 @@ import {
   Bell,
   Clock,
   Edit,
+  Edit3,
   Download,
   Check,
   X,
   AlertCircle,
   Eye,
+  Plus,
+  Trash2,
+  Save,
+  Package,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf, sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { ORDER_STATUSES, type OrderData, type ColorSetEntry } from "@/lib/types";
+import { calculateOrderedColorSetsPieces } from "@/lib/stock";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
