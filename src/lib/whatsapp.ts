@@ -273,7 +273,54 @@ export async function dispatchAutomatedWhatsApp(
     return { success: false, method: "NONE", error: "Missing phone number" };
   }
 
-  // 1. Direct Linked WhatsApp Gateway (UltraMsg) - Sends directly from WhatsApp Business number 8128756632
+  // 1. Free Self-Hosted Baileys Gateway (100% Free, sends directly from linked WhatsApp Business 8128756632)
+  const gatewayUrl = process.env.WHATSAPP_GATEWAY_URL || "http://127.0.0.1:5050";
+  try {
+    const statusRes = await fetch(`${gatewayUrl}/api/status`, {
+      method: "GET",
+      signal: AbortSignal.timeout(2000),
+    }).catch(() => null);
+
+    if (statusRes && statusRes.ok) {
+      const statusData = await statusRes.json().catch(() => ({}));
+      if (statusData.connected) {
+        const docPayload = documentOptions?.pdfBase64 || documentOptions?.pdfUrl;
+        if (docPayload) {
+          const sendDocRes = await fetch(`${gatewayUrl}/api/send-document`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: cleanPhone,
+              documentBase64: documentOptions?.pdfBase64,
+              documentUrl: documentOptions?.pdfUrl,
+              filename: documentOptions?.filename,
+              caption: message,
+            }),
+            signal: AbortSignal.timeout(20000),
+          });
+          if (sendDocRes.ok) {
+            console.log(`✅ [BAILEYS] PDF document dispatched directly to ${cleanPhone}`);
+            return { success: true, method: "BAILEYS_GATEWAY_DOCUMENT" };
+          }
+        } else {
+          const sendChatRes = await fetch(`${gatewayUrl}/api/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to: cleanPhone, message }),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (sendChatRes.ok) {
+            console.log(`✅ [BAILEYS] Chat message dispatched directly to ${cleanPhone}`);
+            return { success: true, method: "BAILEYS_GATEWAY_CHAT" };
+          }
+        }
+      }
+    }
+  } catch (gatewayErr: any) {
+    // Local gateway offline or busy, continue to fallback
+  }
+
+  // 2. Direct Linked WhatsApp Gateway (UltraMsg) - Fallback
   const ultraInstance = process.env.ULTRAMSG_INSTANCE_ID;
   const ultraToken = process.env.ULTRAMSG_TOKEN;
   if (ultraInstance && ultraToken) {
