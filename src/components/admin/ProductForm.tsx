@@ -1964,8 +1964,9 @@ export default function ProductForm({
                   const colorPreset = PRESET_COLORS.find(
                     (c) => c.name.toLowerCase() === color.toLowerCase()
                   );
-                  const hex = colorPreset?.hex || getColorHex(color);
-                  const isLight = colorPreset?.border || false;
+                  const colorInfo = colorPreset ? { hex: colorPreset.hex, isLight: colorPreset.border || false } : getColorHex(color);
+                  const hex = colorInfo.hex;
+                  const isLight = colorInfo.isLight;
                   const isActive = (activeStockColor || selectedColors[0]) === color;
 
                   return (
@@ -2015,8 +2016,9 @@ export default function ProductForm({
               const colorPreset = PRESET_COLORS.find(
                 (c) => c.name.toLowerCase() === currentColor.toLowerCase()
               );
-              const hex = colorPreset?.hex || getColorHex(currentColor);
-              const isLight = colorPreset?.border || false;
+              const colorInfo = colorPreset ? { hex: colorPreset.hex, isLight: colorPreset.border || false } : getColorHex(currentColor);
+              const hex = colorInfo.hex;
+              const isLight = colorInfo.isLight;
 
               // Default sizes list for loose piece stepper
               const standardLooseSizes = ["28", "30", "32", "34", "36", "38", "40", "42"];
@@ -2082,7 +2084,7 @@ export default function ProductForm({
                           </span>
                         </div>
                         <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                          {calc.totalSets} Sets ({calc.setPieces} Pcs)
+                          {calc.totalSets} Sets ({calc.setPcs} Pcs)
                         </span>
                       </div>
 
@@ -2457,8 +2459,9 @@ export default function ProductForm({
                       const colorPreset = PRESET_COLORS.find(
                         (c) => c.name.toLowerCase() === color.toLowerCase()
                       );
-                      const hex = colorPreset?.hex || getColorHex(color);
-                      const isLight = colorPreset?.border || false;
+                      const colorInfo = colorPreset ? { hex: colorPreset.hex, isLight: colorPreset.border || false } : getColorHex(color);
+                      const hex = colorInfo.hex;
+                      const isLight = colorInfo.isLight;
                       const val = calc.totalPcs * (formData.price || 0);
 
                       const ratiosSummary = Object.entries(ratios)
