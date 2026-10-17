@@ -140,6 +140,37 @@ export default function OrderInvoicePage() {
         });
       }
       setEditableItems(initialItems);
+
+      // Populate Order Form Edit States
+      setEditStatus(data.status);
+      setEditNotes(data.notes || "");
+      setEditPlacedBy(data.placedBy || "Admin");
+      setEditCustomerPhone(data.customer?.phoneNumber || data.customerPhone || "");
+      setEditCustomerAddress(data.customer?.address || data.customerAddress || "");
+      setEditCustomerGstPan(data.customer?.gstPanNo || data.customerGstPan || "");
+
+      const orderItemsForEdit = (data.items || []).map((it) => {
+        let parsedColorSets = [];
+        try {
+          parsedColorSets = typeof it.colorSets === "string" ? JSON.parse(it.colorSets) : it.colorSets;
+        } catch {
+          parsedColorSets = [];
+        }
+        return {
+          id: it.id,
+          productId: it.productId,
+          productName: it.productName,
+          sizeRatio: it.sizeRatio || "30 to 38",
+          pcsPerSet: it.pcsPerSet || 5,
+          totalSets: it.totalSets || 0,
+          totalPcs: it.totalPcs || 0,
+          unitPrice: it.unitPrice || 0,
+          itemSubtotal: it.itemSubtotal || 0,
+          colorSets: parsedColorSets || [],
+          product: (it as any).product || null,
+        };
+      });
+      setEditOrderItems(orderItemsForEdit);
     } catch (err: any) {
       setError(err.message || "Failed to load order.");
     } finally {
@@ -150,6 +181,175 @@ export default function OrderInvoicePage() {
   useEffect(() => {
     loadOrder();
   }, [id]);
+
+  useEffect(() => {
+    // Check if ?edit=true was passed in the URL to open Order Form Editor immediately
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("edit") === "true") {
+        setIsEditOrderModalOpen(true);
+      }
+    }
+    // Fetch active products list for adding products to order
+    fetch("/api/products?active_only=1")
+      .then((res) => res.json())
+      .then((prods) => {
+        if (Array.isArray(prods)) setAvailableProducts(prods);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ═══════════════════════════════════════════
+  // ORDER FORM EDIT HANDLERS
+  // ═══════════════════════════════════════════
+  const handleEditColorSet = (itemIndex: number, colorIndex: number, newSets: number) => {
+    const updated = [...editOrderItems];
+    const item = { ...updated[itemIndex] };
+    const colors = [...(item.colorSets || [])];
+    colors[colorIndex] = { ...colors[colorIndex], sets: Math.max(0, newSets) };
+
+    const totalSets = colors.reduce((sum, c) => sum + (Number(c.sets) || 0), 0);
+    const pcsPerSet = item.pcsPerSet || 5;
+
+    let totalPcs = 0;
+    for (const c of colors) {
+      const calc = calculateOrderedColorSetsPieces(
+        item.product?.setsColorwise || null,
+        c.color,
+        c.sets,
+        pcsPerSet
+      );
+      totalPcs += calc.totalPcs;
+    }
+    if (totalPcs === 0) {
+      totalPcs = totalSets * pcsPerSet;
+    }
+
+    const unitPrice = item.unitPrice || 0;
+    item.colorSets = colors;
+    item.totalSets = totalSets;
+    item.totalPcs = totalPcs;
+    item.itemSubtotal = Math.round(totalPcs * unitPrice);
+
+    updated[itemIndex] = item;
+    setEditOrderItems(updated);
+  };
+
+  const handleEditUnitPrice = (itemIndex: number, newPrice: number) => {
+    const updated = [...editOrderItems];
+    const item = { ...updated[itemIndex] };
+    item.unitPrice = Math.max(0, newPrice);
+    item.itemSubtotal = Math.round((item.totalPcs || 0) * item.unitPrice);
+    updated[itemIndex] = item;
+    setEditOrderItems(updated);
+  };
+
+  const handleRemoveOrderItem = (itemIndex: number) => {
+    if (editOrderItems.length <= 1) {
+      toast("An order must have at least one product item", "error");
+      return;
+    }
+    const updated = editOrderItems.filter((_, idx) => idx !== itemIndex);
+    setEditOrderItems(updated);
+  };
+
+  const handleAddProductToOrder = (prodIdStr: string) => {
+    if (!prodIdStr) return;
+    const prod = availableProducts.find((p) => String(p.id) === prodIdStr);
+    if (!prod) return;
+
+    let colors: string[] = [];
+    if (prod.colorsAvailable) {
+      try {
+        const parsed = typeof prod.colorsAvailable === "string" ? JSON.parse(prod.colorsAvailable) : prod.colorsAvailable;
+        if (Array.isArray(parsed)) colors = parsed;
+      } catch {
+        colors = String(prod.colorsAvailable).split(",").map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+    if (colors.length === 0) colors = ["Standard"];
+
+    const colorSets = colors.map((col: string, idx: number) => ({
+      color: col,
+      sets: idx === 0 ? 1 : 0,
+    }));
+
+    const pcsPerSet = prod.pcsPerSet || 5;
+    const calc = calculateOrderedColorSetsPieces(prod.setsColorwise, colors[0], 1, pcsPerSet);
+    const totalPcs = calc.totalPcs || pcsPerSet;
+    const unitPrice = prod.retailerPrice || prod.price || 0;
+
+    const newItem = {
+      productId: prod.id,
+      productName: prod.name,
+      sizeRatio: prod.sizesRatio || "30 to 38",
+      pcsPerSet,
+      totalSets: 1,
+      totalPcs,
+      unitPrice,
+      itemSubtotal: totalPcs * unitPrice,
+      colorSets,
+      product: prod,
+    };
+
+    setEditOrderItems((prev) => [...prev, newItem]);
+    setSelectedProductToAdd("");
+    toast(`Added "${prod.name}" to order`, "success");
+  };
+
+  const handleSaveOrderForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!order) return;
+
+    const mSets = editOrderItems.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
+    if (mSets === 0) {
+      toast("Please allocate at least 1 set across the products", "error");
+      return;
+    }
+
+    try {
+      setSavingOrderForm(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: editStatus,
+          notes: editNotes,
+          placedBy: editPlacedBy,
+          customerPhone: editCustomerPhone,
+          customerAddress: editCustomerAddress,
+          customerGstPan: editCustomerGstPan,
+          items: editOrderItems,
+          notifyCustomer: sendWhatsAppOnSave,
+          sendWhatsApp: sendWhatsAppOnSave,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update order");
+
+      toast("✅ Order Form updated successfully!", "success");
+      setIsEditOrderModalOpen(false);
+      loadOrder();
+
+      if (sendWhatsAppOnSave && data.whatsapp?.customerPhone && data.whatsapp?.message) {
+        toast("Sending updated order details to customer WhatsApp...", "info");
+        sendAutomatedWhatsAppDirect({
+          phone: data.whatsapp.customerPhone,
+          message: data.whatsapp.message,
+          pdfUrl: data.whatsapp.pdfUrl,
+          filename: data.whatsapp.filename,
+          nativeUrl: data.whatsapp.nativeUrl,
+          whatsappUrl: data.whatsapp.directUrl,
+          onToast: toast,
+        }).catch((err) => console.error("Auto WhatsApp edit error:", err));
+      }
+    } catch (err: any) {
+      toast(err.message || "Failed to update order", "error");
+    } finally {
+      setSavingOrderForm(false);
+    }
+  };
 
   // Recalculate an item row in tax invoice modal
   const handleUpdateItemQty = (
@@ -178,12 +378,26 @@ export default function OrderInvoicePage() {
 
     const totalSets = colors.reduce((sum, c) => sum + (Number(c.sets) || 0), 0);
     const pcsPerSet = item.pcsPerSet || 5;
-    const unitPrice = item.unitPrice || 0;
 
+    let totalPcs = 0;
+    for (const c of colors) {
+      const calc = calculateOrderedColorSetsPieces(
+        null,
+        c.color,
+        c.sets,
+        pcsPerSet
+      );
+      totalPcs += calc.totalPcs;
+    }
+    if (totalPcs === 0) {
+      totalPcs = totalSets * pcsPerSet;
+    }
+
+    const unitPrice = item.unitPrice || 0;
     item.colorSets = colors;
     item.totalSets = totalSets;
-    item.totalPcs = totalSets * pcsPerSet;
-    item.itemSubtotal = Math.round(item.totalPcs * unitPrice);
+    item.totalPcs = totalPcs;
+    item.itemSubtotal = Math.round(totalPcs * unitPrice);
 
     updated[itemIndex] = item;
     setEditableItems(updated);
