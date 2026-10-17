@@ -114,13 +114,14 @@ export default function OrderEditPage() {
           "success"
         );
       } else if (data.whatsappUrl || data.nativeUrl) {
-        toast(
-          type === "PAYMENT_REMINDER"
-            ? "Opening WhatsApp with Payment Reminder..."
-            : "Opening WhatsApp with Document & Details...",
-          "success"
-        );
-        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
+        await shareOrOpenWhatsAppWithPdf({
+          whatsappUrl: data.whatsappUrl,
+          nativeUrl: data.nativeUrl,
+          pdfUrl: data.pdfUrl || `/api/orders/${orderId}/pdf?type=${isTax ? "tax_invoice" : "order_form"}`,
+          filename: `${isTax ? "Tax_Invoice" : "Order_Form"}_${orderNumber || orderId}.pdf`,
+          text: data.message,
+          onToast: toast,
+        });
       }
     } catch (err: any) {
       toast(err.message || "Could not open WhatsApp", "error");
