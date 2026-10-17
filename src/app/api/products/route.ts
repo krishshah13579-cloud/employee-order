@@ -32,15 +32,29 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    const inStockOnly = searchParams.get("in_stock_only") === "1" || searchParams.get("hide_out_of_stock") === "1";
+
     const products = await prisma.product.findMany({
       where,
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
+    const { getTotalAvailableSets } = await import("@/lib/stock");
+
+    // Filter out of stock items if requested
+    const filtered = inStockOnly
+      ? products.filter((p) => {
+          if (!p.setsColorwise || !p.setsColorwise.trim()) return true;
+          const totalSets = getTotalAvailableSets(p.setsColorwise);
+          const mix = (p as any).mixPcs || 0;
+          return totalSets > 0 || mix > 0;
+        })
+      : products;
+
     // Optimize payload size: if full gallery not explicitly requested, return only the primary cover image
     const optimized = fullGallery
-      ? products
-      : products.map((p) => ({
+      ? filtered
+      : filtered.map((p) => ({
           ...p,
           imageUrl: getProductCoverImage(p.imageUrl),
         }));
