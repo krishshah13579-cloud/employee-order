@@ -2285,6 +2285,17 @@ export default function ProductForm({
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     )}
+
+                                    {/* Unpack 1 Set into Loose Pieces Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUnpackSet(color, ratioKey)}
+                                      disabled={setsCount <= 0}
+                                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                      title={`Unpack 1 set of '${ratioKey}' into loose pieces`}
+                                    >
+                                      <PackageOpen className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -2293,6 +2304,14 @@ export default function ProductForm({
                               <div className="flex items-center gap-2 pt-1">
                                 <select
                                   onChange={(e) => {
+                                    if (e.target.value === "__custom__") {
+                                      const customR = prompt(`Enter ratio name for ${color} (e.g. 28 to 34 or 30 to 40):`);
+                                      if (customR && customR.trim()) {
+                                        handleAddRatioToColor(color, customR.trim());
+                                      }
+                                      e.target.value = "";
+                                      return;
+                                    }
                                     if (e.target.value) {
                                       handleAddRatioToColor(color, e.target.value);
                                       e.target.value = "";
@@ -2304,13 +2323,19 @@ export default function ProductForm({
                                   <option value="" disabled>
                                     + Add Ratio for {color}...
                                   </option>
+                                  {colorRatios[formData.sizesRatio] === undefined && (
+                                    <option value={formData.sizesRatio}>
+                                      + {formData.sizesRatio} (Selected Pack • {formData.pcsPerSet} pcs)
+                                    </option>
+                                  )}
                                   {STANDARD_SIZE_RATIOS.filter(
-                                    (r) => colorRatios[r.value] === undefined
+                                    (r) => colorRatios[r.value] === undefined && r.value !== formData.sizesRatio
                                   ).map((r) => (
                                     <option key={r.value} value={r.value}>
                                       + {r.value} ({r.pcs} pcs/set)
                                     </option>
                                   ))}
+                                  <option value="__custom__">+ Enter Custom Ratio...</option>
                                 </select>
                               </div>
                             </div>
@@ -2383,11 +2408,67 @@ export default function ProductForm({
                             )}
 
                             {/* + Add Loose Size Selector */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 mb-2">
                               <select
                                 onChange={(e) => {
                                   if (e.target.value) {
                                     handleAddLooseSizeToColor(color, e.target.value);
+                                    e.target.value = "";
+                                  }
+                                }}
+                                defaultValue=""
+                                className="text-[11px] font-medium bg-emerald-50/60 border border-dashed border-emerald-300 hover:border-emerald-600 rounded-lg px-2 py-1 text-emerald-800 cursor-pointer focus:outline-none"
+                              >
+                                <option value="" disabled>
+                                  + Add Single Size Loose Pcs for {color}...
+                                </option>
+                                {AVAILABLE_PACK_SIZES.filter(
+                                  (sz) => colorLoose[sz] === undefined
+                                ).map((sz) => (
+                                  <option key={sz} value={sz}>
+                                    + Size {sz}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* 3. Sell / Deduct 1 Pc (Auto-convert set if no loose pieces) */}
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                              <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
+                                <Scissors className="w-3.5 h-3.5 text-blue-600" /> Sell / Deduct 1 Pc:
+                              </span>
+                              <select
+                                id={`sell-select-${clean}`}
+                                className="text-[11px] font-semibold bg-white border border-gray-300 rounded-lg px-2 py-1 text-gray-800 focus:outline-none"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>Select Size to Sell...</option>
+                                {Object.keys(sizeBreakdown).map((sz) => (
+                                  <option key={sz} value={sz} disabled={sizeBreakdown[sz] <= 0}>
+                                    Size {sz} ({sizeBreakdown[sz]} available{colorLoose[sz] ? ` • ${colorLoose[sz]} loose` : " • in set"})
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const el = document.getElementById(`sell-select-${clean}`) as HTMLSelectElement;
+                                  if (el && el.value) {
+                                    handleSellSingleSize(color, el.value);
+                                  } else {
+                                    toast("Please select a size to sell", "error");
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-black hover:bg-gray-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
+                                title="If no loose pcs exist, automatically removes from set and converts or unpacks set"
+                              >
+                                <span>Sell 1 Pc</span>
+                              </button>
+                              <span className="text-[10px] text-gray-400 italic">
+                                (Auto-unpacks or converts set if loose stock is 0)
+                              </span>
+                            </div>
+                          </div>
                                     e.target.value = "";
                                   }
                                 }}
