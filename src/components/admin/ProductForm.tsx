@@ -367,19 +367,21 @@ export default function ProductForm({
     return {};
   });
 
+  // Parse initial detailed stock with ratios and single size loose pieces
+  const initialStockWithLoose = parseDetailedColorStockWithLoose(
+    initialData?.setsColorwise,
+    initialData?.sizesRatio || "30 to 38"
+  );
+
   // Multi-ratio color stock breakdown: { [color]: { [ratio]: count } }
-  // e.g. { "Navy Blue": { "30 to 38": 5, "32 to 38": 1 } }
+  // e.g. { "Indigo": { "30 to 38": 5, "32 to 38": 1 } }
   const [colorRatioStockMap, setColorRatioStockMap] = useState<Record<string, Record<string, number>>>(() => {
     const result: Record<string, Record<string, number>> = {};
-    const detailed = parseDetailedColorRatioSets(
-      initialData?.setsColorwise,
-      initialData?.sizesRatio || "30 to 38"
-    );
     const initialColors = parseInitialColors();
 
-    for (const [col, ratios] of Object.entries(detailed)) {
+    for (const [col, detail] of Object.entries(initialStockWithLoose)) {
       const clean = cleanColorName(col);
-      result[clean] = { ...ratios };
+      result[clean] = { ...detail.ratios };
     }
 
     initialColors.forEach((c) => {
@@ -394,6 +396,17 @@ export default function ProductForm({
       }
     });
 
+    return result;
+  });
+
+  // Single size loose stock breakdown: { [color]: { [size]: count } }
+  // e.g. { "Indigo": { "34": 3, "36": 2 } }
+  const [colorLooseStockMap, setColorLooseStockMap] = useState<Record<string, Record<string, number>>>(() => {
+    const result: Record<string, Record<string, number>> = {};
+    for (const [col, detail] of Object.entries(initialStockWithLoose)) {
+      const clean = cleanColorName(col);
+      result[clean] = { ...detail.loosePcs };
+    }
     return result;
   });
 
@@ -436,6 +449,50 @@ export default function ProductForm({
       if (Object.keys(current).length === 0) {
         current[formData.sizesRatio] = 0;
       }
+      return {
+        ...prev,
+        [clean]: current,
+      };
+    });
+  };
+
+  const handleColorLoosePieceChange = (color: string, size: string, count: number) => {
+    const clean = cleanColorName(color);
+    setColorLooseStockMap((prev) => {
+      const current = { ...(prev[clean] || {}) };
+      const safeCount = Math.max(0, count);
+      if (safeCount === 0) {
+        delete current[size];
+      } else {
+        current[size] = safeCount;
+      }
+      return {
+        ...prev,
+        [clean]: current,
+      };
+    });
+  };
+
+  const handleAddLooseSizeToColor = (color: string, size: string) => {
+    const clean = cleanColorName(color);
+    setColorLooseStockMap((prev) => {
+      const current = { ...(prev[clean] || {}) };
+      if (current[size] !== undefined) return prev;
+      return {
+        ...prev,
+        [clean]: {
+          ...current,
+          [size]: 1,
+        },
+      };
+    });
+  };
+
+  const handleRemoveLooseSizeFromColor = (color: string, size: string) => {
+    const clean = cleanColorName(color);
+    setColorLooseStockMap((prev) => {
+      const current = { ...(prev[clean] || {}) };
+      delete current[size];
       return {
         ...prev,
         [clean]: current,
