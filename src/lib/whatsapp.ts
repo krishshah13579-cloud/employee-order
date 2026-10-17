@@ -366,47 +366,6 @@ export async function dispatchAutomatedWhatsApp(
     }
   }
 
-  // 2. UltraMsg API fallback
-  const ultraInstance = process.env.ULTRAMSG_INSTANCE_ID;
-  const ultraToken = process.env.ULTRAMSG_TOKEN;
-  if (ultraInstance && ultraToken && cleanPhone) {
-    try {
-      if (documentOptions?.pdfUrl) {
-        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/document`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            token: ultraToken,
-            to: cleanPhone,
-            filename: documentOptions.filename,
-            document: documentOptions.pdfUrl,
-            caption: message,
-          }),
-        });
-        if (res.ok) {
-          console.log(`✅ WhatsApp document sent via UltraMsg to ${cleanPhone}`);
-          return { success: true, method: "ULTRAMSG_DOCUMENT" };
-        }
-      } else {
-        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            token: ultraToken,
-            to: cleanPhone,
-            body: message,
-          }),
-        });
-        if (res.ok) {
-          console.log(`✅ WhatsApp chat sent via UltraMsg to ${cleanPhone}`);
-          return { success: true, method: "ULTRAMSG" };
-        }
-      }
-    } catch (err: any) {
-      console.error("UltraMsg dispatch exception:", err.message);
-    }
-  }
-
   return {
     success: false,
     method: "DIRECT_LINK_FALLBACK",
