@@ -28,6 +28,7 @@ export const revalidate = 0;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const action = searchParams.get("action") || "products";
     // For products feed, default to in-stock only. For inventory sync feed, default to all products (to detect 0-stock)
     const inStockOnly = action === "inventory"
       ? searchParams.get("in_stock_only") === "1"
