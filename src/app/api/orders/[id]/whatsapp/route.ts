@@ -5,6 +5,7 @@ import {
   generateTaxInvoiceWhatsAppMessage,
   generatePaymentReminderWhatsAppMessage,
   createWhatsAppDirectLink,
+  createWhatsAppNativeLink,
   dispatchAutomatedWhatsApp,
 } from "@/lib/whatsapp";
 
