@@ -38,6 +38,7 @@ import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate, isGstPanRegistered } from "@/lib/utils";
+import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
