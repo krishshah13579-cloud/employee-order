@@ -327,7 +327,25 @@ function ProductDetailContent() {
   // Wholesale Calculations & Dynamic Selling Price (Retailer vs Wholesaler)
   const pcsPerSet = product?.pcsPerSet || 5;
   const totalSets = selectedEntries.reduce((sum, item) => sum + item.sets, 0);
-  const totalPcs = totalSets * pcsPerSet;
+
+  // Dynamically calculate accurate pieces across size ratio packs
+  const colorPiecesMap = useMemo(() => {
+    const map: Record<string, { totalPcs: number; breakdownText: string }> = {};
+    for (const entry of selectedEntries) {
+      const calc = calculateOrderedColorSetsPieces(
+        product?.setsColorwise,
+        entry.color,
+        entry.sets,
+        pcsPerSet
+      );
+      map[entry.color] = calc;
+    }
+    return map;
+  }, [product, selectedEntries, pcsPerSet]);
+
+  const totalPcs = useMemo(() => {
+    return Object.values(colorPiecesMap).reduce((sum, item) => sum + item.totalPcs, 0);
+  }, [colorPiecesMap]);
 
   const isWholesaler = draftCustomer?.businessType === "WHOLESALER";
   const retPrice = product?.retailerPrice ?? product?.price ?? 0;
@@ -393,7 +411,7 @@ function ProductDetailContent() {
       sizesList: product.sizesList,
       pcsPerSet: pcsPerSet,
       totalSets: totalSets,
-      totalPcs: totalSets * pcsPerSet,
+      totalPcs: totalPcs,
       retailerPrice: retPrice,
       wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
