@@ -23,7 +23,7 @@ import {
   Eye,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
+import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import type { OrderData, ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
