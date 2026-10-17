@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAvailableSetsForColor, deductSetsFromStock } from "@/lib/stock";
 import { sendNewOrderNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
+import { requireAdmin } from "@/lib/auth-security";
 
 export async function GET(request: NextRequest) {
   try {
