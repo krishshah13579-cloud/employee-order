@@ -214,7 +214,57 @@ export async function PUT(
       });
     });
 
-    return NextResponse.json(updatedOrder);
+    // Automated WhatsApp trigger on status change in full order update
+    const effectiveStatus = updatedOrder.status;
+    const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;
+    let whatsappPayload: any = null;
+
+    if (customerPhone && (status && status !== existingOrder.status)) {
+      try {
+        const origin =
+          request.headers.get("origin") ||
+          request.headers.get("referer")?.replace(/\/admin.*$/, "") ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "https://krish-clothing.vercel.app";
+
+        const {
+          generateOrderStatusUpdateWhatsAppMessage,
+          dispatchAutomatedWhatsApp,
+          createWhatsAppDirectLink,
+          createWhatsAppNativeLink,
+        } = await import("@/lib/whatsapp");
+
+        const statusMsgConfig = generateOrderStatusUpdateWhatsAppMessage(
+          updatedOrder as any,
+          effectiveStatus,
+          origin
+        );
+
+        const autoResult = await dispatchAutomatedWhatsApp(customerPhone, statusMsgConfig.message, {
+          pdfUrl: statusMsgConfig.pdfUrl,
+          filename: statusMsgConfig.filename || "Invoice.pdf",
+        }).catch((err) => ({ success: false, method: "ERROR", error: err.message }));
+
+        whatsappPayload = {
+          customerPhone,
+          message: statusMsgConfig.message,
+          pdfUrl: statusMsgConfig.pdfUrl,
+          filename: statusMsgConfig.filename,
+          hasDocument: statusMsgConfig.hasDocument,
+          directUrl: createWhatsAppDirectLink(customerPhone, statusMsgConfig.message),
+          nativeUrl: createWhatsAppNativeLink(customerPhone, statusMsgConfig.message),
+          dispatchedByServer: autoResult.success,
+          dispatchMethod: autoResult.method,
+        };
+      } catch (waErr) {
+        console.error("Auto WhatsApp notification error in order update:", waErr);
+      }
+    }
+
+    return NextResponse.json({
+      ...updatedOrder,
+      whatsapp: whatsappPayload,
+    });
   } catch (error: any) {
     console.error("Error updating order:", error);
     return NextResponse.json({ error: "Failed to update order: " + error.message }, { status: 500 });
