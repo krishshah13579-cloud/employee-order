@@ -174,11 +174,36 @@ export function generateOrderStatusUpdateWhatsAppMessage(
     creditDays > 0 ? `Payment every week & completed within ${creditDays} Days` : "Advance Payment";
 
   switch (status) {
-    case "Confirmed": {
+    // 1. ORDER FORM SUBMISSION / CONFIRMED -> PDF ATTACHED
+    case "Confirmed":
+    case "Pending": {
       const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=order_form`;
       const filename = `Order_Form_${cleanOrderNum}.pdf`;
+      const msg =
+        `🧵 *KRISH CLOTHING CO.* — Order Status: *CONFIRMED*\n\n` +
+        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Thank you for your wholesale order with Krish Clothing Co.! Your order is now *CONFIRMED*.\n\n` +
+        `📋 *Order Form Summary:*\n` +
+        `• *Order No:* #${order.orderNumber}\n` +
+        `• *Current Status:* 🟢 *Confirmed*\n` +
+        `• *Date:* ${order.orderDate ? new Date(order.orderDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}\n` +
+        `• *Total Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
+        `• *Subtotal:* ₹${order.subtotal.toLocaleString("en-IN")}\n` +
+        `• *GST (5%):* ₹${order.gstAmount.toLocaleString("en-IN")}\n` +
+        `• *Grand Total:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
+        `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
+        `• *Payment Terms:* ${creditTermText}\n\n` +
+        `🏦 *Bank Account Details for Payment (RTGS / NEFT):*\n` +
+        `• *Bank:* ICICI BANK\n` +
+        `• *Account No:* 750705000692\n` +
+        `• *IFSC Code:* ICIC0007507\n` +
+        `• *Beneficiary:* KRISH CLOTHING CO.\n` +
+        `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
+        `📄 *Official Order Form PDF Attached*\n\n` +
+        `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
+
       return {
-        message: generateOrderWhatsAppMessage(order, baseUrl),
+        message: msg,
         pdfUrl,
         filename,
         pdfType: "order_form",
@@ -186,47 +211,59 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       };
     }
 
+    // IN PRODUCTION -> TEXT ONLY (NO PDF)
     case "In Production": {
       const msg =
-        `🏭 *KRISH CLOTHING CO.* — Production Update\n\n` +
+        `🏭 *KRISH CLOTHING CO.* — Order Status: *IN PRODUCTION*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
-        `Your wholesale order *#${order.orderNumber}* is now *IN PRODUCTION* at our manufacturing unit.\n\n` +
-        `📋 *Order Progress Details:*\n` +
+        `Your wholesale order *#${order.orderNumber}* status has been updated to: *IN PRODUCTION* at our manufacturing unit.\n\n` +
+        `📋 *Order Progress:*\n` +
         `• *Order No:* #${order.orderNumber}\n` +
+        `• *Current Status:* 🧵 *In Production* (Cutting, Stitching & Finishing)\n` +
         `• *Total Sets:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
-        `• *Order Status:* 🧵 In Production (Cutting, Stitching & Finishing)\n` +
         `• *Payment Terms:* ${creditTermText}\n\n` +
-        `We will notify you immediately with your final Tax Invoice as soon as packaging is complete.\n\n` +
+        `Our team is currently manufacturing your lot. We will update you as soon as packaging is complete.\n\n` +
         `Thank you for your business!\n` +
         `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return { message: msg, hasDocument: false };
     }
 
+    // READY FOR DISPATCH -> TEXT ONLY (NO PDF)
     case "Ready": {
-      const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
-      const filename = `Tax_Invoice_${cleanTaxNum}.pdf`;
+      const msg =
+        `📦 *KRISH CLOTHING CO.* — Order Status: *READY FOR DISPATCH*\n\n` +
+        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Your wholesale order *#${order.orderNumber}* status has been updated to: *READY FOR DISPATCH*!\n\n` +
+        `📋 *Order Summary:*\n` +
+        `• *Order / Invoice No:* #${cleanTaxNum}\n` +
+        `• *Current Status:* 📦 *Ready for Dispatch*\n` +
+        `• *Packed Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
+        `• *Total Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
+        `• *Transport:* ${resolvedTransport || "Direct Parcel / Transport"}\n` +
+        `• *Payment Terms:* ${creditTermText}\n\n` +
+        `Your goods have been packed and are waiting for transport dispatch.\n\n` +
+        `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return {
-        message: generateTaxInvoiceWhatsAppMessage(order, baseUrl),
-        pdfUrl,
-        filename,
-        pdfType: "tax_invoice",
-        hasDocument: true,
+        message: msg,
+        hasDocument: false,
       };
     }
 
+    // 2. DISPATCHED -> PDF ATTACHED (TAX INVOICE / DISPATCH CHALLAN)
     case "Dispatched": {
       const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
       const filename = `Tax_Invoice_Dispatch_${cleanTaxNum}.pdf`;
       const msg =
-        `🚚 *KRISH CLOTHING CO.* — Wholesale Order Dispatched!\n\n` +
+        `🚚 *KRISH CLOTHING CO.* — Order Status: *DISPATCHED*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
-        `Great news! Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* has been dispatched from our Ahmedabad warehouse.\n\n` +
+        `Great news! Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* status has been updated to: *DISPATCHED* from our Ahmedabad warehouse.\n\n` +
         `📋 *Dispatch & Billed Details:*\n` +
         `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +
+        `• *Current Status:* 🚚 *Dispatched* (En Route)\n` +
         `• *Dispatched Quantity:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
         `• *Total Invoice Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
         `• *Transport / Courier:* ${resolvedTransport || "Direct Transport Booking"}\n` +
-        `• *Status:* 🚚 Dispatched (En Route)\n\n` +
+        `• *Payment Terms:* ${creditTermText}\n\n` +
         `🏦 *Bank Account Details for Payment (RTGS / NEFT / IMPS):*\n` +
         `• *Bank:* ICICI BANK\n` +
         `• *Account No:* 750705000692\n` +
@@ -245,38 +282,35 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       };
     }
 
+    // DELIVERED -> TEXT ONLY (NO PDF)
     case "Delivered": {
-      const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
-      const filename = `Tax_Invoice_${cleanTaxNum}.pdf`;
       const msg =
-        `✅ *KRISH CLOTHING CO.* — Order Delivered\n\n` +
+        `✅ *KRISH CLOTHING CO.* — Order Status: *DELIVERED*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
-        `Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* has been successfully marked as *DELIVERED*.\n\n` +
-        `📋 *Order Summary:*\n` +
+        `Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* status has been updated to: *DELIVERED*.\n\n` +
+        `📋 *Delivery Details:*\n` +
         `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +
+        `• *Current Status:* ✅ *Delivered*\n` +
         `• *Total Sets Delivered:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
-        `• *Total Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
-        `• *Status:* ✅ Delivered\n\n` +
+        `• *Total Bill Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n\n` +
         `Thank you for choosing Krish Clothing Co.! For re-orders or feedback, feel free to message us.\n` +
         `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return {
         message: msg,
-        pdfUrl,
-        filename,
-        pdfType: "tax_invoice",
-        hasDocument: true,
+        hasDocument: false,
       };
     }
 
+    // CANCELLED -> TEXT ONLY (NO PDF)
     case "Cancelled": {
       const msg =
-        `❌ *KRISH CLOTHING CO.* — Order Cancelled\n\n` +
+        `❌ *KRISH CLOTHING CO.* — Order Status: *CANCELLED*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
-        `Please note that wholesale order *#${order.orderNumber}* has been marked as *CANCELLED*.\n\n` +
+        `Please note that wholesale order *#${order.orderNumber}* status has been updated to: *CANCELLED*.\n\n` +
         `📋 *Details:*\n` +
         `• *Order No:* #${order.orderNumber}\n` +
-        `• *Total Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n` +
-        `• *Status:* ❌ Cancelled\n\n` +
+        `• *Current Status:* ❌ *Cancelled*\n` +
+        `• *Total Amount:* ₹${order.grandTotal.toLocaleString("en-IN")}\n\n` +
         `If you have any questions or this was marked in error, please contact us at 8128756632.\n` +
         `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return { message: msg, hasDocument: false };
@@ -284,12 +318,12 @@ export function generateOrderStatusUpdateWhatsAppMessage(
 
     default: {
       const msg =
-        `ℹ️ *KRISH CLOTHING CO.* — Order Status Update\n\n` +
+        `ℹ️ *KRISH CLOTHING CO.* — Order Status: *${status.toUpperCase()}*\n\n` +
         `Dear *${order.customerName.toUpperCase()}*,\n` +
         `Your wholesale order *#${order.orderNumber}* status has been updated to: *${status}*.\n\n` +
         `• *Order No:* #${order.orderNumber}\n` +
-        `• *Total Sets:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n` +
-        `• *New Status:* ${status}\n\n` +
+        `• *Current Status:* *${status}*\n` +
+        `• *Total Sets:* ${order.totalSets} Sets (${order.totalPcs} Pieces)\n\n` +
         `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`;
       return { message: msg, hasDocument: false };
     }
