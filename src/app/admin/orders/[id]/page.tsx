@@ -231,9 +231,9 @@ export default function OrderInvoicePage() {
             : "✅ Order Form PDF sent directly to customer WhatsApp!",
           "success"
         );
-      } else if (data.whatsappUrl) {
+      } else if (data.whatsappUrl || data.nativeUrl) {
         toast("Opening WhatsApp with message and PDF attachment...", "success");
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp", "error");
