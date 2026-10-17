@@ -99,12 +99,14 @@ export async function POST(
 
     // Generate direct click URL for instant web/app fallback
     const directLink = createWhatsAppDirectLink(customerPhone, messageText);
+    const nativeLink = createWhatsAppNativeLink(customerPhone, messageText);
 
     return NextResponse.json({
       success: true,
       automated: autoResult.success,
       method: autoResult.method,
       whatsappUrl: directLink,
+      nativeUrl: nativeLink,
       pdfUrl,
       message: messageText,
       customerPhone,
