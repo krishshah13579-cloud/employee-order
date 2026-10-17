@@ -59,6 +59,40 @@ export async function shareOrOpenWhatsAppWithPdf(options: WhatsAppLaunchOptions)
     typeof navigator !== "undefined" &&
     /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+  // 0. Direct Background Dispatch via Local WhatsApp Gateway (if connected on port 5050)
+  try {
+    const gatewayStatus = await fetch("http://localhost:5050/api/status", {
+      signal: AbortSignal.timeout(1500),
+    }).catch(() => null);
+
+    if (gatewayStatus && gatewayStatus.ok) {
+      const statusJson = await gatewayStatus.json();
+      if (statusJson.connected && options.pdfUrl) {
+        const phoneMatch = options.nativeUrl?.match(/phone=([^&]+)/) || options.whatsappUrl?.match(/phone=([^&]+)/);
+        const recipientPhone = phoneMatch ? phoneMatch[1] : "";
+
+        if (recipientPhone) {
+          const sendRes = await fetch("http://localhost:5050/api/send-document", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: recipientPhone,
+              documentUrl: options.pdfUrl,
+              filename: options.filename,
+              caption: options.text,
+            }),
+            signal: AbortSignal.timeout(15000),
+          }).catch(() => null);
+
+          if (sendRes && sendRes.ok) {
+            options.onToast?.("✅ PDF document sent directly to customer via your WhatsApp (8128756632)!", "success");
+            return;
+          }
+        }
+      }
+    }
+  } catch {}
+
   // 1. Attempt Native File Sharing (Attaches the actual PDF document file directly into WhatsApp)
   if (options.pdfUrl && typeof navigator !== "undefined" && typeof (navigator as any).share === "function") {
     try {
