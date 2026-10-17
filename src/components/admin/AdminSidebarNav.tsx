@@ -14,6 +14,7 @@ import {
   Boxes,
   Receipt,
   RotateCcw,
+  MessageCircle,
   LogOut,
   ExternalLink,
 } from "lucide-react";
