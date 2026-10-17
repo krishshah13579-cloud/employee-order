@@ -114,42 +114,57 @@ export async function PUT(
       },
     });
 
-    // Automated WhatsApp trigger on status change to "Confirmed" or "Ready"
+    // Automated WhatsApp trigger on status change
     const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;
-    if (customerPhone && (status === "Confirmed" || status === "Ready")) {
+    let whatsappPayload: any = null;
+
+    if (customerPhone) {
       try {
         const origin =
           request.headers.get("origin") ||
+          request.headers.get("referer")?.replace(/\/admin.*$/, "") ||
           process.env.NEXT_PUBLIC_APP_URL ||
           "https://krish-clothing.vercel.app";
 
         const {
-          generateOrderWhatsAppMessage,
-          generateTaxInvoiceWhatsAppMessage,
+          generateOrderStatusUpdateWhatsAppMessage,
           dispatchAutomatedWhatsApp,
+          createWhatsAppDirectLink,
+          createWhatsAppNativeLink,
         } = await import("@/lib/whatsapp");
 
-        const isReady = status === "Ready";
-        const pdfDocType = isReady ? "tax_invoice" : "order_form";
-        const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${updatedOrder.id}/pdf?type=${pdfDocType}`;
-        const docNo = (isReady && updatedOrder.taxInvoiceNumber ? updatedOrder.taxInvoiceNumber : updatedOrder.orderNumber).replace(/[^a-zA-Z0-9_-]/g, "_");
-        const pdfFilename = `${isReady ? "Tax_Invoice" : "Order_Form"}_${docNo}.pdf`;
+        const statusMsgConfig = generateOrderStatusUpdateWhatsAppMessage(
+          updatedOrder as any,
+          status,
+          origin
+        );
 
-        const messageText = isReady
-          ? generateTaxInvoiceWhatsAppMessage(updatedOrder as any, origin)
-          : generateOrderWhatsAppMessage(updatedOrder as any, origin);
+        // Run automated dispatch
+        const autoResult = await dispatchAutomatedWhatsApp(customerPhone, statusMsgConfig.message, {
+          pdfUrl: statusMsgConfig.pdfUrl,
+          filename: statusMsgConfig.filename || "Invoice.pdf",
+        }).catch((err) => ({ success: false, method: "ERROR", error: err.message }));
 
-        // Run automated dispatch in background
-        dispatchAutomatedWhatsApp(customerPhone, messageText, {
-          pdfUrl,
-          filename: pdfFilename,
-        }).catch((err) => console.error("Auto WhatsApp status dispatch error:", err));
+        whatsappPayload = {
+          customerPhone,
+          message: statusMsgConfig.message,
+          pdfUrl: statusMsgConfig.pdfUrl,
+          filename: statusMsgConfig.filename,
+          hasDocument: statusMsgConfig.hasDocument,
+          directUrl: createWhatsAppDirectLink(customerPhone, statusMsgConfig.message),
+          nativeUrl: createWhatsAppNativeLink(customerPhone, statusMsgConfig.message),
+          dispatchedByServer: autoResult.success,
+          dispatchMethod: autoResult.method,
+        };
       } catch (waErr) {
         console.error("Auto WhatsApp notification error:", waErr);
       }
     }
 
-    return NextResponse.json(updatedOrder);
+    return NextResponse.json({
+      ...updatedOrder,
+      whatsapp: whatsappPayload,
+    });
   } catch (error: any) {
     console.error("Error updating order status:", error);
     return NextResponse.json({ error: "Failed to update order status: " + error.message }, { status: 500 });
