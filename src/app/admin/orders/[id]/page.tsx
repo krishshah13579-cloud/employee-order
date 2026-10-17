@@ -507,10 +507,22 @@ export default function OrderInvoicePage() {
             <div className="text-xs text-gray-500 mt-1">
               Date: <span className="font-semibold text-gray-900">{formatDate(activeDate)}</span>
             </div>
-            <div className="mt-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <CheckCircle size={12} /> {order.status}
-              </span>
+            <div className="mt-2.5 flex items-center justify-end gap-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status:</span>
+              <select
+                value={order.status}
+                disabled={updatingStatus}
+                onChange={(e) => handleDirectStatusChange(e.target.value)}
+                className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:border-slate-400 text-slate-800 shadow-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none cursor-pointer"
+                title="Change status and automatically dispatch WhatsApp message to customer"
+              >
+                {ORDER_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+              {updatingStatus && <Loader2 size={13} className="animate-spin text-orange-600" />}
             </div>
           </div>
         </div>
