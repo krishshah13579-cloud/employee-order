@@ -75,13 +75,16 @@ export default function AdminStockPage() {
   const handleSyncStore = async () => {
     try {
       setSyncingStore(true);
-      const res = await fetch("https://iq-trousers-store-uge4.vercel.app/api/sync-stock");
+      const res = await fetch("/api/admin/stock/sync", {
+        method: "POST",
+      });
       const data = await res.json();
       if (res.ok && data.success) {
         toast(
           `Synced ${data.syncedStylesCount || 0} styles with E-Commerce Storefront! Out-of-stock items hidden automatically.`,
           "success"
         );
+        fetchStock();
       } else {
         toast(data.error || "Storefront sync encountered an issue", "error");
       }
