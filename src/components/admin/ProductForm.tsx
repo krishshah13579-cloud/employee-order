@@ -2278,7 +2278,18 @@ export default function ProductForm({
                   {selectedColors.map((color) => {
                     const clean = cleanColorName(color);
                     const cInfo = getColorHex(color);
-                    const colorRatios = colorRatioStockMap[clean] || { [formData.sizesRatio]: 0 };
+                    const rawColorRatios = colorRatioStockMap[clean] || {};
+                    let colorRatios: Record<string, number> = { ...rawColorRatios };
+                    if (Object.keys(colorRatios).length === 0) {
+                      colorRatios = { [formData.sizesRatio]: 0 };
+                    } else if (
+                      Object.keys(colorRatios).length === 1 &&
+                      formData.sizesRatio &&
+                      colorRatios[formData.sizesRatio] === undefined
+                    ) {
+                      const singleCount = Object.values(colorRatios)[0] ?? 0;
+                      colorRatios = { [formData.sizesRatio]: singleCount };
+                    }
                     const colorLoose = colorLooseStockMap[clean] || {};
                     const stockCalc = calculateTotalColorPieces(colorRatios, colorLoose, formData.pcsPerSet || 5);
                     const sizeBreakdown = calculateColorSizesBreakdown(colorRatios, colorLoose);
