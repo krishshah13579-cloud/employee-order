@@ -178,6 +178,21 @@ export default function ProductForm({
     });
   }, [selectedColors]);
 
+  const handleColorLetterChange = (color: string, newLetter: string) => {
+    const cleanLetter = newLetter.trim().toUpperCase();
+    if (!cleanLetter) return;
+    setColorAlphabetMap((prev) => {
+      const updated = { ...prev };
+      for (const [k, v] of Object.entries(updated)) {
+        if (cleanColorName(v).toLowerCase() === cleanColorName(color).toLowerCase()) {
+          delete updated[k];
+        }
+      }
+      updated[cleanLetter] = color;
+      return updated;
+    });
+  };
+
   // Parse initial images list (supports comma-separated, single URL, or JSON array)
   const parseInitialImages = (): string[] => {
     if (!initialData?.imageUrl) return [];
