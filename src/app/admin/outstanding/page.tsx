@@ -23,7 +23,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
+import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 
