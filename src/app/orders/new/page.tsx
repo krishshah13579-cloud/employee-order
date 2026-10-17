@@ -1226,7 +1226,7 @@ export default function OrderFormPage() {
                                 {item.productName}
                               </Link>
                               <div className="text-[10px] text-slate-500">
-                                Ratio: {item.sizeRatio} ({item.pcsPerSet || 5} pcs/set)
+                                Ratio: {item.sizeRatio} • {item.totalSets} Sets ({itemTotalPcs} Pcs)
                               </div>
                             </div>
                           </div>
