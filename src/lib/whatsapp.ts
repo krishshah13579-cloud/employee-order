@@ -271,13 +271,61 @@ export async function dispatchAutomatedWhatsApp(
   }
 ): Promise<{ success: boolean; method: string; error?: string }> {
   const cleanPhone = formatWhatsAppPhone(phone);
-  const metaToken =
-    process.env.WHATSAPP_TOKEN ||
-    "EAAevAelNnwkBSs3GQ7wHyRj52ClOHlzgXNR7ycZCZAVUZBjKyrGUdD9ZCGZB32EWSZCi4bnBrImGrrmtWWwMvqZBckRgsWm3ATMBv6ZAZCkeneS5cDgw5ADqxaRU9l1PscZBgDi9MoAqW8abgdPZBTzeUAOCILKNHNqEhxBRwwC7kr9OfNdRCFw7LXIi7EnoipO3ZC6TVQZDZD";
-  const metaPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1435860432936279";
+  if (!cleanPhone) {
+    return { success: false, method: "NONE", error: "Missing phone number" };
+  }
 
-  // 1. Meta WhatsApp Cloud API
-  if (metaToken && metaPhoneId && cleanPhone) {
+  // 1. Direct Linked WhatsApp Gateway (UltraMsg) - Sends directly from WhatsApp Business number 8128756632
+  const ultraInstance = process.env.ULTRAMSG_INSTANCE_ID;
+  const ultraToken = process.env.ULTRAMSG_TOKEN;
+  if (ultraInstance && ultraToken) {
+    try {
+      if (documentOptions?.pdfUrl) {
+        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/document`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: ultraToken,
+            to: cleanPhone,
+            filename: documentOptions.filename,
+            document: documentOptions.pdfUrl,
+            caption: message,
+          }),
+        });
+        if (res.ok) {
+          console.log(`✅ WhatsApp document sent via UltraMsg from 8128756632 to ${cleanPhone}`);
+          return { success: true, method: "ULTRAMSG_DOCUMENT" };
+        } else {
+          const errText = await res.text();
+          console.error("UltraMsg document dispatch error:", errText);
+        }
+      } else {
+        const res = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: ultraToken,
+            to: cleanPhone,
+            body: message,
+          }),
+        });
+        if (res.ok) {
+          console.log(`✅ WhatsApp message sent via UltraMsg from 8128756632 to ${cleanPhone}`);
+          return { success: true, method: "ULTRAMSG" };
+        } else {
+          const errText = await res.text();
+          console.error("UltraMsg chat dispatch error:", errText);
+        }
+      }
+    } catch (err: any) {
+      console.error("UltraMsg dispatch exception:", err.message);
+    }
+  }
+
+  // 2. Meta WhatsApp Cloud API (Fallback if configured with valid token)
+  const metaToken = process.env.WHATSAPP_TOKEN;
+  const metaPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (metaToken && metaPhoneId) {
     try {
       const payload: any = {
         messaging_product: "whatsapp",
