@@ -11,6 +11,11 @@ import {
   ShieldCheck,
   Smartphone,
   ExternalLink,
+  Calendar,
+  Clock,
+  Bell,
+  Users,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
@@ -37,6 +42,18 @@ export default function AdminWhatsAppPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [qrKey, setQrKey] = useState(Date.now());
+
+  // Weekly Reminder Settings State
+  const [settings, setSettings] = useState({
+    weeklyReminderEnabled: true,
+    weeklyReminderDay: "Saturday",
+    weeklyReminderTime: "10:00",
+    autoOrderStatusMessage: true,
+    lastDispatchedDate: null as string | null,
+    lastDispatchedCount: 0,
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [dispatchingWeeklyNow, setDispatchingWeeklyNow] = useState(false);
 
   const fetchStatus = async () => {
     // 1. Direct browser fetch to local gateway on port 5050 (works seamlessly even when browsing via Vercel)
