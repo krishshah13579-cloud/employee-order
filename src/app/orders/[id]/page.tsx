@@ -23,6 +23,7 @@ import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
 import type { ColorSetEntry } from "@/lib/types";
