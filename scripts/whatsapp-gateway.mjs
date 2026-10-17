@@ -160,6 +160,97 @@ async function connectToWhatsApp() {
   }
 }
 
+// Automated Weekly Payment Reminders Job
+async function triggerWeeklyRemindersJob() {
+  if (connectionState !== "CONNECTED" || !sock) {
+    console.log("⏳ [WEEKLY REMINDER] Skipped — WhatsApp gateway is not connected.");
+    return { success: false, error: "WhatsApp gateway is not connected. Scan QR code first." };
+  }
+
+  console.log("\n🚀 [WEEKLY PAYMENT REMINDER] Initiating weekly payment reminder dispatch...");
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const res = await fetch(`${appUrl}/api/admin/outstanding/whatsapp-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoDispatch: false }),
+    }).catch(() => null);
+
+    if (!res || !res.ok) {
+      console.warn("Could not fetch outstanding reminders from application API at", appUrl);
+      return { success: false, error: "Could not fetch customer account statements from application" };
+    }
+
+    const data = await res.json();
+    const reminders = data.reminders || [];
+    console.log(`📋 Found ${reminders.length} customers with outstanding balances.`);
+
+    if (reminders.length === 0) {
+      console.log("✅ Zero outstanding balances found. No reminders needed.");
+      return { success: true, count: 0, message: "No customers with outstanding balance." };
+    }
+
+    let sent = 0;
+    for (const rem of reminders) {
+      if (!rem.phone || !rem.message) continue;
+      const jid = formatJid(rem.phone);
+      try {
+        await sock.sendMessage(jid, { text: rem.message });
+        sent++;
+        console.log(`✅ [${sent}/${reminders.length}] Sent weekly statement to ${rem.customerName} (${jid})`);
+        // Gentle 3-second delay to preserve WhatsApp Business safety
+        await new Promise((r) => setTimeout(r, 3000));
+      } catch (sendErr) {
+        console.error(`Failed to dispatch reminder to ${rem.customerName}:`, sendErr.message);
+      }
+    }
+
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    saveSettings({
+      lastDispatchedDate: todayStr,
+      lastDispatchedCount: sent,
+    });
+
+    console.log(`🎉 [WEEKLY REMINDERS DISPATCHED] Successfully sent to ${sent} customers from +918128756632!\n`);
+    return { success: true, count: sent };
+  } catch (err) {
+    console.error("Weekly reminder job error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Background Cron Scheduler (Runs every 3 minutes)
+setInterval(async () => {
+  if (connectionState !== "CONNECTED" || !sock) return;
+
+  const settings = loadSettings();
+  if (!settings.weeklyReminderEnabled) return;
+
+  const now = new Date();
+  const indianDateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long",
+    hour: "numeric",
+    hour12: false,
+  });
+  const parts = indianDateFormatter.formatToParts(now);
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const scheduledDay = settings.weeklyReminderDay || "Saturday";
+  const scheduledHour = parseInt((settings.weeklyReminderTime || "10:00").split(":")[0], 10);
+
+  if (
+    weekday?.toLowerCase() === scheduledDay.toLowerCase() &&
+    hour >= scheduledHour &&
+    settings.lastDispatchedDate !== todayStr
+  ) {
+    console.log(`⏰ [CRON TRIGGER] Today is ${weekday} (Scheduled: ${scheduledDay} at ${scheduledHour}:00 IST). Dispatching weekly payment reminders...`);
+    await triggerWeeklyRemindersJob();
+  }
+}, 3 * 60 * 1000);
+
 // Start WhatsApp Client
 connectToWhatsApp();
 
