@@ -42,3 +42,4 @@ prisma/*.db*
 !/public/uploads/.gitkeep
 .vercel
 .env*
+.whatsapp-auth/
