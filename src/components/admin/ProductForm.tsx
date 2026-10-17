@@ -996,7 +996,18 @@ export default function ProductForm({
       const finalStockMap: Record<string, { ratios: Record<string, number>; loosePcs: Record<string, number> }> = {};
       for (const c of selectedColors) {
         const clean = cleanColorName(c);
-        const ratios = colorRatioStockMap[clean] || { [formData.sizesRatio]: 0 };
+        const rawRatios = colorRatioStockMap[clean] || {};
+        let ratios = { ...rawRatios };
+        if (Object.keys(ratios).length === 0) {
+          ratios = { [formData.sizesRatio]: 0 };
+        } else if (
+          Object.keys(ratios).length === 1 &&
+          formData.sizesRatio &&
+          ratios[formData.sizesRatio] === undefined
+        ) {
+          const singleCount = Object.values(ratios)[0] ?? 0;
+          ratios = { [formData.sizesRatio]: singleCount };
+        }
         const loose = colorLooseStockMap[clean] || {};
 
         finalStockMap[clean] = {
