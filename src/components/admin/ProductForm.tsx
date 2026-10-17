@@ -419,13 +419,20 @@ export default function ProductForm({
   const handleColorRatioSetChange = (color: string, ratio: string, val: number) => {
     const clean = cleanColorName(color);
     setColorRatioStockMap((prev) => {
-      const current = prev[clean] || { [formData.sizesRatio]: 0 };
+      const current = prev[clean] || {};
+      const keys = Object.keys(current);
+      let updated: Record<string, number> = { ...current };
+
+      if (keys.length === 1 && keys[0] !== ratio) {
+        // Replace single stale ratio key
+        updated = { [ratio]: Math.max(0, val) };
+      } else {
+        updated[ratio] = Math.max(0, val);
+      }
+
       return {
         ...prev,
-        [clean]: {
-          ...current,
-          [ratio]: Math.max(0, val),
-        },
+        [clean]: updated,
       };
     });
   };
