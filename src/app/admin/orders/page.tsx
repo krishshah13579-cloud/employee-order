@@ -292,8 +292,8 @@ export default function OrdersPage() {
                             const data = await res.json();
                             if (data.automated) {
                               toast("✅ Invoice & details sent directly to customer WhatsApp!", "success");
-                            } else if (data.whatsappUrl) {
-                              window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+                            } else if (data.whatsappUrl || data.nativeUrl) {
+                              openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
                             }
                           } catch {
                             toast("Could not send WhatsApp message", "error");
