@@ -533,20 +533,79 @@ export default function ProductForm({
     toast(`Set ${sets} stock sets for all ${selectedColors.length} colors`, "success");
   };
 
-  const AVAILABLE_PACK_SIZES = ["26", "28", "30", "32", "34", "36", "38", "40", "42", "44"];
+  const BASE_PACK_SIZES = ["26", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46", "S", "M", "L", "XL", "XXL", "3XL"];
+  const [customPackSizes, setCustomPackSizes] = useState<string[]>([]);
+  const [customSizeInput, setCustomSizeInput] = useState<string>("");
+  const [isCustomRatioMode, setIsCustomRatioMode] = useState<boolean>(() => {
+    return !STANDARD_SIZE_RATIOS.some((r) => r.value === initialData?.sizesRatio);
+  });
+
+  const AVAILABLE_PACK_SIZES = Array.from(new Set([...BASE_PACK_SIZES, ...customPackSizes]));
+
+  // Helper to sync ratio changes to formData and all colors in colorRatioStockMap
+  const updateRatioEverywhere = (newRatio: string, newSizesList: string, newPcs: number) => {
+    const oldRatio = formData.sizesRatio;
+
+    setFormData((prev) => ({
+      ...prev,
+      sizesRatio: newRatio,
+      sizesList: newSizesList,
+      pcsPerSet: newPcs,
+    }));
+
+    // Replace oldRatio or "30 to 38" with newRatio across all colors in colorRatioStockMap
+    setColorRatioStockMap((prev) => {
+      const next: Record<string, Record<string, number>> = {};
+      for (const [col, ratios] of Object.entries(prev)) {
+        next[col] = {};
+        let replaced = false;
+        for (const [rKey, count] of Object.entries(ratios)) {
+          if (rKey === oldRatio || (rKey === "30 to 38" && oldRatio !== "30 to 38")) {
+            next[col][newRatio] = count;
+            replaced = true;
+          } else {
+            next[col][rKey] = count;
+          }
+        }
+        if (!replaced && Object.keys(next[col]).length === 0) {
+          next[col][newRatio] = 0;
+        }
+      }
+      return next;
+    });
+  };
 
   const handleRatioChange = (ratioVal: string) => {
+    setIsCustomRatioMode(false);
     const found = STANDARD_SIZE_RATIOS.find((r) => r.value === ratioVal);
     if (found) {
-      setFormData((prev) => ({
-        ...prev,
-        sizesRatio: found.value,
-        sizesList: found.sizes,
-        pcsPerSet: found.pcs,
-      }));
+      updateRatioEverywhere(found.value, found.sizes, found.pcs);
     } else {
-      setFormData((prev) => ({ ...prev, sizesRatio: ratioVal }));
+      updateRatioEverywhere(ratioVal, formData.sizesList, formData.pcsPerSet);
     }
+  };
+
+  const handleSelectAddAnySizeRatio = () => {
+    setIsCustomRatioMode(true);
+  };
+
+  const handleAddCustomSizeToPack = () => {
+    const trimmed = customSizeInput.trim().toUpperCase();
+    if (!trimmed) return;
+    if (!customPackSizes.includes(trimmed)) {
+      setCustomPackSizes((prev) => [...prev, trimmed]);
+    }
+    const currentSizes = formData.sizesList.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!currentSizes.includes(trimmed)) {
+      const nextSizes = [...currentSizes, trimmed];
+      const count = nextSizes.length;
+      let ratioName = formData.sizesRatio;
+      if (nextSizes.length >= 2) {
+        ratioName = `${nextSizes[0]} to ${nextSizes[nextSizes.length - 1]}`;
+      }
+      updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
+    }
+    setCustomSizeInput("");
   };
 
   const handleToggleSizeInPack = (sz: string) => {
@@ -579,12 +638,7 @@ export default function ProductForm({
     const maxSize = nextSizes[nextSizes.length - 1];
     const ratioName = `${minSize} to ${maxSize}`;
 
-    setFormData((prev) => ({
-      ...prev,
-      sizesRatio: ratioName,
-      sizesList: nextSizes.join(", "),
-      pcsPerSet: count,
-    }));
+    updateRatioEverywhere(ratioName, nextSizes.join(", "), count);
   };
 
   const handleSizesListInput = (val: string) => {
@@ -597,12 +651,59 @@ export default function ProductForm({
     if (parsed.length >= 2) {
       ratio = `${parsed[0]} to ${parsed[parsed.length - 1]}`;
     }
-    setFormData((prev) => ({
+    updateRatioEverywhere(ratio, val, count);
+  };
+
+  const handleRatioLabelChange = (val: string) => {
+    updateRatioEverywhere(val, formData.sizesList, formData.pcsPerSet);
+  };
+
+  const handleSellSingleSize = (color: string, size: string) => {
+    const clean = cleanColorName(color);
+    const ratios = colorRatioStockMap[clean] || {};
+    const loose = colorLooseStockMap[clean] || {};
+
+    const result = sellSingleSizeFromColorStock(ratios, loose, size);
+    if (!result.success) {
+      toast(result.message, "error");
+      return;
+    }
+
+    setColorRatioStockMap((prev) => ({
       ...prev,
-      sizesList: val,
-      pcsPerSet: count,
-      sizesRatio: ratio,
+      [clean]: result.ratios,
     }));
+
+    setColorLooseStockMap((prev) => ({
+      ...prev,
+      [clean]: result.loosePcs,
+    }));
+
+    toast(result.message, "success");
+  };
+
+  const handleUnpackSet = (color: string, ratioToUnpack: string) => {
+    const clean = cleanColorName(color);
+    const ratios = colorRatioStockMap[clean] || {};
+    const loose = colorLooseStockMap[clean] || {};
+
+    const result = unpackSetToLoosePieces(ratios, loose, ratioToUnpack);
+    if (!result.success) {
+      toast(result.message, "error");
+      return;
+    }
+
+    setColorRatioStockMap((prev) => ({
+      ...prev,
+      [clean]: result.ratios,
+    }));
+
+    setColorLooseStockMap((prev) => ({
+      ...prev,
+      [clean]: result.loosePcs,
+    }));
+
+    toast(result.message, "success");
   };
 
   // Color management
