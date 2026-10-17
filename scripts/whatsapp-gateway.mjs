@@ -36,6 +36,39 @@ let connectionState = "INITIALIZING"; // INITIALIZING | NEED_SCAN | CONNECTING |
 let connectedUser = null;
 let lastError = null;
 
+// Settings Configuration File
+const SETTINGS_FILE = path.resolve(__dirname, "..", "prisma", "whatsapp-settings.json");
+
+function loadSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    }
+  } catch (e) {}
+  return {
+    weeklyReminderEnabled: true,
+    weeklyReminderDay: "Saturday",
+    weeklyReminderTime: "10:00",
+    autoOrderStatusMessage: true,
+    lastDispatchedDate: null,
+    lastDispatchedCount: 0,
+  };
+}
+
+function saveSettings(patch) {
+  try {
+    const cur = loadSettings();
+    const updated = { ...cur, ...patch };
+    const dir = path.dirname(SETTINGS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
+    return updated;
+  } catch (e) {
+    console.error("Error saving WhatsApp settings:", e);
+    return patch;
+  }
+}
+
 // Clean logger
 const logger = pino({ level: process.env.DEBUG ? "debug" : "silent" });
 
