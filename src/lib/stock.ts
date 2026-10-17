@@ -28,11 +28,14 @@ export function parseColorwiseSets(raw: string | null | undefined): Record<strin
       if (typeof parsed === "object" && parsed !== null) {
         for (const [k, v] of Object.entries(parsed)) {
           if (typeof v === "object" && v !== null) {
-            // Nested ratio breakdown, e.g. {"30 to 38": 5, "32 to 38": 1}
+            // Nested breakdown, e.g. { ratios: {"30 to 38": 5}, loosePcs: {"34": 3} } or {"30 to 38": 5}
             let subtotal = 0;
-            for (const rSets of Object.values(v)) {
-              const n = parseInt(String(rSets), 10);
-              if (!isNaN(n)) subtotal += Math.max(0, n);
+            const ratioSource = (v as any).ratios && typeof (v as any).ratios === "object" ? (v as any).ratios : v;
+            for (const [rK, rSets] of Object.entries(ratioSource)) {
+              if (rK !== "loose" && rK !== "loosePcs") {
+                const n = parseInt(String(rSets), 10);
+                if (!isNaN(n)) subtotal += Math.max(0, n);
+              }
             }
             result[k.trim()] = subtotal;
           } else {
