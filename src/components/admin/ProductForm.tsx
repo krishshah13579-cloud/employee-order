@@ -42,6 +42,10 @@ import {
   getAvailableSetsForColor,
   cleanColorName,
   parseDetailedColorRatioSets,
+  parseDetailedColorStockWithLoose,
+  calculateColorSizesBreakdown,
+  calculateTotalColorPieces,
+  getSizesFromRatio,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
 import { extractColorsFromImage } from "@/lib/colorExtractor";
