@@ -37,6 +37,7 @@ import {
   getAllProductColors,
   getProductColorImage,
   cleanColorName,
+  calculateOrderedColorSetsPieces,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
 
