@@ -25,6 +25,8 @@ import {
   Link as LinkIcon,
   AlertCircle,
   Plus,
+  PackageOpen,
+  Scissors,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
@@ -46,6 +48,8 @@ import {
   calculateColorSizesBreakdown,
   calculateTotalColorPieces,
   getSizesFromRatio,
+  sellSingleSizeFromColorStock,
+  unpackSetToLoosePieces,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
 import { extractColorsFromImage } from "@/lib/colorExtractor";
