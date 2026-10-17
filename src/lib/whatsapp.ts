@@ -100,8 +100,7 @@ export function generateOrderWhatsAppMessage(
     `• *IFSC Code:* ICIC0007507\n` +
     `• *Beneficiary:* KRISH CLOTHING CO.\n` +
     `• *Branch:* Maninagar Khokhra, Ahmedabad\n\n` +
-    `📄 *Download Order Form PDF:* ${pdfUrl}\n` +
-    `🔗 *View Live Order:* ${viewUrl}\n\n` +
+    `📄 *Official Order Form PDF Attached*\n\n` +
     `_Krish Clothing Co., Ahmedabad (M: 8128756632)_`
   );
 }
