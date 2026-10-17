@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Check,
   ChevronRight,
+  Bell,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
