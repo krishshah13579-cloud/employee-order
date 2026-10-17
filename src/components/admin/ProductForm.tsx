@@ -2467,26 +2467,6 @@ export default function ProductForm({
                               <span className="text-[10px] text-gray-400 italic">
                                 (Auto-unpacks or converts set if loose stock is 0)
                               </span>
-                            </div>
-                          </div>
-                                    e.target.value = "";
-                                  }
-                                }}
-                                defaultValue=""
-                                className="text-[11px] font-medium bg-emerald-50/60 border border-dashed border-emerald-300 hover:border-emerald-600 rounded-lg px-2 py-1 text-emerald-800 cursor-pointer focus:outline-none"
-                              >
-                                <option value="" disabled>
-                                  + Add Single Size Loose Pcs for {color}...
-                                </option>
-                                {AVAILABLE_PACK_SIZES.filter(
-                                  (sz) => colorLoose[sz] === undefined
-                                ).map((sz) => (
-                                  <option key={sz} value={sz}>
-                                    + Size {sz}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
                           </div>
 
                           {/* 3. Real-time Retail Size Breakdown Matrix */}
