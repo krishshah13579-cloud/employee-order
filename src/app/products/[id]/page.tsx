@@ -990,7 +990,12 @@ function ProductDetailContent() {
                           />
                           <span className="font-bold text-white">{entry.color}:</span>
                           <span className="text-orange-400 font-bold">
-                            {entry.sets} {entry.sets === 1 ? "set" : "sets"} ({entry.sets * pcsPerSet} pcs)
+                            {entry.sets} {entry.sets === 1 ? "set" : "sets"} (
+                            {colorPiecesMap[entry.color]?.totalPcs ?? entry.sets * pcsPerSet} pcs
+                            {colorPiecesMap[entry.color]?.breakdownText
+                              ? `: ${colorPiecesMap[entry.color].breakdownText}`
+                              : ""}
+                            )
                           </span>
                         </span>
                       ))}
