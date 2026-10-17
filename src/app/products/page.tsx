@@ -109,9 +109,18 @@ function ProductsContent() {
     loadCategories();
   }, []);
 
-  // Filter products by category and search term
+  // Filter products by category, search term, and automatically hide Out-of-Stock items
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      // Auto-remove from customer view if Out of Stock (0 total sets and 0 mix pcs)
+      if (product.setsColorwise && product.setsColorwise.trim() !== "") {
+        const totalSets = getTotalAvailableSets(product.setsColorwise);
+        const mixPcs = (product as any).mixPcs || 0;
+        if (totalSets <= 0 && mixPcs <= 0) {
+          return false; // Product is out of stock, hidden from customer view
+        }
+      }
+
       const matchesCategory =
         selectedCategory === "All" ||
         product.category.toLowerCase() === selectedCategory.toLowerCase();
