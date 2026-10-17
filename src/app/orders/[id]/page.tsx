@@ -113,14 +113,14 @@ export default function OrderEditPage() {
             : "Order Form sent directly to customer's WhatsApp!",
           "success"
         );
-      } else if (data.whatsappUrl) {
+      } else if (data.whatsappUrl || data.nativeUrl) {
         toast(
           type === "PAYMENT_REMINDER"
             ? "Opening WhatsApp with Payment Reminder..."
             : "Opening WhatsApp with Document & Details...",
           "success"
         );
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+        openWhatsAppDirectly({ whatsappUrl: data.whatsappUrl, nativeUrl: data.nativeUrl });
       }
     } catch (err: any) {
       toast(err.message || "Could not open WhatsApp", "error");
