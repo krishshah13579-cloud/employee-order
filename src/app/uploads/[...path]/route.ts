@@ -82,7 +82,7 @@ export async function GET(
     // 4. Ensure target path is strictly within the public directory
     const publicRoot = path.resolve(process.cwd(), "public");
     const resolvedTargetPath = path.resolve(targetPath);
-    if (!resolvedTargetPath.startsWith(publicRoot)) {
+    if (!resolvedTargetPath.startsWith(publicRoot + path.sep) && resolvedTargetPath !== publicRoot) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 

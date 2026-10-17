@@ -15,6 +15,10 @@ const TRAVERSAL_PATTERNS = [
   /%c0%ae%c0%ae/i,         // UTF-8 overlong ".."
   /\.\.%2f/i,              // "..%2f"
   /\.\.%5c/i,              // "..%5c"
+  /%2e%2e%2f/i,            // "%2e%2e%2f"
+  /%2e%2e%5c/i,            // "%2e%2e%5c"
+  /%252f/i,                // Double-encoded "/"
+  /%255c/i,                // Double-encoded "\"
   /%00/,                   // Null byte
   /\0/,                    // Null character
 ];
@@ -33,8 +37,11 @@ const RESTRICTED_TARGETS = [
   /^\/package-lock\.json/i,
   /^\/tsconfig\.json/i,
   /^\/prisma\//i,
+  /^\/scripts\//i,
   /^\/node_modules\//i,
   /^\/\.system_generated/i,
+  /^\/\.vercel/i,
+  /\.(db|sqlite|sqlite3|sql|pem|key|crt|bak|config)$/i,
 ];
 
 export function middleware(request: NextRequest) {
@@ -129,6 +136,8 @@ export function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set("X-XSS-Protection", "1; mode=block");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
   return response;
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
+import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".pdf"]);
@@ -12,6 +13,16 @@ const ALLOWED_MIME_TYPES = new Set([
 
 export async function POST(req: NextRequest) {
   try {
+    // Authentication Guard: require logged-in Admin or Employee
+    const admin = await getAdminSession(req);
+    const employee = !admin ? await getEmployeeSession(req) : null;
+    if (!admin && !employee) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in to upload files." },
+        { status: 401 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -66,7 +77,8 @@ export async function POST(req: NextRequest) {
 
       // Verify that target path is strictly inside uploadDir (Path Traversal Protection)
       const resolvedPath = path.resolve(filePath);
-      if (!resolvedPath.startsWith(path.resolve(uploadDir))) {
+      const resolvedUploadDir = path.resolve(uploadDir);
+      if (!resolvedPath.startsWith(resolvedUploadDir + path.sep)) {
         return NextResponse.json({ error: "Invalid file destination" }, { status: 400 });
       }
 
