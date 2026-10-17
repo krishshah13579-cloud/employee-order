@@ -1147,6 +1147,314 @@ export default function OrderInvoicePage() {
           </div>
         </form>
       </Modal>
+
+      {/* ═══════════════════════════════════════════
+          EDIT ORDER FORM MODAL
+          ═══════════════════════════════════════════ */}
+      <Modal
+        isOpen={isEditOrderModalOpen}
+        onClose={() => setIsEditOrderModalOpen(false)}
+        title={`Edit Wholesale Order #${order.orderNumber}`}
+        size="xl"
+      >
+        <form onSubmit={handleSaveOrderForm} className="space-y-5">
+          <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 flex items-start gap-2">
+            <AlertCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <strong>Wholesale Order Editor:</strong> Update customer contact, order status, add/remove garment items, and adjust color-wise sets or rates.
+              The total pieces and 5% GST will automatically recalculate.
+            </div>
+          </div>
+
+          {/* Top Row: Status, Customer Phone, GST/PAN */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Order Status*
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                {ORDER_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Customer Phone (WhatsApp)*
+              </label>
+              <input
+                type="text"
+                value={editCustomerPhone}
+                onChange={(e) => setEditCustomerPhone(e.target.value)}
+                placeholder="10-digit mobile number"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                GST / PAN Number
+              </label>
+              <input
+                type="text"
+                value={editCustomerGstPan}
+                onChange={(e) => setEditCustomerGstPan(e.target.value.toUpperCase())}
+                placeholder="GSTIN / PAN"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Customer Address & Notes / Transport */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Customer Delivery Address
+              </label>
+              <input
+                type="text"
+                value={editCustomerAddress}
+                onChange={(e) => setEditCustomerAddress(e.target.value)}
+                placeholder="Shop address, city, state"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Transport / Order Notes
+              </label>
+              <input
+                type="text"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="e.g. [TRANSPORT: Patel Transport] urgent parcel"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Products & Color-wise Sets List */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                Order Items &amp; Color Sets
+              </label>
+
+              {/* Add Product Dropdown */}
+              {availableProducts.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedProductToAdd}
+                    onChange={(e) => setSelectedProductToAdd(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-700 cursor-pointer max-w-[240px] truncate"
+                  >
+                    <option value="">+ Add Product from Catalogue...</option>
+                    {availableProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.category}) — ₹{p.retailerPrice || p.price}/pc
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!selectedProductToAdd}
+                    onClick={() => handleAddProductToOrder(selectedProductToAdd)}
+                    className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Plus size={13} />
+                    <span>Add</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+              {editOrderItems.map((item, itIdx) => (
+                <div
+                  key={itIdx}
+                  className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-black text-slate-900">{item.productName}</span>
+                      <span className="ml-2 text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        Ratio: {item.sizeRatio}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right font-mono font-bold">
+                        <span className="text-blue-700">{item.totalSets} Sets ({item.totalPcs} Pcs)</span>
+                        <span className="text-slate-400 mx-1.5">=</span>
+                        <span className="text-emerald-700">{formatCurrency(item.itemSubtotal)}</span>
+                      </div>
+
+                      {editOrderItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOrderItem(itIdx)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Remove product item"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Colors & Sets Grid */}
+                  {item.colorSets && item.colorSets.length > 0 ? (
+                    <div className="space-y-1.5 pt-2 border-t border-slate-200/80">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Color-Wise Sets:
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {item.colorSets.map((cs: any, cIdx: number) => {
+                          const cHex = getColorHex(cs.color);
+                          return (
+                            <div
+                              key={cIdx}
+                              className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-2xs"
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
+                                  style={{ backgroundColor: cHex.hex }}
+                                />
+                                <span className="truncate text-xs font-semibold text-slate-800" title={cs.color}>
+                                  {cs.color}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center border border-slate-300 rounded-md overflow-hidden bg-white shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditColorSet(itIdx, cIdx, (Number(cs.sets) || 0) - 1)}
+                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={cs.sets === 0 ? "" : cs.sets}
+                                  placeholder="0"
+                                  onChange={(e) =>
+                                    handleEditColorSet(itIdx, cIdx, parseInt(e.target.value, 10) || 0)
+                                  }
+                                  className="w-9 h-6 border-x border-slate-300 text-center text-xs font-bold text-slate-900 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditColorSet(itIdx, cIdx, (Number(cs.sets) || 0) + 1)}
+                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Rate / Pc row */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-600">Rate / Pc (₹):</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.unitPrice}
+                        onChange={(e) => handleEditUnitPrice(itIdx, parseFloat(e.target.value) || 0)}
+                        className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="text-slate-500 text-[11px]">
+                      {item.pcsPerSet || 5} Pcs per wholesale set
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Modal Summary Totals */}
+          {(() => {
+            const mSets = editOrderItems.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
+            const mPcs = editOrderItems.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
+            const mSub = editOrderItems.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
+            const mGst = Math.round(mSub * 0.05 * 100) / 100;
+            const mTotal = Math.round(mSub + mGst);
+
+            return (
+              <div className="flex flex-col sm:flex-row items-center justify-between p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold gap-2">
+                <div className="space-x-2 text-slate-800">
+                  <span>Total Sets: <strong>{mSets}</strong></span>
+                  <span>•</span>
+                  <span>Total Pcs: <strong>{mPcs}</strong></span>
+                  <span>•</span>
+                  <span>Subtotal: <strong>{formatCurrency(mSub)}</strong></span>
+                  <span>•</span>
+                  <span>5% GST: <strong>{formatCurrency(mGst)}</strong></span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-600 mr-2">Grand Total:</span>
+                  <span className="text-base font-black font-mono text-blue-700">
+                    {formatCurrency(mTotal)}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* WhatsApp Notification Option */}
+          <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-950">
+              <input
+                type="checkbox"
+                checked={sendWhatsAppOnSave}
+                onChange={(e) => setSendWhatsAppOnSave(e.target.checked)}
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+              />
+              <span>Send updated Order Form / Invoice to customer on WhatsApp</span>
+            </label>
+            <p className="text-[11px] text-emerald-700 pl-6">
+              When status is <strong>Confirmed</strong>, the customer receives the official Confirmed Order Form PDF.
+              When status is <strong>Ready</strong>, the customer receives the Ready Order / Tax Invoice PDF.
+            </p>
+          </div>
+
+          {/* Modal Footer Buttons */}
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsEditOrderModalOpen(false)}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingOrderForm}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-40"
+            >
+              <Check size={14} />
+              <span>{savingOrderForm ? "Saving Order..." : "Save Order Form"}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
