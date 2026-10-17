@@ -1901,37 +1901,59 @@ export default function ProductForm({
                   </span>
                 </div>
                 <p className="text-[11px] text-orange-800/80 mt-0.5">
-                  Wholesale color code mapping (e.g. A → Ice Grey, B → Jet Black). This mapping is strictly hidden from employee views.
+                  Assign wholesale letter codes (A, B, C, etc.) to each color below. Click and type any letter or code for each color.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-              {Object.entries(colorAlphabetMap)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([letter, color]) => {
-                  const colorInfo = getColorHex(color);
-                  return (
-                    <div
-                      key={letter}
-                      className="flex items-center gap-2.5 p-2.5 bg-white rounded-xl border border-orange-200/80 shadow-2xs"
-                    >
-                      <span className="w-6 h-6 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                        {letter}
-                      </span>
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border shrink-0"
-                        style={{
-                          backgroundColor: colorInfo.hex,
-                          borderColor: colorInfo.isLight ? "#cbd5e1" : "transparent",
-                        }}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {selectedColors.map((color, idx) => {
+                const colorPreset = PRESET_COLORS.find(
+                  (c) => c.name.toLowerCase() === color.toLowerCase()
+                );
+                const colorInfo = colorPreset
+                  ? { hex: colorPreset.hex, isLight: colorPreset.border || false }
+                  : getColorHex(color);
+
+                // Look up custom assigned letter or fallback to sequential A, B, C...
+                const assignedLetter =
+                  Object.entries(colorAlphabetMap).find(
+                    ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(color).toLowerCase()
+                  )?.[0] || String.fromCharCode(65 + idx);
+
+                return (
+                  <div
+                    key={color}
+                    className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-orange-200/90 shadow-2xs hover:border-orange-400 transition"
+                  >
+                    <div className="relative shrink-0">
+                      <input
+                        type="text"
+                        maxLength={3}
+                        value={assignedLetter}
+                        onChange={(e) => handleColorLetterChange(color, e.target.value.toUpperCase())}
+                        className="w-8 h-8 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs text-center border border-zinc-700 uppercase focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-text shadow-2xs"
+                        title="Click to type custom code (e.g. A, B, C) for this color"
                       />
-                      <span className="text-xs font-bold text-gray-900 truncate">
+                    </div>
+                    <span
+                      className="w-4 h-4 rounded-full border shrink-0"
+                      style={{
+                        backgroundColor: colorInfo.hex,
+                        borderColor: colorInfo.isLight ? "#cbd5e1" : "rgba(0,0,0,0.15)",
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-bold text-gray-900 truncate block">
                         {color}
                       </span>
+                      <span className="text-[10px] text-orange-800 font-mono">
+                        Code: <span className="font-bold">{assignedLetter}</span>
+                      </span>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
