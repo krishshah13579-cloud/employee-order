@@ -59,6 +59,20 @@ export default function OrderInvoicePage() {
   const [markAsReady, setMarkAsReady] = useState(true);
   const [editableItems, setEditableItems] = useState<any[]>([]);
 
+  // Order Form Editing Modal State (Edit customer, items, colors, sets, rates, notes, status)
+  const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
+  const [savingOrderForm, setSavingOrderForm] = useState(false);
+  const [editStatus, setEditStatus] = useState<string>("Pending");
+  const [editNotes, setEditNotes] = useState<string>("");
+  const [editPlacedBy, setEditPlacedBy] = useState<string>("");
+  const [editCustomerPhone, setEditCustomerPhone] = useState<string>("");
+  const [editCustomerAddress, setEditCustomerAddress] = useState<string>("");
+  const [editCustomerGstPan, setEditCustomerGstPan] = useState<string>("");
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+  const [sendWhatsAppOnSave, setSendWhatsAppOnSave] = useState<boolean>(true);
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [selectedProductToAdd, setSelectedProductToAdd] = useState<string>("");
+
   // Load Order
   async function loadOrder() {
     if (!id) return;
