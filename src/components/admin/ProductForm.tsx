@@ -795,10 +795,22 @@ export default function ProductForm({
 
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
-        // Note: Do NOT automatically push extracted background colors to selectedColors.
-        // Prevents studio background colors (e.g. wall, floor) from polluting product colors.
+        // Once product photos are uploaded, select 2 color palettes if none are selected yet
+        setSelectedColors((prev) => {
+          if (prev.length === 0) {
+            const twoColors = ["Dark Indigo", "Light Blue"];
+            setActiveStockColor(twoColors[0]);
+            setColorRatioStockMap((stockPrev) => ({
+              ...stockPrev,
+              "Dark Indigo": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
+              "Light Blue": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
+            }));
+            return twoColors;
+          }
+          return prev;
+        });
         toast(
-          `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}!`,
+          `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Selected 2 standard color palettes to get started.`,
           "success"
         );
       }
@@ -823,6 +835,19 @@ export default function ProductForm({
       return;
     }
     setImagesList((prev) => [...prev, url]);
+    setSelectedColors((prev) => {
+      if (prev.length === 0) {
+        const twoColors = ["Dark Indigo", "Light Blue"];
+        setActiveStockColor(twoColors[0]);
+        setColorRatioStockMap((stockPrev) => ({
+          ...stockPrev,
+          "Dark Indigo": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
+          "Light Blue": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
+        }));
+        return twoColors;
+      }
+      return prev;
+    });
     setExternalUrlInput("");
     setShowUrlInput(false);
     toast("Photo URL added to gallery", "success");
