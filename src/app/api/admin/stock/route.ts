@@ -119,6 +119,27 @@ export async function PUT(request: NextRequest) {
       data: updateData,
     });
 
+    // Real-time auto-sync to Storefront (iq-trousers-store-uge4.vercel.app)
+    try {
+      const totalSets = getTotalAvailableSets(updated.setsColorwise);
+      const pcsPerSet = updated.pcsPerSet || 5;
+      const totalPcs = totalSets * pcsPerSet + (updated.mixPcs || 0);
+
+      fetch("https://iq-trousers-store-uge4.vercel.app/api/sync-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          styleCode: updated.name,
+          totalPcs,
+          inStock: totalPcs > 0,
+        }),
+      }).catch((err) =>
+        console.warn("Auto-sync storefront notification failed:", err.message)
+      );
+    } catch (e: any) {
+      console.warn("Stock sync trigger error:", e?.message);
+    }
+
     return NextResponse.json({ success: true, product: updated });
   } catch (error: any) {
     console.error("Error updating stock:", error);
