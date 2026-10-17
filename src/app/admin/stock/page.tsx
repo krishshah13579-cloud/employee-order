@@ -231,15 +231,28 @@ export default function AdminStockPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={fetchStock}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition cursor-pointer self-start sm:self-auto"
-            >
-              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-              <span>Refresh Stock</span>
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={handleSyncStore}
+                disabled={syncingStore}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                title="Sync live pieces with E-Commerce Storefront (iq-trousers-store-uge4.vercel.app)"
+              >
+                <RefreshCw size={13} className={syncingStore ? "animate-spin" : ""} />
+                <span>{syncingStore ? "Syncing Storefront..." : "Sync Storefront"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={fetchStock}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              >
+                <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+                <span>Refresh Stock</span>
+              </button>
+            </div>
           </div>
 
           {/* ═══════════════════════════════════════════
