@@ -301,6 +301,166 @@ export function calculateTotalColorPieces(
   };
 }
 
+export interface SellSingleSizeResult {
+  success: boolean;
+  method: "loose" | "set_converted" | "set_unpacked" | "out_of_stock";
+  ratios: Record<string, number>;
+  loosePcs: Record<string, number>;
+  brokenRatio?: string;
+  newRatio?: string;
+  addedLooseSizes?: string[];
+  message: string;
+}
+
+/**
+ * Intelligent Single-Size Sale / Stock Deduction:
+ * 1. If requested size has loose pieces (> 0), deduct from loose pieces.
+ * 2. If NO loose pieces exist, unpack 1 set that contains this size:
+ *    - If the removed size is the STARTING size (e.g. 30 from 30 to 38):
+ *      remaining sizes (32 to 38) form a valid ratio. Convert 1 set of '30 to 38' into 1 set of '32 to 38'!
+ *    - If the removed size is the ENDING size (e.g. 38 from 30 to 38):
+ *      remaining sizes (30 to 36) form a valid ratio. Convert 1 set of '30 to 38' into 1 set of '30 to 36'!
+ *    - If the removed size is a MIDDLE size (e.g. 34 from 30 to 38):
+ *      Unpack the set into loose pieces for all remaining sizes (30, 32, 36, 38).
+ */
+export function sellSingleSizeFromColorStock(
+  ratios: Record<string, number>,
+  loosePcs: Record<string, number>,
+  soldSize: string
+): SellSingleSizeResult {
+  const nextRatios = { ...ratios };
+  const nextLoose = { ...loosePcs };
+  const cleanSize = soldSize.trim();
+
+  // 1. Check if loose piece is available
+  if ((nextLoose[cleanSize] || 0) > 0) {
+    nextLoose[cleanSize] = nextLoose[cleanSize] - 1;
+    if (nextLoose[cleanSize] <= 0) {
+      delete nextLoose[cleanSize];
+    }
+    return {
+      success: true,
+      method: "loose",
+      ratios: nextRatios,
+      loosePcs: nextLoose,
+      message: `Sold 1 pc of Size ${cleanSize} from loose pieces stock.`,
+    };
+  }
+
+  // 2. Loose piece not available: find a set ratio with count > 0 containing this size
+  let targetRatio: string | null = null;
+  let targetSizes: string[] = [];
+
+  for (const [rKey, count] of Object.entries(nextRatios)) {
+    if (count > 0) {
+      const sizes = getSizesFromRatio(rKey);
+      if (sizes.includes(cleanSize)) {
+        targetRatio = rKey;
+        targetSizes = sizes;
+        break;
+      }
+    }
+  }
+
+  if (!targetRatio) {
+    return {
+      success: false,
+      method: "out_of_stock",
+      ratios: nextRatios,
+      loosePcs: nextLoose,
+      message: `Size ${cleanSize} is out of stock (no loose pieces and no sets contain this size).`,
+    };
+  }
+
+  // Deduct 1 set from targetRatio
+  nextRatios[targetRatio] = nextRatios[targetRatio] - 1;
+  if (nextRatios[targetRatio] <= 0) {
+    delete nextRatios[targetRatio];
+  }
+
+  const remainingSizes = targetSizes.filter((s) => s !== cleanSize);
+
+  // Check if starting size was removed (e.g. 30 from [30, 32, 34, 36, 38])
+  const isStartSize = cleanSize === targetSizes[0];
+  // Check if ending size was removed (e.g. 38 from [30, 32, 34, 36, 38])
+  const isEndSize = cleanSize === targetSizes[targetSizes.length - 1];
+
+  if ((isStartSize || isEndSize) && remainingSizes.length >= 3) {
+    const minSize = remainingSizes[0];
+    const maxSize = remainingSizes[remainingSizes.length - 1];
+    const newRatio = `${minSize} to ${maxSize}`;
+
+    // Convert into new ratio set
+    nextRatios[newRatio] = (nextRatios[newRatio] || 0) + 1;
+
+    return {
+      success: true,
+      method: "set_converted",
+      ratios: nextRatios,
+      loosePcs: nextLoose,
+      brokenRatio: targetRatio,
+      newRatio,
+      message: `Size ${cleanSize} had 0 loose pcs. Converted 1 set of '${targetRatio}' into 1 set of '${newRatio}'!`,
+    };
+  }
+
+  // Middle size removed, or remaining sizes cannot form a valid set:
+  // All remaining sizes become loose pieces
+  for (const s of remainingSizes) {
+    nextLoose[s] = (nextLoose[s] || 0) + 1;
+  }
+
+  return {
+    success: true,
+    method: "set_unpacked",
+    ratios: nextRatios,
+    loosePcs: nextLoose,
+    brokenRatio: targetRatio,
+    addedLooseSizes: remainingSizes,
+    message: `Size ${cleanSize} had 0 loose pcs. Unpacked 1 set of '${targetRatio}' into loose pieces (${remainingSizes.join(", ")}) and sold size ${cleanSize}.`,
+  };
+}
+
+/**
+ * Manually unpacks 1 set of a given ratio into loose pieces.
+ */
+export function unpackSetToLoosePieces(
+  ratios: Record<string, number>,
+  loosePcs: Record<string, number>,
+  ratioToUnpack: string
+): { success: boolean; ratios: Record<string, number>; loosePcs: Record<string, number>; addedSizes: string[]; message: string } {
+  const nextRatios = { ...ratios };
+  const nextLoose = { ...loosePcs };
+
+  if ((nextRatios[ratioToUnpack] || 0) <= 0) {
+    return {
+      success: false,
+      ratios: nextRatios,
+      loosePcs: nextLoose,
+      addedSizes: [],
+      message: `No sets of '${ratioToUnpack}' available to unpack.`,
+    };
+  }
+
+  nextRatios[ratioToUnpack] -= 1;
+  if (nextRatios[ratioToUnpack] <= 0) {
+    delete nextRatios[ratioToUnpack];
+  }
+
+  const sizes = getSizesFromRatio(ratioToUnpack);
+  for (const s of sizes) {
+    nextLoose[s] = (nextLoose[s] || 0) + 1;
+  }
+
+  return {
+    success: true,
+    ratios: nextRatios,
+    loosePcs: nextLoose,
+    addedSizes: sizes,
+    message: `Unpacked 1 set of '${ratioToUnpack}' into loose pieces (${sizes.join(", ")}).`,
+  };
+}
+
 /**
  * Resolves the specific photo for a given color of a product.
  * Checks colorImages mapping, index match with gallery images, or falls back to cover image.
