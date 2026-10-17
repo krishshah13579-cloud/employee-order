@@ -666,11 +666,22 @@ export default function ProductForm({
   };
 
   const handleRemoveColor = (colorName: string) => {
+    const clean = cleanColorName(colorName);
     setSelectedColors((prev) => prev.filter((c) => c !== colorName));
     setColorImages((prev) => {
       const copy = { ...prev };
       delete copy[colorName];
-      delete copy[cleanColorName(colorName)];
+      delete copy[clean];
+      return copy;
+    });
+    setColorRatioStockMap((prev) => {
+      const copy = { ...prev };
+      delete copy[clean];
+      return copy;
+    });
+    setColorLooseStockMap((prev) => {
+      const copy = { ...prev };
+      delete copy[clean];
       return copy;
     });
   };
