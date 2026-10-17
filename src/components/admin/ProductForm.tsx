@@ -2467,6 +2467,7 @@ export default function ProductForm({
                               <span className="text-[10px] text-gray-400 italic">
                                 (Auto-unpacks or converts set if loose stock is 0)
                               </span>
+                            </div>
                           </div>
 
                           {/* 3. Real-time Retail Size Breakdown Matrix */}
