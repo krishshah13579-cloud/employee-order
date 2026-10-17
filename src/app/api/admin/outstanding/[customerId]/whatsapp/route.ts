@@ -132,12 +132,14 @@ export async function POST(
 
     const autoResult = await dispatchAutomatedWhatsApp(customerPhone, messageText);
     const directLink = createWhatsAppDirectLink(customerPhone, messageText);
+    const nativeLink = createWhatsAppNativeLink(customerPhone, messageText);
 
     return NextResponse.json({
       success: true,
       automated: autoResult.success,
       method: autoResult.method,
       whatsappUrl: directLink,
+      nativeUrl: nativeLink,
       message: messageText,
       customerName: customer.shopName,
       customerPhone,
