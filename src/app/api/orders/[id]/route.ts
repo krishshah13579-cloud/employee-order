@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession, requireAdmin } from "@/lib/auth-security";
 import { calculateOrderedColorSetsPieces } from "@/lib/stock";
+import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 
 export async function GET(
   _request: NextRequest,
@@ -228,6 +229,9 @@ export async function PUT(
         },
       });
     });
+
+    // Automatically sync updated confirmed order to Sales Register
+    await createOrUpdateSalesInvoiceFromOrder(orderId);
 
     // Automated WhatsApp trigger on status change or order edit for Confirmed / Ready
     const effectiveStatus = updatedOrder.status;

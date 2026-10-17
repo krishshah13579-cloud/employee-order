@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
+import { syncExistingConfirmedOrdersToSales } from "@/lib/sales";
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +13,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await syncExistingConfirmedOrdersToSales();
+
     const { customerId } = await params;
     const cid = parseInt(customerId, 10);
 
@@ -22,15 +25,9 @@ export async function GET(
     const customer = await prisma.customer.findUnique({
       where: { id: cid },
       include: {
-        orders: {
-          where: {
-            status: { not: "Cancelled" },
-          },
-          include: {
-            items: true,
-          },
+        salesInvoices: {
           orderBy: {
-            orderDate: "asc",
+            invoiceDate: "asc",
           },
         },
         payments: {
@@ -50,37 +47,22 @@ export async function GET(
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
-    // 1. Process customer bills datewise
-    const bills = customer.orders.map((o) => {
-      let billTotal = o.grandTotal;
-      let totalSets = o.totalSets;
-      let totalPcs = o.totalPcs;
-
-      if (o.taxInvoiceItems) {
-        try {
-          const parsed = JSON.parse(o.taxInvoiceItems);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            totalSets = parsed.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
-            totalPcs = parsed.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
-            const subtotal = parsed.reduce((sum, it) => sum + (Number(it.itemSubtotal) || 0), 0);
-            const gst = Math.round(subtotal * 0.05 * 100) / 100;
-            billTotal = Math.round(subtotal + gst);
-          }
-        } catch {}
-      }
-
-      return {
-        id: o.id,
-        orderNumber: o.orderNumber,
-        taxInvoiceNumber: o.taxInvoiceNumber,
-        displayDocNo: o.taxInvoiceNumber || o.orderNumber,
-        invoiceDate: o.taxInvoiceDate || o.orderDate,
-        totalSets,
-        totalPcs,
-        totalAmount: billTotal,
-        status: o.status,
-      };
-    });
+    // 1. Process customer bills datewise from Sales Invoices (Credit sales)
+    const bills = customer.salesInvoices
+      .filter((si) => si.paymentType !== "Cash")
+      .map((si) => ({
+        id: si.id,
+        orderId: si.orderId,
+        orderNumber: si.orderNumber || si.invoiceNumber,
+        taxInvoiceNumber: si.invoiceNumber,
+        displayDocNo: si.invoiceNumber || si.orderNumber || `INV-${si.id}`,
+        invoiceDate: si.invoiceDate,
+        totalSets: si.totalSets || 0,
+        totalPcs: si.totalPcs || 0,
+        totalAmount: si.grandTotal,
+        paymentType: si.paymentType,
+        status: "Confirmed",
+      }));
 
     // 2. Total credits = Payments + Sales Returns
     const totalBilled = bills.reduce((sum, b) => sum + b.totalAmount, 0);

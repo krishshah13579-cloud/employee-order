@@ -71,6 +71,7 @@ model Customer {
   orders          Order[]
   payments        Payment[]
   salesReturns    SalesReturn[]
+  salesInvoices   SalesInvoice[]
 }
 
 // 5. Product Page (Product Details: Product Name, Colors Available, Sizes, Price, No of Set Colorwise, Size Guide)
@@ -191,5 +192,37 @@ model SalesReturn {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// 9. Sales Register & Invoicing (Track all sales invoices, cash sales, and credit sales)
+model SalesInvoice {
+  id              Int       @id @default(autoincrement())
+  invoiceNumber   String    @unique // e.g. INV-261017-001 or CS-261017-001
+  orderId         Int?      // Linked order if originated from confirmed order
+  orderNumber     String?   // Linked order number (e.g. GO-261017-001)
+  customerId      Int?      // Optional: can be null for walk-in counter cash sales
+  customerName    String    // Firm name or Cash Customer name
+  customerPhone   String?
+  customerGstPan  String?
+  customerAddress String?
+  businessType    String?   @default("RETAILER") // RETAILER, WHOLESALER, or CASH
+  invoiceDate     DateTime  @default(now())
+  paymentType     String    @default("Credit") // "Cash" or "Credit" (or "UPI", "Bank Transfer")
+  paymentStatus   String    @default("Unpaid") // "Paid", "Partially Paid", "Unpaid"
+  subtotal        Float     @default(0)
+  gstRate         Float     @default(5.0)
+  gstAmount       Float     @default(0)
+  grandTotal      Float     @default(0)
+  paidAmount      Float     @default(0) // Immediately equals grandTotal for cash sales
+  balanceAmount   Float     @default(0) // Remaining unpaid balance
+  totalSets       Int       @default(0)
+  totalPcs        Int       @default(0)
+  items           String    // JSON string of invoice items
+  creditDays      Int       @default(0)
+  notes           String?
+  placedBy        String?   // Billed by admin/employee
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 }
 

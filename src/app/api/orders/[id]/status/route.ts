@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/types";
 import { restoreSetsToStock, deductSetsFromStock } from "@/lib/stock";
 import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
+import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 
 export async function PUT(
   request: NextRequest,
@@ -113,6 +114,9 @@ export async function PUT(
         items: true,
       },
     });
+
+    // Automatically send/sync confirmed order to Sales Register
+    await createOrUpdateSalesInvoiceFromOrder(orderId);
 
     // Automated WhatsApp trigger on status change
     const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;

@@ -18,6 +18,7 @@ import {
   MessageCircle,
   LogOut,
   ExternalLink,
+  BadgePercent,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -65,6 +66,12 @@ const navItems = [
     name: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+    exact: false,
+  },
+  {
+    name: "Sales Register",
+    href: "/admin/sales",
+    icon: BadgePercent,
     exact: false,
   },
   {

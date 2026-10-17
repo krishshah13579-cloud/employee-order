@@ -17,6 +17,7 @@ import {
   ArrowRight,
   LogOut,
   Sparkles,
+  BadgePercent,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -59,6 +60,12 @@ const navItems = [
     label: "Orders",
     href: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    id: "sales",
+    label: "Sales Register",
+    href: "/admin/sales",
+    icon: BadgePercent,
   },
   {
     id: "outstanding",

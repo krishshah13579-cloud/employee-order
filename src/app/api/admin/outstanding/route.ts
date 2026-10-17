@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
+import { syncExistingConfirmedOrdersToSales } from "@/lib/sales";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,28 +10,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Ensure all confirmed orders are properly represented in the sales register
+    await syncExistingConfirmedOrdersToSales();
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.toLowerCase() || "";
 
-    // Fetch all customers with their active orders, payments, and sales returns
+    // Fetch all customers with their sales invoices, payments, and sales returns
     const customers = await prisma.customer.findMany({
       include: {
-        orders: {
-          where: {
-            status: { not: "Cancelled" },
-          },
+        salesInvoices: {
           select: {
             id: true,
+            invoiceNumber: true,
             orderNumber: true,
-            taxInvoiceNumber: true,
-            taxInvoiceDate: true,
-            taxInvoiceItems: true,
-            orderDate: true,
+            orderId: true,
+            invoiceDate: true,
             grandTotal: true,
-            status: true,
+            paymentType: true,
+            paymentStatus: true,
+            totalSets: true,
+            totalPcs: true,
           },
           orderBy: {
-            orderDate: "asc",
+            invoiceDate: "asc",
           },
         },
         payments: {
@@ -68,27 +71,20 @@ export async function GET(request: NextRequest) {
     let totalOutstandingAll = 0;
 
     const customerSummaries = customers.map((c) => {
-      // 1. Calculate bills
-      const bills = c.orders.map((o) => {
-        let billTotal = o.grandTotal;
-        if (o.taxInvoiceItems) {
-          try {
-            const parsed = JSON.parse(o.taxInvoiceItems);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const subtotal = parsed.reduce((sum, it) => sum + (Number(it.itemSubtotal) || 0), 0);
-              const gst = Math.round(subtotal * 0.05 * 100) / 100;
-              billTotal = Math.round(subtotal + gst);
-            }
-          } catch {}
-        }
-        return {
-          id: o.id,
-          docNo: o.taxInvoiceNumber || o.orderNumber,
-          date: o.taxInvoiceDate || o.orderDate,
-          amount: billTotal,
-          status: o.status,
-        };
-      });
+      // 1. Calculate bills from Sales Tab invoices (Credit sales require settlement; Cash sales are pre-settled)
+      const bills = c.salesInvoices
+        .filter((si) => si.paymentType !== "Cash")
+        .map((si) => ({
+          id: si.id,
+          docNo: si.invoiceNumber || si.orderNumber || `INV-${si.id}`,
+          orderNumber: si.orderNumber,
+          date: si.invoiceDate,
+          amount: si.grandTotal,
+          totalSets: si.totalSets || 0,
+          totalPcs: si.totalPcs || 0,
+          paymentType: si.paymentType,
+          status: "Confirmed",
+        }));
 
       const totalBilled = bills.reduce((sum, b) => sum + b.amount, 0);
       const totalPaid = c.payments.reduce((sum, p) => sum + p.amount, 0);
