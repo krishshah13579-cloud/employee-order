@@ -402,6 +402,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 7. Settings API (GET / POST)
+  if (url.pathname === "/api/settings") {
+    if (req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(loadSettings()));
+      return;
+    }
+    if (req.method === "POST") {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        try {
+          const patch = JSON.parse(body || "{}");
+          const updated = saveSettings(patch);
+          console.log("⚙️ [SETTINGS UPDATED]", updated);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, settings: updated }));
+        } catch (e) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+      return;
+    }
+  }
+
+  // 8. Trigger Weekly Payment Reminders Job (POST)
+  if (req.method === "POST" && url.pathname === "/api/cron/payment-reminders") {
+    const result = await triggerWeeklyRemindersJob();
+    res.writeHead(result.success ? 200 : 500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
   res.writeHead(404);
   res.end("Not Found");
 });
