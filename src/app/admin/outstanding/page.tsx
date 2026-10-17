@@ -338,7 +338,22 @@ export default function AdminOutstandingPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSendWeeklyRemindersToAll}
+            disabled={sendingToAll || summaryStats.customersWithOutstandingCount === 0}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition shadow-sm cursor-pointer disabled:opacity-50"
+            title="Immediately send weekly payment reminder to all customers with pending balance"
+          >
+            <Bell size={14} className={sendingToAll ? "animate-bounce" : ""} />
+            <span>
+              {sendingToAll
+                ? "Sending Reminders..."
+                : `Send Weekly Reminders (${summaryStats.customersWithOutstandingCount})`}
+            </span>
+          </button>
+
           <Link
             href="/admin/returns"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition shadow-xs cursor-pointer"
