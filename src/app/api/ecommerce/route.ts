@@ -6,6 +6,10 @@ import {
   getAllProductColors,
   deductSetsFromStock,
   restoreSetsToStock,
+  parseDetailedColorStockWithLoose,
+  calculateColorSizesBreakdown,
+  calculateTotalColorPieces,
+  cleanColorName,
 } from "@/lib/stock";
 import { getProductCoverImage, getProductAllImages } from "@/lib/utils";
 
