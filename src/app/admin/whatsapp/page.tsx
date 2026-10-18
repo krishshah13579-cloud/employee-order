@@ -56,38 +56,41 @@ export default function AdminWhatsAppPage() {
   const [dispatchingWeeklyNow, setDispatchingWeeklyNow] = useState(false);
 
   const fetchStatus = async () => {
-    // 1. Direct browser fetch to local gateway on port 5050 (works seamlessly even when browsing via Vercel)
-    try {
-      const localStatusRes = await fetch("http://localhost:5050/api/status", {
-        signal: AbortSignal.timeout(2000),
-      }).catch(() => null);
+    // 1. Direct browser fetch to local gateway on port 5050 (checks localhost and 127.0.0.1)
+    const localGateways = ["http://localhost:5050", "http://127.0.0.1:5050"];
+    for (const baseUrl of localGateways) {
+      try {
+        const localStatusRes = await fetch(`${baseUrl}/api/status`, {
+          signal: AbortSignal.timeout(2000),
+        }).catch(() => null);
 
-      if (localStatusRes && localStatusRes.ok) {
-        const localStatus = await localStatusRes.json();
-        let qrDataUrl = null;
+        if (localStatusRes && localStatusRes.ok) {
+          const localStatus = await localStatusRes.json();
+          let qrDataUrl = null;
 
-        if (!localStatus.connected) {
-          const qrRes = await fetch("http://localhost:5050/api/qr", {
-            signal: AbortSignal.timeout(2000),
-          }).catch(() => null);
-          if (qrRes && qrRes.ok) {
-            const qrJson = await qrRes.json();
-            qrDataUrl = qrJson.qr;
+          if (!localStatus.connected) {
+            const qrRes = await fetch(`${baseUrl}/api/qr`, {
+              signal: AbortSignal.timeout(2000),
+            }).catch(() => null);
+            if (qrRes && qrRes.ok) {
+              const qrJson = await qrRes.json();
+              qrDataUrl = qrJson.qr;
+            }
           }
-        }
 
-        setGateway({
-          online: true,
-          status: localStatus.status || (localStatus.connected ? "CONNECTED" : "NEED_SCAN"),
-          connected: Boolean(localStatus.connected),
-          phone: localStatus.phone || (localStatus.connected ? "8128756632" : null),
-          name: localStatus.name || "Krish Clothing Co.",
-          qr: qrDataUrl,
-        });
-        setLoading(false);
-        return;
-      }
-    } catch {}
+          setGateway({
+            online: true,
+            status: localStatus.status || (localStatus.connected ? "CONNECTED" : "NEED_SCAN"),
+            connected: Boolean(localStatus.connected),
+            phone: localStatus.phone || (localStatus.connected ? "8128756632" : null),
+            name: localStatus.name || "Krish Clothing Co.",
+            qr: qrDataUrl,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch {}
+    }
 
     // 2. Fallback to server route /api/admin/whatsapp
     try {
@@ -557,21 +560,40 @@ export default function AdminWhatsAppPage() {
             </p>
           </div>
 
-          {/* QR Display: Uses Data URL or direct embedded localhost frame */}
+          {/* QR Display: Uses Data URL directly; no insecure HTTP iframes */}
           <div className="inline-block p-4 sm:p-5 bg-white border-2 border-slate-200 rounded-3xl shadow-lg relative">
             {gateway.qr ? (
               <img
                 src={gateway.qr}
                 alt="Scan WhatsApp QR Code"
-                className="w-72 h-72 mx-auto rounded-xl"
+                className="w-72 h-72 mx-auto rounded-xl shadow-xs"
               />
+            ) : gateway.status === "CONNECTING" || gateway.status === "INITIALIZING" ? (
+              <div className="w-72 h-72 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-200 p-4 text-center">
+                <RefreshCw size={36} className="text-orange-500 animate-spin mb-3" />
+                <p className="text-xs font-bold text-slate-800">Generating Secure QR Code...</p>
+                <p className="text-[11px] text-slate-500 mt-1">Connecting to WhatsApp session</p>
+              </div>
             ) : (
-              <div className="w-72 h-72 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-dashed border-slate-300 p-4">
-                <iframe
-                  src="http://localhost:5050/qr"
-                  className="w-full h-full border-0 rounded-lg"
-                  title="Local QR Code"
-                />
+              <div className="w-72 h-72 flex flex-col items-center justify-center bg-slate-50/80 rounded-xl border border-dashed border-slate-300 p-5 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mb-3">
+                  <Smartphone size={24} />
+                </div>
+                <p className="text-xs font-bold text-slate-800">Local Gateway Offline</p>
+                <p className="text-[11px] text-slate-500 mt-1.5 max-w-[210px] leading-relaxed">
+                  Start the background gateway on your computer to link WhatsApp (8128756632):
+                </p>
+                <code className="text-[10px] font-mono bg-slate-900 text-emerald-400 px-2.5 py-1.5 rounded-lg mt-2.5 block max-w-full">
+                  npm run whatsapp:gateway
+                </code>
+                <button
+                  type="button"
+                  onClick={() => fetchStatus()}
+                  className="mt-3 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  <span>Refresh Status</span>
+                </button>
               </div>
             )}
           </div>
@@ -584,8 +606,16 @@ export default function AdminWhatsAppPage() {
               className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm"
             >
               <ExternalLink size={15} />
-              <span>Open QR in Dedicated Window (http://localhost:5050/qr)</span>
+              <span>Open Local QR Window (http://localhost:5050/qr)</span>
             </a>
+            <button
+              type="button"
+              onClick={() => fetchStatus()}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2"
+            >
+              <RefreshCw size={14} />
+              <span>Check Status Now</span>
+            </button>
           </div>
 
           <div className="text-left bg-slate-50/80 border border-slate-200 rounded-2xl p-5 sm:p-6 text-xs text-slate-700 space-y-2.5 max-w-md mx-auto">

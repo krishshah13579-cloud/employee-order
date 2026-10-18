@@ -60,38 +60,41 @@ export async function shareOrOpenWhatsAppWithPdf(options: WhatsAppLaunchOptions)
     /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // 0. Direct Background Dispatch via Local WhatsApp Gateway (if connected on port 5050)
-  try {
-    const gatewayStatus = await fetch("http://localhost:5050/api/status", {
-      signal: AbortSignal.timeout(1500),
-    }).catch(() => null);
+  const localGateways = ["http://localhost:5050", "http://127.0.0.1:5050"];
+  for (const gatewayBase of localGateways) {
+    try {
+      const gatewayStatus = await fetch(`${gatewayBase}/api/status`, {
+        signal: AbortSignal.timeout(1500),
+      }).catch(() => null);
 
-    if (gatewayStatus && gatewayStatus.ok) {
-      const statusJson = await gatewayStatus.json();
-      if (statusJson.connected && options.pdfUrl) {
-        const phoneMatch = options.nativeUrl?.match(/phone=([^&]+)/) || options.whatsappUrl?.match(/phone=([^&]+)/);
-        const recipientPhone = phoneMatch ? phoneMatch[1] : "";
+      if (gatewayStatus && gatewayStatus.ok) {
+        const statusJson = await gatewayStatus.json();
+        if (statusJson.connected && options.pdfUrl) {
+          const phoneMatch = options.nativeUrl?.match(/phone=([^&]+)/) || options.whatsappUrl?.match(/phone=([^&]+)/);
+          const recipientPhone = phoneMatch ? phoneMatch[1] : "";
 
-        if (recipientPhone) {
-          const sendRes = await fetch("http://localhost:5050/api/send-document", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: recipientPhone,
-              documentUrl: options.pdfUrl,
-              filename: options.filename,
-              caption: options.text,
-            }),
-            signal: AbortSignal.timeout(15000),
-          }).catch(() => null);
+          if (recipientPhone) {
+            const sendRes = await fetch(`${gatewayBase}/api/send-document`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: recipientPhone,
+                documentUrl: options.pdfUrl,
+                filename: options.filename,
+                caption: options.text,
+              }),
+              signal: AbortSignal.timeout(15000),
+            }).catch(() => null);
 
-          if (sendRes && sendRes.ok) {
-            options.onToast?.("✅ PDF document sent directly to customer via your WhatsApp (8128756632)!", "success");
-            return;
+            if (sendRes && sendRes.ok) {
+              options.onToast?.("✅ PDF document sent directly to customer via your WhatsApp (8128756632)!", "success");
+              return;
+            }
           }
         }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   // 1. Attempt Native File Sharing (Attaches the actual PDF document file directly into WhatsApp)
   if (options.pdfUrl && typeof navigator !== "undefined" && typeof (navigator as any).share === "function") {
@@ -164,58 +167,61 @@ export async function sendAutomatedWhatsAppDirect(options: {
   const targetPhone = cleanDigits.length === 10 ? "91" + cleanDigits : cleanDigits;
 
   // 1. Direct browser fetch to local gateway on port 5050
-  try {
-    const gatewayStatus = await fetch("http://localhost:5050/api/status", {
-      signal: AbortSignal.timeout(1500),
-    }).catch(() => null);
+  const localGateways = ["http://localhost:5050", "http://127.0.0.1:5050"];
+  for (const gatewayBase of localGateways) {
+    try {
+      const gatewayStatus = await fetch(`${gatewayBase}/api/status`, {
+        signal: AbortSignal.timeout(1500),
+      }).catch(() => null);
 
-    if (gatewayStatus && gatewayStatus.ok) {
-      const statusJson = await gatewayStatus.json();
-      if (statusJson.connected) {
-        if (options.pdfUrl) {
-          const resolvedPdf = options.pdfUrl.startsWith("http")
-            ? options.pdfUrl
-            : typeof window !== "undefined"
-            ? `${window.location.origin}${options.pdfUrl}`
-            : options.pdfUrl;
+      if (gatewayStatus && gatewayStatus.ok) {
+        const statusJson = await gatewayStatus.json();
+        if (statusJson.connected) {
+          if (options.pdfUrl) {
+            const resolvedPdf = options.pdfUrl.startsWith("http")
+              ? options.pdfUrl
+              : typeof window !== "undefined"
+              ? `${window.location.origin}${options.pdfUrl}`
+              : options.pdfUrl;
 
-          const sendDocRes = await fetch("http://localhost:5050/api/send-document", {
+            const sendDocRes = await fetch(`${gatewayBase}/api/send-document`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: targetPhone,
+                documentUrl: resolvedPdf,
+                filename: options.filename || "Invoice.pdf",
+                caption: options.message,
+              }),
+              signal: AbortSignal.timeout(15000),
+            }).catch(() => null);
+
+            if (sendDocRes && sendDocRes.ok) {
+              options.onToast?.("✅ Message & PDF sent automatically to customer via WhatsApp (+918128756632)!", "success");
+              return { success: true, method: "LOCAL_GATEWAY_DOCUMENT" };
+            }
+          }
+
+          // Send text message via local gateway
+          const sendTextRes = await fetch(`${gatewayBase}/api/send`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: targetPhone,
-              documentUrl: resolvedPdf,
-              filename: options.filename || "Invoice.pdf",
-              caption: options.message,
+              message: options.message,
             }),
-            signal: AbortSignal.timeout(15000),
+            signal: AbortSignal.timeout(10000),
           }).catch(() => null);
 
-          if (sendDocRes && sendDocRes.ok) {
-            options.onToast?.("✅ Message & PDF sent automatically to customer via WhatsApp (+918128756632)!", "success");
-            return { success: true, method: "LOCAL_GATEWAY_DOCUMENT" };
+          if (sendTextRes && sendTextRes.ok) {
+            options.onToast?.("✅ Status update sent automatically to customer via WhatsApp (+918128756632)!", "success");
+            return { success: true, method: "LOCAL_GATEWAY_TEXT" };
           }
         }
-
-        // Send text message via local gateway
-        const sendTextRes = await fetch("http://localhost:5050/api/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: targetPhone,
-            message: options.message,
-          }),
-          signal: AbortSignal.timeout(10000),
-        }).catch(() => null);
-
-        if (sendTextRes && sendTextRes.ok) {
-          options.onToast?.("✅ Status update sent automatically to customer via WhatsApp (+918128756632)!", "success");
-          return { success: true, method: "LOCAL_GATEWAY_TEXT" };
-        }
       }
+    } catch (err) {
+      console.warn("Client direct gateway check failed:", err);
     }
-  } catch (err) {
-    console.warn("Client direct gateway check failed:", err);
   }
 
   // 2. Fallback to share sheet / direct link if gateway is not connected

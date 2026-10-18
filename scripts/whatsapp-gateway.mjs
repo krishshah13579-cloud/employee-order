@@ -256,13 +256,14 @@ connectToWhatsApp();
 
 // HTTP Gateway Server
 const server = http.createServer(async (req, res) => {
-  // Enable CORS
+  // Enable CORS & Chrome Private Network Access (PNA)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Access-Control-Request-Private-Network");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
 
   if (req.method === "OPTIONS") {
-    res.writeHead(200);
+    res.writeHead(204);
     res.end();
     return;
   }
@@ -531,7 +532,7 @@ const server = http.createServer(async (req, res) => {
   res.end("Not Found");
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`\n======================================================`);
   console.log(`🧵 KRISH CLOTHING CO. — FREE WHATSAPP GATEWAY`);
   console.log(`📡 Server running on http://localhost:${PORT}`);
