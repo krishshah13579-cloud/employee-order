@@ -164,6 +164,21 @@ export default function ProductForm({
 
   const [colorAlphabetMap, setColorAlphabetMap] = useState<Record<string, string>>(parseInitialColorMapping);
 
+  // Sorts an array of colors according to their assigned alphabet letters (A, B, C, D...)
+  const sortColorsByAlphabet = (colors: string[], mapping: Record<string, string>): string[] => {
+    const getLetter = (col: string): string => {
+      const entry = Object.entries(mapping).find(
+        ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(col).toLowerCase()
+      );
+      return entry ? entry[0].toUpperCase() : "ZZZ";
+    };
+    return [...colors].sort((a, b) => {
+      const la = getLetter(a);
+      const lb = getLetter(b);
+      return la.localeCompare(lb, undefined, { numeric: true, sensitivity: "base" });
+    });
+  };
+
   // Keep colorAlphabetMap synchronized with selectedColors
   useEffect(() => {
     setColorAlphabetMap((prev) => {
@@ -173,22 +188,22 @@ export default function ProductForm({
 
       // Retain existing mapped letters for colors that are still selected
       for (const [letter, col] of Object.entries(prev)) {
-        if (selectedColors.includes(col)) {
-          updated[letter] = col;
-          assignedColors.add(col);
+        if (selectedColors.some((c) => cleanColorName(c).toLowerCase() === cleanColorName(col).toLowerCase())) {
+          updated[letter.toUpperCase()] = col;
+          assignedColors.add(cleanColorName(col).toLowerCase());
         }
       }
 
       // Assign remaining colors to next available alphabet letters
       let letterIdx = 0;
       for (const col of selectedColors) {
-        if (!assignedColors.has(col)) {
+        if (!assignedColors.has(cleanColorName(col).toLowerCase())) {
           while (letterIdx < letters.length && updated[letters[letterIdx]]) {
             letterIdx++;
           }
           const letter = letters[letterIdx] || `C${letterIdx + 1}`;
           updated[letter] = col;
-          assignedColors.add(col);
+          assignedColors.add(cleanColorName(col).toLowerCase());
         }
       }
 
@@ -199,16 +214,58 @@ export default function ProductForm({
   const handleColorLetterChange = (color: string, newLetter: string) => {
     const cleanLetter = newLetter.trim().toUpperCase();
     if (!cleanLetter) return;
+
     setColorAlphabetMap((prev) => {
+      const currentEntry = Object.entries(prev).find(
+        ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(color).toLowerCase()
+      );
+      const oldLetter = currentEntry ? currentEntry[0].toUpperCase() : null;
+
+      if (oldLetter === cleanLetter) return prev;
+
       const updated = { ...prev };
+
+      // Check if target letter is already assigned to a different color
+      const existingEntry = Object.entries(updated).find(
+        ([k, c]) => k.toUpperCase() === cleanLetter && cleanColorName(c).toLowerCase() !== cleanColorName(color).toLowerCase()
+      );
+
+      // Remove current mappings for this color
       for (const [k, v] of Object.entries(updated)) {
         if (cleanColorName(v).toLowerCase() === cleanColorName(color).toLowerCase()) {
           delete updated[k];
         }
       }
+
+      // If target letter was occupied, swap: assign the displaced color to oldLetter
+      if (existingEntry && oldLetter) {
+        updated[oldLetter] = existingEntry[1];
+      }
+
       updated[cleanLetter] = color;
+
+      // Re-sort selectedColors immediately so the colors move beside the alphabets in order A, B, C, D...
+      setTimeout(() => {
+        setSelectedColors((curr) => sortColorsByAlphabet(curr, updated));
+      }, 0);
+
       return updated;
     });
+  };
+
+  const moveColorAlphabet = (color: string, direction: -1 | 1) => {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+    const currentEntry = Object.entries(colorAlphabetMap).find(
+      ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(color).toLowerCase()
+    );
+    if (!currentEntry) return;
+    const curLetter = currentEntry[0].toUpperCase();
+    const curIdx = letters.indexOf(curLetter);
+    if (curIdx === -1) return;
+    const targetIdx = curIdx + direction;
+    if (targetIdx < 0 || targetIdx >= selectedColors.length) return;
+    const targetLetter = letters[targetIdx];
+    handleColorLetterChange(color, targetLetter);
   };
 
   // Parse initial images list (supports comma-separated, single URL, or JSON array)
@@ -870,6 +927,12 @@ export default function ProductForm({
         if (detected.length > 0) {
           setSelectedColors(detected);
           setActiveStockColor(detected[0]);
+          const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+          const initialMap: Record<string, string> = {};
+          detected.forEach((col, idx) => {
+            initialMap[alphabetLetters[idx] || `C${idx + 1}`] = col;
+          });
+          setColorAlphabetMap(initialMap);
           setColorRatioStockMap((stockPrev) => {
             const next = { ...stockPrev };
             for (const col of detected) {
@@ -935,6 +998,12 @@ export default function ProductForm({
       // Set precisely the detected colors from the photo
       setSelectedColors(detected);
       setActiveStockColor(detected[0]);
+      const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      const initialMap: Record<string, string> = {};
+      detected.forEach((col, idx) => {
+        initialMap[alphabetLetters[idx] || `C${idx + 1}`] = col;
+      });
+      setColorAlphabetMap(initialMap);
       setColorRatioStockMap((stockPrev) => {
         const next = { ...stockPrev };
         for (const col of detected) {
@@ -1139,10 +1208,12 @@ export default function ProductForm({
       const primarySizes = getSizesFromRatio(primaryRatioName);
       const primaryPcs = primarySizes.length > 0 ? primarySizes.length : (formData.pcsPerSet || 5);
 
+      const sortedColors = sortColorsByAlphabet(selectedColors, colorAlphabetMap);
+
       const payload = {
         name: formData.name.trim(),
         category: formData.category,
-        colorsAvailable: selectedColors.join(", "),
+        colorsAvailable: sortedColors.join(", "),
         sizesRatio: primaryRatioName,
         sizesList: primarySizes.join(", ") || formData.sizesList,
         pcsPerSet: primaryPcs,
@@ -2151,7 +2222,7 @@ export default function ProductForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {selectedColors.map((color, idx) => {
+              {sortColorsByAlphabet(selectedColors, colorAlphabetMap).map((color, idx) => {
                 const colorPreset = PRESET_COLORS.find(
                   (c) => c.name.toLowerCase() === color.toLowerCase()
                 );
@@ -2163,22 +2234,48 @@ export default function ProductForm({
                 const assignedLetter =
                   Object.entries(colorAlphabetMap).find(
                     ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(color).toLowerCase()
-                  )?.[0] || String.fromCharCode(65 + idx);
+                  )?.[0]?.toUpperCase() || String.fromCharCode(65 + idx);
+
+                const availableLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").slice(0, Math.max(selectedColors.length, 6));
 
                 return (
                   <div
                     key={color}
-                    className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-orange-200/90 shadow-2xs hover:border-orange-400 transition"
+                    className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-orange-200/90 shadow-2xs hover:border-orange-400 transition"
                   >
-                    <div className="relative shrink-0">
-                      <input
-                        type="text"
-                        maxLength={3}
+                    <div className="relative shrink-0 flex items-center gap-1">
+                      <select
                         value={assignedLetter}
-                        onChange={(e) => handleColorLetterChange(color, e.target.value.toUpperCase())}
-                        className="w-8 h-8 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs text-center border border-zinc-700 uppercase focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-text shadow-2xs"
-                        title="Click to type custom code (e.g. A, B, C) for this color"
-                      />
+                        onChange={(e) => handleColorLetterChange(color, e.target.value)}
+                        className="w-10 h-8 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs text-center border border-zinc-700 uppercase focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer shadow-2xs pl-1.5"
+                        title="Change wholesale letter code — automatically moves beside alphabets in order"
+                      >
+                        {availableLetters.map((ltr) => (
+                          <option key={ltr} value={ltr}>
+                            {ltr}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => moveColorAlphabet(color, -1)}
+                          disabled={idx === 0}
+                          className="w-4 h-3.5 flex items-center justify-center bg-orange-100 hover:bg-orange-200 disabled:opacity-30 disabled:cursor-not-allowed rounded text-[8px] text-orange-950 font-bold cursor-pointer"
+                          title="Move left to earlier alphabet (A <- B)"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveColorAlphabet(color, 1)}
+                          disabled={idx === selectedColors.length - 1}
+                          className="w-4 h-3.5 flex items-center justify-center bg-orange-100 hover:bg-orange-200 disabled:opacity-30 disabled:cursor-not-allowed rounded text-[8px] text-orange-950 font-bold cursor-pointer"
+                          title="Move right to later alphabet (B -> C)"
+                        >
+                          ▼
+                        </button>
+                      </div>
                     </div>
                     <span
                       className="w-4 h-4 rounded-full border shrink-0"
@@ -2262,7 +2359,7 @@ export default function ProductForm({
                 Choose Color to Configure:
               </div>
               <div className="flex flex-wrap gap-2">
-                {selectedColors.map((color) => {
+                {sortColorsByAlphabet(selectedColors, colorAlphabetMap).map((color, idx) => {
                   const clean = cleanColorName(color);
                   const ratios = colorRatioStockMap[clean] || {};
                   const loose = colorLooseStockMap[clean] || {};
@@ -2274,6 +2371,10 @@ export default function ProductForm({
                   const hex = colorInfo.hex;
                   const isLight = colorInfo.isLight;
                   const isActive = (activeStockColor || selectedColors[0]) === color;
+                  const assignedLetter =
+                    Object.entries(colorAlphabetMap).find(
+                      ([_, c]) => cleanColorName(c).toLowerCase() === cleanColorName(color).toLowerCase()
+                    )?.[0]?.toUpperCase() || String.fromCharCode(65 + idx);
 
                   return (
                     <button
@@ -2286,6 +2387,13 @@ export default function ProductForm({
                           : "bg-white text-gray-700 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
                       }`}
                     >
+                      <span
+                        className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded ${
+                          isActive ? "bg-white/20 text-white" : "bg-orange-100 text-orange-950 border border-orange-200"
+                        }`}
+                      >
+                        {assignedLetter}
+                      </span>
                       <span
                         className="w-3.5 h-3.5 rounded-full border shrink-0"
                         style={{
