@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Truck,
+  Trash2,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -262,18 +263,23 @@ function ProductDetailContent() {
     return parseColorwiseSets(product.setsColorwise);
   }, [product]);
 
-  // Handle color set count change with strict stock cap
+  // Handle color set count change with flexible stock cap for custom shades
   const handleSetChange = (color: string, requestedSets: number) => {
     setActiveColor(color);
-    const maxStock = getAvailableSetsForColor(
+    const isCustom = customColors.some(
+      (c) => c.toLowerCase() === color.toLowerCase()
+    );
+    const rawStock = getAvailableSetsForColor(
       product?.setsColorwise,
       color,
       product?.colorMapping
     );
+    // Custom shades or products without inventory restriction can have up to 9999 sets
+    const maxStock = isCustom || !product?.setsColorwise || rawStock <= 0 ? 9999 : rawStock;
     const validCount = Math.max(0, Math.min(requestedSets, maxStock));
 
-    if (requestedSets > maxStock) {
-      toast(`Maximum available stock for ${color} is ${maxStock} sets`, "error");
+    if (rawStock > 0 && requestedSets > rawStock && !isCustom) {
+      toast(`Maximum available stock for ${color} is ${rawStock} sets`, "error");
     }
 
     setColorSetsSelection((prev) => ({
@@ -282,16 +288,50 @@ function ProductDetailContent() {
     }));
   };
 
+  // Helper: Add custom shade with live color palette recognition
+  const handleAddCustomColor = () => {
+    const trimmed = customColorInput.trim();
+    if (!trimmed) return;
+    if (availableColors.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      toast(`Color "${trimmed}" is already in the list`, "info");
+      setActiveColor(trimmed);
+      if ((colorSetsSelection[trimmed] || 0) === 0) {
+        handleSetChange(trimmed, 1);
+      }
+      setCustomColorInput("");
+      return;
+    }
+    setCustomColors((prev) => [...prev, trimmed]);
+    setActiveColor(trimmed);
+    setColorSetsSelection((prev) => ({
+      ...prev,
+      [trimmed]: 1,
+    }));
+    setCustomColorInput("");
+    toast(`Added shade "${trimmed}" with 1 set selected`);
+  };
+
+  // Helper: Remove a custom added shade
+  const handleRemoveCustomColor = (colorToRemove: string) => {
+    setCustomColors((prev) => prev.filter((c) => c.toLowerCase() !== colorToRemove.toLowerCase()));
+    setColorSetsSelection((prev) => {
+      const next = { ...prev };
+      delete next[colorToRemove];
+      return next;
+    });
+  };
+
   // Helper: Select 1 set of each available color
   const handleSelectOneEach = () => {
     const updated: Record<string, number> = {};
     availableColors.forEach((color) => {
+      const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
       const maxStock = getAvailableSetsForColor(
         product?.setsColorwise,
         color,
         product?.colorMapping
       );
-      updated[color] = maxStock > 0 ? 1 : 0;
+      updated[color] = isCustom || maxStock > 0 || !product?.setsColorwise ? 1 : 0;
     });
     setColorSetsSelection(updated);
     toast("Selected 1 set of each available color");
@@ -393,14 +433,17 @@ function ProductDetailContent() {
       return;
     }
 
-    // Verify stock limits
+    // Verify stock limits (only for non-custom colors when inventory is tracked and positive)
     for (const entry of selectedEntries) {
+      const isCustom = customColors.some(
+        (c) => c.toLowerCase() === entry.color.toLowerCase()
+      );
       const maxStock = getAvailableSetsForColor(
         product.setsColorwise,
         entry.color,
         product.colorMapping
       );
-      if (entry.sets > maxStock) {
+      if (!isCustom && maxStock > 0 && entry.sets > maxStock) {
         toast(
           `Cannot add ${entry.sets} sets for ${entry.color}. Only ${maxStock} available in stock.`,
           "error"
@@ -843,7 +886,8 @@ function ProductDetailContent() {
                 ) : (
                   availableColors.map((color) => {
                     const hex = getColorHex(color).hex;
-                    const stock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
+                    const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
+                    const rawStock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
                     const currentSets = colorSetsSelection[color] || 0;
                     const pcsInfo = calculateOrderedColorSetsPieces(
                       product.setsColorwise,
@@ -852,7 +896,6 @@ function ProductDetailContent() {
                       pcsPerSet
                     );
                     const calculatedColorPcs = pcsInfo.totalPcs;
-                    const isOutOfStock = stock <= 0;
                     const isPhotoActive = activeColor.toLowerCase() === color.toLowerCase();
 
                     return (
@@ -863,14 +906,15 @@ function ProductDetailContent() {
                           const colImg = getProductColorImage(product, color);
                           const fIdx = allImages.findIndex((i) => i === colImg);
                           if (fIdx !== -1) setActiveImageIndex(fIdx);
+                          if (currentSets === 0) {
+                            handleSetChange(color, 1);
+                          }
                         }}
-                        className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer ${
-                          isPhotoActive ? "ring-2 ring-orange-500" : ""
+                        className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer select-none ${
+                          isPhotoActive ? "ring-2 ring-orange-500 shadow-sm" : ""
                         } ${
                           currentSets > 0
                             ? "bg-orange-50/70 border-orange-300 shadow-xs"
-                            : isOutOfStock
-                            ? "bg-slate-50 border-slate-200 opacity-60"
                             : "bg-white border-slate-200 hover:border-slate-300"
                         }`}
                       >
@@ -878,8 +922,9 @@ function ProductDetailContent() {
                           {/* Left: Swatch + Color Name + Stock */}
                           <div className="flex items-center gap-3">
                             <span
-                              className="w-7 h-7 rounded-full border border-slate-300 shadow-sm shrink-0 flex items-center justify-center"
+                              className="w-7 h-7 rounded-full border border-slate-300 shadow-sm shrink-0 flex items-center justify-center transition-transform hover:scale-105"
                               style={{ backgroundColor: hex }}
+                              title={`Palette: ${hex}`}
                             >
                               {currentSets > 0 && (
                                 <Check size={14} className="text-white drop-shadow-md stroke-[3]" />
@@ -896,21 +941,39 @@ function ProductDetailContent() {
                                 )}
                               </div>
                               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  <span>In Stock</span>
-                                </span>
+                                {isCustom ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                    <span>Custom Shade</span>
+                                  </span>
+                                ) : rawStock > 0 ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    <span>In Stock</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    <span>Advance / Made to Order</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
 
-                          {/* Right: Quantity Selector (+/- sets) */}
-                          <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                          {/* Right: Quantity Selector (+/- sets) + optional remove custom */}
+                          <div
+                            className="flex items-center gap-3 shrink-0 self-end sm:self-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <div className="flex items-center border border-slate-300 rounded-xl overflow-hidden bg-white shadow-xs">
                               <button
                                 type="button"
-                                disabled={currentSets <= 0 || isOutOfStock}
-                                onClick={() => handleSetChange(color, currentSets - 1)}
+                                disabled={currentSets <= 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetChange(color, currentSets - 1);
+                                }}
                                 className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition"
                                 aria-label="Decrease sets"
                               >
@@ -920,10 +983,9 @@ function ProductDetailContent() {
                               <input
                                 type="number"
                                 min={0}
-                                max={stock}
-                                disabled={isOutOfStock}
                                 value={currentSets === 0 ? "" : currentSets}
                                 placeholder="0"
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
                                   handleSetChange(color, isNaN(val) ? 0 : val);
@@ -933,9 +995,11 @@ function ProductDetailContent() {
 
                               <button
                                 type="button"
-                                disabled={currentSets >= stock || isOutOfStock}
-                                onClick={() => handleSetChange(color, currentSets + 1)}
-                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetChange(color, currentSets + 1);
+                                }}
+                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 transition"
                                 aria-label="Increase sets"
                               >
                                 <Plus size={15} />
@@ -945,12 +1009,71 @@ function ProductDetailContent() {
                             <span className="text-xs font-semibold text-slate-500 w-12 text-right hidden sm:inline">
                               Sets
                             </span>
+
+                            {isCustom && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveCustomColor(color);
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-500 transition"
+                                title="Remove custom shade"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
                     );
                   })
                 )}
+              </div>
+
+              {/* + Add Custom Shade Form */}
+              <div className="p-3.5 bg-slate-50/90 rounded-2xl border border-dashed border-slate-300 space-y-2">
+                <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Need a custom shade / color not listed above?</span>
+                  {customColorInput.trim() && (
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs inline-block"
+                        style={{ backgroundColor: getColorHex(customColorInput).hex }}
+                      />
+                      Palette preview: {getColorHex(customColorInput).hex}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="e.g. Dark Indigo, Olive, Wine, Rust, Pista, #1a2538..."
+                      value={customColorInput}
+                      onChange={(e) => setCustomColorInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomColor();
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 pl-9 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                    />
+                    <span
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-slate-300 shadow-2xs"
+                      style={{ backgroundColor: customColorInput.trim() ? getColorHex(customColorInput).hex : "#cbd5e1" }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomColor}
+                    disabled={!customColorInput.trim()}
+                    className="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition disabled:opacity-40 shrink-0"
+                  >
+                    + Add Shade
+                  </button>
+                </div>
               </div>
 
               {/* Special Order Notes */}

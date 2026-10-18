@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
+import { getAllProductColors } from "@/lib/stock";
 import type { CustomerData, ProductData, ColorSetEntry } from "@/lib/types";
 
 interface NewOrderItem {
@@ -47,6 +48,7 @@ export default function NewOrderPage() {
   const [placedBy, setPlacedBy] = useState("Krish Sandip Shah (Admin)");
   const [orderNotes, setOrderNotes] = useState("");
   const [orderItems, setOrderItems] = useState<NewOrderItem[]>([]);
+  const [customShadeInputs, setCustomShadeInputs] = useState<Record<number, string>>({});
 
   useEffect(() => {
     async function loadData() {
@@ -63,7 +65,11 @@ export default function NewOrderPage() {
           // Pre-populate with first product if available
           if (prods.length > 0) {
             const first = prods[0];
-            const colors = first.colorsAvailable.split(",").map((c) => c.trim()).filter(Boolean);
+            const colors = getAllProductColors(
+              first.colorsAvailable,
+              first.setsColorwise,
+              first.colorMapping
+            );
             setOrderItems([
               {
                 productId: first.id,
@@ -94,7 +100,11 @@ export default function NewOrderPage() {
   const handleAddProductToOrder = () => {
     if (products.length === 0) return;
     const prod = products[0];
-    const colors = prod.colorsAvailable.split(",").map((c) => c.trim()).filter(Boolean);
+    const colors = getAllProductColors(
+      prod.colorsAvailable,
+      prod.setsColorwise,
+      prod.colorMapping
+    );
 
     setOrderItems((prev) => [
       ...prev,
@@ -122,6 +132,47 @@ export default function NewOrderPage() {
       const item = { ...copy[itemIndex] };
       item.colorSets = item.colorSets.map((cs) =>
         cs.color === colorName ? { ...cs, sets: Math.max(0, setsVal) } : cs
+      );
+      copy[itemIndex] = item;
+      return copy;
+    });
+  };
+
+  const handleAddCustomShade = (itemIndex: number) => {
+    const input = (customShadeInputs[itemIndex] || "").trim();
+    if (!input) return;
+
+    setOrderItems((prev) => {
+      const copy = [...prev];
+      const item = { ...copy[itemIndex] };
+      const exists = item.colorSets.some(
+        (cs) => cs.color.toLowerCase() === input.toLowerCase()
+      );
+      if (exists) {
+        toast(`Shade "${input}" is already in this garment item`, "info");
+        return prev;
+      }
+      item.colorSets = [...item.colorSets, { color: input, sets: 1 }];
+      if (!item.colorsAvailable.some((c) => c.toLowerCase() === input.toLowerCase())) {
+        item.colorsAvailable = [...item.colorsAvailable, input];
+      }
+      copy[itemIndex] = item;
+      return copy;
+    });
+
+    setCustomShadeInputs((prev) => ({ ...prev, [itemIndex]: "" }));
+    toast(`Added shade "${input}" with 1 set`);
+  };
+
+  const handleRemoveColorFromItem = (itemIndex: number, colorName: string) => {
+    setOrderItems((prev) => {
+      const copy = [...prev];
+      const item = { ...copy[itemIndex] };
+      item.colorSets = item.colorSets.filter(
+        (cs) => cs.color.toLowerCase() !== colorName.toLowerCase()
+      );
+      item.colorsAvailable = item.colorsAvailable.filter(
+        (c) => c.toLowerCase() !== colorName.toLowerCase()
       );
       copy[itemIndex] = item;
       return copy;
@@ -402,7 +453,11 @@ export default function NewOrderPage() {
                       onChange={(e) => {
                         const newProd = products.find((p) => p.id === Number(e.target.value));
                         if (newProd) {
-                          const colors = newProd.colorsAvailable.split(",").map((c) => c.trim()).filter(Boolean);
+                          const colors = getAllProductColors(
+                            newProd.colorsAvailable,
+                            newProd.setsColorwise,
+                            newProd.colorMapping
+                          );
                           setOrderItems((prev) => {
                             const updated = [...prev];
                             updated[itemIdx] = {
@@ -468,25 +523,40 @@ export default function NewOrderPage() {
 
                 {/* Colorwise Sets Inputs (A-2, B-3, C-2) */}
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-2">
-                    SET (Color Wise) — Allocate Sets against shades
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                      SET (Color Wise) — Allocate Sets against shades
+                    </label>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {item.colorSets.map((cs) => {
                       const colorInfo = getColorHex(cs.color);
                       return (
                         <div
                           key={cs.color}
-                          className="bg-white p-2.5 rounded-xl border border-gray-200 flex flex-col justify-between shadow-2xs"
+                          className="bg-white p-2.5 rounded-xl border border-gray-200 flex flex-col justify-between shadow-2xs relative group"
                         >
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <span
-                              className="w-3 h-3 rounded-full shrink-0 border border-black/15 shadow-2xs"
-                              style={{ backgroundColor: colorInfo.hex }}
-                            />
-                            <span className="text-xs font-semibold text-gray-800 truncate">
-                              {cs.color}
-                            </span>
+                          <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span
+                                className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/15 shadow-2xs"
+                                style={{ backgroundColor: colorInfo.hex }}
+                                title={`Palette: ${colorInfo.hex}`}
+                              />
+                              <span className="text-xs font-semibold text-gray-800 truncate" title={cs.color}>
+                                {cs.color}
+                              </span>
+                            </div>
+                            {item.colorSets.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColorFromItem(itemIdx, cs.color)}
+                                className="text-gray-300 hover:text-red-500 text-xs px-1"
+                                title={`Remove ${cs.color}`}
+                              >
+                                ✕
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <input
@@ -503,6 +573,51 @@ export default function NewOrderPage() {
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Inline Add Custom Shade with live swatch */}
+                  <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center gap-2">
+                    <div className="relative flex-1 max-w-sm">
+                      <input
+                        type="text"
+                        placeholder="Add custom shade (e.g. Dark Indigo, Olive, Wine, #1a2538)..."
+                        value={customShadeInputs[itemIdx] || ""}
+                        onChange={(e) =>
+                          setCustomShadeInputs((prev) => ({
+                            ...prev,
+                            [itemIdx]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddCustomShade(itemIdx);
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 pl-8 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                      />
+                      <span
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border border-gray-300"
+                        style={{
+                          backgroundColor: (customShadeInputs[itemIdx] || "").trim()
+                            ? getColorHex(customShadeInputs[itemIdx]).hex
+                            : "#e2e8f0",
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddCustomShade(itemIdx)}
+                      disabled={!(customShadeInputs[itemIdx] || "").trim()}
+                      className="px-3 py-1.5 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-lg transition disabled:opacity-40 shrink-0"
+                    >
+                      + Add Shade
+                    </button>
+                    {(customShadeInputs[itemIdx] || "").trim() && (
+                      <span className="text-[11px] text-gray-500 font-mono hidden sm:inline">
+                        Palette: {getColorHex(customShadeInputs[itemIdx]).hex}
+                      </span>
+                    )}
                   </div>
                 </div>
 
