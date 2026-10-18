@@ -133,6 +133,13 @@ function ProductDetailContent() {
           console.error("Error reading draft:", e);
         }
 
+        // Auto-select 1 set for the first available color if draft has no sets yet
+        const hasExisting = Object.values(initial).some((s) => s > 0);
+        if (!hasExisting && colors.length > 0) {
+          initial[colors[0]] = 1;
+          setActiveColor(colors[0]);
+        }
+
         setColorSetsSelection(initial);
       } catch (err: any) {
         console.error("Error loading product:", err);
@@ -147,7 +154,11 @@ function ProductDetailContent() {
     }
   }, [productId]);
 
-  // All colors for this product (hide out-of-stock colors from employee panel)
+  // Custom colors added by the employee/customer directly
+  const [customColors, setCustomColors] = useState<string[]>([]);
+  const [customColorInput, setCustomColorInput] = useState<string>("");
+
+  // All colors for this product (takes all product colors automatically and any custom colors)
   const availableColors = useMemo(() => {
     if (!product) return [];
     const colors = getAllProductColors(
@@ -156,17 +167,15 @@ function ProductDetailContent() {
       product.colorMapping
     );
 
-    // If any color is out of stock, don't show it on employee panel
-    return colors.filter((color) => {
-      if (!product.setsColorwise || !product.setsColorwise.trim()) return true;
-      const stock = getAvailableSetsForColor(
-        product.setsColorwise,
-        color,
-        product.colorMapping
-      );
-      return stock > 0;
+    const merged = [...colors];
+    customColors.forEach((cc) => {
+      if (!merged.some((c) => c.toLowerCase() === cc.toLowerCase())) {
+        merged.push(cc);
+      }
     });
-  }, [product]);
+
+    return merged;
+  }, [product, customColors]);
 
   // Active selected color for photo and quick sets order
   const [activeColor, setActiveColor] = useState<string>("");
