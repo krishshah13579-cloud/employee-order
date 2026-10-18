@@ -39,13 +39,22 @@ const COLOR_MAP: Record<string, string> = {
   "steel blue": "#4682b4",
   "denim": "#2b4c7e",
   "denim blue": "#2b4c7e",
+  "dark denim": "#1a2538",
+  "light denim": "#5c7fa8",
   "blue": "#2563eb",
   "light blue": "#93c5fd",
   "sky blue": "#7dd3fc",
   "ice blue": "#bfdbfe",
   "teal": "#0f766e",
   "petrol blue": "#164e63",
-  "indigo": "#4338ca",
+  "dark indigo": "#1a2538",
+  "deep indigo": "#151e2e",
+  "raw indigo": "#121926",
+  "indigo": "#23334d",
+  "indigo blue": "#1d2e50",
+  "washed indigo": "#3b537d",
+  "light indigo": "#4d6b9c",
+  "indigo denim": "#23334d",
 
   // Greys & Grays
   "charcoal": "#334155",
@@ -100,6 +109,8 @@ const COLOR_MAP: Record<string, string> = {
   "biscuit": "#e8dcbe",
 
   // Greens
+  "dark green": "#14532d",
+  "bottle green": "#0f381e",
   "olive": "#3f4f34",
   "olive green": "#3f4f34",
   "dark olive": "#2e3a27",
@@ -113,6 +124,9 @@ const COLOR_MAP: Record<string, string> = {
   "sage green": "#84a98c",
   "emerald": "#047857",
   "mint": "#a7f3d0",
+  "pista": "#93c572",
+  "pista green": "#93c572",
+  "mehendi": "#4a5320",
 
   // Reds, Maroons & Burgundies
   "burgundy": "#581c24",
@@ -205,6 +219,12 @@ export function getColorHex(colorName: string): ColorInfo {
     return { hex: raw, isLight: isLightHex(raw) };
   }
 
+  // 1b. Check for embedded hex codes inside parenthesis or text (e.g. "Dark Indigo (#1a2538)")
+  const embeddedHex = raw.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/);
+  if (embeddedHex) {
+    return { hex: embeddedHex[0], isLight: isLightHex(embeddedHex[0]) };
+  }
+
   const norm = raw.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ");
 
   // 2. Direct dictionary match
@@ -213,9 +233,18 @@ export function getColorHex(colorName: string): ColorInfo {
     return { hex, isLight: isLightHex(hex) };
   }
 
-  // 3. Keyword / Substring match (e.g. "Classic Black", "Vibrant Navy Blue", "Deep Navy", "Medium Grey")
+  // 3. Keyword / Substring match (e.g. "Classic Black", "Vibrant Navy Blue", "Dark Indigo", "Medium Grey")
   if (norm.includes("black") || norm.includes("onyx") || norm.includes("ebony") || norm.includes("carbon")) {
     return { hex: "#121212", isLight: false };
+  }
+  if (norm.includes("indigo")) {
+    if (norm.includes("dark") || norm.includes("deep") || norm.includes("raw") || norm.includes("black")) {
+      return { hex: "#1a2538", isLight: false };
+    }
+    if (norm.includes("light") || norm.includes("washed") || norm.includes("sky") || norm.includes("ice")) {
+      return { hex: "#4d6b9c", isLight: false };
+    }
+    return { hex: "#23334d", isLight: false };
   }
   if (norm.includes("navy")) {
     if (norm.includes("vibrant") || norm.includes("royal") || norm.includes("bright")) {
@@ -275,8 +304,17 @@ export function getColorHex(colorName: string): ColorInfo {
   if (norm.includes("olive")) {
     return { hex: "#3f4f34", isLight: false };
   }
-  if (norm.includes("green")) {
-    if (norm.includes("forest") || norm.includes("pine") || norm.includes("deep") || norm.includes("dark")) {
+  if (norm.includes("green") || norm.includes("pista") || norm.includes("mehendi")) {
+    if (norm.includes("pista")) return { hex: "#93c572", isLight: true };
+    if (norm.includes("mehendi")) return { hex: "#4a5320", isLight: false };
+    if (
+      norm.includes("forest") ||
+      norm.includes("pine") ||
+      norm.includes("deep") ||
+      norm.includes("dark") ||
+      norm.includes("bottle") ||
+      norm.includes("army")
+    ) {
       return { hex: "#14532d", isLight: false };
     }
     if (norm.includes("sage") || norm.includes("mint")) return { hex: "#84a98c", isLight: true };
@@ -307,7 +345,16 @@ export function getColorHex(colorName: string): ColorInfo {
     return { hex: "#ea580c", isLight: false };
   }
 
-  // 4. Deterministic unique hue fallback so different unknown names NEVER look identical
+  // 4. Check individual word matches in case of compound names (e.g. "Vintage Charcoal", "Cotton Denim")
+  const words = norm.split(/[\s,]+/);
+  for (const w of words) {
+    if (w && COLOR_MAP[w]) {
+      const hex = COLOR_MAP[w];
+      return { hex, isLight: isLightHex(hex) };
+    }
+  }
+
+  // 5. Deterministic unique hue fallback so different unknown names NEVER look identical
   const fallbackHex = getDeterministicHue(norm);
   return { hex: fallbackHex, isLight: false };
 }
