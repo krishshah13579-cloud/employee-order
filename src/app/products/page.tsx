@@ -17,7 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
-import { formatCurrency, getProductCoverImage, isGstPanRegistered } from "@/lib/utils";
+import { formatCurrency, getProductCoverImage, isGstPanRegistered, sortProductsByImpSequence } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import {
   getTotalAvailableSets,
@@ -111,7 +111,7 @@ function ProductsContent() {
 
   // Filter products by category, search term, and automatically hide Out-of-Stock items
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    const list = products.filter((product) => {
       // Auto-remove from customer view if Out of Stock (0 total sets and 0 mix pcs)
       if (product.setsColorwise && product.setsColorwise.trim() !== "") {
         const totalSets = getTotalAvailableSets(product.setsColorwise);
@@ -135,6 +135,9 @@ function ProductsContent() {
 
       return matchesCategory && matchesSearch;
     });
+
+    // Strictly sort from IMP - 001 upwards in numerical sequence
+    return sortProductsByImpSequence(list);
   }, [products, selectedCategory, searchQuery]);
 
   return (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseColorwiseSets, getTotalAvailableSets, getAllProductColors, parseDetailedColorRatioSets } from "@/lib/stock";
-import { getProductCoverImage } from "@/lib/utils";
+import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,11 @@ export async function GET(request: NextRequest) {
       return auth.errorResponse!;
     }
 
-    const products = await prisma.product.findMany({
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+    const rawProducts = await prisma.product.findMany({
+      orderBy: { name: "asc" },
     });
+
+    const products = sortProductsByImpSequence(rawProducts);
 
     const stockItems = products.map((p) => {
       const colors = getAllProductColors(p.colorsAvailable, p.setsColorwise, p.colorMapping);

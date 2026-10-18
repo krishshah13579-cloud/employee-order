@@ -154,3 +154,34 @@ export function isGstPanRegistered(gstPan?: string | null): boolean {
   return true;
 }
 
+/**
+ * Natural numerical sorter for Garment Products.
+ * Sorts products sequentially starting from "IMP - 001", "IMP - 002", "IMP - 003", ... up to any number.
+ * Extracts integer digits from product names (e.g. "IMP - 001" -> 1, "IMP-010" -> 10, "IMP 105" -> 105).
+ */
+export function extractProductNumber(name?: string | null): number {
+  if (!name) return Number.MAX_SAFE_INTEGER;
+  // Match any sequence of digits in name (e.g. IMP - 001, IMP-05, etc.)
+  const match = name.match(/\d+/);
+  if (match) {
+    const parsed = parseInt(match[0], 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+export function sortProductsByImpSequence<T extends { name?: string | null }>(products: T[]): T[] {
+  return [...products].sort((a, b) => {
+    const numA = extractProductNumber(a.name);
+    const numB = extractProductNumber(b.name);
+
+    if (numA !== numB) {
+      return numA - numB;
+    }
+
+    // Secondary fallback: natural string comparison
+    const nameA = a.name || "";
+    const nameB = b.name || "";
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+  });
+}

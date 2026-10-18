@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, getProductCoverImage } from "@/lib/utils";
+import { formatCurrency, getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
 import {
   Package,
@@ -122,7 +122,7 @@ export default function ProductsPage() {
               )
           );
         }
-        setProducts(data);
+        setProducts(sortProductsByImpSequence(data));
       }
     } catch (err: any) {
       toast("Failed to load products: " + err.message, "error");

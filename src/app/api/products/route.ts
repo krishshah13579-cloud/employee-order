@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getProductCoverImage } from "@/lib/utils";
+import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
@@ -34,10 +34,13 @@ export async function GET(request: NextRequest) {
 
     const inStockOnly = searchParams.get("in_stock_only") === "1" || searchParams.get("hide_out_of_stock") === "1";
 
-    const products = await prisma.product.findMany({
+    const rawProducts = await prisma.product.findMany({
       where,
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      orderBy: { name: "asc" },
     });
+
+    // Sort strictly in numerical sequence starting from IMP - 001 upwards
+    const products = sortProductsByImpSequence(rawProducts);
 
     const { getTotalAvailableSets } = await import("@/lib/stock");
 
