@@ -28,6 +28,7 @@ import {
   PackageOpen,
   Scissors,
   Copy,
+  Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -60,20 +61,31 @@ import { extractColorsFromImage } from "@/lib/colorExtractor";
 const PRESET_COLORS = [
   { name: "Jet Black", hex: "#0a0a0a" },
   { name: "Navy Blue", hex: "#1e293b" },
+  { name: "Dark Indigo", hex: "#1a2538" },
   { name: "Charcoal Grey", hex: "#334155" },
+  { name: "Dark Grey", hex: "#374151" },
   { name: "Light Grey", hex: "#94a3b8" },
+  { name: "Ice Grey", hex: "#d1d5db" },
+  { name: "Steel Grey", hex: "#64748b" },
+  { name: "Slate Blue", hex: "#475569" },
+  { name: "Dark Denim", hex: "#1e293b" },
+  { name: "Light Blue", hex: "#93c5fd" },
   { name: "Khaki", hex: "#c2b280" },
   { name: "Olive Green", hex: "#3f4f34" },
+  { name: "Dark Olive", hex: "#2e3a27" },
+  { name: "Bottle Green", hex: "#14532d" },
+  { name: "Pista Green", hex: "#93c572" },
   { name: "Beige", hex: "#e7dbc8" },
-  { name: "Dark Brown", hex: "#452a1a" },
-  { name: "Tan", hex: "#c19a6b" },
+  { name: "Cream", hex: "#fef3c7" },
   { name: "Off White", hex: "#f8fafc", border: true },
-  { name: "Slate Blue", hex: "#475569" },
-  { name: "Burgundy", hex: "#581c24" },
-  { name: "Dark Indigo", hex: "#1e1b4b" },
-  { name: "Light Blue", hex: "#93c5fd" },
-  { name: "Dark Grey", hex: "#374151" },
   { name: "White", hex: "#ffffff", border: true },
+  { name: "Tan", hex: "#c19a6b" },
+  { name: "Camel", hex: "#c19a6b" },
+  { name: "Dark Brown", hex: "#452a1a" },
+  { name: "Coffee", hex: "#451a03" },
+  { name: "Burgundy", hex: "#581c24" },
+  { name: "Maroon", hex: "#7f1d1d" },
+  { name: "Rust", hex: "#c2410c" },
 ];
 
 // Default Standard Size Guide (Fixed brand sizes 28–44, editable waist & length)
@@ -107,6 +119,7 @@ export default function ProductForm({
   const MAX_IMAGES = 10;
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [detectingColors, setDetectingColors] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Collapsible sections states
@@ -125,6 +138,11 @@ export default function ProductForm({
   };
 
   const [selectedColors, setSelectedColors] = useState<string[]>(parseInitialColors);
+  const [customColorsList, setCustomColorsList] = useState<string[]>(() => {
+    const initial = parseInitialColors();
+    const presetNamesLower = PRESET_COLORS.map((p) => p.name.toLowerCase());
+    return initial.filter((c) => !presetNamesLower.includes(c.toLowerCase()));
+  });
   const [customColorInput, setCustomColorInput] = useState("");
 
   // Color Alphabet Mapping: e.g. { "A": "Ice Grey", "B": "Jet Black" }
@@ -731,29 +749,72 @@ export default function ProductForm({
   const handleAddCustomColor = () => {
     const trimmed = customColorInput.trim();
     if (!trimmed) return;
-    const newItems = trimmed.split(",").map((s) => cleanColorName(s.trim())).filter(Boolean);
-    setSelectedColors((prev) => {
-      const updated = [...prev];
-      for (const item of newItems) {
-        if (!updated.includes(item)) updated.push(item);
-      }
-      return updated;
+    const newItems = trimmed
+      .split(",")
+      .map((s) => cleanColorName(s.trim()))
+      .filter(Boolean);
+    if (newItems.length === 0) return;
+
+    // Match case-insensitively with standard presets if applicable
+    const normalizedNewItems = newItems.map((item) => {
+      const matched = PRESET_COLORS.find(
+        (p) => p.name.toLowerCase() === item.toLowerCase()
+      );
+      return matched ? matched.name : item;
     });
-    setColorRatioStockMap((stockPrev) => {
-      const next = { ...stockPrev };
-      for (const item of newItems) {
-        if (!next[item] || Object.keys(next[item]).length === 0) {
-          next[item] = { [formData.sizesRatio]: Math.max(4, bulkSetsInput) };
+
+    // Add to customColorsList if not present in standard presets
+    setCustomColorsList((prev) => {
+      const next = [...prev];
+      for (const item of normalizedNewItems) {
+        if (
+          !PRESET_COLORS.some((p) => p.name.toLowerCase() === item.toLowerCase()) &&
+          !next.some((c) => c.toLowerCase() === item.toLowerCase())
+        ) {
+          next.push(item);
         }
       }
       return next;
     });
+
+    // Select the colors
+    setSelectedColors((prev) => {
+      const updated = [...prev];
+      for (const item of normalizedNewItems) {
+        if (!updated.some((c) => c.toLowerCase() === item.toLowerCase())) {
+          updated.push(item);
+        }
+      }
+      return updated;
+    });
+
+    // Initialize ratio stock for new colors
+    setColorRatioStockMap((stockPrev) => {
+      const next = { ...stockPrev };
+      for (const item of normalizedNewItems) {
+        const clean = cleanColorName(item);
+        if (!next[clean] || Object.keys(next[clean]).length === 0) {
+          next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+        }
+      }
+      return next;
+    });
+
+    // Switch active stock color
+    setActiveStockColor(normalizedNewItems[0]);
     setCustomColorInput("");
+    toast(
+      `Added and selected ${normalizedNewItems.length} color${
+        normalizedNewItems.length > 1 ? "s" : ""
+      }: ${normalizedNewItems.join(", ")}`,
+      "success"
+    );
   };
 
   const handleRemoveColor = (colorName: string) => {
     const clean = cleanColorName(colorName);
     setSelectedColors((prev) => prev.filter((c) => c !== colorName));
+    setCustomColorsList((prev) => prev.filter((c) => c.toLowerCase() !== colorName.toLowerCase()));
     setColorImages((prev) => {
       const copy = { ...prev };
       delete copy[colorName];
@@ -795,24 +856,57 @@ export default function ProductForm({
 
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
-        // Once product photos are uploaded, select 2 color palettes if none are selected yet
-        setSelectedColors((prev) => {
-          if (prev.length === 0) {
-            const twoColors = ["Dark Indigo", "Light Blue"];
-            setActiveStockColor(twoColors[0]);
-            setColorRatioStockMap((stockPrev) => ({
-              ...stockPrev,
-              "Dark Indigo": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
-              "Light Blue": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
-            }));
-            return twoColors;
+
+        // Automatically extract all colors present in the uploaded garment photo(s)
+        const extractedSet = new Set<string>();
+        for (const url of uploadedUrls) {
+          const colors = await extractColorsFromImage(url);
+          for (const c of colors) {
+            extractedSet.add(c);
           }
-          return prev;
-        });
-        toast(
-          `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Selected 2 standard color palettes to get started.`,
-          "success"
-        );
+        }
+
+        const detected = Array.from(extractedSet);
+        if (detected.length > 0) {
+          setSelectedColors((prev) => {
+            const combined = prev.length === 0 ? detected : Array.from(new Set([...prev, ...detected]));
+            if (combined.length > 0) {
+              setActiveStockColor(combined[0]);
+              setColorRatioStockMap((stockPrev) => {
+                const next = { ...stockPrev };
+                for (const col of combined) {
+                  const clean = cleanColorName(col);
+                  if (!next[clean] || Object.keys(next[clean]).length === 0) {
+                    next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+                  }
+                }
+                return next;
+              });
+            }
+            return combined;
+          });
+
+          // Add any non-standard preset colors to customColorsList
+          setCustomColorsList((prev) => {
+            const next = [...prev];
+            for (const c of detected) {
+              if (
+                !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
+                !next.some((x) => x.toLowerCase() === c.toLowerCase())
+              ) {
+                next.push(c);
+              }
+            }
+            return next;
+          });
+
+          toast(
+            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Automatically detected & selected ${detected.length} colors: ${detected.join(", ")}`,
+            "success"
+          );
+        } else {
+          toast(`Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""} successfully!`, "success");
+        }
       }
     } catch (err: any) {
       console.error("Image upload error:", err);
@@ -823,7 +917,69 @@ export default function ProductForm({
     }
   };
 
-  const handleAddExternalUrl = () => {
+  const handleDetectColorsFromImages = async () => {
+    if (imagesList.length === 0) {
+      toast("Please upload a product photo first to detect colors", "error");
+      return;
+    }
+    setDetectingColors(true);
+    try {
+      const extractedSet = new Set<string>();
+      for (const url of imagesList) {
+        const colors = await extractColorsFromImage(url);
+        for (const c of colors) {
+          extractedSet.add(c);
+        }
+      }
+      const detected = Array.from(extractedSet);
+      if (detected.length === 0) {
+        toast("No distinct garment colors recognized from photo. You can type colors in the box below.", "info");
+        return;
+      }
+
+      setSelectedColors((prev) => {
+        const combined = Array.from(new Set([...prev, ...detected]));
+        if (combined.length > 0) {
+          setActiveStockColor(combined[0]);
+          setColorRatioStockMap((stockPrev) => {
+            const next = { ...stockPrev };
+            for (const col of combined) {
+              const clean = cleanColorName(col);
+              if (!next[clean] || Object.keys(next[clean]).length === 0) {
+                next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+              }
+            }
+            return next;
+          });
+        }
+        return combined;
+      });
+
+      setCustomColorsList((prev) => {
+        const next = [...prev];
+        for (const c of detected) {
+          if (
+            !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
+            !next.some((x) => x.toLowerCase() === c.toLowerCase())
+          ) {
+            next.push(c);
+          }
+        }
+        return next;
+      });
+
+      toast(
+        `Detected & selected ${detected.length} colors from photo: ${detected.join(", ")}`,
+        "success"
+      );
+    } catch (err: any) {
+      toast("Color detection error: " + err.message, "error");
+    } finally {
+      setDetectingColors(false);
+    }
+  };
+
+  const handleAddExternalUrl = async () => {
     const url = externalUrlInput.trim();
     if (!url) return;
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
@@ -835,22 +991,50 @@ export default function ProductForm({
       return;
     }
     setImagesList((prev) => [...prev, url]);
-    setSelectedColors((prev) => {
-      if (prev.length === 0) {
-        const twoColors = ["Dark Indigo", "Light Blue"];
-        setActiveStockColor(twoColors[0]);
-        setColorRatioStockMap((stockPrev) => ({
-          ...stockPrev,
-          "Dark Indigo": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
-          "Light Blue": { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) },
-        }));
-        return twoColors;
-      }
-      return prev;
-    });
     setExternalUrlInput("");
     setShowUrlInput(false);
-    toast("Photo URL added to gallery", "success");
+
+    try {
+      const colors = await extractColorsFromImage(url);
+      if (colors.length > 0) {
+        setSelectedColors((prev) => {
+          const combined = prev.length === 0 ? colors : Array.from(new Set([...prev, ...colors]));
+          if (combined.length > 0) {
+            setActiveStockColor(combined[0]);
+            setColorRatioStockMap((stockPrev) => {
+              const next = { ...stockPrev };
+              for (const col of combined) {
+                const clean = cleanColorName(col);
+                if (!next[clean] || Object.keys(next[clean]).length === 0) {
+                  next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+                }
+              }
+              return next;
+            });
+          }
+          return combined;
+        });
+
+        setCustomColorsList((prev) => {
+          const next = [...prev];
+          for (const c of colors) {
+            if (
+              !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
+              !next.some((x) => x.toLowerCase() === c.toLowerCase())
+            ) {
+              next.push(c);
+            }
+          }
+          return next;
+        });
+
+        toast(`Photo URL added! Detected ${colors.length} colors: ${colors.join(", ")}`, "success");
+      } else {
+        toast("Photo URL added to gallery", "success");
+      }
+    } catch {
+      toast("Photo URL added to gallery", "success");
+    }
   };
 
   const handleRemoveImage = (index: number) => {
@@ -1762,7 +1946,7 @@ export default function ProductForm({
 
       {/* 4. Available Colors Section (Palette) */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-xs space-y-6">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-2">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Palette className="w-5 h-5 text-gray-700" />
@@ -1772,7 +1956,19 @@ export default function ProductForm({
               Select or type the color variants available for this trouser design.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {imagesList.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDetectColorsFromImages}
+                disabled={detectingColors}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs hover:scale-102"
+                title="Scan uploaded garment photo and detect all colors automatically"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${detectingColors ? "animate-spin" : ""}`} />
+                <span>{detectingColors ? "Detecting Colors..." : "Auto-Detect from Photo"}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSelectAllPresets}
@@ -1791,10 +1987,10 @@ export default function ProductForm({
           </div>
         </div>
 
-        {/* Color Presets */}
+        {/* Standard Color Presets */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2.5">
-            Standard Trouser Colors
+            Standard Trouser Colors ({PRESET_COLORS.length})
           </label>
           <div className="flex flex-wrap gap-2.5">
             {PRESET_COLORS.map((color) => {
@@ -1806,7 +2002,7 @@ export default function ProductForm({
                   onClick={() => handleToggleColor(color.name)}
                   className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-150 cursor-pointer ${
                     isSelected
-                      ? "bg-gray-900 text-white border-gray-900 shadow-xs"
+                      ? "bg-gray-900 text-white border-gray-900 shadow-xs ring-1 ring-black"
                       : "bg-white text-gray-700 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
                   }`}
                 >
@@ -1825,31 +2021,88 @@ export default function ProductForm({
           </div>
         </div>
 
+        {/* Custom Added Color Shades (Clickable palette buttons) */}
+        {customColorsList.length > 0 && (
+          <div className="pt-2 border-t border-gray-100">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-indigo-900 mb-2.5 flex items-center justify-between">
+              <span>Custom & Added Shades ({customColorsList.length})</span>
+              <span className="text-[11px] text-gray-500 font-normal lowercase">Click to toggle active selection</span>
+            </label>
+            <div className="flex flex-wrap gap-2.5">
+              {customColorsList.map((color) => {
+                const isSelected = selectedColors.includes(color);
+                const colorInfo = getColorHex(color);
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => handleToggleColor(color)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? "bg-gray-900 text-white border-gray-900 shadow-xs ring-1 ring-black"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
+                      style={{ backgroundColor: colorInfo.hex }}
+                    />
+                    <span>{color}</span>
+                    {isSelected && <Check className="w-3 h-3 text-white ml-0.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Custom Color Input */}
         <div className="pt-2 border-t border-gray-100">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
-            Add Custom Color Name
-          </label>
-          <div className="flex gap-2 max-w-md">
-            <input
-              type="text"
-              placeholder="e.g. Royal Navy, Slate Blue, Stone Beige"
-              value={customColorInput}
-              onChange={(e) => setCustomColorInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddCustomColor();
-                }
-              }}
-              className="flex-1 px-3.5 py-2 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-black"
-            />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+              Add Custom Color Name (If shade is not in palette above)
+            </label>
+            {customColorInput.trim() && (
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-gray-300 inline-block shadow-2xs"
+                  style={{ backgroundColor: getColorHex(customColorInput).hex }}
+                />
+                <span>Palette Preview: <code className="text-gray-900 font-mono text-[11px]">{getColorHex(customColorInput).hex}</code></span>
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2 max-w-lg">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="e.g. Royal Navy, Slate Blue, Stone Beige, Mint Green, Rust..."
+                value={customColorInput}
+                onChange={(e) => setCustomColorInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomColor();
+                  }
+                }}
+                className="w-full px-3.5 py-2 pl-9 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-black"
+              />
+              <span
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-gray-300 shadow-2xs transition-colors"
+                style={{
+                  backgroundColor: customColorInput.trim()
+                    ? getColorHex(customColorInput).hex
+                    : "#cbd5e1",
+                }}
+              />
+            </div>
             <button
               type="button"
               onClick={handleAddCustomColor}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer"
+              disabled={!customColorInput.trim()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer disabled:opacity-40"
             >
-              <span>+ Add</span>
+              <span>+ Add Color</span>
             </button>
           </div>
         </div>
