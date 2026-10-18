@@ -868,22 +868,17 @@ export default function ProductForm({
 
         const detected = Array.from(extractedSet);
         if (detected.length > 0) {
-          setSelectedColors((prev) => {
-            const combined = prev.length === 0 ? detected : Array.from(new Set([...prev, ...detected]));
-            if (combined.length > 0) {
-              setActiveStockColor(combined[0]);
-              setColorRatioStockMap((stockPrev) => {
-                const next = { ...stockPrev };
-                for (const col of combined) {
-                  const clean = cleanColorName(col);
-                  if (!next[clean] || Object.keys(next[clean]).length === 0) {
-                    next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
-                  }
-                }
-                return next;
-              });
+          setSelectedColors(detected);
+          setActiveStockColor(detected[0]);
+          setColorRatioStockMap((stockPrev) => {
+            const next = { ...stockPrev };
+            for (const col of detected) {
+              const clean = cleanColorName(col);
+              if (!next[clean] || Object.keys(next[clean]).length === 0) {
+                next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+              }
             }
-            return combined;
+            return next;
           });
 
           // Add any non-standard preset colors to customColorsList
@@ -901,7 +896,7 @@ export default function ProductForm({
           });
 
           toast(
-            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Automatically detected & selected ${detected.length} colors: ${detected.join(", ")}`,
+            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Auto-detected ${detected.length} color${detected.length > 1 ? "s" : ""}: ${detected.join(", ")}`,
             "success"
           );
         } else {
@@ -937,22 +932,18 @@ export default function ProductForm({
         return;
       }
 
-      setSelectedColors((prev) => {
-        const combined = Array.from(new Set([...prev, ...detected]));
-        if (combined.length > 0) {
-          setActiveStockColor(combined[0]);
-          setColorRatioStockMap((stockPrev) => {
-            const next = { ...stockPrev };
-            for (const col of combined) {
-              const clean = cleanColorName(col);
-              if (!next[clean] || Object.keys(next[clean]).length === 0) {
-                next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
-              }
-            }
-            return next;
-          });
+      // Set precisely the detected colors from the photo
+      setSelectedColors(detected);
+      setActiveStockColor(detected[0]);
+      setColorRatioStockMap((stockPrev) => {
+        const next = { ...stockPrev };
+        for (const col of detected) {
+          const clean = cleanColorName(col);
+          if (!next[clean] || Object.keys(next[clean]).length === 0) {
+            next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
+          }
         }
-        return combined;
+        return next;
       });
 
       setCustomColorsList((prev) => {
@@ -969,7 +960,7 @@ export default function ProductForm({
       });
 
       toast(
-        `Detected & selected ${detected.length} colors from photo: ${detected.join(", ")}`,
+        `Auto-detected ${detected.length} color${detected.length > 1 ? "s" : ""} from photo: ${detected.join(", ")}`,
         "success"
       );
     } catch (err: any) {

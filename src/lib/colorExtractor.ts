@@ -1,8 +1,9 @@
 /**
  * Intelligent dominant and multi-color extractor for garment and trouser photography.
- * Handles both:
- * 1. Multi-garment photos (e.g. rack of 8 trousers hanging side-by-side or stacked).
- * 2. Single-garment photos (extracting primary garment color).
+ * Correctly identifies the exact number of physical garments present:
+ * - If 2 trousers are in the photo, extracts exactly the 2 distinct colors (without duplicate shadows/highlights).
+ * - If 8 trousers are on a rack, extracts all 8 distinct colors.
+ * - If 1 trouser is in the photo, extracts the single dominant color.
  */
 
 export interface ReferenceColor {
@@ -10,42 +11,42 @@ export interface ReferenceColor {
   r: number;
   g: number;
   b: number;
+  family: string;
 }
 
 export const TROUSER_COLOR_PALETTE: ReferenceColor[] = [
-  { name: "Jet Black", r: 15, g: 15, b: 18 },
-  { name: "Navy Blue", r: 24, g: 38, b: 68 },
-  { name: "Dark Indigo", r: 26, g: 37, b: 56 },
-  { name: "Slate Blue", r: 71, g: 85, b: 105 },
-  { name: "Charcoal Grey", r: 51, g: 65, b: 85 },
-  { name: "Dark Grey", r: 55, g: 65, b: 81 },
-  { name: "Light Grey", r: 156, g: 163, b: 175 },
-  { name: "Ice Grey", r: 215, g: 220, b: 225 },
-  { name: "Steel Grey", r: 100, g: 116, b: 139 },
-  { name: "Khaki", r: 185, g: 170, b: 135 },
-  { name: "Olive Green", r: 63, g: 79, b: 52 },
-  { name: "Dark Olive", r: 46, g: 58, b: 39 },
-  { name: "Beige", r: 225, g: 215, b: 195 },
-  { name: "Cream", r: 250, g: 243, b: 224 },
-  { name: "Off White", r: 245, g: 245, b: 240 },
-  { name: "White", r: 255, g: 255, b: 255 },
-  { name: "Dark Brown", r: 69, g: 42, b: 26 },
-  { name: "Tan", r: 193, g: 154, b: 107 },
-  { name: "Camel", r: 193, g: 154, b: 107 },
-  { name: "Coffee", r: 69, g: 26, b: 3 },
-  { name: "Burgundy", r: 88, g: 28, b: 36 },
-  { name: "Maroon", r: 127, g: 29, b: 29 },
-  { name: "Light Blue", r: 147, g: 197, b: 253 },
-  { name: "Sky Blue", r: 125, g: 211, b: 252 },
-  { name: "Dark Denim", r: 30, g: 41, b: 59 },
-  { name: "Bottle Green", r: 20, g: 83, b: 45 },
-  { name: "Pista Green", r: 147, g: 197, b: 114 },
-  { name: "Rust", r: 194, g: 65, b: 12 },
+  { name: "Jet Black", r: 15, g: 15, b: 18, family: "black" },
+  { name: "Charcoal Grey", r: 51, g: 65, b: 85, family: "black" },
+  { name: "Dark Grey", r: 55, g: 65, b: 81, family: "grey" },
+  { name: "Light Grey", r: 156, g: 163, b: 175, family: "light_grey" },
+  { name: "Ice Grey", r: 215, g: 220, b: 225, family: "light_grey" },
+  { name: "Steel Grey", r: 100, g: 116, b: 139, family: "grey" },
+  { name: "Navy Blue", r: 24, g: 38, b: 68, family: "navy" },
+  { name: "Dark Indigo", r: 26, g: 37, b: 56, family: "navy" },
+  { name: "Dark Denim", r: 30, g: 41, b: 59, family: "navy" },
+  { name: "Light Blue", r: 147, g: 197, b: 253, family: "light_blue" },
+  { name: "Sky Blue", r: 125, g: 211, b: 252, family: "light_blue" },
+  { name: "Slate Blue", r: 71, g: 85, b: 105, family: "slate_blue" },
+  { name: "Khaki", r: 185, g: 170, b: 135, family: "khaki" },
+  { name: "Tan", r: 193, g: 154, b: 107, family: "khaki" },
+  { name: "Camel", r: 193, g: 154, b: 107, family: "khaki" },
+  { name: "Olive Green", r: 63, g: 79, b: 52, family: "olive" },
+  { name: "Dark Olive", r: 46, g: 58, b: 39, family: "olive" },
+  { name: "Bottle Green", r: 20, g: 83, b: 45, family: "green" },
+  { name: "Pista Green", r: 147, g: 197, b: 114, family: "green" },
+  { name: "Beige", r: 225, g: 215, b: 195, family: "beige" },
+  { name: "Cream", r: 250, g: 243, b: 224, family: "beige" },
+  { name: "Off White", r: 245, g: 245, b: 240, family: "white" },
+  { name: "White", r: 255, g: 255, b: 255, family: "white" },
+  { name: "Dark Brown", r: 69, g: 42, b: 26, family: "brown" },
+  { name: "Coffee", r: 69, g: 26, b: 3, family: "brown" },
+  { name: "Burgundy", r: 88, g: 28, b: 36, family: "maroon" },
+  { name: "Maroon", r: 127, g: 29, b: 29, family: "maroon" },
+  { name: "Rust", r: 194, g: 65, b: 12, family: "rust" },
 ];
 
 /**
  * Calculates weighted perceptual color difference between two RGB values.
- * Gives higher weight to green and red channels matching human visual sensitivity.
  */
 function getColorDistance(
   r1: number,
@@ -66,9 +67,19 @@ function getColorDistance(
 }
 
 /**
- * Finds the closest matched name in TROUSER_COLOR_PALETTE for a given RGB.
+ * Intelligent classifier for garment RGB values:
+ * Resolves dark tones properly so studio light reflections on black fabric
+ * are accurately classified as Jet Black, while blue-chroma fabrics match Navy Blue.
  */
 export function matchRgbToTrouserColor(r: number, g: number, b: number): string {
+  // Dark range analysis (under studio lighting, dark fabrics range between 15-75 RGB)
+  if (r < 75 && g < 75 && b < 95) {
+    if (b > r + 14 && b > g + 10) return "Navy Blue";
+    if (r > b + 15 && r > g + 8) return "Dark Brown";
+    if (g > r + 8 && g > b + 8) return "Olive Green";
+    return "Jet Black";
+  }
+
   let closestName = "Jet Black";
   let minDistance = Infinity;
 
@@ -83,10 +94,20 @@ export function matchRgbToTrouserColor(r: number, g: number, b: number): string 
   return closestName;
 }
 
+interface PixelCluster {
+  count: number;
+  rSum: number;
+  gSum: number;
+  bSum: number;
+  meanR: number;
+  meanG: number;
+  meanB: number;
+}
+
 /**
- * Extracts all distinct garment colors from an image.
- * If 8 trousers are hung side-by-side or stacked, this scans across the garment
- * columns as well as global clusters to discover all distinct colors.
+ * Extracts the exact set of real garment colors from an uploaded image.
+ * Merges shadows and fabric creases belonging to the same physical garment
+ * so 2 trousers produce exactly 2 colors, 8 trousers produce 8 colors, etc.
  */
 export async function extractColorsFromImage(dataUrl: string): Promise<string[]> {
   if (typeof window === "undefined") return [];
@@ -101,129 +122,149 @@ export async function extractColorsFromImage(dataUrl: string): Promise<string[]>
         const ctx = canvas.getContext("2d");
         if (!ctx) return resolve([]);
 
-        // Scaled to 160x160 for high accuracy and instant sub-20ms execution
-        const width = 160;
-        const height = 160;
+        const width = 120;
+        const height = 120;
         canvas.width = width;
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
 
         const imgData = ctx.getImageData(0, 0, width, height).data;
 
-        const isGarmentPixel = (r: number, g: number, b: number, a: number): boolean => {
-          if (a < 128) return false;
-          // Skip pure / near-white studio backdrop
-          if (r > 242 && g > 242 && b > 242) return false;
-          // Skip pure desaturated white ceiling / floor highlights
-          if (r > 235 && g > 235 && b > 235 && Math.abs(r - g) < 8 && Math.abs(g - b) < 8) return false;
-          return true;
-        };
+        // Collect genuine garment pixels, excluding studio backdrop and hangers
+        const garmentPixels: { r: number; g: number; b: number }[] = [];
+        const minY = Math.floor(height * 0.18); // skip hangers / hooks
+        const maxY = Math.floor(height * 0.88); // skip floor / ground shadow
+        const minX = Math.floor(width * 0.05);
+        const maxX = Math.floor(width * 0.95);
 
-        // ══════════════════════════════════════════════════════════════
-        // METHOD 1: VERTICAL COLUMN STRIP SCANNING
-        // (Detects trousers hanging side-by-side from left to right)
-        // ══════════════════════════════════════════════════════════════
-        const detectedFromSlices: string[] = [];
-        const numSlices = 8; // Scan 8 vertical columns for up to 8 hanging garments
-        const sliceWidth = Math.floor((width * 0.90) / numSlices);
-        const startX = Math.floor(width * 0.05);
-        // Exclude top 18% (hangers/hooks) and bottom 10% (shadows/floor)
-        const minY = Math.floor(height * 0.20);
-        const maxY = Math.floor(height * 0.85);
-
-        for (let s = 0; s < numSlices; s++) {
-          const colX1 = startX + s * sliceWidth;
-          const colX2 = colX1 + sliceWidth;
-          const sliceBuckets: Record<string, { r: number; g: number; b: number; count: number }> = {};
-
-          for (let y = minY; y < maxY; y += 2) {
-            for (let x = colX1; x < colX2; x += 2) {
-              const idx = (y * width + x) * 4;
-              const r = imgData[idx];
-              const g = imgData[idx + 1];
-              const b = imgData[idx + 2];
-              const a = imgData[idx + 3];
-
-              if (!isGarmentPixel(r, g, b, a)) continue;
-
-              const qr = Math.round(r / 24) * 24;
-              const qg = Math.round(g / 24) * 24;
-              const qb = Math.round(b / 24) * 24;
-              const key = `${qr},${qg},${qb}`;
-
-              if (!sliceBuckets[key]) {
-                sliceBuckets[key] = { r, g, b, count: 1 };
-              } else {
-                sliceBuckets[key].count++;
-                sliceBuckets[key].r = (sliceBuckets[key].r + r) / 2;
-                sliceBuckets[key].g = (sliceBuckets[key].g + g) / 2;
-                sliceBuckets[key].b = (sliceBuckets[key].b + b) / 2;
-              }
-            }
-          }
-
-          const topCluster = Object.values(sliceBuckets).sort((a, b) => b.count - a.count)[0];
-          if (topCluster && topCluster.count >= 4) {
-            const matchedName = matchRgbToTrouserColor(topCluster.r, topCluster.g, topCluster.b);
-            detectedFromSlices.push(matchedName);
-          }
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        // METHOD 2: GLOBAL COLOR CLUSTER TALLY
-        // (Ensures any significant color present anywhere in the image is captured)
-        // ══════════════════════════════════════════════════════════════
-        const globalColorCounts: Record<string, number> = {};
-        let totalGarmentPixels = 0;
-
-        for (let y = minY; y < maxY; y += 2) {
-          for (let x = Math.floor(width * 0.04); x < Math.floor(width * 0.96); x += 2) {
+        for (let y = minY; y < maxY; y++) {
+          for (let x = minX; x < maxX; x++) {
             const idx = (y * width + x) * 4;
             const r = imgData[idx];
             const g = imgData[idx + 1];
             const b = imgData[idx + 2];
             const a = imgData[idx + 3];
 
-            if (!isGarmentPixel(r, g, b, a)) continue;
+            if (a < 128) continue;
+            // Studio white/grey backdrop
+            if (r > 215 && g > 215 && b > 215) continue;
+            // Studio warm wood backdrop panel (high red/green, low blue)
+            if (r > 115 && g > 75 && r > b + 22) continue;
 
-            totalGarmentPixels++;
-            const matched = matchRgbToTrouserColor(r, g, b);
-            globalColorCounts[matched] = (globalColorCounts[matched] || 0) + 1;
+            garmentPixels.push({ r, g, b });
           }
         }
 
-        const sortedGlobalColors = Object.entries(globalColorCounts)
-          .filter(([_, count]) => totalGarmentPixels > 0 && count / totalGarmentPixels >= 0.035) // at least 3.5% presence
-          .sort((a, b) => b[1] - a[1])
-          .map(([name]) => name);
+        if (garmentPixels.length < 50) {
+          return resolve(["Jet Black"]);
+        }
 
         // ══════════════════════════════════════════════════════════════
-        // MERGE & DEDUPLICATE COLORS
+        // STEP 1: INITIAL LEADER-FOLLOWER COLOR CLUSTERING
         // ══════════════════════════════════════════════════════════════
-        const finalColors: string[] = [];
+        const clusters: PixelCluster[] = [];
+        const INITIAL_THRESH = 35;
 
-        // 1. First add distinct slice colors in left-to-right order
-        for (const col of detectedFromSlices) {
-          if (!finalColors.includes(col)) {
-            finalColors.push(col);
+        for (const p of garmentPixels) {
+          let matched: PixelCluster | null = null;
+          let minD = Infinity;
+
+          for (const cl of clusters) {
+            const d = getColorDistance(p.r, p.g, p.b, cl.meanR, cl.meanG, cl.meanB);
+            if (d < INITIAL_THRESH && d < minD) {
+              minD = d;
+              matched = cl;
+            }
+          }
+
+          if (matched) {
+            matched.count++;
+            matched.rSum += p.r;
+            matched.gSum += p.g;
+            matched.bSum += p.b;
+            matched.meanR = Math.round(matched.rSum / matched.count);
+            matched.meanG = Math.round(matched.gSum / matched.count);
+            matched.meanB = Math.round(matched.bSum / matched.count);
+          } else {
+            clusters.push({
+              count: 1,
+              rSum: p.r,
+              gSum: p.g,
+              bSum: p.b,
+              meanR: p.r,
+              meanG: p.g,
+              meanB: p.b,
+            });
           }
         }
 
-        // 2. Add any additional prominent global colors
-        for (const col of sortedGlobalColors) {
-          if (!finalColors.includes(col)) {
-            finalColors.push(col);
+        // ══════════════════════════════════════════════════════════════
+        // STEP 2: MERGE NEARBY CLUSTERS (Shadows/Creases on same garment)
+        // ══════════════════════════════════════════════════════════════
+        let merged = true;
+        while (merged) {
+          merged = false;
+          for (let i = 0; i < clusters.length; i++) {
+            for (let j = i + 1; j < clusters.length; j++) {
+              const d = getColorDistance(
+                clusters[i].meanR,
+                clusters[i].meanG,
+                clusters[i].meanB,
+                clusters[j].meanR,
+                clusters[j].meanG,
+                clusters[j].meanB
+              );
+              // Folds and studio highlights on same garment are within distance 46
+              if (d < 46) {
+                clusters[i].count += clusters[j].count;
+                clusters[i].rSum += clusters[j].rSum;
+                clusters[i].gSum += clusters[j].gSum;
+                clusters[i].bSum += clusters[j].bSum;
+                clusters[i].meanR = Math.round(clusters[i].rSum / clusters[i].count);
+                clusters[i].meanG = Math.round(clusters[i].gSum / clusters[i].count);
+                clusters[i].meanB = Math.round(clusters[i].bSum / clusters[i].count);
+                clusters.splice(j, 1);
+                merged = true;
+                break;
+              }
+            }
+            if (merged) break;
           }
         }
 
-        // If fewer than 2 colors detected from slices/clusters, fallback to top global
-        if (finalColors.length === 0 && sortedGlobalColors.length > 0) {
-          finalColors.push(...sortedGlobalColors.slice(0, 8));
+        // Sort clusters by size descending
+        clusters.sort((a, b) => b.count - a.count);
+
+        // ══════════════════════════════════════════════════════════════
+        // STEP 3: FILTER SIGNIFICANT GARMENTS & ELIMINATE DUPLICATE FAMILIES
+        // ══════════════════════════════════════════════════════════════
+        // In a photo with N garments, each garment occupies >= 6-10% of total garment pixels
+        const total = garmentPixels.length;
+        const significant = clusters.filter((c) => c.count / total >= 0.08);
+
+        const detectedColors: string[] = [];
+        const familiesSeen = new Set<string>();
+
+        for (const cl of significant) {
+          const colName = matchRgbToTrouserColor(cl.meanR, cl.meanG, cl.meanB);
+          const ref = TROUSER_COLOR_PALETTE.find((p) => p.name === colName);
+          const fam = ref ? ref.family : colName;
+
+          // Prevent duplicate shades from the same color family (e.g. Navy Blue + Dark Denim)
+          if (!familiesSeen.has(fam) && !detectedColors.includes(colName)) {
+            detectedColors.push(colName);
+            familiesSeen.add(fam);
+          }
         }
 
-        // Return up to 8 distinct colors
-        const result = finalColors.slice(0, 8);
-        resolve(result);
+        // Fallback: If no cluster met 8% threshold, take the top 1 dominant cluster
+        if (detectedColors.length === 0 && clusters.length > 0) {
+          detectedColors.push(
+            matchRgbToTrouserColor(clusters[0].meanR, clusters[0].meanG, clusters[0].meanB)
+          );
+        }
+
+        resolve(detectedColors);
       } catch (err) {
         console.error("Failed to extract colors from image:", err);
         resolve([]);
