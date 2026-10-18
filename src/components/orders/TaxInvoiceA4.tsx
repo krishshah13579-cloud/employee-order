@@ -1,12 +1,14 @@
 "use client";
 
 import React from "react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatColorAlphabetLines } from "@/lib/utils";
 
 export interface TaxInvoiceItem {
   id?: number;
   productName: string;
   colorSets?: any;
+  colorMapping?: string | null;
+  colorsAvailable?: string | null;
   sizeRatio?: string;
   pcsPerSet?: number;
   totalSets?: number;
@@ -448,11 +450,13 @@ export default function TaxInvoiceA4({
                 colorArr = [];
               }
 
+              const colorLines = formatColorAlphabetLines(
+                it.colorSets,
+                it.colorMapping,
+                it.colorsAvailable
+              );
+
               if (colorArr.length > 0) {
-                colorSummary = colorArr
-                  .filter((c) => c.sets > 0)
-                  .map((c) => `${c.color} (${c.sets}s)`)
-                  .join(", ");
                 if (!totalSets) {
                   totalSets = colorArr.reduce((acc, c) => acc + (Number(c.sets) || 0), 0);
                 }
@@ -514,11 +518,21 @@ export default function TaxInvoiceA4({
                       borderRight: "1px solid #000000",
                       padding: "4px 4px",
                       fontSize: "10px",
-                      fontWeight: "500",
-                      lineHeight: "1.2",
+                      fontWeight: "600",
+                      lineHeight: "1.3",
                     }}
                   >
-                    {colorSummary || "Standard Mix"}
+                    {colorLines.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        {colorLines.map((line, lIdx) => (
+                          <div key={lIdx} style={{ whiteSpace: "nowrap" }}>
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: "#666" }}>Standard Mix</span>
+                    )}
                   </td>
                   <td
                     style={{

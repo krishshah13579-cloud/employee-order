@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { formatColorAlphabetLines } from "@/lib/utils";
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +22,11 @@ export async function GET(
       },
       include: {
         customer: true,
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
     });
 
@@ -62,6 +67,38 @@ export async function GET(
         }
       } catch (e) {
         console.error("Error parsing taxInvoiceItems for PDF:", e);
+      }
+    }
+
+    // Build product map for resolving colorMapping & colorsAvailable
+    const productByItem = new Map<any, any>();
+    order.items.forEach((it: any) => {
+      if (it.product) {
+        if (it.productId) productByItem.set(it.productId, it.product);
+        if (it.productName) productByItem.set(String(it.productName).toLowerCase().trim(), it.product);
+      }
+    });
+
+    const missingProductNames = displayItems
+      .filter(
+        (it: any) =>
+          !productByItem.get(it.productId) &&
+          !productByItem.get(String(it.productName || "").toLowerCase().trim())
+      )
+      .map((it: any) => String(it.productName || "").trim())
+      .filter(Boolean);
+
+    if (missingProductNames.length > 0) {
+      try {
+        const dbProducts = await prisma.product.findMany({
+          where: { name: { in: missingProductNames } },
+        });
+        dbProducts.forEach((p) => {
+          productByItem.set(p.id, p);
+          productByItem.set(p.name.toLowerCase().trim(), p);
+        });
+      } catch (err) {
+        console.error("Error fetching missing products for PDF:", err);
       }
     }
 
@@ -264,48 +301,58 @@ export async function GET(
     let currentY = y;
 
     displayItems.forEach((item: any, index: number) => {
-      const rowHeight = 30;
+      // Resolve product information for color wholesale alphabet mapping
+      const prod =
+        (item as any).product ||
+        productByItem.get(item.productId) ||
+        productByItem.get(String(item.productName || "").toLowerCase().trim());
+      const colorMapping = prod?.colorMapping || (item as any).colorMapping;
+      const colorsAvailable = prod?.colorsAvailable || (item as any).colorsAvailable;
+
+      // Format each color's wholesale alphabet and sets (each on next line)
+      const colorLines = formatColorAlphabetLines(item.colorSets, colorMapping, colorsAvailable);
+      const colorLinesCount = colorLines.length;
+
+      const lineSpacing = colorLinesCount > 4 ? 9.5 : 10.5;
+      const rowHeight = Math.max(28, 16 + colorLinesCount * lineSpacing);
       currentY -= rowHeight;
 
+      const topY = currentY + rowHeight - 12;
+
       // Draw item details
-      drawText(String(index + 1), colX[0] + 8, currentY + 16, { size: 8 });
+      drawText(String(index + 1), colX[0] + 8, topY, { size: 8 });
 
       // Product Name
-      const prodName = String(item.productName || "Garment Item").slice(0, 32);
-      drawText(prodName, colX[1] + 6, currentY + 16, { font: fontBold, size: 8 });
+      const prodName = String(item.productName || "Garment Item").slice(0, 34);
+      drawText(prodName, colX[1] + 6, topY, { font: fontBold, size: 8 });
 
-      // Colors / Sets summary
-      let colorStr = "";
-      try {
-        const parsedCs = typeof item.colorSets === "string" ? JSON.parse(item.colorSets) : item.colorSets;
-        if (Array.isArray(parsedCs)) {
-          colorStr = parsedCs
-            .filter((c: any) => c.sets > 0)
-            .map((c: any) => `${c.color}: ${c.sets}`)
-            .join(", ");
-        }
-      } catch {}
-      if (colorStr) {
-        drawText(colorStr.slice(0, 40), colX[1] + 6, currentY + 5, { size: 7, color: rgb(0.3, 0.3, 0.3) });
-      }
+      // Each color wholesale alphabet entry on the next line
+      colorLines.forEach((line, lIdx) => {
+        const lineY = topY - 11 - lIdx * lineSpacing;
+        drawText(line, colX[1] + 6, lineY, {
+          font: fontBold,
+          size: 7.5,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+      });
 
       // Size Ratio
       const ratio = String(item.sizeRatio || "30 to 38");
-      drawText(ratio, colX[2] + 6, currentY + 16, { size: 8 });
+      drawText(ratio, colX[2] + 6, topY, { size: 8 });
 
       // Sets
-      drawText(String(item.totalSets || 0), colX[3] + 12, currentY + 16, { font: fontBold, size: 8 });
+      drawText(String(item.totalSets || 0), colX[3] + 12, topY, { font: fontBold, size: 8 });
 
       // PCS
-      drawText(String(item.totalPcs || 0), colX[4] + 14, currentY + 16, { font: fontBold, size: 8 });
+      drawText(String(item.totalPcs || 0), colX[4] + 14, topY, { font: fontBold, size: 8 });
 
       // Unit Price
       const unitPriceStr = `Rs. ${Number(item.unitPrice || 0).toLocaleString("en-IN")}`;
-      drawText(unitPriceStr, colX[5] + 8, currentY + 16, { size: 8 });
+      drawText(unitPriceStr, colX[5] + 8, topY, { size: 8 });
 
       // Amount
       const subtotalStr = `Rs. ${Number(item.itemSubtotal || 0).toLocaleString("en-IN")}`;
-      drawText(subtotalStr, colX[6] + 8, currentY + 16, { font: fontBold, size: 8 });
+      drawText(subtotalStr, colX[6] + 8, topY, { font: fontBold, size: 8 });
 
       // Row separator
       drawLine(margin, currentY, width - margin, currentY, 0.5);

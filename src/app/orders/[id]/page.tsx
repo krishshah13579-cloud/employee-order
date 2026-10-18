@@ -22,7 +22,7 @@ import {
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getColorAlphabetLetter } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
@@ -35,6 +35,8 @@ interface EditableOrderItem {
   productName: string;
   category?: string;
   colorSets: ColorSetEntry[];
+  colorMapping?: string | null;
+  colorsAvailable?: string | null;
   sizeRatio: string;
   sizesList?: string;
   pcsPerSet: number;
@@ -188,6 +190,8 @@ export default function OrderEditPage() {
           productName: it.productName,
           category: it.product?.category,
           colorSets: colorSets,
+          colorMapping: it.product?.colorMapping || it.colorMapping || null,
+          colorsAvailable: it.product?.colorsAvailable || it.colorsAvailable || null,
           sizeRatio: it.sizeRatio || it.product?.sizesRatio || "30 to 38",
           sizesList: it.sizesList || it.product?.sizesList,
           pcsPerSet: it.pcsPerSet || it.product?.pcsPerSet || 5,
@@ -503,22 +507,31 @@ export default function OrderEditPage() {
 
                       {/* Colors & Sets (Read-Only) */}
                       <td className="py-4 px-4">
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                           {item.colorSets && item.colorSets.length > 0 ? (
-                            item.colorSets.map((cs) => (
-                              <div
-                                key={cs.color}
-                                className="inline-flex items-center gap-1.5 mr-2 mb-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs"
-                              >
-                                <span
-                                  className="w-2.5 h-2.5 rounded-full inline-block"
-                                  style={{ backgroundColor: getColorHex(cs.color).hex }}
-                                />
-                                <span className="font-bold text-slate-800">{cs.color}:</span>
-                                <span className="font-mono font-black text-orange-600">{cs.sets}</span>
-                                <span className="text-[10px] text-slate-500">sets</span>
-                              </div>
-                            ))
+                            item.colorSets
+                              .filter((cs) => Number(cs.sets) > 0)
+                              .map((cs, cIdx) => {
+                                const letter = getColorAlphabetLetter(
+                                  cs.color,
+                                  item.colorMapping,
+                                  item.colorsAvailable,
+                                  cIdx
+                                );
+                                return (
+                                  <div
+                                    key={cIdx}
+                                    className="flex items-center gap-1.5 text-xs py-0.5"
+                                  >
+                                    <span className="w-5 h-5 rounded bg-zinc-900 text-white font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
+                                      {letter}
+                                    </span>
+                                    <span className="font-bold text-slate-800">
+                                      {letter}: {cs.sets} {Number(cs.sets) === 1 ? "Set" : "Sets"}
+                                    </span>
+                                  </div>
+                                );
+                              })
                           ) : (
                             <span className="text-slate-400 italic">No color sets</span>
                           )}
@@ -661,6 +674,8 @@ export default function OrderEditPage() {
             id: it.id,
             productName: it.productName,
             colorSets: it.colorSets,
+            colorMapping: it.colorMapping,
+            colorsAvailable: it.colorsAvailable,
             sizeRatio: it.sizeRatio,
             pcsPerSet: it.pcsPerSet,
             totalSets: it.totalSets,
@@ -742,6 +757,8 @@ export default function OrderEditPage() {
                     id: it.id,
                     productName: it.productName,
                     colorSets: it.colorSets,
+                    colorMapping: it.colorMapping,
+                    colorsAvailable: it.colorsAvailable,
                     sizeRatio: it.sizeRatio,
                     pcsPerSet: it.pcsPerSet,
                     totalSets: it.totalSets,

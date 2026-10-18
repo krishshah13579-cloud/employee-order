@@ -185,3 +185,98 @@ export function sortProductsByImpSequence<T extends { name?: string | null }>(pr
     return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
   });
 }
+
+/**
+ * Resolves the wholesale alphabet code (A, B, C, D...) for a color name.
+ * 1. If color is already a single letter (e.g. "A", "B"), returns it.
+ * 2. If color starts with a letter like "A: Ice Grey" or "A - Ice Grey", extracts "A".
+ * 3. If colorMapping JSON is provided (e.g. {"A": "Ice Grey", "B": "Jet Black"}), looks up the letter.
+ * 4. If colorsAvailable comma-separated string is provided, looks up index in the list.
+ * 5. Otherwise falls back to String.fromCharCode(65 + fallbackIndex) ('A', 'B', 'C'...).
+ */
+export function getColorAlphabetLetter(
+  colorName: string,
+  colorMapping?: string | null | Record<string, string>,
+  colorsAvailable?: string | null,
+  fallbackIndex: number = 0
+): string {
+  if (!colorName) return String.fromCharCode(65 + (fallbackIndex % 26));
+
+  const trimmed = colorName.trim();
+
+  // 1. If already a single uppercase/lowercase letter
+  if (/^[A-Za-z]$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  // 2. If prefixed with alphabet like "A: Blue", "A - Blue", "(A) Blue", "A. Blue"
+  const prefixMatch = trimmed.match(/^(\(?([A-Za-z])\)?)[\s:\-–—\.]+/);
+  if (prefixMatch && prefixMatch[2]) {
+    return prefixMatch[2].toUpperCase();
+  }
+
+  const cleanColor = (s: string) => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const lowerColor = trimmed.toLowerCase();
+  const cleanTarget = cleanColor(trimmed);
+
+  // 3. Check colorMapping
+  if (colorMapping) {
+    try {
+      const map: Record<string, string> =
+        typeof colorMapping === "string" ? JSON.parse(colorMapping) : colorMapping;
+      if (map && typeof map === "object") {
+        for (const [letter, mappedColor] of Object.entries(map)) {
+          if (typeof mappedColor === "string") {
+            const mappedTrimmed = mappedColor.trim().toLowerCase();
+            if (mappedTrimmed === lowerColor || cleanColor(mappedTrimmed) === cleanTarget) {
+              return letter.toUpperCase();
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Check colorsAvailable comma-separated string
+  if (colorsAvailable) {
+    const list = colorsAvailable.split(",").map((c) => c.trim().toLowerCase());
+    const matchIdx = list.findIndex((c) => c === lowerColor || cleanColor(c) === cleanTarget);
+    if (matchIdx >= 0) {
+      return String.fromCharCode(65 + (matchIdx % 26));
+    }
+  }
+
+  // 5. Fallback index
+  return String.fromCharCode(65 + (fallbackIndex % 26));
+}
+
+/**
+ * Returns formatted lines showing wholesale alphabet and sets count for each color:
+ * e.g. ["A: 2 Sets", "B: 3 Sets"]
+ * Each color entry is on its own line.
+ */
+export function formatColorAlphabetLines(
+  colorSets: any,
+  colorMapping?: string | null | Record<string, string>,
+  colorsAvailable?: string | null
+): string[] {
+  let parsed: { color: string; sets: number }[] = [];
+  try {
+    if (Array.isArray(colorSets)) {
+      parsed = colorSets;
+    } else if (typeof colorSets === "string") {
+      parsed = JSON.parse(colorSets || "[]");
+    }
+  } catch {
+    parsed = [];
+  }
+
+  const active = parsed.filter((c) => Number(c.sets) > 0);
+  if (active.length === 0) return [];
+
+  return active.map((c, idx) => {
+    const letter = getColorAlphabetLetter(c.color, colorMapping, colorsAvailable, idx);
+    const sets = Number(c.sets) || 0;
+    return `${letter}: ${sets} ${sets === 1 ? "Set" : "Sets"}`;
+  });
+}

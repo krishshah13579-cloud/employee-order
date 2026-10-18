@@ -27,7 +27,7 @@ import {
   Save,
   Package,
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getColorAlphabetLetter } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf, sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { ORDER_STATUSES, type OrderData, type ColorSetEntry } from "@/lib/types";
@@ -831,24 +831,28 @@ export default function OrderInvoicePage() {
                     <td className="p-3 border-r border-gray-200 text-center font-mono">{idx + 1}</td>
                     <td className="p-3 border-r border-gray-200">
                       <div className="font-bold text-gray-900 text-sm">{it.productName}</div>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <div className="flex flex-col gap-1 mt-1.5">
                         {colorSetsParsed
                           ?.filter((cs) => cs.sets > 0)
                           .map((cs, cIdx) => {
-                            const colorInfo = getColorHex(cs.color);
+                            const letter = getColorAlphabetLetter(
+                              cs.color,
+                              it.product?.colorMapping || it.colorMapping,
+                              it.product?.colorsAvailable || it.colorsAvailable,
+                              cIdx
+                            );
                             return (
-                              <span
+                              <div
                                 key={cIdx}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-[11px] font-medium text-gray-800 border border-gray-200"
+                                className="inline-flex items-center gap-1.5 text-xs py-0.5"
                               >
-                                <span
-                                  className="w-2 h-2 rounded-full border border-black/15 shrink-0"
-                                  style={{ backgroundColor: colorInfo.hex }}
-                                />
-                                <span>
-                                  {cs.color}: <strong>{cs.sets} sets</strong>
+                                <span className="w-4 h-4 rounded bg-zinc-900 text-white font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
+                                  {letter}
                                 </span>
-                              </span>
+                                <span className="text-gray-900 font-semibold">
+                                  {letter}: {cs.sets} {Number(cs.sets) === 1 ? "Set" : "Sets"}
+                                </span>
+                              </div>
                             );
                           })}
                       </div>
@@ -957,6 +961,8 @@ export default function OrderInvoicePage() {
               id: it.id,
               productName: it.productName,
               colorSets: it.colorSets,
+              colorMapping: it.product?.colorMapping || it.colorMapping,
+              colorsAvailable: it.product?.colorsAvailable || it.colorsAvailable,
               sizeRatio: it.sizeRatio,
               pcsPerSet: it.pcsPerSet,
               totalSets: it.totalSets,
