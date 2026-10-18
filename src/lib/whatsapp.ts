@@ -81,9 +81,10 @@ export function generateOrderWhatsAppMessage(
     if (match && match[1]) resolvedTransport = match[1].trim();
   }
 
+  const custName = (order.customerName || "Customer").toUpperCase();
   return (
     `🧵 *KRISH CLOTHING CO.* — Order Form Confirmed\n\n` +
-    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `Dear *${custName}*,\n` +
     `Thank you for your wholesale order with Krish Clothing Co.! Your order has been confirmed.\n\n` +
     `📋 *Order Form Summary:*\n` +
     `• *Order No:* #${order.orderNumber}\n` +
@@ -126,9 +127,10 @@ export function generateTaxInvoiceWhatsAppMessage(
     if (match && match[1]) resolvedTransport = match[1].trim();
   }
 
+  const custName = (order.customerName || "Customer").toUpperCase();
   return (
     `📦 *KRISH CLOTHING CO.* — Tax Invoice (Order Ready for Dispatch)\n\n` +
-    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `Dear *${custName}*,\n` +
     `Your wholesale order is ready for dispatch! Please find your official Tax Invoice with final quantities and billing below.\n\n` +
     `📋 *Tax Invoice Details:*\n` +
     `• *Tax Invoice No:* #${invNo}\n` +
@@ -173,6 +175,8 @@ export function generateOrderStatusUpdateWhatsAppMessage(
   const creditTermText =
     creditDays > 0 ? `Payment every week & completed within ${creditDays} Days` : "Advance Payment";
 
+  const custName = (order.customerName || "Customer").toUpperCase();
+
   switch (status) {
     // 1. ORDER FORM SUBMISSION / CONFIRMED -> PDF ATTACHED
     case "Confirmed":
@@ -181,7 +185,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       const filename = `Order_Form_${cleanOrderNum}.pdf`;
       const msg =
         `🧵 *KRISH CLOTHING CO.* — Order Status: *CONFIRMED*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Thank you for your wholesale order with Krish Clothing Co.! Your order is now *CONFIRMED*.\n\n` +
         `📋 *Order Form Summary:*\n` +
         `• *Order No:* #${order.orderNumber}\n` +
@@ -215,7 +219,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
     case "In Production": {
       const msg =
         `🏭 *KRISH CLOTHING CO.* — Order Status: *IN PRODUCTION*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Your wholesale order *#${order.orderNumber}* status has been updated to: *IN PRODUCTION* at our manufacturing unit.\n\n` +
         `📋 *Order Progress:*\n` +
         `• *Order No:* #${order.orderNumber}\n` +
@@ -234,7 +238,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       const filename = `Tax_Invoice_${cleanTaxNum}.pdf`;
       const msg =
         `📦 *KRISH CLOTHING CO.* — Order Status: *READY FOR DISPATCH*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* has been processed, packed, and is *READY FOR DISPATCH*!\n\n` +
         `📋 *Tax Invoice & Pack Details:*\n` +
         `• *Invoice / Order No:* #${cleanTaxNum}\n` +
@@ -269,7 +273,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
       const filename = `Tax_Invoice_Dispatch_${cleanTaxNum}.pdf`;
       const msg =
         `🚚 *KRISH CLOTHING CO.* — Order Status: *DISPATCHED*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Great news! Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* status has been updated to: *DISPATCHED* from our Ahmedabad warehouse.\n\n` +
         `📋 *Dispatch & Billed Details:*\n` +
         `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +
@@ -300,7 +304,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
     case "Delivered": {
       const msg =
         `✅ *KRISH CLOTHING CO.* — Order Status: *DELIVERED*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Your wholesale order *#${order.taxInvoiceNumber || order.orderNumber}* status has been updated to: *DELIVERED*.\n\n` +
         `📋 *Delivery Details:*\n` +
         `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +
@@ -319,7 +323,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
     case "Cancelled": {
       const msg =
         `❌ *KRISH CLOTHING CO.* — Order Status: *CANCELLED*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Please note that wholesale order *#${order.orderNumber}* status has been updated to: *CANCELLED*.\n\n` +
         `📋 *Details:*\n` +
         `• *Order No:* #${order.orderNumber}\n` +
@@ -333,7 +337,7 @@ export function generateOrderStatusUpdateWhatsAppMessage(
     default: {
       const msg =
         `ℹ️ *KRISH CLOTHING CO.* — Order Status: *${status.toUpperCase()}*\n\n` +
-        `Dear *${order.customerName.toUpperCase()}*,\n` +
+        `Dear *${custName}*,\n` +
         `Your wholesale order *#${order.orderNumber}* status has been updated to: *${status}*.\n\n` +
         `• *Order No:* #${order.orderNumber}\n` +
         `• *Current Status:* *${status}*\n` +
@@ -366,12 +370,13 @@ export function generateCustomerOutstandingWhatsAppMessage(
       `\n\n`;
   }
 
+  const custName = (payload.customerName || "Customer").toUpperCase();
   return (
     `🔔 *KRISH CLOTHING CO.* — Weekly Payment Reminder\n\n` +
-    `Dear *${payload.customerName.toUpperCase()}*,\n` +
+    `Dear *${custName}*,\n` +
     `This is a gentle weekly reminder regarding your outstanding payment balance with Krish Clothing Co.\n\n` +
     `📊 *Statement of Account:*\n` +
-    `• *Firm Name:* ${payload.customerName.toUpperCase()}\n` +
+    `• *Firm Name:* ${custName}\n` +
     `• *City:* ${payload.city || "Ahmedabad"}\n` +
     `• *Total Billed:* ₹${payload.totalBilled.toLocaleString("en-IN")}\n` +
     `• *Total Paid / Received:* ₹${payload.totalPaid.toLocaleString("en-IN")}\n` +
@@ -402,10 +407,11 @@ export function generatePaymentReminderWhatsAppMessage(
   const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/orders/${order.orderNumber}/pdf?type=tax_invoice`;
   const orderDateObj = order.orderDate ? new Date(order.orderDate) : new Date();
   const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
+  const custName = (order.customerName || "Customer").toUpperCase();
 
   return (
     `🔔 *KRISH CLOTHING CO.* — Weekly Payment Reminder\n\n` +
-    `Dear *${order.customerName.toUpperCase()}*,\n` +
+    `Dear *${custName}*,\n` +
     `This is a gentle weekly reminder regarding your outstanding bill:\n\n` +
     `📋 *Bill Details:*\n` +
     `• *Invoice / Order No:* #${order.taxInvoiceNumber || order.orderNumber}\n` +

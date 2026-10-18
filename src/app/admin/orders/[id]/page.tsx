@@ -79,10 +79,16 @@ export default function OrderInvoicePage() {
     try {
       setLoading(true);
       const res = await fetch(`/api/orders/${id}`);
-      if (!res.ok) {
-        throw new Error(`Failed to load order invoice (Status ${res.status})`);
+      const text = await res.text();
+      let data: OrderData;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Failed to load order invoice (Invalid server response)`);
       }
-      const data: OrderData = await res.json();
+      if (!res.ok || !data) {
+        throw new Error((data as any)?.error || `Failed to load order invoice (Status ${res.status})`);
+      }
       setOrder(data);
 
       // Default format type: if status is Ready/Dispatched/Delivered or taxInvoiceNumber exists, default to TAX_INVOICE, else ORDER_FORM
@@ -104,7 +110,12 @@ export default function OrderInvoicePage() {
       setTaxInvoiceNoInput(defaultTaxNo);
 
       if (data.taxInvoiceDate) {
-        setTaxInvoiceDateInput(new Date(data.taxInvoiceDate).toISOString().split("T")[0]);
+        try {
+          const d = new Date(data.taxInvoiceDate);
+          if (!isNaN(d.getTime())) {
+            setTaxInvoiceDateInput(d.toISOString().split("T")[0]);
+          }
+        } catch {}
       }
 
       // Parse items for editing
@@ -192,9 +203,12 @@ export default function OrderInvoicePage() {
     }
     // Fetch active products list for adding products to order
     fetch("/api/products?active_only=1")
-      .then((res) => res.json())
-      .then((prods) => {
-        if (Array.isArray(prods)) setAvailableProducts(prods);
+      .then((res) => res.text())
+      .then((text) => {
+        try {
+          const prods = JSON.parse(text);
+          if (Array.isArray(prods)) setAvailableProducts(prods);
+        } catch {}
       })
       .catch(() => {});
   }, []);
@@ -309,6 +323,23 @@ export default function OrderInvoicePage() {
 
     try {
       setSavingOrderForm(true);
+
+      // Sanitize items payload to prevent sending huge base64 images/objects in `it.product`
+      const sanitizedItems = editOrderItems.map((it) => ({
+        id: it.id,
+        productId: Number(it.productId) || 0,
+        productName: it.productName || "Garment",
+        sizeRatio: it.sizeRatio || "Standard",
+        sizesList: it.sizesList || "Standard",
+        pcsPerSet: Number(it.pcsPerSet) || 5,
+        totalSets: Number(it.totalSets) || 0,
+        totalPcs: Number(it.totalPcs) || 0,
+        unitPrice: Number(it.unitPrice) || 0,
+        itemSubtotal: Number(it.itemSubtotal) || 0,
+        colorSets: Array.isArray(it.colorSets) ? it.colorSets : [],
+        notes: it.notes || null,
+      }));
+
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -319,14 +350,26 @@ export default function OrderInvoicePage() {
           customerPhone: editCustomerPhone,
           customerAddress: editCustomerAddress,
           customerGstPan: editCustomerGstPan,
-          items: editOrderItems,
+          items: sanitizedItems,
           notifyCustomer: sendWhatsAppOnSave,
           sendWhatsApp: sendWhatsAppOnSave,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update order");
+      // Safe text response parser to prevent Safari "The string did not match the expected pattern" DOMException
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Invalid server response format"
+            : `Server error (${res.status}): ${text.slice(0, 120) || res.statusText || "Failed to update order"}`
+        );
+      }
+
+      if (!res.ok) throw new Error(data.error || `Failed to update order (${res.status})`);
 
       toast("✅ Order Form updated successfully!", "success");
       setIsEditOrderModalOpen(false);
@@ -426,8 +469,18 @@ export default function OrderInvoicePage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update tax invoice");
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Invalid server response format"
+            : `Server error (${res.status}): ${text.slice(0, 120) || res.statusText || "Failed to save tax invoice"}`
+        );
+      }
+      if (!res.ok) throw new Error(data.error || `Failed to update tax invoice (${res.status})`);
 
       toast("✅ Tax Invoice generated with updated quantities & amount!", "success");
       setIsTaxInvoiceModalOpen(false);
@@ -464,8 +517,18 @@ export default function OrderInvoicePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update status");
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Invalid server response format"
+            : `Server error (${res.status}): ${text.slice(0, 120) || res.statusText || "Failed to update status"}`
+        );
+      }
+      if (!res.ok) throw new Error(data.error || `Failed to update status (${res.status})`);
 
       toast(`✅ Order status updated to "${newStatus}"!`, "success");
       loadOrder();
@@ -502,8 +565,18 @@ export default function OrderInvoicePage() {
           formatType: isTax ? "tax_invoice" : "order_form",
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process WhatsApp");
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Invalid server response format"
+            : `Server error (${res.status}): ${text.slice(0, 120) || res.statusText || "Failed to process WhatsApp"}`
+        );
+      }
+      if (!res.ok) throw new Error(data.error || `Failed to process WhatsApp (${res.status})`);
 
       if (data.automated) {
         toast(

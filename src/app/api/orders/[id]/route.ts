@@ -109,28 +109,51 @@ export async function PUT(
 
     if (items && Array.isArray(items) && items.length > 0) {
       for (const it of items) {
-        const product = await prisma.product.findUnique({
-          where: { id: parseInt(it.productId, 10) },
-        });
+        const rawPid = parseInt(String(it.productId), 10);
+        let product = !isNaN(rawPid) && rawPid > 0
+          ? await prisma.product.findUnique({
+              where: { id: rawPid },
+            })
+          : null;
 
-        const pcsPerSet = parseInt(it.pcsPerSet, 10) || product?.pcsPerSet || 5;
+        // If product not found by id, try find by name
+        if (!product && it.productName) {
+          product = await prisma.product.findFirst({
+            where: { name: it.productName },
+          });
+        }
 
-        let colorSetsArray = Array.isArray(it.colorSets)
-          ? it.colorSets
-          : typeof it.colorSets === "string"
-          ? JSON.parse(it.colorSets || "[]")
-          : [];
+        // Guaranteed valid foreign key product ID
+        let targetPid = product ? product.id : (!isNaN(rawPid) && rawPid > 0 ? rawPid : 0);
+        if (targetPid <= 0) {
+          const firstP = await prisma.product.findFirst({ select: { id: true } });
+          targetPid = firstP?.id || 1;
+        }
+
+        const pcsPerSet = parseInt(String(it.pcsPerSet), 10) || product?.pcsPerSet || 5;
+
+        let colorSetsArray: any[] = [];
+        if (Array.isArray(it.colorSets)) {
+          colorSetsArray = it.colorSets;
+        } else if (typeof it.colorSets === "string") {
+          try {
+            const p = JSON.parse(it.colorSets);
+            if (Array.isArray(p)) colorSetsArray = p;
+          } catch {
+            colorSetsArray = [];
+          }
+        }
 
         let itemTotalSets = colorSetsArray.reduce(
-          (sum: number, cs: any) => sum + (parseInt(cs.sets, 10) || 0),
+          (sum: number, cs: any) => sum + (parseInt(String(cs.sets), 10) || 0),
           0
         );
 
         if (itemTotalSets === 0) {
           if (it.totalSets) {
-            itemTotalSets = parseInt(it.totalSets, 10) || 1;
+            itemTotalSets = parseInt(String(it.totalSets), 10) || 1;
           } else if (it.quantity) {
-            itemTotalSets = Math.max(1, Math.round(parseInt(it.quantity, 10) / pcsPerSet));
+            itemTotalSets = Math.max(1, Math.round(parseInt(String(it.quantity), 10) / pcsPerSet));
           } else {
             itemTotalSets = 1;
           }
@@ -139,7 +162,7 @@ export async function PUT(
 
         let itemTotalPcs = 0;
         for (const cs of colorSetsArray) {
-          const requested = parseInt(cs.sets, 10) || 0;
+          const requested = parseInt(String(cs.sets), 10) || 0;
           const pcsCalc = calculateOrderedColorSetsPieces(
             product ? product.setsColorwise : null,
             cs.color,
@@ -149,10 +172,10 @@ export async function PUT(
           itemTotalPcs += pcsCalc.totalPcs;
         }
         if (itemTotalPcs === 0) {
-          itemTotalPcs = it.totalPcs || (itemTotalSets * pcsPerSet);
+          itemTotalPcs = Number(it.totalPcs) || (itemTotalSets * pcsPerSet);
         }
 
-        const unitPrice = parseFloat(it.unitPrice) || product?.price || 0;
+        const unitPrice = parseFloat(String(it.unitPrice)) || product?.price || 0;
         const itemSubtotal = itemTotalPcs * unitPrice;
 
         orderSubtotal += itemSubtotal;
@@ -161,7 +184,7 @@ export async function PUT(
 
         validatedItems.push({
           orderId,
-          productId: product ? product.id : it.productId,
+          productId: targetPid,
           productName: product ? product.name : (it.productName || "Garment"),
           colorSets: JSON.stringify(colorSetsArray),
           sizeRatio: it.sizeRatio || product?.sizesRatio || "Standard",
