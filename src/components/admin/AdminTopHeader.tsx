@@ -26,6 +26,7 @@ export default function AdminTopHeader({
     if (pathname === "/admin/products/new") return "Add New Wholesale Garment";
     if (pathname.includes("/admin/products/") && pathname.endsWith("/edit")) return "Edit Wholesale Garment";
     if (pathname.startsWith("/admin/products")) return "Product Catalog Management";
+    if (pathname.startsWith("/admin/categories")) return "Garment Categories";
     if (pathname === "/admin/customers/new") return "Add Customer Shop";
     if (pathname.includes("/admin/customers/") && pathname.endsWith("/edit")) return "Edit Customer Shop";
     if (pathname.startsWith("/admin/customers")) return "Customer Shops & Retailers";
@@ -35,7 +36,12 @@ export default function AdminTopHeader({
     if (pathname === "/admin/orders/new") return "Book New Wholesale Order";
     if (pathname.startsWith("/admin/orders/")) return "Wholesale Order Invoice";
     if (pathname.startsWith("/admin/orders")) return "Garment Orders & Invoices";
+    if (pathname.startsWith("/admin/sales")) return "Sales Register & Invoices";
+    if (pathname.startsWith("/admin/outstanding")) return "Customer Outstanding & Bills";
+    if (pathname.startsWith("/admin/returns")) return "Sales Returns & Credits";
     if (pathname.startsWith("/admin/stock")) return "Stock & Inventory Control";
+    if (pathname.startsWith("/admin/reports")) return "Sales & Financial Reports";
+    if (pathname.startsWith("/admin/whatsapp")) return "WhatsApp Business Gateway";
     return "Control Center";
   };
 
@@ -52,15 +58,16 @@ export default function AdminTopHeader({
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200/90 shadow-2xs">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
         {/* Left: Mobile hamburger & Breadcrumbs */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
           {onToggleMobileMenu && (
             <button
               type="button"
               onClick={onToggleMobileMenu}
-              className="md:hidden p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-              aria-label="Toggle menu"
+              className="md:hidden p-2.5 -ml-1.5 text-gray-700 hover:text-black hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors cursor-pointer touch-manipulation shrink-0"
+              aria-label="Toggle navigation menu"
+              title="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           )}
 

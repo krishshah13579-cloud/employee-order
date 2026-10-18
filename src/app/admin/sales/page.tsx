@@ -25,7 +25,6 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
-import { Sidebar } from "@/components/admin/Sidebar";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
 import { Modal } from "@/components/ui/Modal";
@@ -494,12 +493,9 @@ Thank you for your business with IQ TROUSERS!`;
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar activePage="sales" />
-
-      <main className="flex-1 ml-[260px] p-8 max-w-7xl mx-auto space-y-6">
-        {/* Top Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
               <BadgePercent size={14} /> Sales Register & Invoicing
@@ -1349,7 +1345,6 @@ Thank you for your business with IQ TROUSERS!`;
             </form>
           </Modal>
         )}
-      </main>
     </div>
   );
 }

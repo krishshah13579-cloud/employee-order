@@ -19,6 +19,7 @@ import {
   LogOut,
   ExternalLink,
   BadgePercent,
+  X,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -136,79 +137,90 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
   };
 
   return (
-    <div className="flex flex-col h-full justify-between select-none">
-      <div>
-        {/* Brand Header */}
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-          <Link
-            href="/admin"
-            onClick={onItemClick}
-            className="flex items-center gap-3 group"
-          >
-            <div className="w-9 h-9 bg-white rounded-xl p-1 shadow-xs border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
-              <img
-                src="/images/iq-logo.jpg"
-                alt="IQ Trousers"
-                className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-              />
-            </div>
-            <div>
-              <span className="block text-xs font-black tracking-wider text-zinc-950 uppercase leading-tight">
-                IQ TROUSERS
-              </span>
-              <span className="block text-[9px] font-bold text-orange-600 uppercase tracking-widest leading-none mt-0.5">
-                Control Center
-              </span>
-            </div>
-          </Link>
+    <div className="flex flex-col h-full bg-white select-none overflow-hidden">
+      {/* Brand Header */}
+      <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+        <Link
+          href="/admin"
+          onClick={onItemClick}
+          className="flex items-center gap-3 group min-w-0"
+        >
+          <div className="w-9 h-9 bg-white rounded-xl p-1 shadow-xs border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
+            <img
+              src="/images/iq-logo.jpg"
+              alt="IQ Trousers"
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+            />
+          </div>
+          <div className="min-w-0">
+            <span className="block text-xs font-black tracking-wider text-zinc-950 uppercase leading-tight truncate">
+              IQ TROUSERS
+            </span>
+            <span className="block text-[9px] font-bold text-orange-600 uppercase tracking-widest leading-none mt-0.5">
+              Control Center
+            </span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-amber-400 tracking-wider uppercase">
             Admin
           </span>
-        </div>
-
-        {/* Navigation Section */}
-        <div className="p-3">
-          <p className="px-3 pt-2 pb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-            Wholesale Management
-          </p>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onItemClick}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-zinc-950 text-white shadow-xs"
-                      : "text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100/80"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon
-                      className={`w-4 h-4 ${
-                        isActive ? "text-amber-400" : "text-zinc-400 group-hover:text-zinc-950"
-                      }`}
-                    />
-                    <span>{item.name}</span>
-                  </div>
-                  {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+          {onItemClick && (
+            <button
+              type="button"
+              onClick={onItemClick}
+              className="md:hidden p-1.5 text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              aria-label="Close menu"
+              title="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Scrollable Navigation Section */}
+      <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+        <p className="px-3 pt-1 pb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          Wholesale Management
+        </p>
+        <nav className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onItemClick}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-zinc-950 text-white shadow-xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100/80"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-4 h-4 ${
+                      isActive ? "text-amber-400" : "text-zinc-400 group-hover:text-zinc-950"
+                    }`}
+                  />
+                  <span>{item.name}</span>
+                </div>
+                {isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
       {/* Footer User & Security Card */}
-      <div className="p-3 border-t border-gray-100 space-y-2">
+      <div className="p-3 border-t border-gray-100 space-y-2 shrink-0 bg-white">
         {/* User Card */}
         <div className="p-3 rounded-xl bg-zinc-50 border border-gray-200/80">
           <div className="flex items-center gap-2.5 mb-2">

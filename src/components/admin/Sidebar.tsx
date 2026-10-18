@@ -121,7 +121,7 @@ export function Sidebar({ activePage }: SidebarProps) {
   };
 
   return (
-    <aside className="w-[260px] min-w-[260px] h-screen fixed left-0 top-0 bg-slate-950 text-white z-40 flex flex-col border-r border-slate-800/80 select-none shadow-2xl">
+    <aside className="hidden md:flex w-[260px] min-w-[260px] h-screen fixed left-0 top-0 bg-slate-950 text-white z-40 flex-col border-r border-slate-800/80 select-none shadow-2xl">
       {/* Brand Header with IQ TROUSERS Logo */}
       <div className="p-5 border-b border-slate-800/80 bg-slate-900/40">
         <Link
