@@ -136,7 +136,9 @@ export default function AdminSalesPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerGstPan, setCustomerGstPan] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
-  const [businessType, setBusinessType] = useState<"RETAILER" | "WHOLESALER" | "CASH">("CASH");
+  const [businessType, setBusinessType] = useState<
+    "RETAILER" | "WHOLESALER" | "CASH" | "RETAILER WITH SPECIAL DISCOUNT"
+  >("CASH");
   const [creditDays, setCreditDays] = useState(0);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
@@ -155,32 +157,6 @@ export default function AdminSalesPage() {
       itemSubtotal: number;
     }[]
   >([]);
-
-  // Import Previous Bills State
-  const [importingPastBills, setImportingPastBills] = useState(false);
-
-  const handleImportPastBills = async () => {
-    if (
-      !confirm(
-        "Import all previous bills (Invoices 1 to 39) into Sales Register & Orders?\n\n- Customers will be added/linked automatically.\n- Live inventory stock will NOT be deducted.\n- WhatsApp messages will NOT be sent."
-      )
-    ) {
-      return;
-    }
-
-    setImportingPastBills(true);
-    try {
-      const res = await fetch("/api/admin/import-invoices", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to import previous bills");
-      toast(`✅ ${data.message}`, "success");
-      loadInvoices();
-    } catch (err: any) {
-      toast(err.message || "Failed to import previous bills", "error");
-    } finally {
-      setImportingPastBills(false);
-    }
-  };
 
   // Load Sales Invoices
   const loadInvoices = async () => {
@@ -550,17 +526,6 @@ Thank you for your business with IQ TROUSERS!`;
             >
               <Plus size={15} />
               <span>+ New Credit Invoice</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={importingPastBills}
-              onClick={handleImportPastBills}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
-              title="Upload all previous bills (1 to 39) without deducting live stock"
-            >
-              {importingPastBills ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-              <span>{importingPastBills ? "Uploading Bills..." : "Upload Bills 1-39"}</span>
             </button>
 
             <button

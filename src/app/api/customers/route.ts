@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendNewCustomerNotification } from "@/lib/email";
+import { cookies } from "next/headers";
+import { getAdminSession, verifyToken } from "@/lib/auth-security";
+import { isEmployeeTeamLeader } from "@/lib/time";
+
+async function canUserAssignSpecialDiscount(request: NextRequest): Promise<boolean> {
+  // Check Admin
+  const admin = await getAdminSession(request);
+  if (admin) return true;
+
+  // Check Team Leader (T.L.)
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("garmentpro_emp_session");
+  if (!sessionCookie?.value) return false;
+
+  const session = verifyToken<{ id: number; name: string }>(sessionCookie.value);
+  if (!session?.id) return false;
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: session.id },
+    select: { id: true, designation: true, isTeamLeader: true, isActive: true },
+  });
+
+  if (!employee || !employee.isActive) return false;
+  return isEmployeeTeamLeader(employee);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,11 +96,22 @@ export async function POST(request: NextRequest) {
     }
 
     const rawBusinessType = (body.businessType || "").trim().toUpperCase();
-    if (!rawBusinessType || (rawBusinessType !== "RETAILER" && rawBusinessType !== "WHOLESALER")) {
+    const validTypes = ["RETAILER", "WHOLESALER", "RETAILER WITH SPECIAL DISCOUNT"];
+    if (!rawBusinessType || !validTypes.includes(rawBusinessType)) {
       return NextResponse.json(
-        { error: "Business Type is mandatory. Please select either Retailer or Wholesaler." },
+        { error: "Business Type is mandatory. Please select Retailer, Wholesaler, or Retailer with Special Discount." },
         { status: 400 }
       );
+    }
+
+    if (rawBusinessType === "RETAILER WITH SPECIAL DISCOUNT") {
+      const allowed = await canUserAssignSpecialDiscount(request);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Team Leaders (T.L.) and Admins can register customers under 'Retailer with Special Discount'." },
+          { status: 403 }
+        );
+      }
     }
     const businessType = rawBusinessType;
     const creditDays = parseInt(body.creditDays, 10) || 0;

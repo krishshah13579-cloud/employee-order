@@ -234,6 +234,7 @@ export default function CustomerForm({
             >
               <option value="RETAILER">Retailer</option>
               <option value="WHOLESALER">Wholesaler</option>
+              <option value="RETAILER WITH SPECIAL DISCOUNT">Retailer with Special Discount</option>
             </select>
           </div>
 

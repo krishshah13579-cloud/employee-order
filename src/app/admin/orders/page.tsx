@@ -45,32 +45,6 @@ export default function OrdersPage() {
   // Delete Order Modal
   const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
 
-  // Import Previous Bills State
-  const [importingPastBills, setImportingPastBills] = useState(false);
-
-  const handleImportPastBills = async () => {
-    if (
-      !confirm(
-        "Import all previous bills (Invoices 1 to 39) into Orders & Sales Register?\n\n- Customers will be added/linked automatically.\n- Live inventory stock will NOT be deducted.\n- WhatsApp messages will NOT be sent."
-      )
-    ) {
-      return;
-    }
-
-    setImportingPastBills(true);
-    try {
-      const res = await fetch("/api/admin/import-invoices", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to import previous bills");
-      toast(`✅ ${data.message}`, "success");
-      fetchOrders();
-    } catch (err: any) {
-      toast(err.message || "Failed to import previous bills", "error");
-    } finally {
-      setImportingPastBills(false);
-    }
-  };
-
   useEffect(() => {
     fetch("/api/auth/check")
       .then((r) => r.json())
@@ -167,17 +141,6 @@ export default function OrdersPage() {
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            type="button"
-            disabled={importingPastBills}
-            onClick={handleImportPastBills}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-            title="Upload all previous bills (1 to 39) without deducting live stock"
-          >
-            {importingPastBills ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-            <span>{importingPastBills ? "Uploading Bills..." : "Upload Bills 1-39"}</span>
-          </button>
-
           {isSuperAdmin && (
             <Link
               href="/admin/orders/new"

@@ -34,8 +34,10 @@ export default function CustomersPage() {
   const [previewCardUrl, setPreviewCardUrl] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Tab filter: all | credit | 45days | advance
-  const [activeCreditTab, setActiveCreditTab] = useState<"all" | "credit" | "45days" | "advance">("all");
+  // Tab filter: all | credit | 45days | advance | specialDiscount
+  const [activeCreditTab, setActiveCreditTab] = useState<
+    "all" | "credit" | "45days" | "advance" | "specialDiscount"
+  >("all");
 
   // Super Admin Credit Days Quick-Edit Modal state
   const [editingCreditCustomer, setEditingCreditCustomer] = useState<CustomerData | null>(null);
@@ -127,9 +129,12 @@ export default function CustomersPage() {
     }
   };
 
-  // Filter customers by active Credit Days tab
+  // Filter customers by active Credit Days / Business Type tab
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
+      if (activeCreditTab === "specialDiscount") {
+        return c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+      }
       const days = c.creditDays || 0;
       if (activeCreditTab === "credit") return days > 0;
       if (activeCreditTab === "45days") return days === 45;
@@ -208,6 +213,16 @@ export default function CustomersPage() {
             }`}
           >
             Advance Payment ({customers.filter((c) => (c.creditDays || 0) === 0).length})
+          </button>
+          <button
+            onClick={() => setActiveCreditTab("specialDiscount")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              activeCreditTab === "specialDiscount"
+                ? "bg-teal-700 text-white shadow-xs"
+                : "bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200"
+            }`}
+          >
+            Special Discount ({customers.filter((c) => c.businessType === "RETAILER WITH SPECIAL DISCOUNT").length})
           </button>
         </div>
 
@@ -308,6 +323,13 @@ export default function CustomersPage() {
                         {isWholesaler ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                             WHOLESALER
+                          </span>
+                        ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
+                            title="Retailer with Special Discount"
+                          >
+                            RETAILER (SPL DISC)
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">

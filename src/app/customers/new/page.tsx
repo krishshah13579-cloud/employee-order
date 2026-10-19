@@ -31,6 +31,8 @@ import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
 import { compressImageFile } from "@/lib/imageCompression";
 import { scanVisitingCard, type ExtractedCardData } from "@/lib/visitingCardOcr";
+import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { isEmployeeTeamLeader } from "@/lib/time";
 
 const INDIAN_STATES = [
   "Gujarat",
@@ -62,6 +64,20 @@ function CustomerRegistrationContent() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/orders/new";
   const { toast } = useToast();
+  const { employee } = useEmployee();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/check")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.authenticated) setIsAdmin(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isTL = isEmployeeTeamLeader(employee);
+  const canSetSpecialDiscount = isAdmin || isTL;
 
   // File input refs for mobile camera and gallery upload
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +96,9 @@ function CustomerRegistrationContent() {
   const [state, setState] = useState("Gujarat");
   const [transportName, setTransportName] = useState("");
   const [visitingCardUrl, setVisitingCardUrl] = useState("");
-  const [businessType, setBusinessType] = useState<"RETAILER" | "WHOLESALER">("RETAILER");
+  const [businessType, setBusinessType] = useState<
+    "RETAILER" | "WHOLESALER" | "RETAILER WITH SPECIAL DISCOUNT"
+  >("RETAILER");
   const [creditDays, setCreditDays] = useState<number | "">(0);
 
   // Tracking which fields were auto-filled by OCR
@@ -590,7 +608,7 @@ function CustomerRegistrationContent() {
                   </span>
                 </div>
 
-                {/* Mandatory Business Type: Retailer or Wholesaler */}
+                {/* Mandatory Business Type: Retailer, Wholesaler, or Retailer with Special Discount (T.L. / Admin only) */}
                 <div className="space-y-2 p-4 bg-slate-50/90 rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -599,7 +617,7 @@ function CustomerRegistrationContent() {
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`grid grid-cols-1 ${canSetSpecialDiscount ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
                     <button
                       type="button"
                       onClick={() => setBusinessType("RETAILER")}
@@ -629,6 +647,29 @@ function CustomerRegistrationContent() {
                         <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
                       )}
                     </button>
+
+                    {/* Retailer with Special Discount: ONLY shown to Team Leader (T.L.) or Admin */}
+                    {canSetSpecialDiscount && (
+                      <button
+                        type="button"
+                        onClick={() => setBusinessType("RETAILER WITH SPECIAL DISCOUNT")}
+                        className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                          businessType === "RETAILER WITH SPECIAL DISCOUNT"
+                            ? "border-emerald-600 bg-emerald-50/90 text-emerald-950 shadow-xs ring-1 ring-emerald-500"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-black text-sm text-emerald-950">Retailer (Spl Disc)</div>
+                          <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+                            {isTL ? "Team Leader (T.L.)" : "Admin Only"}
+                          </div>
+                        </div>
+                        {businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 

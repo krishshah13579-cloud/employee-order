@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, requireAdmin } from "@/lib/auth-security";
+import { getAdminSession, requireAdmin, verifyToken } from "@/lib/auth-security";
+import { cookies } from "next/headers";
+import { isEmployeeTeamLeader } from "@/lib/time";
+
+async function canUserAssignSpecialDiscount(request: NextRequest): Promise<boolean> {
+  // Check Admin
+  const admin = await getAdminSession(request);
+  if (admin) return true;
+
+  // Check Team Leader (T.L.)
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("garmentpro_emp_session");
+  if (!sessionCookie?.value) return false;
+
+  const session = verifyToken<{ id: number; name: string }>(sessionCookie.value);
+  if (!session?.id) return false;
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: session.id },
+    select: { id: true, designation: true, isTeamLeader: true, isActive: true },
+  });
+
+  if (!employee || !employee.isActive) return false;
+  return isEmployeeTeamLeader(employee);
+}
 
 export async function GET(
   request: NextRequest,
@@ -54,7 +78,17 @@ export async function PUT(
     if (body.contactPerson !== undefined) updateData.contactPerson = body.contactPerson;
 
     if (body.businessType) {
-      updateData.businessType = String(body.businessType).trim().toUpperCase();
+      const bType = String(body.businessType).trim().toUpperCase();
+      if (bType === "RETAILER WITH SPECIAL DISCOUNT") {
+        const allowed = await canUserAssignSpecialDiscount(request);
+        if (!allowed) {
+          return NextResponse.json(
+            { error: "Permission Denied: Only Team Leaders (T.L.) and Admins can set 'Retailer with Special Discount'." },
+            { status: 403 }
+          );
+        }
+      }
+      updateData.businessType = bType;
     }
 
     if (body.contactPersons) {

@@ -1088,6 +1088,10 @@ export default function OrderFormPage() {
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold">
                         <span>Wholesaler</span>
                       </span>
+                    ) : selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-900 border border-teal-300 rounded-xl text-xs font-bold">
+                        <span>Retailer (Special Discount)</span>
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
                         <span>Retailer</span>
