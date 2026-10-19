@@ -3,37 +3,50 @@ import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const dwarkadhishList = await prisma.customer.findMany({
-      where: {
-        shopName: {
-          contains: "DWARKADHISH",
+    const allCustomers = await prisma.customer.findMany({
+      select: {
+        id: true,
+        shopName: true,
+        phoneNumber: true,
+        gstPanNo: true,
+        city: true,
+        _count: {
+          select: {
+            orders: true,
+            salesInvoices: true,
+          },
         },
       },
-      include: {
-        orders: true,
-        payments: true,
-        salesReturns: true,
+      orderBy: {
+        id: "asc",
       },
     });
 
-    const sheetalList = await prisma.customer.findMany({
+    const dwarkadhishCandidates = await prisma.customer.findMany({
       where: {
         OR: [
-          { shopName: { contains: "EETAL" } },
-          { gstPanNo: { contains: "24AJNPD8327K1ZZ" } },
+          { gstPanNo: { contains: "GGLPS3886R" } },
+          { phoneNumber: { contains: "8128756632" } },
+          { shopName: { contains: "DWARKA" } },
+          { shopName: { contains: "CLOTHING" } },
         ],
       },
-      include: {
-        orders: true,
-        payments: true,
-        salesReturns: true,
+      select: {
+        id: true,
+        shopName: true,
+        phoneNumber: true,
+        gstPanNo: true,
+        city: true,
+        _count: {
+          select: {
+            orders: true,
+            salesInvoices: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json({
-      dwarkadhishList,
-      sheetalList,
-    });
+    return NextResponse.json({ allCustomers, dwarkadhishCandidates });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -42,65 +55,70 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // 1. DWARKADHISH CLOTHING:
-    // Find all DWARKADHISH customers
-    const dwarkadhishCustomers = await prisma.customer.findMany({
+    // Find the first account (having GST GGLPS3886R, phone 8128756632, or 0 bills)
+    const firstDwarkadhish = await prisma.customer.findFirst({
       where: {
-        shopName: {
-          contains: "DWARKADHISH",
-        },
-      },
-      include: {
-        orders: true,
-        payments: true,
-        salesReturns: true,
-      },
-      orderBy: {
-        id: "asc",
+        OR: [
+          { gstPanNo: { contains: "GGLPS3886R" } },
+          { phoneNumber: { contains: "8128756632" } },
+          {
+            AND: [
+              { shopName: { contains: "DWARKADHISH" } },
+              { orders: { none: {} } },
+              { salesInvoices: { none: {} } },
+            ],
+          },
+        ],
       },
     });
 
     let removedFirstDwarkadhish = null;
     let retainedDwarkadhish = null;
 
-    if (dwarkadhishCustomers.length >= 2) {
-      // First one is the older one with 0 bills (or phone 8128756632)
-      const firstDwarkadhish = dwarkadhishCustomers[0];
-      const secondDwarkadhish = dwarkadhishCustomers[1];
-
-      // Move any phone number or GST from first to second if second is missing them
-      await prisma.customer.update({
-        where: { id: secondDwarkadhish.id },
-        data: {
-          phoneNumber: secondDwarkadhish.phoneNumber || firstDwarkadhish.phoneNumber || "8128756632",
-          gstPanNo: secondDwarkadhish.gstPanNo || firstDwarkadhish.gstPanNo || "GGLPS3886R",
+    if (firstDwarkadhish) {
+      // Find the active DWARKADHISH with the 3 bills
+      const activeDwarkadhish = await prisma.customer.findFirst({
+        where: {
+          shopName: { contains: "DWARKADHISH" },
+          id: { not: firstDwarkadhish.id },
         },
       });
 
-      // Move any orders / payments from first to second if any exist
-      await prisma.order.updateMany({
-        where: { customerId: firstDwarkadhish.id },
-        data: { customerId: secondDwarkadhish.id },
-      });
-      await prisma.salesInvoice.updateMany({
-        where: { customerId: firstDwarkadhish.id },
-        data: { customerId: secondDwarkadhish.id },
-      });
-      await prisma.payment.updateMany({
-        where: { customerId: firstDwarkadhish.id },
-        data: { customerId: secondDwarkadhish.id },
-      });
-      await prisma.salesReturn.updateMany({
-        where: { customerId: firstDwarkadhish.id },
-        data: { customerId: secondDwarkadhish.id },
-      });
+      if (activeDwarkadhish) {
+        // Transfer details to the retained account
+        await prisma.customer.update({
+          where: { id: activeDwarkadhish.id },
+          data: {
+            phoneNumber: activeDwarkadhish.phoneNumber || firstDwarkadhish.phoneNumber || "8128756632",
+            gstPanNo: firstDwarkadhish.gstPanNo || "GGLPS3886R",
+          },
+        });
 
-      // Delete the first Dwarkadhish customer
+        // Reassign any remaining orders or invoices just in case
+        await prisma.order.updateMany({
+          where: { customerId: firstDwarkadhish.id },
+          data: { customerId: activeDwarkadhish.id },
+        });
+        await prisma.salesInvoice.updateMany({
+          where: { customerId: firstDwarkadhish.id },
+          data: { customerId: activeDwarkadhish.id },
+        });
+        await prisma.payment.updateMany({
+          where: { customerId: firstDwarkadhish.id },
+          data: { customerId: activeDwarkadhish.id },
+        });
+        await prisma.salesReturn.updateMany({
+          where: { customerId: firstDwarkadhish.id },
+          data: { customerId: activeDwarkadhish.id },
+        });
+
+        retainedDwarkadhish = activeDwarkadhish;
+      }
+
       await prisma.customer.delete({
         where: { id: firstDwarkadhish.id },
       });
-
       removedFirstDwarkadhish = firstDwarkadhish;
-      retainedDwarkadhish = secondDwarkadhish;
     }
 
     // 2. SHEETAL FAMILY SHOWROOM -> Merge into SHEETAL SELECTION and remove SHEETAL FAMILY SHOWROOM
