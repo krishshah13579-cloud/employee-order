@@ -17,6 +17,7 @@ import {
   Clock,
   Edit,
   Edit3,
+  Receipt,
   Download,
   Check,
   X,
@@ -82,17 +83,37 @@ export default function OrderInvoicePage() {
       }
       setOrder(data);
 
-      // Default format type: if status is Ready/Dispatched/Delivered or taxInvoiceNumber exists, default to TAX_INVOICE, else ORDER_FORM
-      if (
+      // Format type: check URL parameter ?format= or auto-determine from data
+      let initialFormat: "ORDER_FORM" | "TAX_INVOICE" = "ORDER_FORM";
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const formatParam = urlParams.get("format");
+        if (formatParam === "order-form" || formatParam === "order_form" || formatParam === "orders") {
+          initialFormat = "ORDER_FORM";
+        } else if (formatParam === "tax-invoice" || formatParam === "tax_invoice" || formatParam === "invoices") {
+          initialFormat = "TAX_INVOICE";
+        } else if (
+          data.taxInvoiceNumber ||
+          data.status === "Ready" ||
+          data.status === "Dispatched" ||
+          data.status === "Delivered"
+        ) {
+          initialFormat = "TAX_INVOICE";
+        }
+
+        if (urlParams.get("editInvoice") === "true") {
+          setIsTaxInvoiceModalOpen(true);
+        }
+      } else if (
         data.taxInvoiceNumber ||
         data.status === "Ready" ||
         data.status === "Dispatched" ||
         data.status === "Delivered"
       ) {
-        setFormatType("TAX_INVOICE");
-      } else {
-        setFormatType("ORDER_FORM");
+        initialFormat = "TAX_INVOICE";
       }
+
+      setFormatType(initialFormat);
 
       // Initialize Tax Invoice Form Fields
       if (data.taxInvoiceNumber) {
@@ -454,24 +475,26 @@ export default function OrderInvoicePage() {
           <button
             type="button"
             onClick={() => setFormatType("ORDER_FORM")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
               formatType === "ORDER_FORM"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            1. Order Form (Booked)
+            <FileText size={13} className={formatType === "ORDER_FORM" ? "text-blue-600" : "text-slate-400"} />
+            <span>1. Order Form (Booked)</span>
           </button>
           <button
             type="button"
             onClick={() => setFormatType("TAX_INVOICE")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
               formatType === "TAX_INVOICE"
-                ? "bg-orange-600 text-white shadow-xs"
+                ? "bg-orange-600 text-white shadow-xs font-black"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            <span>2. Tax Invoice (Ready)</span>
+            <Receipt size={13} className={formatType === "TAX_INVOICE" ? "text-white" : "text-slate-400"} />
+            <span>2. Final Invoices (Tax Invoice)</span>
             {order.taxInvoiceNumber && (
               <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
             )}

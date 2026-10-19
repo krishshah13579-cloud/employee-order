@@ -66,9 +66,15 @@ const navItems = [
     exact: false,
   },
   {
-    name: "Orders",
+    name: "Order Forms",
     href: "/admin/orders",
     icon: ShoppingCart,
+    exact: false,
+  },
+  {
+    name: "Final Invoices",
+    href: "/admin/invoices",
+    icon: Receipt,
     exact: false,
   },
   {

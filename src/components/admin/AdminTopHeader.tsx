@@ -34,8 +34,9 @@ export default function AdminTopHeader({
     if (pathname.includes("/admin/employees/") && pathname.endsWith("/edit")) return "Edit Employee";
     if (pathname.startsWith("/admin/employees")) return "Employee Management";
     if (pathname === "/admin/orders/new") return "Book New Wholesale Order";
-    if (pathname.startsWith("/admin/orders/")) return "Wholesale Order Invoice";
-    if (pathname.startsWith("/admin/orders")) return "Garment Orders & Invoices";
+    if (pathname.startsWith("/admin/orders/")) return "Wholesale Order Form & Invoice";
+    if (pathname.startsWith("/admin/invoices")) return "Final Tax Invoices (GST 5%)";
+    if (pathname.startsWith("/admin/orders")) return "Wholesale Order Forms";
     if (pathname.startsWith("/admin/sales")) return "Sales Register & Invoices";
     if (pathname.startsWith("/admin/outstanding")) return "Customer Outstanding & Bills";
     if (pathname.startsWith("/admin/returns")) return "Sales Returns & Credits";
