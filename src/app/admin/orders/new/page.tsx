@@ -204,7 +204,8 @@ export default function NewOrderPage() {
   const orderTotalSets = orderItems.reduce((acc, it) => acc + getItemTotalSets(it), 0);
   const orderTotalPcs = orderItems.reduce((acc, it) => acc + getItemTotalPcs(it), 0);
   const orderSubtotal = orderItems.reduce((acc, it) => acc + getItemSubtotal(it), 0);
-  const orderGst = Math.round(orderSubtotal * 0.05);
+  const isWithoutGst = activeCustomer?.businessType === "WHOLESALER WITHOUT GST";
+  const orderGst = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05);
   const orderGrandTotal = Math.round(orderSubtotal + orderGst);
 
   const handleSubmit = async (e: React.FormEvent) => {

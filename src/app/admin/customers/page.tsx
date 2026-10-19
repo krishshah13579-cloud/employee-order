@@ -324,6 +324,13 @@ export default function CustomersPage() {
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                             WHOLESALER
                           </span>
+                        ) : c.businessType === "WHOLESALER WITHOUT GST" ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300"
+                            title="Wholesaler Without GST"
+                          >
+                            WHOLESALER (NO GST)
+                          </span>
                         ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"

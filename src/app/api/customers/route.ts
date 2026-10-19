@@ -96,12 +96,22 @@ export async function POST(request: NextRequest) {
     }
 
     const rawBusinessType = (body.businessType || "").trim().toUpperCase();
-    const validTypes = ["RETAILER", "WHOLESALER", "RETAILER WITH SPECIAL DISCOUNT"];
+    const validTypes = ["RETAILER", "WHOLESALER", "WHOLESALER WITHOUT GST", "RETAILER WITH SPECIAL DISCOUNT"];
     if (!rawBusinessType || !validTypes.includes(rawBusinessType)) {
       return NextResponse.json(
-        { error: "Business Type is mandatory. Please select Retailer, Wholesaler, or Retailer with Special Discount." },
+        { error: "Business Type is mandatory. Please select Retailer, Wholesaler, Wholesaler Without GST, or Retailer with Special Discount." },
         { status: 400 }
       );
+    }
+
+    if (rawBusinessType === "WHOLESALER WITHOUT GST") {
+      const admin = await getAdminSession(request);
+      if (!admin) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Admin can create customers under 'Wholesaler Without GST'." },
+          { status: 403 }
+        );
+      }
     }
 
     if (rawBusinessType === "RETAILER WITH SPECIAL DISCOUNT") {

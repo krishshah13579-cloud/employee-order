@@ -216,8 +216,11 @@ export async function PUT(
       }
     }
 
-    const gstRate = 5.0;
-    const gstAmount = Math.round(orderSubtotal * 0.05 * 100) / 100;
+    // GST calculation: 0% if WHOLESALER WITHOUT GST, else 5%
+    const targetBusinessType = (body.businessType || existingOrder.businessType || "RETAILER").trim().toUpperCase();
+    const isWithoutGst = targetBusinessType === "WHOLESALER WITHOUT GST" || body.gstRate === 0;
+    const gstRate = isWithoutGst ? 0 : 5.0;
+    const gstAmount = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05 * 100) / 100;
     const grandTotal = Math.round(orderSubtotal + gstAmount);
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
@@ -390,6 +393,13 @@ export async function DELETE(
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (order.status === "Dispatched") {
+      return NextResponse.json(
+        { error: "Cannot delete dispatched orders. Dispatched orders/invoices cannot be deleted." },
+        { status: 400 }
+      );
     }
 
     // 1. Preserve any generated Tax Invoice in Sales Register!

@@ -42,6 +42,7 @@ import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp
 import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { isEmployeeTeamLeader } from "@/lib/time";
 import { compressImageFile } from "@/lib/imageCompression";
 
 interface DraftOrderItem {
@@ -117,8 +118,21 @@ export default function OrderFormPage() {
   // Visiting Card Modal State
   const [viewVisitingCard, setViewVisitingCard] = useState<string | null>(null);
 
-  // Authenticated employee
+  // Authenticated employee & Admin
   const { employee } = useEmployee();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/check")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.authenticated) setIsAdmin(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isTL = isEmployeeTeamLeader(employee);
+  const canAdjustSpecialDiscount = isAdmin || isTL;
 
   // Load employee name from session or localStorage
   useEffect(() => {
@@ -349,9 +363,9 @@ export default function OrderFormPage() {
     }
 
     // Dynamic Price sync:
-    // If selected customer is Retailer -> use Retailer Price (MRP / 2)
-    // If selected customer is Wholesaler -> use Wholesaler Price (MRP / 2 - 100)
-    const isWholesaler = c.businessType === "WHOLESALER";
+    // If selected customer is Retailer or Retailer with Special Discount -> Base Price is Retailer Price (MRP / 2)
+    // If selected customer is Wholesaler (with or without GST) -> use Wholesaler Price (MRP / 2 - 100)
+    const isWholesaler = c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST";
     const updatedItems = items.map((it) => {
       let applicableUnitPrice = it.unitPrice;
       if (isWholesaler && it.wholesalerPrice !== undefined) {
@@ -444,8 +458,9 @@ export default function OrderFormPage() {
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const gstRate = 5.0; // 5% GST
-  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
+  const isWithoutGst = selectedCustomer?.businessType === "WHOLESALER WITHOUT GST";
+  const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
+  const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
 
   // Step 1: Validate and Open Transport Popup Modal
@@ -1086,11 +1101,15 @@ export default function OrderFormPage() {
                     </span>
                     {selectedCustomer.businessType === "WHOLESALER" ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold">
-                        <span>Wholesaler</span>
+                        <span>Wholesaler (With 5% GST)</span>
+                      </span>
+                    ) : selectedCustomer.businessType === "WHOLESALER WITHOUT GST" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 rounded-xl text-xs font-bold">
+                        <span>Wholesaler (Without GST)</span>
                       </span>
                     ) : selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-900 border border-teal-300 rounded-xl text-xs font-bold">
-                        <span>Retailer (Special Discount)</span>
+                        <span>Retailer (Special Discount: Base MRP/2)</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
@@ -1274,7 +1293,48 @@ export default function OrderFormPage() {
 
                         {/* 6. Price */}
                         <td className="py-4 px-4 text-right font-medium text-slate-800">
-                          {formatCurrency(item.unitPrice)}
+                          {selectedCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT" && canAdjustSpecialDiscount ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400 font-bold text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="1"
+                                  value={item.unitPrice}
+                                  onChange={(e) => {
+                                    const newPrice = Math.max(0, parseFloat(e.target.value) || 0);
+                                    const copy = [...items];
+                                    const itemPcs = copy[index].totalPcs || ((copy[index].totalSets || 0) * (copy[index].pcsPerSet || 5));
+                                    copy[index] = {
+                                      ...copy[index],
+                                      unitPrice: newPrice,
+                                      itemSubtotal: itemPcs * newPrice,
+                                    };
+                                    setItems(copy);
+                                    saveDraft(copy, selectedCustomerId, orderNotes, placedBy, orderCreditDays);
+                                  }}
+                                  className="w-24 px-2 py-1 text-right font-mono font-bold text-sm bg-white border border-teal-400 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                  title="Custom price / special discount set by Admin/TL"
+                                />
+                              </div>
+                              <span className="text-[10px] text-teal-700 font-semibold">
+                                Base (MRP/2): ₹{item.retailerPrice || Math.round((item.unitPrice || 0))}
+                                {item.retailerPrice && item.unitPrice < item.retailerPrice && (
+                                  <span className="ml-1 text-emerald-600 font-bold">
+                                    (-₹{item.retailerPrice - item.unitPrice})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="font-mono">{formatCurrency(item.unitPrice)}</span>
+                              {selectedCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+                                <span className="text-[10px] text-teal-600 block font-semibold">MRP/2 Special</span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* 7. Total Amount */}

@@ -137,7 +137,7 @@ export default function AdminSalesPage() {
   const [customerGstPan, setCustomerGstPan] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [businessType, setBusinessType] = useState<
-    "RETAILER" | "WHOLESALER" | "CASH" | "RETAILER WITH SPECIAL DISCOUNT"
+    "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "CASH" | "RETAILER WITH SPECIAL DISCOUNT"
   >("CASH");
   const [creditDays, setCreditDays] = useState(0);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
@@ -309,9 +309,12 @@ export default function AdminSalesPage() {
     return formItems.reduce((sum, it) => sum + it.itemSubtotal, 0);
   }, [formItems]);
 
+  const isWithoutGst = businessType === "WHOLESALER WITHOUT GST";
+
   const calculatedGst = useMemo(() => {
+    if (isWithoutGst) return 0;
     return Math.round(calculatedSubtotal * 0.05 * 100) / 100;
-  }, [calculatedSubtotal]);
+  }, [calculatedSubtotal, isWithoutGst]);
 
   const calculatedGrandTotal = useMemo(() => {
     return Math.round(calculatedSubtotal + calculatedGst);
@@ -378,7 +381,7 @@ export default function AdminSalesPage() {
       setCreditDays(c.creditDays || 0);
 
       // Recalculate prices if wholesaler
-      if (c.businessType === "WHOLESALER") {
+      if (c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST") {
         setFormItems((prev) =>
           prev.map((it) => {
             const prod = availableProducts.find((p) => p.id === it.productId);
@@ -423,7 +426,7 @@ export default function AdminSalesPage() {
           creditDays: formPaymentType === "Credit" ? creditDays : 0,
           items: formItems,
           subtotal: calculatedSubtotal,
-          gstRate: 5.0,
+          gstRate: isWithoutGst ? 0 : 5.0,
           notes: notes.trim() || null,
         }),
       });

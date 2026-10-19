@@ -41,7 +41,7 @@ export interface CreateCustomerPayload {
   firmName?: string;
   name?: string;
   gstPanNo?: string;
-  businessType?: "RETAILER" | "WHOLESALER" | string;
+  businessType?: "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
   creditDays?: number;
   address?: string;
   city?: string;
@@ -90,7 +90,7 @@ export interface CustomerData {
   shopName: string; // Firm Name / Shop Name
   firmName?: string;
   gstPanNo: string;
-  businessType?: "RETAILER" | "WHOLESALER" | string;
+  businessType?: "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
   creditDays?: number;
   address: string; // Shop Address
   city?: string | null;

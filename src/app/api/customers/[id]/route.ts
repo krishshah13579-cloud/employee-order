@@ -79,6 +79,15 @@ export async function PUT(
 
     if (body.businessType) {
       const bType = String(body.businessType).trim().toUpperCase();
+      if (bType === "WHOLESALER WITHOUT GST") {
+        const admin = await getAdminSession(request);
+        if (!admin) {
+          return NextResponse.json(
+            { error: "Permission Denied: Only Admin can set 'Wholesaler Without GST'." },
+            { status: 403 }
+          );
+        }
+      }
       if (bType === "RETAILER WITH SPECIAL DISCOUNT") {
         const allowed = await canUserAssignSpecialDiscount(request);
         if (!allowed) {

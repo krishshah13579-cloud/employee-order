@@ -196,9 +196,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 5% GST calculation
-    const gstRate = 5.0;
-    const gstAmount = Math.round(orderSubtotal * 0.05 * 100) / 100;
+    // GST calculation: 0% if WHOLESALER WITHOUT GST, else 5%
+    const effectiveBusinessType = (body.businessType || (customer as any).businessType || "RETAILER").trim().toUpperCase();
+    const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST" || body.gstRate === 0;
+    const gstRate = isWithoutGst ? 0 : 5.0;
+    const gstAmount = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05 * 100) / 100;
     const grandTotal = Math.round(orderSubtotal + gstAmount);
 
     // Determine Order Number: use custom Order No. from previous written form, or auto-generate

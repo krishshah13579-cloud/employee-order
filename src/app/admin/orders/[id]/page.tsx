@@ -545,15 +545,25 @@ export default function OrderInvoicePage() {
           </button>
 
           {/* Delete Order Button */}
-          <button
-            type="button"
-            onClick={() => setIsDeleteModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer border border-red-200"
-            title="Delete order form with option to restore stock"
-          >
-            <Trash2 size={14} className="text-red-600" />
-            <span>Delete</span>
-          </button>
+          {order.status === "Dispatched" ? (
+            <span
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-50 text-gray-400 text-xs font-bold rounded-xl border border-gray-200 cursor-not-allowed"
+              title="Dispatched orders/invoices cannot be deleted"
+            >
+              <Trash2 size={14} className="text-gray-400" />
+              <span>Delete</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer border border-red-200"
+              title="Delete order form with option to restore stock"
+            >
+              <Trash2 size={14} className="text-red-600" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       </div>
 

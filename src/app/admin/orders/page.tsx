@@ -195,131 +195,82 @@ export default function OrdersPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-                <th className="py-3.5 px-6">Invoice / Order # & Date</th>
-                <th className="py-3.5 px-6">Customer Shop & GST</th>
-                <th className="py-3.5 px-6">Items & Color Sets Breakdown</th>
-                <th className="py-3.5 px-6">Total Amount (5% GST Incl.)</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
+                <th className="py-3.5 px-6">Invoice</th>
+                <th className="py-3.5 px-6">Date</th>
+                <th className="py-3.5 px-6">Customer Name</th>
+                <th className="py-3.5 px-6">Amount</th>
+                <th className="py-3.5 px-6 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400">
+                  <td colSpan={5} className="py-12 text-center text-gray-400">
                     Loading wholesale orders...
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400">
+                  <td colSpan={5} className="py-12 text-center text-gray-400">
                     No orders found. Click "Book New Order" to create a client order.
                   </td>
                 </tr>
               ) : (
                 orders.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
+                    {/* 1. Invoice */}
                     <td className="py-4 px-6">
                       {o.taxInvoiceNumber ? (
-                        <div>
-                          <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
-                            <span className="font-black text-amber-950">Invoice #{o.taxInvoiceNumber}</span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              Tax Invoice
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-gray-400 mt-0.5">
-                            {formatDate(o.taxInvoiceDate || o.orderDate || o.createdAt)}
-                          </div>
-                          {o.placedBy && (
-                            <span className="text-[10px] text-gray-500 font-medium">By: {o.placedBy}</span>
-                          )}
+                        <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-amber-950 text-base">{o.taxInvoiceNumber}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            Tax Invoice
+                          </span>
                         </div>
                       ) : (
-                        <div>
-                          <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-slate-900">Order Form #{o.orderNumber}</span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              Order Form
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-gray-400 mt-0.5">
-                            {formatDate(o.orderDate || o.createdAt)}
-                          </div>
-                          {o.placedBy && (
-                            <span className="text-[10px] text-gray-500 font-medium">By: {o.placedBy}</span>
-                          )}
+                        <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900">{o.orderNumber}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            Order Form
+                          </span>
                         </div>
                       )}
                     </td>
+
+                    {/* 2. Date */}
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-800">
+                        {formatDate(o.taxInvoiceDate || o.orderDate || o.createdAt)}
+                      </div>
+                      {o.placedBy && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">By: {o.placedBy}</div>
+                      )}
+                    </td>
+
+                    {/* 3. Customer Name (No GST) */}
                     <td className="py-4 px-6">
                       <div className="font-bold text-gray-900">
                         {o.customer?.shopName || "Customer #" + o.customerId}
                       </div>
-                      <div className="font-mono text-[11px] text-gray-500 mt-0.5">
-                        GST: {o.customer?.gstPanNo || "—"}
-                      </div>
                     </td>
-                    <td className="py-4 px-6 max-w-xs">
-                      <div className="space-y-1">
-                        {o.items?.map((item, idx) => {
-                          let colorSetsParsed: ColorSetEntry[] = [];
-                          try {
-                            colorSetsParsed = typeof item.colorSets === "string" ? JSON.parse(item.colorSets) : item.colorSets;
-                          } catch {}
 
-                          return (
-                            <div key={idx} className="text-xs">
-                              <span className="font-semibold text-gray-800">
-                                {formatProductNameWithMrp(
-                                  item.productName,
-                                  (item as any).mrp || (item as any).product?.mrp,
-                                  item.unitPrice
-                                )}
-                              </span>
-                              <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                                <span className="text-[11px] text-gray-500">Ratio:</span>
-                                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-1 rounded">{item.sizeRatio}</span>
-                                {colorSetsParsed
-                                  ?.filter((cs) => cs.sets > 0)
-                                  .map((cs, cIdx) => {
-                                    const colorInfo = getColorHex(cs.color);
-                                    return (
-                                      <span
-                                        key={cIdx}
-                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-medium text-gray-700 border border-gray-200"
-                                      >
-                                        <span
-                                          className="w-2 h-2 rounded-full border border-black/15 shrink-0"
-                                          style={{ backgroundColor: colorInfo.hex }}
-                                        />
-                                        <span>{cs.color}: {cs.sets}s</span>
-                                      </span>
-                                    );
-                                  })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </td>
+                    {/* 4. Amount */}
                     <td className="py-4 px-6">
                       <div className="font-bold text-gray-900 font-mono text-sm">
                         {formatCurrency(o.grandTotal)}
                       </div>
-                      <div className="text-[10px] text-emerald-700 font-medium">
-                        (Incl. ₹{o.gstAmount || Math.round(o.subtotal * 0.05)} GST)
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            STATUS_COLORS[o.status] || "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {o.status}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          STATUS_COLORS[o.status] || "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {o.status}
-                      </span>
-                    </td>
+
+                    {/* 5. Action */}
                     <td className="py-4 px-6 text-right space-x-1.5">
                       <button
                         type="button"
@@ -376,13 +327,22 @@ export default function OrdersPage() {
                       >
                         <Clock size={15} />
                       </button>
-                      <button
-                        onClick={() => setOrderToDelete(o)}
-                        className="p-1.5 inline-flex text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Order"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {o.status === "Dispatched" ? (
+                        <span
+                          className="p-1.5 inline-flex text-gray-300 cursor-not-allowed"
+                          title="Dispatched orders/invoices cannot be deleted"
+                        >
+                          <Trash2 size={15} />
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setOrderToDelete(o)}
+                          className="p-1.5 inline-flex text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Order"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
