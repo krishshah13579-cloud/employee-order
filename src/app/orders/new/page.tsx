@@ -43,8 +43,7 @@ import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
-import { compressImageFile } from "@/lib/imageCompression";
-import { getProductMixSizesInfo } from "@/lib/stock";
+import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
 
 interface DraftOrderItem {
   productId: number;
@@ -62,6 +61,7 @@ interface DraftOrderItem {
   unitPrice: number;
   mixPcs?: number;
   mixSizes?: string;
+  colorMixPcs?: Record<string, Record<string, number>>;
   itemSubtotal: number;
   notes?: string;
 }
@@ -1285,7 +1285,7 @@ export default function OrderFormPage() {
                                 href={`/products/${item.productId}?returnTo=/orders/new`}
                                 className="font-black text-slate-900 hover:text-orange-600 transition"
                               >
-                                {item.productName}
+                                {item.productName}{prodData?.mrp ? ` (${prodData.mrp})` : ""}
                               </Link>
                               <div className="text-[10px] text-slate-500">
                                 Ratio: {item.sizeRatio} • {item.totalSets} Sets ({itemTotalPcs} Pcs)
@@ -1294,52 +1294,79 @@ export default function OrderFormPage() {
                           </div>
                         </td>
 
-                        {/* 2. Colors */}
+                        {/* 2. Colors & Sets */}
                         <td className="py-4 px-4">
-                          <div className="flex flex-wrap gap-1 max-w-xs">
+                          <div className="flex flex-wrap gap-1.5 max-w-xs">
                             {item.colorSets && item.colorSets.length > 0 ? (
-                              item.colorSets.map((cs) => (
-                                <span
-                                  key={cs.color}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] text-slate-800"
-                                >
+                              item.colorSets.map((cs, csIdx) => {
+                                const letter = getColorShadeLetter(prodData, cs.color, csIdx);
+                                return (
                                   <span
-                                    className="w-2 h-2 rounded-full inline-block"
-                                    style={{ backgroundColor: getColorHex(cs.color).hex }}
-                                  />
-                                  <span>{cs.color}:</span>
-                                  <strong className="text-orange-600 font-bold">{cs.sets}s</strong>
-                                </span>
-                              ))
+                                    key={cs.color}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-900 font-mono"
+                                  >
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                                      style={{ backgroundColor: getColorHex(cs.color).hex }}
+                                    />
+                                    <span className="font-black text-slate-900">{letter}-{cs.sets}</span>
+                                    <span className="text-slate-500 text-[10px] font-sans">({cs.color})</span>
+                                  </span>
+                                );
+                              })
                             ) : (
                               <span className="text-slate-400 italic">No colors</span>
                             )}
                           </div>
-                          <span className="text-[10px] text-slate-500 font-semibold mt-0.5 block">
+                          <span className="text-[10px] text-slate-500 font-semibold mt-1 block">
                             Total Sets: {item.totalSets}
                           </span>
                         </td>
 
-                        {/* 3. Mix Sizes (Special Column) */}
-                        <td className="py-4 px-4 text-center">
-                          {mixTotal > 0 ? (
-                            <div className="inline-flex flex-col items-center">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-300 font-mono shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                <span>{mixTotal} Pcs</span>
-                              </span>
-                              <span
-                                className="text-[10px] font-semibold text-slate-600 mt-1 max-w-[140px] truncate"
-                                title={mixSummary}
-                              >
-                                {mixSummary}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 font-medium italic">
-                              0 pcs
-                            </span>
-                          )}
+                        {/* 3. Mix Sizes (Next Column) */}
+                        <td className="py-4 px-4">
+                          {(() => {
+                            const formattedMix = parseMixSizesForDisplay(item, prodData);
+                            if (formattedMix.length === 0) {
+                              return (
+                                <div className="text-center">
+                                  <span className="text-[11px] text-slate-400 font-medium italic">—</span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="flex flex-col gap-2 min-w-[110px]">
+                                {formattedMix.map((entry, eIdx) => (
+                                  <div
+                                    key={eIdx}
+                                    className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
+                                  >
+                                    {/* First line: A - 34-2 */}
+                                    <div className="font-black text-slate-900 flex items-center gap-1">
+                                      <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
+                                        {entry.letter}
+                                      </span>
+                                      <span className="text-slate-400">-</span>
+                                      <span className="text-amber-900 font-bold">
+                                        {entry.sizes[0].size}-{entry.sizes[0].count}
+                                      </span>
+                                    </div>
+
+                                    {/* Below it: 36-1 */}
+                                    {entry.sizes.slice(1).map((sz, sIdx) => (
+                                      <div
+                                        key={sIdx}
+                                        className="text-amber-900 font-bold pl-7 pt-0.5 text-xs"
+                                      >
+                                        {sz.size}-{sz.count}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* 4. PCS */}

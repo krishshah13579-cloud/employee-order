@@ -25,10 +25,9 @@ import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate, getColorAlphabetLetter, formatProductNameWithMrp } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
-import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
-import type { ColorSetEntry } from "@/lib/types";
+import { STATUS_COLORS, type OrderStatus, type ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
-import { getProductMixSizesInfo } from "@/lib/stock";
+import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
 
 interface EditableOrderItem {
   id?: number;
@@ -558,30 +557,86 @@ export default function OrderEditPage() {
                         </div>
                       </td>
 
-                      {/* Mix Sizes (Special Column) */}
-                      <td className="py-4 px-4 text-center">
+                      {/* Mix Sizes (Next Column) */}
+                      <td className="py-4 px-4 text-left">
                         {(() => {
-                          const mixInfo = getProductMixSizesInfo(
-                            item.product?.setsColorwise,
-                            item.product?.mixPcs || 0
+                          const mixMatch = item.notes?.match(/\[Mix Sizes:\s*([^\]]+)\]/i)?.[1];
+                          const formattedMix = parseMixSizesForDisplay(
+                            { mixSizes: mixMatch || item.product?.mixSizes, mixPcs: item.product?.mixPcs },
+                            item.product
                           );
-                          return mixInfo.totalMixPcs > 0 ? (
-                            <div className="inline-flex flex-col items-center">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-300 font-mono shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                <span>{mixInfo.totalMixPcs} Pcs</span>
-                              </span>
-                              <span
-                                className="text-[10px] font-semibold text-slate-600 mt-1 max-w-[140px] truncate"
-                                title={mixInfo.sizesSummary}
-                              >
-                                {mixInfo.sizesSummary}
-                              </span>
+
+                          if (formattedMix.length === 0) {
+                            const mixInfo = getProductMixSizesInfo(
+                              item.product?.setsColorwise,
+                              item.product?.mixPcs || 0
+                            );
+                            if (mixInfo.totalMixPcs <= 0) {
+                              return (
+                                <div className="text-center">
+                                  <span className="text-[11px] text-slate-400 font-medium italic">—</span>
+                                </div>
+                              );
+                            }
+                            const fallback = parseMixSizesForDisplay({ mixSizes: mixInfo.sizesSummary, mixPcs: mixInfo.totalMixPcs }, item.product);
+                            if (fallback.length > 0) {
+                              return (
+                                <div className="flex flex-col gap-1.5 min-w-[100px]">
+                                  {fallback.map((entry, eIdx) => (
+                                    <div
+                                      key={eIdx}
+                                      className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
+                                    >
+                                      <div className="font-black text-slate-900 flex items-center gap-1">
+                                        <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
+                                          {entry.letter}
+                                        </span>
+                                        <span className="text-slate-400">-</span>
+                                        <span className="text-amber-900 font-bold">
+                                          {entry.sizes[0].size}-{entry.sizes[0].count}
+                                        </span>
+                                      </div>
+                                      {entry.sizes.slice(1).map((sz, sIdx) => (
+                                        <div key={sIdx} className="text-amber-900 font-bold pl-7 pt-0.5 text-xs">
+                                          {sz.size}-{sz.count}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="text-center">
+                                <span className="text-[11px] text-slate-400 font-medium italic">—</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="flex flex-col gap-1.5 min-w-[100px]">
+                              {formattedMix.map((entry, eIdx) => (
+                                <div
+                                  key={eIdx}
+                                  className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
+                                >
+                                  <div className="font-black text-slate-900 flex items-center gap-1">
+                                    <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
+                                      {entry.letter}
+                                    </span>
+                                    <span className="text-slate-400">-</span>
+                                    <span className="text-amber-900 font-bold">
+                                      {entry.sizes[0].size}-{entry.sizes[0].count}
+                                    </span>
+                                  </div>
+                                  {entry.sizes.slice(1).map((sz, sIdx) => (
+                                    <div key={sIdx} className="text-amber-900 font-bold pl-7 pt-0.5 text-xs">
+                                      {sz.size}-{sz.count}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
                             </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 font-medium italic">
-                              0 pcs
-                            </span>
                           );
                         })()}
                       </td>

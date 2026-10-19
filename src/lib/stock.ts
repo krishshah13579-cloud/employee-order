@@ -973,3 +973,146 @@ export function getProductMixSizesInfo(
   };
 }
 
+/**
+ * Resolves the shade letter (A, B, C...) for a given color.
+ */
+export function getColorShadeLetter(
+  product: { colorMapping?: string | null; colorsAvailable?: string | null } | null | undefined,
+  colorName: string,
+  fallbackIndex: number = 0
+): string {
+  if (!colorName) return String.fromCharCode(65 + fallbackIndex);
+  const cleanTarget = cleanColorName(colorName).trim().toLowerCase();
+
+  // If colorName is already a single letter (A, B, C...)
+  if (/^[a-z]$/i.test(cleanTarget)) {
+    return cleanTarget.toUpperCase();
+  }
+
+  // Check if colorName starts with a letter like "A: Black" or "A - Black"
+  const prefixMatch = cleanTarget.match(/^([a-z])\s*[:\-\.]\s*/i);
+  if (prefixMatch) {
+    return prefixMatch[1].toUpperCase();
+  }
+
+  if (product?.colorMapping) {
+    try {
+      const map = JSON.parse(product.colorMapping);
+      for (const [letter, name] of Object.entries(map)) {
+        if (cleanColorName(String(name)).trim().toLowerCase() === cleanTarget) {
+          return letter.toUpperCase();
+        }
+      }
+    } catch {}
+  }
+
+  // Check index in product colorsAvailable
+  if (product?.colorsAvailable) {
+    const list = product.colorsAvailable.split(",").map((c) => cleanColorName(c).trim().toLowerCase());
+    const idx = list.indexOf(cleanTarget);
+    if (idx >= 0) {
+      return String.fromCharCode(65 + idx);
+    }
+  }
+
+  return String.fromCharCode(65 + fallbackIndex);
+}
+
+export interface FormattedMixEntry {
+  letter: string;
+  colorName: string;
+  sizes: { size: string; count: number }[];
+}
+
+/**
+ * Parses mix single sizes from an order item or product into structured format:
+ * [ { letter: "A", colorName: "Dark Blue", sizes: [ { size: "34", count: 2 }, { size: "36", count: 1 } ] } ]
+ */
+export function parseMixSizesForDisplay(
+  item: { colorMixPcs?: Record<string, Record<string, number>> | null; mixSizes?: string | null; mixPcs?: number },
+  prodData?: { colorMapping?: string | null; colorsAvailable?: string | null } | null
+): FormattedMixEntry[] {
+  const result: FormattedMixEntry[] = [];
+
+  // 1. Try colorMixPcs object first
+  if (item.colorMixPcs && typeof item.colorMixPcs === "object") {
+    let colIdx = 0;
+    for (const [colName, sizeMap] of Object.entries(item.colorMixPcs)) {
+      if (typeof sizeMap !== "object" || !sizeMap) continue;
+      const validSizes = Object.entries(sizeMap)
+        .map(([sz, cnt]) => ({ size: String(sz).trim(), count: parseInt(String(cnt), 10) || 0 }))
+        .filter((s) => s.count > 0)
+        .sort((a, b) => {
+          const nA = parseInt(a.size, 10);
+          const nB = parseInt(b.size, 10);
+          if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+          return a.size.localeCompare(b.size);
+        });
+
+      if (validSizes.length > 0) {
+        const letter = getColorShadeLetter(prodData, colName, colIdx);
+        result.push({
+          letter,
+          colorName: colName,
+          sizes: validSizes,
+        });
+      }
+      colIdx++;
+    }
+  }
+
+  if (result.length > 0) return result;
+
+  // 2. Fallback: Parse from item.mixSizes string e.g. "Jet Black: 34(2), 36(1); Navy: 32(1)" or "A: 34(2), 36(1)"
+  if (item.mixSizes && item.mixSizes !== "None" && typeof item.mixSizes === "string") {
+    const colorChunks = item.mixSizes.split(/;|\n/);
+    let colIdx = 0;
+    for (const chunk of colorChunks) {
+      const colonIdx = chunk.indexOf(":");
+      if (colonIdx !== -1) {
+        const colName = chunk.substring(0, colonIdx).trim();
+        const sizesPart = chunk.substring(colonIdx + 1).trim();
+        // Match "34(2)" or "34-2" or "34 (2 pcs)"
+        const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
+        let match;
+        const validSizes: { size: string; count: number }[] = [];
+        while ((match = sizeRegex.exec(sizesPart)) !== null) {
+          validSizes.push({
+            size: match[1],
+            count: parseInt(match[2], 10) || 1,
+          });
+        }
+        if (validSizes.length > 0) {
+          const letter = getColorShadeLetter(prodData, colName, colIdx);
+          result.push({
+            letter,
+            colorName: colName,
+            sizes: validSizes,
+          });
+        }
+      } else {
+        // Flat sizes e.g. "34 (2 pcs), 36 (1 pc)" or "34 (2)"
+        const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
+        let match;
+        const validSizes: { size: string; count: number }[] = [];
+        while ((match = sizeRegex.exec(chunk)) !== null) {
+          validSizes.push({
+            size: match[1],
+            count: parseInt(match[2], 10) || 1,
+          });
+        }
+        if (validSizes.length > 0) {
+          result.push({
+            letter: "Mix",
+            colorName: "",
+            sizes: validSizes,
+          });
+        }
+      }
+      colIdx++;
+    }
+  }
+
+  return result;
+}
+

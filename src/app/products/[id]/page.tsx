@@ -1127,27 +1127,22 @@ function ProductDetailContent() {
                       ? availableRatios
                       : [product.sizesRatio || "28 to 36"];
 
-                    // Sizes available for this color (from current ratio, loose stock, and product)
-                    const colorAvailableSizes = (() => {
-                      const sizesSet = new Set<string>();
-                      const ratioSizes = getSizesFromRatio(currentRatioForColor);
-                      if (ratioSizes.length > 0 && ratioSizes[0] !== currentRatioForColor) {
-                        ratioSizes.forEach((s) => sizesSet.add(s));
-                      }
-                      productAvailableSizes.forEach((s) => sizesSet.add(s));
-                      Object.keys(colorStockDetail.loosePcs).forEach((s) => sizesSet.add(s));
-                      return Array.from(sizesSet).sort((a, b) => {
+                    // ONLY sizes that have available mix single pieces in stock for this color (or already selected)
+                    const colorAvailableMixSizes = Object.keys(colorStockDetail.loosePcs)
+                      .filter((sz) => (colorStockDetail.loosePcs[sz] || 0) > 0 || (colorMixMap[sz] || 0) > 0)
+                      .sort((a, b) => {
                         const nA = parseInt(a, 10);
                         const nB = parseInt(b, 10);
                         if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
                         return a.localeCompare(b);
                       });
-                    })();
 
-                    const totalLooseInStockForColor = Object.values(colorStockDetail.loosePcs).reduce(
-                      (s, c) => s + Math.max(0, c || 0),
+                    const totalLooseInStockForColor = colorAvailableMixSizes.reduce(
+                      (s, sz) => s + Math.max(0, colorStockDetail.loosePcs[sz] || 0),
                       0
                     );
+
+                    const hasMixStockForColor = colorAvailableMixSizes.length > 0;
 
                     const isExpanded = isPhotoActive || currentSets > 0 || colorSelectedMixTotal > 0;
 
@@ -1345,94 +1340,82 @@ function ProductDetailContent() {
                               </div>
                             </div>
 
-                            {/* 2. Mix Sizes (Loose Single Pieces) of the same color */}
-                            <div className="bg-amber-50/60 rounded-xl p-3 border border-amber-200/90 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                                  <Sparkles size={13} className="text-amber-600" />
-                                  <span>Mix Sizes Available — Single Pieces ({color})</span>
-                                </span>
-                                <span className="text-[10px] font-bold">
-                                  {totalLooseInStockForColor > 0 ? (
-                                    <span className="text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300">
-                                      {totalLooseInStockForColor} Loose Pcs In Stock
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 font-normal italic">
-                                      0 loose pcs in stock
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
+                            {/* 2. Mix Sizes (Loose Single Pieces) of the same color - ONLY shown if mix pieces exist for this color */}
+                            {hasMixStockForColor && (
+                              <div className="bg-amber-50/60 rounded-xl p-3 border border-amber-200/90 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                    <Sparkles size={13} className="text-amber-600" />
+                                    <span>Mix Sizes Available — Single Pieces ({color})</span>
+                                  </span>
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300">
+                                    {totalLooseInStockForColor} Loose Pcs In Stock
+                                  </span>
+                                </div>
 
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                                {colorAvailableSizes.map((sz) => {
-                                  const availLoose = colorStockDetail.loosePcs[sz] || 0;
-                                  const selectedLoose = colorMixMap[sz] || 0;
-                                  const isSelected = selectedLoose > 0;
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                                  {colorAvailableMixSizes.map((sz) => {
+                                    const availLoose = colorStockDetail.loosePcs[sz] || 0;
+                                    const selectedLoose = colorMixMap[sz] || 0;
+                                    const isSelected = selectedLoose > 0;
 
-                                  return (
-                                    <div
-                                      key={sz}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className={`p-2 rounded-xl border transition-all ${
-                                        isSelected
-                                          ? "bg-amber-100/90 border-amber-400 ring-1 ring-amber-400 shadow-2xs"
-                                          : "bg-white border-slate-200 hover:border-slate-300"
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between mb-1.5">
-                                        <span className="font-black text-xs text-slate-900">
-                                          Size {sz}
-                                        </span>
-                                        <span
-                                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                                            availLoose > 0
-                                              ? "bg-emerald-100 text-emerald-800"
-                                              : "bg-slate-100 text-slate-500"
-                                          }`}
-                                        >
-                                          {availLoose > 0 ? `${availLoose} in stock` : "0 in stock"}
-                                        </span>
+                                    return (
+                                      <div
+                                        key={sz}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`p-2 rounded-xl border transition-all ${
+                                          isSelected
+                                            ? "bg-amber-100/90 border-amber-400 ring-1 ring-amber-400 shadow-2xs"
+                                            : "bg-white border-slate-200 hover:border-slate-300"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between mb-1.5">
+                                          <span className="font-black text-xs text-slate-900">
+                                            Size {sz}
+                                          </span>
+                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                                            {availLoose} in stock
+                                          </span>
+                                        </div>
+
+                                        {/* Stepper buttons */}
+                                        <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+                                          <button
+                                            type="button"
+                                            disabled={selectedLoose <= 0}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMixPieceChange(color, sz, selectedLoose - 1);
+                                            }}
+                                            className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
+                                            title={`Decrease Size ${sz}`}
+                                          >
+                                            <Minus size={11} />
+                                          </button>
+
+                                          <span className="font-mono font-black text-xs text-slate-900">
+                                            {selectedLoose}
+                                          </span>
+
+                                          <button
+                                            type="button"
+                                            disabled={availLoose > 0 && selectedLoose >= availLoose && !isCustom}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMixPieceChange(color, sz, selectedLoose + 1);
+                                            }}
+                                            className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
+                                            title={`Increase Size ${sz}`}
+                                          >
+                                            <Plus size={11} />
+                                          </button>
+                                        </div>
                                       </div>
-
-                                      {/* Stepper buttons */}
-                                      <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-0.5">
-                                        <button
-                                          type="button"
-                                          disabled={selectedLoose <= 0}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMixPieceChange(color, sz, selectedLoose - 1);
-                                          }}
-                                          className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
-                                          title={`Decrease Size ${sz}`}
-                                        >
-                                          <Minus size={11} />
-                                        </button>
-
-                                        <span className="font-mono font-black text-xs text-slate-900">
-                                          {selectedLoose}
-                                        </span>
-
-                                        <button
-                                          type="button"
-                                          disabled={availLoose > 0 && selectedLoose >= availLoose && !isCustom}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMixPieceChange(color, sz, selectedLoose + 1);
-                                          }}
-                                          className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
-                                          title={`Increase Size ${sz}`}
-                                        >
-                                          <Plus size={11} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
+                            )}
 
                             {/* 3. Color Piece & Mix Summary Bar */}
                             <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
