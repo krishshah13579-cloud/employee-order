@@ -27,6 +27,7 @@ import {
   sortSizeRatioKeys,
   parseDetailedColorRatioSets,
   getPcsFromRatio,
+  getProductMixSizesInfo,
 } from "@/lib/stock";
 import type { ProductData } from "@/lib/types";
 
@@ -354,6 +355,7 @@ function ProductsContent() {
               const sortedRatios = sortSizeRatioKeys(Array.from(ratioSet));
               const displayRatio = sortedRatios[0] || product.sizesRatio || "28 to 36";
               const displayPcs = getPcsFromRatio(displayRatio, product.pcsPerSet || 5);
+              const mixInfo = getProductMixSizesInfo(product.setsColorwise, (product as any).mixPcs || 0);
 
               return (
                 <div
@@ -409,6 +411,21 @@ function ProductsContent() {
                         <span className="font-semibold text-slate-700">
                           {displayPcs} Pcs / Set
                         </span>
+                      </div>
+
+                      {/* Mix Sizes Available */}
+                      <div className="mt-1 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-medium">Mix Sizes:</span>
+                        {mixInfo.totalMixPcs > 0 ? (
+                          <span
+                            className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-mono truncate max-w-[170px]"
+                            title={mixInfo.sizesSummary}
+                          >
+                            {mixInfo.totalMixPcs} Pcs ({mixInfo.sizesSummary})
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">0 pcs</span>
+                        )}
                       </div>
 
                       {/* Colors Palette Preview */}

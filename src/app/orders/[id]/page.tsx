@@ -28,6 +28,7 @@ import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
 import type { ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
+import { getProductMixSizesInfo } from "@/lib/stock";
 
 interface EditableOrderItem {
   id?: number;
@@ -489,6 +490,7 @@ export default function OrderEditPage() {
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3.5 px-4">Product Name</th>
                   <th className="py-3.5 px-4">Colors &amp; Sets</th>
+                  <th className="py-3.5 px-4 text-center">Mix Sizes</th>
                   <th className="py-3.5 px-4 text-center">PCS</th>
                   <th className="py-3.5 px-4 text-right">Price (₹/pc)</th>
                   <th className="py-3.5 px-4 text-right">Total Amount (₹)</th>
@@ -498,7 +500,7 @@ export default function OrderEditPage() {
               <tbody className="divide-y divide-slate-100">
                 {activeItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-slate-500">
+                    <td colSpan={6} className="py-10 text-center text-slate-500">
                       No items currently in this order.
                     </td>
                   </tr>
@@ -554,6 +556,34 @@ export default function OrderEditPage() {
                         <div className="text-[10px] text-slate-500 mt-1 font-semibold">
                           Total Sets: {item.totalSets}
                         </div>
+                      </td>
+
+                      {/* Mix Sizes (Special Column) */}
+                      <td className="py-4 px-4 text-center">
+                        {(() => {
+                          const mixInfo = getProductMixSizesInfo(
+                            item.product?.setsColorwise,
+                            item.product?.mixPcs || 0
+                          );
+                          return mixInfo.totalMixPcs > 0 ? (
+                            <div className="inline-flex flex-col items-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-300 font-mono shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>{mixInfo.totalMixPcs} Pcs</span>
+                              </span>
+                              <span
+                                className="text-[10px] font-semibold text-slate-600 mt-1 max-w-[140px] truncate"
+                                title={mixInfo.sizesSummary}
+                              >
+                                {mixInfo.sizesSummary}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium italic">
+                              0 pcs
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* PCS */}

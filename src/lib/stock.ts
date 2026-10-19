@@ -887,3 +887,55 @@ export function restoreSetsToStock(
 
   return JSON.stringify(stockWithLoose);
 }
+
+/**
+ * Returns available mix/loose single sizes for a product from its setsColorwise and mixPcs.
+ * e.g. { totalMixPcs: 8, sizesSummary: "30 (2), 32 (1), 34 (5)", sizesList: ["30", "32", "34"] }
+ */
+export function getProductMixSizesInfo(
+  setsColorwise: string | null | undefined,
+  mixPcsFallback: number = 0
+): {
+  totalMixPcs: number;
+  sizesSummary: string;
+  sizesList: string[];
+  bySize: Record<string, number>;
+} {
+  const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
+  const bySize: Record<string, number> = {};
+  let totalLoose = 0;
+
+  for (const detail of Object.values(stockWithLoose)) {
+    if (detail && detail.loosePcs) {
+      for (const [sz, count] of Object.entries(detail.loosePcs)) {
+        const num = Math.max(0, count || 0);
+        if (num > 0) {
+          bySize[sz] = (bySize[sz] || 0) + num;
+          totalLoose += num;
+        }
+      }
+    }
+  }
+
+  const finalTotal = totalLoose > 0 ? totalLoose : Math.max(0, mixPcsFallback || 0);
+  const sortedSizes = Object.keys(bySize).sort((a, b) => {
+    const nA = parseInt(a, 10);
+    const nB = parseInt(b, 10);
+    if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+    return a.localeCompare(b);
+  });
+
+  const sizesSummary = sortedSizes.length > 0
+    ? sortedSizes.map((sz) => `${sz} (${bySize[sz]} pcs)`).join(", ")
+    : finalTotal > 0
+    ? `${finalTotal} Pcs`
+    : "None";
+
+  return {
+    totalMixPcs: finalTotal,
+    sizesSummary,
+    sizesList: sortedSizes,
+    bySize,
+  };
+}
+

@@ -44,6 +44,7 @@ import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
 import { compressImageFile } from "@/lib/imageCompression";
+import { getProductMixSizesInfo } from "@/lib/stock";
 
 interface DraftOrderItem {
   productId: number;
@@ -59,6 +60,8 @@ interface DraftOrderItem {
   retailerPrice?: number;
   wholesalerPrice?: number;
   unitPrice: number;
+  mixPcs?: number;
+  mixSizes?: string;
   itemSubtotal: number;
   notes?: string;
 }
@@ -105,6 +108,22 @@ export default function OrderFormPage() {
   const [items, setItems] = useState<DraftOrderItem[]>([]);
   const [orderNotes, setOrderNotes] = useState<string>("");
   const [customOrderNumber, setCustomOrderNumber] = useState<string>("");
+  const [productsMap, setProductsMap] = useState<Record<number, any>>({});
+
+  useEffect(() => {
+    fetch("/api/products?active_only=1")
+      .then((res) => res.json())
+      .then((prods: any[]) => {
+        if (Array.isArray(prods)) {
+          const map: Record<number, any> = {};
+          for (const p of prods) {
+            map[p.id] = p;
+          }
+          setProductsMap(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Transport Popup Modal State
@@ -1182,6 +1201,7 @@ export default function OrderFormPage() {
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3.5 px-4">Product Name</th>
                   <th className="py-3.5 px-4">Colors & Sets</th>
+                  <th className="py-3.5 px-4 text-center">Mix Sizes</th>
                   <th className="py-3.5 px-4 text-center">PCS</th>
                   <th className="py-3.5 px-4 text-right">Price (₹/pc)</th>
                   <th className="py-3.5 px-4 text-right">Total Amount (₹)</th>
@@ -1192,7 +1212,7 @@ export default function OrderFormPage() {
               <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="max-w-sm mx-auto flex flex-col items-center">
                         <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
                           <ShoppingBag size={28} />
@@ -1236,6 +1256,13 @@ export default function OrderFormPage() {
                 ) : (
                   items.map((item, index) => {
                     const itemTotalPcs = item.totalPcs || ((item.totalSets || 0) * (item.pcsPerSet || 5));
+                    const prodData = productsMap[item.productId];
+                    const mixInfo = getProductMixSizesInfo(
+                      prodData?.setsColorwise,
+                      item.mixPcs !== undefined ? item.mixPcs : (prodData?.mixPcs || 0)
+                    );
+                    const mixTotal = item.mixPcs !== undefined ? item.mixPcs : mixInfo.totalMixPcs;
+                    const mixSummary = item.mixSizes || mixInfo.sizesSummary;
 
                     return (
                       <tr key={index} className="hover:bg-slate-50/80 transition-colors">
@@ -1289,7 +1316,29 @@ export default function OrderFormPage() {
                           </span>
                         </td>
 
-                        {/* 3. PCS */}
+                        {/* 3. Mix Sizes (Special Column) */}
+                        <td className="py-4 px-4 text-center">
+                          {mixTotal > 0 ? (
+                            <div className="inline-flex flex-col items-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-300 font-mono shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>{mixTotal} Pcs</span>
+                              </span>
+                              <span
+                                className="text-[10px] font-semibold text-slate-600 mt-1 max-w-[140px] truncate"
+                                title={mixSummary}
+                              >
+                                {mixSummary}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium italic">
+                              0 pcs
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 4. PCS */}
                         <td className="py-4 px-4 text-center">
                           <span className="font-black text-slate-900 text-sm">
                             {itemTotalPcs}

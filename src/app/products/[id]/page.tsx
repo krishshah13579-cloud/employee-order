@@ -43,6 +43,7 @@ import {
   parseDetailedColorRatioSets,
   getPcsFromRatio,
   getSizesFromRatio,
+  getProductMixSizesInfo,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
 
@@ -436,6 +437,11 @@ function ProductDetailContent() {
   const unitPrice = isWholesaler ? whoPrice : isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice;
   const totalAmount = totalPcs * unitPrice;
 
+  // Mix sizes available information
+  const mixInfo = useMemo(() => {
+    return getProductMixSizesInfo(product?.setsColorwise, (product as any)?.mixPcs || 0);
+  }, [product]);
+
   // Add To Order Form Action
   const handleAddToOrderForm = () => {
     if (!product) return;
@@ -501,6 +507,8 @@ function ProductDetailContent() {
       retailerPrice: retPrice,
       wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
+      mixPcs: mixInfo.totalMixPcs,
+      mixSizes: mixInfo.sizesSummary,
       itemSubtotal: totalAmount,
       notes: itemNotes.trim() || undefined,
     };
@@ -796,6 +804,30 @@ function ProductDetailContent() {
                     </span>
                   </div>
                 )}
+              </div>
+
+              {/* Mix Sizes Available Highlight */}
+              <div className="p-3.5 bg-amber-50/90 rounded-xl border border-amber-300 text-xs space-y-1.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Layers size={14} className="text-amber-700" />
+                    <span>Mix Sizes Available (Loose Stock)</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-xs ${
+                    mixInfo.totalMixPcs > 0 ? "bg-amber-200 text-amber-950" : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {mixInfo.totalMixPcs} Pcs
+                  </span>
+                </div>
+                <div className="text-amber-900 font-medium text-xs">
+                  {mixInfo.totalMixPcs > 0 ? (
+                    <span className="font-semibold">
+                      Available Sizes: <strong className="font-mono text-amber-950">{mixInfo.sizesSummary}</strong>
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 italic">No loose single pieces currently in stock (full sets only).</span>
+                  )}
+                </div>
               </div>
 
               {/* Collapsible Size Guide */}
