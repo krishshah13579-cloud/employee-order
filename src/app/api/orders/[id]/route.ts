@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAdminSession, requireAdmin } from "@/lib/auth-security";
 import { calculateOrderedColorSetsPieces } from "@/lib/stock";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
+import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 
 export async function GET(
   _request: NextRequest,
@@ -74,6 +75,28 @@ export async function PUT(
       taxInvoiceItems,
       templateOverrides,
     } = body;
+
+    const isAlreadyConfirmed =
+      existingOrder.status === "Confirmed" ||
+      existingOrder.status === "In Production" ||
+      existingOrder.status === "Ready" ||
+      existingOrder.status === "Dispatched" ||
+      existingOrder.status === "Delivered";
+
+    // Only Tax Invoice modal adjustments (taxInvoiceNumber, taxInvoiceDate, taxInvoiceItems, templateOverrides) are permitted on confirmed orders
+    const isTaxInvoiceOnlyUpdate =
+      body.taxInvoiceNumber !== undefined &&
+      body.taxInvoiceItems !== undefined &&
+      !body.items;
+
+    if (isAlreadyConfirmed && !isTaxInvoiceOnlyUpdate && (body.items !== undefined || body.orderNumber !== undefined || body.customerId !== undefined)) {
+      return NextResponse.json(
+        {
+          error: `Order #${existingOrder.orderNumber} is already ${existingOrder.status} and locked. Once an order is confirmed, editing the order form is strictly prohibited.`,
+        },
+        { status: 403 }
+      );
+    }
 
     if (status === "Confirmed" && existingOrder.status !== "Confirmed") {
       const admin = await getAdminSession(request);
@@ -233,6 +256,26 @@ export async function PUT(
     const gstAmount = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05 * 100) / 100;
     const grandTotal = Math.round(orderSubtotal + gstAmount);
 
+    let effectiveTaxInvoiceNumber =
+      taxInvoiceNumber !== undefined
+        ? taxInvoiceNumber
+          ? String(taxInvoiceNumber).trim().toUpperCase()
+          : null
+        : existingOrder.taxInvoiceNumber;
+
+    let effectiveTaxInvoiceDate =
+      taxInvoiceDate !== undefined
+        ? taxInvoiceDate
+          ? new Date(taxInvoiceDate)
+          : null
+        : existingOrder.taxInvoiceDate;
+
+    const nextStatus = status || existingOrder.status;
+    if (nextStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
+      effectiveTaxInvoiceNumber = await getNextTaxInvoiceNumber();
+      effectiveTaxInvoiceDate = effectiveTaxInvoiceDate || new Date();
+    }
+
     const updatedOrder = await prisma.$transaction(async (tx) => {
       if (validatedItems.length > 0) {
         await tx.orderItem.deleteMany({ where: { orderId } });
@@ -258,18 +301,8 @@ export async function PUT(
           totalSets: validatedItems.length > 0 ? orderTotalSets : existingOrder.totalSets,
           placedBy: placedBy !== undefined ? placedBy : existingOrder.placedBy,
           notes: notes !== undefined ? notes : existingOrder.notes,
-          taxInvoiceNumber:
-            taxInvoiceNumber !== undefined
-              ? taxInvoiceNumber
-                ? String(taxInvoiceNumber).trim().toUpperCase()
-                : null
-              : existingOrder.taxInvoiceNumber,
-          taxInvoiceDate:
-            taxInvoiceDate !== undefined
-              ? taxInvoiceDate
-                ? new Date(taxInvoiceDate)
-                : null
-              : existingOrder.taxInvoiceDate,
+          taxInvoiceNumber: effectiveTaxInvoiceNumber,
+          taxInvoiceDate: effectiveTaxInvoiceDate,
           taxInvoiceItems:
             taxInvoiceItems !== undefined
               ? typeof taxInvoiceItems === "string"

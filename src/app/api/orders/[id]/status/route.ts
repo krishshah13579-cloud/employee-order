@@ -5,6 +5,7 @@ import { restoreSetsToStock, deductSetsFromStock } from "@/lib/stock";
 import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { recordAuditLog } from "@/lib/audit";
+import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 
 export async function PUT(
   request: NextRequest,
@@ -107,9 +108,21 @@ export async function PUT(
       }
     }
 
+    let autoTaxInvoiceNumber = existingOrder.taxInvoiceNumber;
+    let autoTaxInvoiceDate = existingOrder.taxInvoiceDate;
+
+    if (status === "Confirmed" && (!autoTaxInvoiceNumber || !autoTaxInvoiceNumber.trim())) {
+      autoTaxInvoiceNumber = await getNextTaxInvoiceNumber();
+      autoTaxInvoiceDate = new Date();
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status },
+      data: {
+        status,
+        ...(autoTaxInvoiceNumber ? { taxInvoiceNumber: autoTaxInvoiceNumber } : {}),
+        ...(autoTaxInvoiceDate ? { taxInvoiceDate: autoTaxInvoiceDate } : {}),
+      },
       include: {
         customer: true,
         items: true,
@@ -119,13 +132,18 @@ export async function PUT(
     // Automatically send/sync confirmed order to Sales Register
     await createOrUpdateSalesInvoiceFromOrder(orderId);
 
+    const invoiceGenNote =
+      autoTaxInvoiceNumber && autoTaxInvoiceNumber !== existingOrder.taxInvoiceNumber
+        ? ` (Auto-generated Tax Invoice #${autoTaxInvoiceNumber})`
+        : "";
+
     await recordAuditLog({
       action: "ORDER_STATUS_CHANGED",
       actorType: admin ? "ADMIN" : "EMPLOYEE",
       actorName: admin?.username || employee?.name || "Staff",
       entityType: "Order",
       entityId: orderId,
-      details: `Order #${existingOrder.orderNumber} status transitioned from "${existingOrder.status}" to "${status}"`,
+      details: `Order #${existingOrder.orderNumber} status transitioned from "${existingOrder.status}" to "${status}"${invoiceGenNote}`,
       status: "SUCCESS",
     });
 

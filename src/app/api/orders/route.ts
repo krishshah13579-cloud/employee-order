@@ -11,6 +11,7 @@ import {
 import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { requireAdmin } from "@/lib/auth-security";
+import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -294,9 +295,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine custom Tax Invoice Number from previous accounting software bills
+    // Determine custom Tax Invoice Number from previous accounting software bills or auto-generate if confirmed
     const customTaxInvoiceNumber = body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null;
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
+
+    const initialStatus = body.status || (customTaxInvoiceNumber ? "Ready" : "Pending");
+    let effectiveTaxInvoiceNumber = customTaxInvoiceNumber;
+    let effectiveTaxInvoiceDate = customTaxInvoiceDate;
+
+    if (initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
+      effectiveTaxInvoiceNumber = await getNextTaxInvoiceNumber();
+      effectiveTaxInvoiceDate = new Date();
+    }
 
     const newlySoldOutColors: Array<{
       productName: string;
@@ -347,7 +357,7 @@ export async function POST(request: NextRequest) {
           businessType: body.businessType || (customer as any).businessType || "RETAILER",
           creditDays: body.creditDays !== undefined ? (parseInt(body.creditDays, 10) || 0) : ((customer as any).creditDays || 0),
           orderDate: orderDate ? new Date(orderDate) : new Date(),
-          status: body.status || (customTaxInvoiceNumber ? "Ready" : "Pending"),
+          status: initialStatus,
           subtotal: orderSubtotal,
           gstRate: gstRate,
           gstAmount: gstAmount,
@@ -356,8 +366,8 @@ export async function POST(request: NextRequest) {
           totalSets: orderTotalSets,
           placedBy: placedBy || "Admin",
           notes: notes || null,
-          taxInvoiceNumber: customTaxInvoiceNumber,
-          taxInvoiceDate: customTaxInvoiceDate,
+          taxInvoiceNumber: effectiveTaxInvoiceNumber,
+          taxInvoiceDate: effectiveTaxInvoiceDate,
           items: {
             create: validatedItems,
           },

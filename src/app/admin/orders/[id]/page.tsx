@@ -27,6 +27,7 @@ import {
   Trash2,
   Save,
   Package,
+  Lock,
 } from "lucide-react";
 import { formatCurrency, formatDate, getColorAlphabetLetter, formatProductNameWithMrp } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf, sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
@@ -503,14 +504,24 @@ export default function OrderInvoicePage() {
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Edit Order & Products Page Button */}
-          <Link
-            href={`/admin/orders/${order.id}/edit`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-            title="Edit customer order items, products, size ratios, sets, prices, notes, or status on dedicated page"
-          >
-            <Edit3 size={14} className="text-white" />
-            <span>Edit Products &amp; Order</span>
-          </Link>
+          {order.status === "Pending" ? (
+            <Link
+              href={`/admin/orders/${order.id}/edit`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              title="Edit customer order items, products, size ratios, sets, prices, notes on dedicated page"
+            >
+              <Edit3 size={14} className="text-white" />
+              <span>Edit Products &amp; Order</span>
+            </Link>
+          ) : (
+            <div
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-500 text-xs font-bold rounded-xl border border-slate-200 select-none cursor-not-allowed"
+              title="Order is confirmed and locked. The order form cannot be edited once confirmed."
+            >
+              <Lock size={14} className="text-slate-400" />
+              <span>Order Locked (Confirmed)</span>
+            </div>
+          )}
 
           {/* Generate / Edit Tax Invoice Button */}
           <button

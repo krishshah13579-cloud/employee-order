@@ -22,6 +22,7 @@ import {
   Receipt,
   FileCheck2,
   Loader2,
+  Lock,
 } from "lucide-react";
 import {
   ORDER_STATUSES,
@@ -417,13 +418,30 @@ export default function OrdersView({
                       </button>
 
                       {/* Edit Order or Edit Tax Invoice */}
-                      <Link
-                        href={activeTab === "INVOICES" ? `/admin/orders/${o.id}?editInvoice=true` : `/admin/orders/${o.id}/edit`}
-                        className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
-                        title={activeTab === "INVOICES" ? "Edit Tax Invoice details" : "Edit Order Form items & quantities"}
-                      >
-                        <Edit size={15} />
-                      </Link>
+                      {activeTab === "INVOICES" ? (
+                        <Link
+                          href={`/admin/orders/${o.id}?editInvoice=true`}
+                          className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Tax Invoice details"
+                        >
+                          <Edit size={15} />
+                        </Link>
+                      ) : o.status === "Pending" ? (
+                        <Link
+                          href={`/admin/orders/${o.id}/edit`}
+                          className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Order Form items & quantities"
+                        >
+                          <Edit size={15} />
+                        </Link>
+                      ) : (
+                        <span
+                          className="p-1.5 inline-flex text-gray-300 cursor-not-allowed"
+                          title="Order is confirmed and locked from editing"
+                        >
+                          <Lock size={15} />
+                        </span>
+                      )}
 
                       {/* View Dedicated Page */}
                       <Link

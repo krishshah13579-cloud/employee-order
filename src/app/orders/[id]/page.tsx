@@ -17,6 +17,7 @@ import {
   Truck,
   Clock,
   Eye,
+  Lock,
   X,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
@@ -318,6 +319,18 @@ export default function OrderEditPage() {
               <span>Preview Order Form</span>
             </button>
           </div>
+
+          {/* Locked Order Notice */}
+          {status !== "Pending" && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-center gap-3 text-xs text-amber-900 shadow-2xs">
+              <Lock size={18} className="text-amber-700 shrink-0" />
+              <div>
+                <span className="font-bold">Order Confirmed &amp; Locked:</span>{" "}
+                <span>This order has been confirmed by administration. The order form is locked and cannot be edited.</span>
+              </div>
+            </div>
+          )}
+
           {/* ═══════════════════════════════════════════
               1. CUSTOMER & ORDER STATUS DETAILS
               ═══════════════════════════════════════════ */}
