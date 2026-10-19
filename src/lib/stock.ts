@@ -210,9 +210,10 @@ export function parseDetailedColorStockWithLoose(
  */
 export function getSizesFromRatio(ratio: string): string[] {
   const clean = ratio.trim().toLowerCase();
+  if (clean === "28 to 36" || clean === "28x36") return ["28", "30", "32", "34", "36"];
+  if (clean === "28 to 34" || clean === "28x34" || clean.includes("28 to 34")) return ["28", "30", "32", "34"];
   if (clean === "30 to 38" || clean === "30x38") return ["30", "32", "34", "36", "38"];
   if (clean === "32 to 38" || clean === "32x38") return ["32", "34", "36", "38"];
-  if (clean === "28 to 36" || clean === "28x36") return ["28", "30", "32", "34", "36"];
   if (clean === "28 to 38" || clean === "28x38") return ["28", "30", "32", "34", "36", "38"];
   if (clean === "30 to 40" || clean === "30x40") return ["30", "32", "34", "36", "38", "40"];
   if (clean === "32 to 40" || clean === "32x40") return ["32", "34", "36", "38", "40"];
@@ -235,6 +236,38 @@ export function getSizesFromRatio(ratio: string): string[] {
     }
   }
   return [ratio];
+}
+
+/**
+ * Returns number of pieces per set for a size ratio.
+ */
+export function getPcsFromRatio(ratio: string, fallback: number = 5): number {
+  const sizes = getSizesFromRatio(ratio);
+  return sizes.length > 0 && sizes[0] !== ratio ? sizes.length : fallback;
+}
+
+/**
+ * Sorts ratio keys according to garment business rules:
+ * "28 to 36" (5 pcs) is prioritized first,
+ * followed immediately by "28 to 34" (4 pc set),
+ * then "30 to 38" (5 pcs), "32 to 38" (4 pcs), etc.
+ */
+export function sortSizeRatioKeys(ratios: string[]): string[] {
+  const getPriority = (raw: string): number => {
+    const clean = raw.trim().toLowerCase();
+    if (clean === "28 to 36" || clean === "28x36") return 1;
+    if (clean === "28 to 34" || clean === "28x34" || clean.includes("28 to 34") || clean.includes("4 pc") || clean.includes("4pc")) return 2;
+    if (clean === "30 to 38" || clean === "30x38") return 3;
+    if (clean === "32 to 38" || clean === "32x38") return 4;
+    return 10;
+  };
+
+  return [...ratios].sort((a, b) => {
+    const pA = getPriority(a);
+    const pB = getPriority(b);
+    if (pA !== pB) return pA - pB;
+    return a.localeCompare(b);
+  });
 }
 
 /**

@@ -261,9 +261,10 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const STANDARD_SIZE_RATIOS = [
-  { label: "28 to 36 (28, 30, 32, 34, 36)", value: "28 to 36", sizes: "28, 30, 32, 34, 36", pcs: 5 },
-  { label: "30 to 38 (30, 32, 34, 36, 38)", value: "30 to 38", sizes: "30, 32, 34, 36, 38", pcs: 5 },
-  { label: "32 to 38 (32, 34, 36, 38)", value: "32 to 38", sizes: "32, 34, 36, 38", pcs: 4 },
+  { label: "28 to 36 (28, 30, 32, 34, 36) - 5 Pcs", value: "28 to 36", sizes: "28, 30, 32, 34, 36", pcs: 5 },
+  { label: "28 to 34 (28, 30, 32, 34) - 4 Pc Set", value: "28 to 34", sizes: "28, 30, 32, 34", pcs: 4 },
+  { label: "30 to 38 (30, 32, 34, 36, 38) - 5 Pcs", value: "30 to 38", sizes: "30, 32, 34, 36, 38", pcs: 5 },
+  { label: "32 to 38 (32, 34, 36, 38) - 4 Pcs", value: "32 to 38", sizes: "32, 34, 36, 38", pcs: 4 },
 ];
 
 export const PRODUCT_CATEGORIES = [

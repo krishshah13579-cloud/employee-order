@@ -51,6 +51,7 @@ import {
   calculateColorSizesBreakdown,
   calculateTotalColorPieces,
   getSizesFromRatio,
+  sortSizeRatioKeys,
   sellSingleSizeFromColorStock,
   unpackSetToLoosePieces,
 } from "@/lib/stock";
@@ -1204,7 +1205,8 @@ export default function ProductForm({
       // Derive primary sizesRatio, sizesList, and pcsPerSet from activeStockColor or first color
       const primaryClean = cleanColorName(activeStockColor || selectedColors[0] || "");
       const primaryRatios = colorRatioStockMap[primaryClean] || {};
-      const primaryRatioName = Object.keys(primaryRatios)[0] || formData.sizesRatio || "30 to 38";
+      const sortedKeys = sortSizeRatioKeys(Object.keys(primaryRatios));
+      const primaryRatioName = sortedKeys[0] || formData.sizesRatio || "28 to 36";
       const primarySizes = getSizesFromRatio(primaryRatioName);
       const primaryPcs = primarySizes.length > 0 ? primarySizes.length : (formData.pcsPerSet || 5);
 
@@ -2507,7 +2509,7 @@ export default function ProductForm({
                         <span className="text-[11px] font-medium text-gray-500 block">
                           Add Standard Pack (Click to Apply / Add):
                         </span>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {STANDARD_SIZE_RATIOS.map((std) => {
                             const isPresent = ratios[std.value] !== undefined;
                             return (
@@ -2573,7 +2575,8 @@ export default function ProductForm({
                             No ratio packs configured. Click a standard pack above.
                           </div>
                         ) : (
-                          Object.entries(ratios).map(([ratioKey, setsCount]) => {
+                          sortSizeRatioKeys(Object.keys(ratios)).map((ratioKey) => {
+                            const setsCount = ratios[ratioKey];
                             const ratioSizes = getSizesFromRatio(ratioKey);
                             return (
                               <div

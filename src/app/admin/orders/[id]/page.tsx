@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -38,6 +38,7 @@ import { useToast } from "@/components/ui/Toast";
 
 export default function OrderInvoicePage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const { toast } = useToast();
 
@@ -60,19 +61,6 @@ export default function OrderInvoicePage() {
   const [markAsReady, setMarkAsReady] = useState(true);
   const [editableItems, setEditableItems] = useState<any[]>([]);
 
-  // Order Form Editing Modal State (Edit customer, items, colors, sets, rates, notes, status)
-  const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
-  const [savingOrderForm, setSavingOrderForm] = useState(false);
-  const [editStatus, setEditStatus] = useState<string>("Pending");
-  const [editNotes, setEditNotes] = useState<string>("");
-  const [editPlacedBy, setEditPlacedBy] = useState<string>("");
-  const [editCustomerPhone, setEditCustomerPhone] = useState<string>("");
-  const [editCustomerAddress, setEditCustomerAddress] = useState<string>("");
-  const [editCustomerGstPan, setEditCustomerGstPan] = useState<string>("");
-  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
-  const [sendWhatsAppOnSave, setSendWhatsAppOnSave] = useState<boolean>(true);
-  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [selectedProductToAdd, setSelectedProductToAdd] = useState<string>("");
 
   // Load Order
   async function loadOrder() {
@@ -152,37 +140,6 @@ export default function OrderInvoicePage() {
         });
       }
       setEditableItems(initialItems);
-
-      // Populate Order Form Edit States
-      setEditStatus(data.status);
-      setEditNotes(data.notes || "");
-      setEditPlacedBy(data.placedBy || "Admin");
-      setEditCustomerPhone(data.customer?.phoneNumber || data.customerPhone || "");
-      setEditCustomerAddress(data.customer?.address || data.customerAddress || "");
-      setEditCustomerGstPan(data.customer?.gstPanNo || data.customerGstPan || "");
-
-      const orderItemsForEdit = (data.items || []).map((it) => {
-        let parsedColorSets = [];
-        try {
-          parsedColorSets = typeof it.colorSets === "string" ? JSON.parse(it.colorSets) : it.colorSets;
-        } catch {
-          parsedColorSets = [];
-        }
-        return {
-          id: it.id,
-          productId: it.productId,
-          productName: it.productName,
-          sizeRatio: it.sizeRatio || "30 to 38",
-          pcsPerSet: it.pcsPerSet || 5,
-          totalSets: it.totalSets || 0,
-          totalPcs: it.totalPcs || 0,
-          unitPrice: it.unitPrice || 0,
-          itemSubtotal: it.itemSubtotal || 0,
-          colorSets: parsedColorSets || [],
-          product: (it as any).product || null,
-        };
-      });
-      setEditOrderItems(orderItemsForEdit);
     } catch (err: any) {
       setError(err.message || "Failed to load order.");
     } finally {
@@ -195,205 +152,14 @@ export default function OrderInvoicePage() {
   }, [id]);
 
   useEffect(() => {
-    // Check if ?edit=true was passed in the URL to open Order Form Editor immediately
+    // Check if ?edit=true was passed in the URL to open Order Form Editor page immediately
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("edit") === "true") {
-        setIsEditOrderModalOpen(true);
+        router.replace(`/admin/orders/${id}/edit`);
       }
     }
-    // Fetch active products list for adding products to order
-    fetch("/api/products?active_only=1")
-      .then((res) => res.text())
-      .then((text) => {
-        try {
-          const prods = JSON.parse(text);
-          if (Array.isArray(prods)) setAvailableProducts(prods);
-        } catch {}
-      })
-      .catch(() => {});
   }, []);
-
-  // ═══════════════════════════════════════════
-  // ORDER FORM EDIT HANDLERS
-  // ═══════════════════════════════════════════
-  const handleEditColorSet = (itemIndex: number, colorIndex: number, newSets: number) => {
-    const updated = [...editOrderItems];
-    const item = { ...updated[itemIndex] };
-    const colors = [...(item.colorSets || [])];
-    colors[colorIndex] = { ...colors[colorIndex], sets: Math.max(0, newSets) };
-
-    const totalSets = colors.reduce((sum, c) => sum + (Number(c.sets) || 0), 0);
-    const pcsPerSet = item.pcsPerSet || 5;
-
-    let totalPcs = 0;
-    for (const c of colors) {
-      const calc = calculateOrderedColorSetsPieces(
-        item.product?.setsColorwise || null,
-        c.color,
-        c.sets,
-        pcsPerSet
-      );
-      totalPcs += calc.totalPcs;
-    }
-    if (totalPcs === 0) {
-      totalPcs = totalSets * pcsPerSet;
-    }
-
-    const unitPrice = item.unitPrice || 0;
-    item.colorSets = colors;
-    item.totalSets = totalSets;
-    item.totalPcs = totalPcs;
-    item.itemSubtotal = Math.round(totalPcs * unitPrice);
-
-    updated[itemIndex] = item;
-    setEditOrderItems(updated);
-  };
-
-  const handleEditUnitPrice = (itemIndex: number, newPrice: number) => {
-    const updated = [...editOrderItems];
-    const item = { ...updated[itemIndex] };
-    item.unitPrice = Math.max(0, newPrice);
-    item.itemSubtotal = Math.round((item.totalPcs || 0) * item.unitPrice);
-    updated[itemIndex] = item;
-    setEditOrderItems(updated);
-  };
-
-  const handleRemoveOrderItem = (itemIndex: number) => {
-    if (editOrderItems.length <= 1) {
-      toast("An order must have at least one product item", "error");
-      return;
-    }
-    const updated = editOrderItems.filter((_, idx) => idx !== itemIndex);
-    setEditOrderItems(updated);
-  };
-
-  const handleAddProductToOrder = (prodIdStr: string) => {
-    if (!prodIdStr) return;
-    const prod = availableProducts.find((p) => String(p.id) === prodIdStr);
-    if (!prod) return;
-
-    let colors: string[] = [];
-    if (prod.colorsAvailable) {
-      try {
-        const parsed = typeof prod.colorsAvailable === "string" ? JSON.parse(prod.colorsAvailable) : prod.colorsAvailable;
-        if (Array.isArray(parsed)) colors = parsed;
-      } catch {
-        colors = String(prod.colorsAvailable).split(",").map((s: string) => s.trim()).filter(Boolean);
-      }
-    }
-    if (colors.length === 0) colors = ["Standard"];
-
-    const colorSets = colors.map((col: string, idx: number) => ({
-      color: col,
-      sets: idx === 0 ? 1 : 0,
-    }));
-
-    const pcsPerSet = prod.pcsPerSet || 5;
-    const calc = calculateOrderedColorSetsPieces(prod.setsColorwise, colors[0], 1, pcsPerSet);
-    const totalPcs = calc.totalPcs || pcsPerSet;
-    const unitPrice = prod.retailerPrice || prod.price || 0;
-
-    const newItem = {
-      productId: prod.id,
-      productName: prod.name,
-      sizeRatio: prod.sizesRatio || "30 to 38",
-      pcsPerSet,
-      totalSets: 1,
-      totalPcs,
-      unitPrice,
-      itemSubtotal: totalPcs * unitPrice,
-      colorSets,
-      product: prod,
-    };
-
-    setEditOrderItems((prev) => [...prev, newItem]);
-    setSelectedProductToAdd("");
-    toast(`Added "${prod.name}" to order`, "success");
-  };
-
-  const handleSaveOrderForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!order) return;
-
-    const mSets = editOrderItems.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
-    if (mSets === 0) {
-      toast("Please allocate at least 1 set across the products", "error");
-      return;
-    }
-
-    try {
-      setSavingOrderForm(true);
-
-      // Sanitize items payload to prevent sending huge base64 images/objects in `it.product`
-      const sanitizedItems = editOrderItems.map((it) => ({
-        id: it.id,
-        productId: Number(it.productId) || 0,
-        productName: it.productName || "Garment",
-        sizeRatio: it.sizeRatio || "Standard",
-        sizesList: it.sizesList || "Standard",
-        pcsPerSet: Number(it.pcsPerSet) || 5,
-        totalSets: Number(it.totalSets) || 0,
-        totalPcs: Number(it.totalPcs) || 0,
-        unitPrice: Number(it.unitPrice) || 0,
-        itemSubtotal: Number(it.itemSubtotal) || 0,
-        colorSets: Array.isArray(it.colorSets) ? it.colorSets : [],
-        notes: it.notes || null,
-      }));
-
-      const res = await fetch(`/api/orders/${order.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: editStatus,
-          notes: editNotes,
-          placedBy: editPlacedBy,
-          customerPhone: editCustomerPhone,
-          customerAddress: editCustomerAddress,
-          customerGstPan: editCustomerGstPan,
-          items: sanitizedItems,
-          notifyCustomer: sendWhatsAppOnSave,
-          sendWhatsApp: sendWhatsAppOnSave,
-        }),
-      });
-
-      // Safe text response parser to prevent Safari "The string did not match the expected pattern" DOMException
-      const text = await res.text();
-      let data: any = {};
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error(
-          res.ok
-            ? "Invalid server response format"
-            : `Server error (${res.status}): ${text.slice(0, 120) || res.statusText || "Failed to update order"}`
-        );
-      }
-
-      if (!res.ok) throw new Error(data.error || `Failed to update order (${res.status})`);
-
-      toast("✅ Order Form updated successfully!", "success");
-      setIsEditOrderModalOpen(false);
-      loadOrder();
-
-      if (sendWhatsAppOnSave && data.whatsapp?.customerPhone && data.whatsapp?.message) {
-        toast("Sending updated order details to customer WhatsApp...", "info");
-        sendAutomatedWhatsAppDirect({
-          phone: data.whatsapp.customerPhone,
-          message: data.whatsapp.message,
-          pdfUrl: data.whatsapp.pdfUrl,
-          filename: data.whatsapp.filename,
-          nativeUrl: data.whatsapp.nativeUrl,
-          whatsappUrl: data.whatsapp.directUrl,
-          onToast: toast,
-        }).catch((err) => console.error("Auto WhatsApp edit error:", err));
-      }
-    } catch (err: any) {
-      toast(err.message || "Failed to update order", "error");
-    } finally {
-      setSavingOrderForm(false);
-    }
-  };
 
   // Recalculate an item row in tax invoice modal
   const handleUpdateItemQty = (
@@ -653,7 +419,7 @@ export default function OrderInvoicePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-16">
+    <div className="space-y-6 max-w-4xl mx-auto pb-16 print:space-y-0 print:max-w-none print:w-full print:p-0 print:m-0">
       {/* Top Bar with Back, Format Switcher, WhatsApp, and Print */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-200 print:hidden">
         <Link
@@ -694,16 +460,15 @@ export default function OrderInvoicePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Edit Order Form Button */}
-          <button
-            type="button"
-            onClick={() => setIsEditOrderModalOpen(true)}
+          {/* Edit Order & Products Page Button */}
+          <Link
+            href={`/admin/orders/${order.id}/edit`}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-            title="Edit customer order items, sets, prices, notes, or status"
+            title="Edit customer order items, products, size ratios, sets, prices, notes, or status on dedicated page"
           >
             <Edit3 size={14} className="text-white" />
-            <span>Edit Order Form</span>
-          </button>
+            <span>Edit Products &amp; Order</span>
+          </Link>
 
           {/* Generate / Edit Tax Invoice Button */}
           <button
@@ -1023,7 +788,7 @@ export default function OrderInvoicePage() {
       {/* ═══════════════════════════════════════════
           EXACT A4 TAX INVOICE PRINT VIEW
           ═══════════════════════════════════════════ */}
-      <div className="hidden print:block py-2">
+      <div id="printable-tax-invoice" className="hidden print:block printable-invoice-container w-full py-1">
         <TaxInvoiceA4
           formatType={formatType}
           order={{
@@ -1253,319 +1018,7 @@ export default function OrderInvoicePage() {
         </form>
       </Modal>
 
-      {/* ═══════════════════════════════════════════
-          EDIT ORDER FORM MODAL
-          ═══════════════════════════════════════════ */}
-      <Modal
-        isOpen={isEditOrderModalOpen}
-        onClose={() => setIsEditOrderModalOpen(false)}
-        title={`Edit Wholesale Order #${order.orderNumber}`}
-        size="xl"
-      >
-        <form onSubmit={handleSaveOrderForm} className="space-y-5">
-          <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 flex items-start gap-2">
-            <AlertCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <strong>Wholesale Order Editor:</strong> Update customer contact, order status, add/remove garment items, and adjust color-wise sets or rates.
-              The total pieces and 5% GST will automatically recalculate.
-            </div>
-          </div>
 
-          {/* Top Row: Status, Customer Phone, GST/PAN */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Order Status*
-              </label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                {ORDER_STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Customer Phone (WhatsApp)*
-              </label>
-              <input
-                type="text"
-                value={editCustomerPhone}
-                onChange={(e) => setEditCustomerPhone(e.target.value)}
-                placeholder="10-digit mobile number"
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                GST / PAN Number
-              </label>
-              <input
-                type="text"
-                value={editCustomerGstPan}
-                onChange={(e) => setEditCustomerGstPan(e.target.value.toUpperCase())}
-                placeholder="GSTIN / PAN"
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Customer Address & Notes / Transport */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Customer Delivery Address
-              </label>
-              <input
-                type="text"
-                value={editCustomerAddress}
-                onChange={(e) => setEditCustomerAddress(e.target.value)}
-                placeholder="Shop address, city, state"
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Transport / Order Notes
-              </label>
-              <input
-                type="text"
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="e.g. [TRANSPORT: Patel Transport] urgent parcel"
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Products & Color-wise Sets List */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                Order Items &amp; Color Sets
-              </label>
-
-              {/* Add Product Dropdown */}
-              {availableProducts.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedProductToAdd}
-                    onChange={(e) => setSelectedProductToAdd(e.target.value)}
-                    className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-700 cursor-pointer max-w-[240px] truncate"
-                  >
-                    <option value="">+ Add Product from Catalogue...</option>
-                    {availableProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.category}) — ₹{p.retailerPrice || p.price}/pc
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!selectedProductToAdd}
-                    onClick={() => handleAddProductToOrder(selectedProductToAdd)}
-                    className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <Plus size={13} />
-                    <span>Add</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-              {editOrderItems.map((item, itIdx) => (
-                <div
-                  key={itIdx}
-                  className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-black text-slate-900">
-                        {formatProductNameWithMrp(
-                          item.productName,
-                          (item as any).mrp || (item as any).product?.mrp,
-                          item.unitPrice
-                        )}
-                      </span>
-                      <span className="ml-2 text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                        Ratio: {item.sizeRatio}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="text-right font-mono font-bold">
-                        <span className="text-blue-700">{item.totalSets} Sets ({item.totalPcs} Pcs)</span>
-                        <span className="text-slate-400 mx-1.5">=</span>
-                        <span className="text-emerald-700">{formatCurrency(item.itemSubtotal)}</span>
-                      </div>
-
-                      {editOrderItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveOrderItem(itIdx)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Remove product item"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Colors & Sets Grid */}
-                  {item.colorSets && item.colorSets.length > 0 ? (
-                    <div className="space-y-1.5 pt-2 border-t border-slate-200/80">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Color-Wise Sets:
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {item.colorSets.map((cs: any, cIdx: number) => {
-                          const cHex = getColorHex(cs.color);
-                          return (
-                            <div
-                              key={cIdx}
-                              className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-2xs"
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                                <span
-                                  className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
-                                  style={{ backgroundColor: cHex.hex }}
-                                />
-                                <span className="truncate text-xs font-semibold text-slate-800" title={cs.color}>
-                                  {cs.color}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center border border-slate-300 rounded-md overflow-hidden bg-white shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditColorSet(itIdx, cIdx, (Number(cs.sets) || 0) - 1)}
-                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={cs.sets === 0 ? "" : cs.sets}
-                                  placeholder="0"
-                                  onChange={(e) =>
-                                    handleEditColorSet(itIdx, cIdx, parseInt(e.target.value, 10) || 0)
-                                  }
-                                  className="w-9 h-6 border-x border-slate-300 text-center text-xs font-bold text-slate-900 focus:outline-none"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditColorSet(itIdx, cIdx, (Number(cs.sets) || 0) + 1)}
-                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Rate / Pc row */}
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-600">Rate / Pc (₹):</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) => handleEditUnitPrice(itIdx, parseFloat(e.target.value) || 0)}
-                        className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="text-slate-500 text-[11px]">
-                      {item.pcsPerSet || 5} Pcs per wholesale set
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Modal Summary Totals */}
-          {(() => {
-            const mSets = editOrderItems.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
-            const mPcs = editOrderItems.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
-            const mSub = editOrderItems.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
-            const mGst = Math.round(mSub * 0.05 * 100) / 100;
-            const mTotal = Math.round(mSub + mGst);
-
-            return (
-              <div className="flex flex-col sm:flex-row items-center justify-between p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold gap-2">
-                <div className="space-x-2 text-slate-800">
-                  <span>Total Sets: <strong>{mSets}</strong></span>
-                  <span>•</span>
-                  <span>Total Pcs: <strong>{mPcs}</strong></span>
-                  <span>•</span>
-                  <span>Subtotal: <strong>{formatCurrency(mSub)}</strong></span>
-                  <span>•</span>
-                  <span>5% GST: <strong>{formatCurrency(mGst)}</strong></span>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-600 mr-2">Grand Total:</span>
-                  <span className="text-base font-black font-mono text-blue-700">
-                    {formatCurrency(mTotal)}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* WhatsApp Notification Option */}
-          <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-950">
-              <input
-                type="checkbox"
-                checked={sendWhatsAppOnSave}
-                onChange={(e) => setSendWhatsAppOnSave(e.target.checked)}
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
-              />
-              <span>Send updated Order Form / Invoice to customer on WhatsApp</span>
-            </label>
-            <p className="text-[11px] text-emerald-700 pl-6">
-              When status is <strong>Confirmed</strong>, the customer receives the official Confirmed Order Form PDF.
-              When status is <strong>Ready</strong>, the customer receives the Ready Order / Tax Invoice PDF.
-            </p>
-          </div>
-
-          {/* Modal Footer Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsEditOrderModalOpen(false)}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={savingOrderForm}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-40"
-            >
-              <Check size={14} />
-              <span>{savingOrderForm ? "Saving Order..." : "Save Order Form"}</span>
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* ═══════════════════════════════════════════
           ON-SCREEN A4 TAX INVOICE & ORDER FORM LIVE EDITOR MODAL

@@ -45,3 +45,52 @@
 }
 .modal-overlay-enter { animation: modalFadeIn 0.2s ease-out forwards; }
 .modal-content-enter { animation: modalScaleIn 0.25s ease-out forwards; }
+
+/* ═══════════════════════════════════════════
+   PRINT MEDIA STYLES (A4 BILL / INVOICE)
+   ═══════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm 6mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all dashboard chrome, navigation, headers, footers, buttons */
+  aside,
+  header,
+  nav,
+  footer,
+  .print\:hidden,
+  .no-print,
+  #toast-container,
+  .toast-container {
+    display: none !important;
+  }
+
+  /* Reset main content container */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Clean full-width bill container */
+  .printable-invoice-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
