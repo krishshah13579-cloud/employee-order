@@ -152,6 +152,11 @@ export default function OrderInvoicePage() {
         });
       }
       setEditableItems(initialItems);
+
+      // If order already has a tax invoice number, default format to TAX_INVOICE
+      if (data.taxInvoiceNumber || data.status === "Ready" || data.status === "Dispatched" || data.status === "Delivered") {
+        setFormatType("TAX_INVOICE");
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load order.");
     } finally {
@@ -402,7 +407,7 @@ export default function OrderInvoicePage() {
 
   // Active Format Data Calculation
   const isTaxInvoiceActive = formatType === "TAX_INVOICE";
-  let activeDisplayItems = order.items || [];
+  let activeDisplayItems = order.items && order.items.length > 0 ? order.items : [];
   let activeTotalSets = order.totalSets;
   let activeTotalPcs = order.totalPcs;
   let activeSubtotal = order.subtotal;
@@ -411,16 +416,18 @@ export default function OrderInvoicePage() {
   let activeDocNumber = order.orderNumber;
   let activeDate = order.orderDate;
 
-  if (isTaxInvoiceActive && order.taxInvoiceItems) {
+  if (order.taxInvoiceItems) {
     try {
       const parsed = JSON.parse(order.taxInvoiceItems);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        activeDisplayItems = parsed;
-        activeTotalSets = parsed.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
-        activeTotalPcs = parsed.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
-        activeSubtotal = parsed.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
-        activeGst = Math.round(activeSubtotal * 0.05 * 100) / 100;
-        activeGrandTotal = Math.round(activeSubtotal + activeGst);
+        if (isTaxInvoiceActive || activeDisplayItems.length === 0) {
+          activeDisplayItems = parsed;
+          activeTotalSets = parsed.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
+          activeTotalPcs = parsed.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
+          activeSubtotal = parsed.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
+          activeGst = Math.round(activeSubtotal * 0.05 * 100) / 100;
+          activeGrandTotal = Math.round(activeSubtotal + activeGst);
+        }
       }
     } catch {}
   }

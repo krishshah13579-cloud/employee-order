@@ -3,11 +3,14 @@ export interface PastInvoiceItem {
   sizeRatio?: string;
   sizesList?: string;
   color?: string;
+  colorSets?: { color: string; sets: number }[];
   totalSets: number;
   totalPcs: number;
   unitPrice: number;
   itemSubtotal: number;
   pcsPerSet?: number;
+  mrp?: number;
+  hsnCode?: string;
 }
 
 export interface PastInvoiceDefinition {
@@ -922,7 +925,26 @@ export const PAST_INVOICES_1_TO_39: PastInvoiceDefinition[] = [
     totalPcs: 30,
     totalSets: 6,
     items: [
-      { productName: "IMP 039 (1549)", sizeRatio: "30-38", color: "6", totalSets: 6, totalPcs: 30, unitPrice: 625.0, itemSubtotal: 18750.0, pcsPerSet: 5 },
+      {
+        productName: "IMP - 039 (1549)",
+        sizeRatio: "30-38",
+        sizesList: "30, 32, 34, 36, 38",
+        color: "Brown (1), Navy Blue (1), Off White (1), Dark Brown (1), Khaki (1), Black (1)",
+        colorSets: [
+          { color: "Brown", sets: 1 },
+          { color: "Navy Blue", sets: 1 },
+          { color: "Off White", sets: 1 },
+          { color: "Dark Brown", sets: 1 },
+          { color: "Khaki", sets: 1 },
+          { color: "Black", sets: 1 },
+        ],
+        totalSets: 6,
+        totalPcs: 30,
+        unitPrice: 625.0,
+        itemSubtotal: 18750.0,
+        pcsPerSet: 5,
+        mrp: 1549,
+      },
     ],
   },
 ];

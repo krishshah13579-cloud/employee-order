@@ -248,7 +248,12 @@ export default function OrderEditPage() {
   }, [orderId]);
 
   // Active items based on selected format
-  const activeItems = formatType === "TAX_INVOICE" && taxInvoiceItems.length > 0 ? taxInvoiceItems : items;
+  const activeItems =
+    formatType === "TAX_INVOICE" && taxInvoiceItems.length > 0
+      ? taxInvoiceItems
+      : items.length > 0
+      ? items
+      : taxInvoiceItems;
 
   // Order Totals Calculations
   const totalSets = activeItems.reduce((sum, it) => sum + (it.totalSets || 0), 0);

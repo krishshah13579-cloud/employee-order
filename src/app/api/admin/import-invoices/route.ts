@@ -92,12 +92,108 @@ export async function POST(request: NextRequest) {
         importedOrders++;
       }
 
+      // Synchronize OrderItem records for this order without touching stock
+      await prisma.orderItem.deleteMany({
+        where: { orderId: order.id },
+      });
+
+      const formattedTaxInvoiceItems: any[] = [];
+
+      for (const it of inv.items) {
+        // Match or find product in catalog
+        const cleanName = it.productName.trim();
+        const m = cleanName.match(/\d+/);
+        const num = m ? parseInt(m[0], 10) : null;
+
+        let prod = await prisma.product.findFirst({
+          where: {
+            OR: [
+              { name: { equals: cleanName } },
+              ...(num !== null ? [{ name: { contains: String(num) } }] : []),
+            ],
+          },
+        });
+
+        if (!prod) {
+          const baseMrp = it.mrp || (it.unitPrice ? Math.round(it.unitPrice * 2) : 1500);
+          prod = await prisma.product.create({
+            data: {
+              name: cleanName,
+              category: "FORMAL WEAR",
+              colorsAvailable: it.color || "Standard Mix",
+              sizesRatio: it.sizeRatio || "30 to 38",
+              sizesList: it.sizesList || "30, 32, 34, 36, 38",
+              pcsPerSet: it.pcsPerSet || 5,
+              mrp: baseMrp,
+              retailerPrice: it.unitPrice || Math.round(baseMrp / 2),
+              wholesalerPrice: it.unitPrice ? Math.max(0, it.unitPrice - 100) : Math.round(baseMrp / 2 - 100),
+              price: it.unitPrice || Math.round(baseMrp / 2),
+              setsColorwise: "{}",
+              isActive: true,
+            },
+          });
+        }
+
+        let colorSetsArray = (it as any).colorSets || [];
+        if (!colorSetsArray || colorSetsArray.length === 0) {
+          if (it.color && it.color.trim()) {
+            colorSetsArray = [{ color: it.color.trim(), sets: it.totalSets || 1 }];
+          } else {
+            colorSetsArray = [];
+          }
+        }
+
+        const createdItem = await prisma.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: prod.id,
+            productName: it.productName,
+            colorSets: JSON.stringify(colorSetsArray),
+            sizeRatio: it.sizeRatio || prod.sizesRatio || "30 to 38",
+            sizesList: it.sizesList || prod.sizesList || "30, 32, 34, 36, 38",
+            pcsPerSet: it.pcsPerSet || prod.pcsPerSet || 5,
+            totalSets: Number(it.totalSets) || 0,
+            totalPcs: Number(it.totalPcs) || 0,
+            unitPrice: Number(it.unitPrice) || 0,
+            itemSubtotal: Number(it.itemSubtotal) || 0,
+            notes: it.color ? `Color: ${it.color}` : null,
+          },
+        });
+
+        formattedTaxInvoiceItems.push({
+          id: createdItem.id,
+          productId: prod.id,
+          productName: it.productName,
+          sizeRatio: it.sizeRatio || prod.sizesRatio || "30 to 38",
+          sizesList: it.sizesList || prod.sizesList || "30, 32, 34, 36, 38",
+          pcsPerSet: it.pcsPerSet || prod.pcsPerSet || 5,
+          totalSets: Number(it.totalSets) || 0,
+          totalPcs: Number(it.totalPcs) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          itemSubtotal: Number(it.itemSubtotal) || 0,
+          color: it.color || "",
+          colorSets: colorSetsArray,
+          mrp: it.mrp || prod.mrp,
+        });
+      }
+
+      // Update Order taxInvoiceItems
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          taxInvoiceItems: JSON.stringify(formattedTaxInvoiceItems),
+          taxInvoiceNumber: inv.invoiceNumber,
+          status: "Delivered",
+        },
+      });
+
       // Check if SalesInvoice already exists
       let salesInv = await prisma.salesInvoice.findFirst({
         where: {
           OR: [
             { invoiceNumber: inv.invoiceNumber },
             { invoiceNumber: `INV-${inv.invoiceNumber}` },
+            { orderId: order.id },
           ],
         },
       });
@@ -124,10 +220,22 @@ export async function POST(request: NextRequest) {
             balanceAmount: inv.isCashMemo ? 0 : inv.grandTotal,
             totalSets: inv.totalSets,
             totalPcs: inv.totalPcs,
-            items: JSON.stringify(inv.items),
+            items: JSON.stringify(formattedTaxInvoiceItems),
             creditDays: inv.creditDays !== undefined ? inv.creditDays : inv.isCashMemo ? 0 : 45,
             notes: noteText || null,
             placedBy: "Historical Import",
+          },
+        });
+        importedInvoices++;
+      } else {
+        await prisma.salesInvoice.update({
+          where: { id: salesInv.id },
+          data: {
+            items: JSON.stringify(formattedTaxInvoiceItems),
+            totalSets: inv.totalSets,
+            totalPcs: inv.totalPcs,
+            subtotal: inv.subtotal,
+            grandTotal: inv.grandTotal,
           },
         });
         importedInvoices++;
