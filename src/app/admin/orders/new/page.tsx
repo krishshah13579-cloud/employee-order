@@ -66,7 +66,7 @@ export default function NewOrderPage() {
           setProducts(prods);
 
           // Fetch next order form number starting from 1
-          fetch("/api/orders/next-numbers")
+          fetch("/api/order-numbers")
             .then((r) => r.json())
             .then((numData) => {
               if (numData?.nextOrderNumber) {

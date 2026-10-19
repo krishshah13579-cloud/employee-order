@@ -98,7 +98,7 @@ export default function OrderInvoicePage() {
       if (data.taxInvoiceNumber) {
         setTaxInvoiceNoInput(data.taxInvoiceNumber);
       } else {
-        fetch("/api/orders/next-numbers")
+        fetch("/api/order-numbers")
           .then((r) => r.json())
           .then((numData) => {
             if (numData?.nextTaxInvoiceNumber) {
