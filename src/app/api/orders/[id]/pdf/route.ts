@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
+import { getInvoiceTemplateSettings } from "@/lib/invoice-template";
 
 export async function GET(
   request: NextRequest,
@@ -69,6 +70,19 @@ export async function GET(
         console.error("Error parsing taxInvoiceItems for PDF:", e);
       }
     }
+
+    // Load dynamic invoice template settings & order overrides
+    const globalTemplate = await getInvoiceTemplateSettings();
+    let overrides: any = {};
+    if ((order as any).templateOverrides) {
+      try {
+        overrides =
+          typeof (order as any).templateOverrides === "string"
+            ? JSON.parse((order as any).templateOverrides)
+            : (order as any).templateOverrides;
+      } catch {}
+    }
+    const tpl = { ...globalTemplate, ...overrides };
 
     // Build product map for resolving colorMapping & colorsAvailable
     const productByItem = new Map<any, any>();
@@ -157,22 +171,22 @@ export async function GET(
 
     // 1. TOP HEADER: KRISH CLOTHING CO.
     y = height - margin - 20;
-    const headerTitle = "KRISH CLOTHING CO.";
+    const headerTitle = String(tpl.companyName || "KRISH CLOTHING CO.").toUpperCase();
     const titleWidth = fontBold.widthOfTextAtSize(headerTitle, 16);
     drawText(headerTitle, margin + (contentWidth - titleWidth) / 2, y, { font: fontBold, size: 16 });
 
     y -= 12;
-    const subTitle = "Samet Business Park, Khokhra Circle, Maninagar, Ahmedabad - 380008, Gujarat";
-    const subTitleWidth = fontRegular.widthOfTextAtSize(subTitle, 8);
-    drawText(subTitle, margin + (contentWidth - subTitleWidth) / 2, y, { size: 8, color: rgb(0.2, 0.2, 0.2) });
+    const subTitle = `${tpl.addressLine1 || ""} ${tpl.addressLine2 || ""}`.trim() || "Samet Business Park, Khokhra Circle, Maninagar, Ahmedabad - 380008, Gujarat";
+    const subTitleWidth = fontRegular.widthOfTextAtSize(subTitle, 7.5);
+    drawText(subTitle, margin + (contentWidth - subTitleWidth) / 2, y, { size: 7.5, color: rgb(0.2, 0.2, 0.2) });
 
     y -= 11;
-    const contactLine = "Mobile: +91 8128756632  |  Email: krishclothingco3@gmail.com";
+    const contactLine = `Mobile: ${tpl.phone || "+91 8128756632"}  |  Email: ${tpl.email || "krishclothingco3@gmail.com"}`;
     const contactLineWidth = fontRegular.widthOfTextAtSize(contactLine, 8);
     drawText(contactLine, margin + (contentWidth - contactLineWidth) / 2, y, { size: 8 });
 
     y -= 11;
-    const gstinLine = "GSTIN: 24LAAPS9916E1ZD    PAN: LAAPS9916E";
+    const gstinLine = `GSTIN: ${tpl.gstNo || "24LAAPS9916E1ZD"}    PAN: ${tpl.panNo || "LAAPS9916E"}`;
     const gstinLineWidth = fontBold.widthOfTextAtSize(gstinLine, 8);
     drawText(gstinLine, margin + (contentWidth - gstinLineWidth) / 2, y, { font: fontBold, size: 8 });
 
@@ -387,15 +401,15 @@ export async function GET(
     let bankY = summaryTopY - 14;
     drawText("BANK ACCOUNT DETAILS FOR PAYMENT:", margin + 10, bankY, { font: fontBold, size: 8 });
     bankY -= 12;
-    drawText("Bank Name: ICICI BANK", margin + 10, bankY, { size: 8 });
+    drawText(`Bank Name: ${tpl.bankName || "ICICI BANK"}`, margin + 10, bankY, { size: 8 });
     bankY -= 11;
-    drawText("Account No: 750705000692", margin + 10, bankY, { font: fontBold, size: 8 });
+    drawText(`Account No: ${tpl.accountNo || "750705000692"}`, margin + 10, bankY, { font: fontBold, size: 8 });
     bankY -= 11;
-    drawText("IFSC Code: ICIC0007507", margin + 10, bankY, { size: 8 });
+    drawText(`IFSC Code: ${tpl.ifscCode || "ICIC0007507"}`, margin + 10, bankY, { size: 8 });
     bankY -= 11;
-    drawText("Beneficiary: KRISH CLOTHING CO.", margin + 10, bankY, { size: 8 });
+    drawText(`Beneficiary: ${tpl.beneficiaryName || tpl.companyName || "KRISH CLOTHING CO."}`, margin + 10, bankY, { size: 8 });
     bankY -= 11;
-    drawText("Branch: Khokhra Maninagar, Ahmedabad", margin + 10, bankY, { size: 8 });
+    drawText(`Branch: ${tpl.branch || "Khokhra Maninagar, Ahmedabad"}`, margin + 10, bankY, { size: 8 });
 
     // Vertical line between Bank details and Totals
     drawLine(totalsSplitX, summaryTopY, totalsSplitX, summaryTopY - summaryHeight, 0.75);
@@ -450,18 +464,18 @@ export async function GET(
     let termY = footerTopY - 14;
     drawText("TERMS & CONDITIONS:", margin + 10, termY, { font: fontBold, size: 7.5 });
     termY -= 10;
-    drawText("1. Goods once sold will not be taken back without valid Return Invoice.", margin + 10, termY, { size: 7 });
+    drawText(String(tpl.terms1 || "1. Goods once sold will not be taken back without valid Return Invoice.").slice(0, 80), margin + 10, termY, { size: 7 });
     termY -= 9;
-    drawText(`2. Payment strictly due within ${creditTerms}. Weekly payments expected.`, margin + 10, termY, { size: 7 });
+    drawText(String(tpl.terms2 || `2. Payment strictly due within ${creditTerms}. Weekly payments expected.`).slice(0, 80), margin + 10, termY, { size: 7 });
     termY -= 9;
-    drawText("3. Interest @ 18% p.a. will be charged on overdue payments beyond credit limit.", margin + 10, termY, { size: 7 });
+    drawText(String(tpl.terms3 || "3. Interest @ 18% p.a. will be charged on overdue payments beyond credit limit.").slice(0, 80), margin + 10, termY, { size: 7 });
     termY -= 9;
-    drawText("4. Subject to Ahmedabad jurisdiction only.", margin + 10, termY, { size: 7 });
+    drawText(String(tpl.terms4 || "4. Subject to Ahmedabad jurisdiction only.").slice(0, 80), margin + 10, termY, { size: 7 });
 
     // Signature on Right
     drawLine(sigSplitX, footerTopY, sigSplitX, margin, 0.75);
-    drawText("For, KRISH CLOTHING CO.", sigSplitX + 15, footerTopY - 16, { font: fontBold, size: 8 });
-    drawText("Authorized Signatory", sigSplitX + 22, margin + 10, { size: 8 });
+    drawText(String(tpl.signatoryLabel || "For, KRISH CLOTHING CO.").slice(0, 32), sigSplitX + 15, footerTopY - 16, { font: fontBold, size: 8 });
+    drawText(String(tpl.signatoryTitle || "(Authorised Signatory)").slice(0, 32), sigSplitX + 22, margin + 10, { size: 8 });
 
     // Serialize PDF to bytes
     const pdfBytes = await pdfDoc.save();

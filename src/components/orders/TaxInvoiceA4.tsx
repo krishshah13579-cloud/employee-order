@@ -1,7 +1,21 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { formatCurrency, formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
+import {
+  DEFAULT_INVOICE_TEMPLATE,
+  type InvoiceTemplateSettings,
+} from "@/lib/invoice-template-types";
+import {
+  Edit3,
+  Check,
+  RotateCcw,
+  Plus,
+  Trash2,
+  Save,
+  Printer,
+  Sparkles,
+} from "lucide-react";
 
 export interface TaxInvoiceItem {
   id?: number;
@@ -43,19 +57,24 @@ export interface TaxInvoiceOrder {
   placedBy?: string | null;
   notes?: string | null;
   transportName?: string | null;
+  templateOverrides?: any;
   items: TaxInvoiceItem[];
 }
 
 interface TaxInvoiceA4Props {
   order: TaxInvoiceOrder;
-  copyTitle?: string; // e.g. "Duplicate" or "Original for Recipient"
+  copyTitle?: string;
   formatType?: "ORDER_FORM" | "TAX_INVOICE";
+  allowInlineEdit?: boolean;
+  onSaveOverrides?: (overrides: Record<string, any>) => Promise<void> | void;
 }
 
 export default function TaxInvoiceA4({
   order,
   copyTitle = "Original",
   formatType,
+  allowInlineEdit = true,
+  onSaveOverrides,
 }: TaxInvoiceA4Props) {
   // Determine whether this document should render as TAX INVOICE or ORDER FORM
   const isTaxInvoice =
@@ -66,42 +85,253 @@ export default function TaxInvoiceA4({
         order.status === "Delivered" ||
         Boolean(order.taxInvoiceNumber)));
 
-  const displayTitle = isTaxInvoice ? "TAX INVOICE" : "ORDER FORM";
-  const numberLabel = isTaxInvoice ? "Invoice No." : "Order No.";
-  const displayDocNumber = isTaxInvoice
+  const defaultTitle = isTaxInvoice ? "TAX INVOICE" : "ORDER FORM";
+  const defaultNumberLabel = isTaxInvoice ? "Invoice No." : "Order No.";
+  const defaultDocNumber = isTaxInvoice
     ? order.taxInvoiceNumber || order.orderNumber
     : order.orderNumber;
 
   // Active Date formatted as DD/MM/YYYY
   const activeDate = isTaxInvoice && order.taxInvoiceDate ? order.taxInvoiceDate : order.orderDate;
   const dateObj = activeDate ? new Date(activeDate) : new Date();
-  const formattedDate = !isNaN(dateObj.getTime())
+  const defaultFormattedDate = !isNaN(dateObj.getTime())
     ? `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(
         2,
         "0"
       )}/${dateObj.getFullYear()}`
     : "";
 
-  // Extract transport from notes if not directly present
-  let resolvedTransport = order.transportName || "";
-  if (!resolvedTransport && order.notes) {
+  let defaultTransport = order.transportName || "";
+  if (!defaultTransport && order.notes) {
     const match = order.notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
     if (match && match[1]) {
-      resolvedTransport = match[1].trim();
+      defaultTransport = match[1].trim();
     }
   }
 
-  const subtotal = Number(order.subtotal) || 0;
-  const gstAmount = Number(order.gstAmount) || Math.round(subtotal * 0.05 * 100) / 100;
+  // Edit Mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Template / Header states
+  const [template, setTemplate] = useState<InvoiceTemplateSettings>(DEFAULT_INVOICE_TEMPLATE);
+  const [companyName, setCompanyName] = useState(DEFAULT_INVOICE_TEMPLATE.companyName);
+  const [addressLine1, setAddressLine1] = useState(DEFAULT_INVOICE_TEMPLATE.addressLine1);
+  const [addressLine2, setAddressLine2] = useState(DEFAULT_INVOICE_TEMPLATE.addressLine2);
+  const [phone, setPhone] = useState(DEFAULT_INVOICE_TEMPLATE.phone);
+  const [email, setEmail] = useState(DEFAULT_INVOICE_TEMPLATE.email);
+  const [gstNo, setGstNo] = useState(DEFAULT_INVOICE_TEMPLATE.gstNo);
+  const [panNo, setPanNo] = useState(DEFAULT_INVOICE_TEMPLATE.panNo);
+  const [debitMemoText, setDebitMemoText] = useState("Debit Memo");
+  const [docTitleText, setDocTitleText] = useState(defaultTitle);
+  const [copyTitleText, setCopyTitleText] = useState(copyTitle);
+
+  // Buyer / Customer states
+  const [customerName, setCustomerName] = useState(order.customerName || "WALK-IN CUSTOMER");
+  const [customerAddress, setCustomerAddress] = useState(order.customerAddress || "Direct Delivery");
+  const [customerCity, setCustomerCity] = useState(order.customerCity || "AHMEDABAD");
+  const [customerState, setCustomerState] = useState(order.customerState || "Gujarat");
+  const [placeOfSupply, setPlaceOfSupply] = useState(DEFAULT_INVOICE_TEMPLATE.placeOfSupply);
+  const [customerPhone, setCustomerPhone] = useState(order.customerPhone || "");
+  const [customerGstPan, setCustomerGstPan] = useState(order.customerGstPan || "URP (Unregistered)");
+
+  // Invoice Meta states
+  const [numberLabel, setNumberLabel] = useState(defaultNumberLabel);
+  const [docNumber, setDocNumber] = useState(defaultDocNumber);
+  const [dateStr, setDateStr] = useState(defaultFormattedDate);
+  const [transportName, setTransportName] = useState(defaultTransport || DEFAULT_INVOICE_TEMPLATE.defaultTransport);
+
+  // Bank & Terms states
+  const [bankName, setBankName] = useState(DEFAULT_INVOICE_TEMPLATE.bankName);
+  const [accountNo, setAccountNo] = useState(DEFAULT_INVOICE_TEMPLATE.accountNo);
+  const [ifscCode, setIfscCode] = useState(DEFAULT_INVOICE_TEMPLATE.ifscCode);
+  const [creditDaysVal, setCreditDaysVal] = useState(order.creditDays !== undefined ? order.creditDays : 45);
+  const [creditNotePrefix, setCreditNotePrefix] = useState(DEFAULT_INVOICE_TEMPLATE.creditNotePrefix);
+  const [terms1, setTerms1] = useState(DEFAULT_INVOICE_TEMPLATE.terms1);
+  const [terms2, setTerms2] = useState(DEFAULT_INVOICE_TEMPLATE.terms2);
+  const [terms3, setTerms3] = useState(DEFAULT_INVOICE_TEMPLATE.terms3);
+  const [terms4, setTerms4] = useState(DEFAULT_INVOICE_TEMPLATE.terms4);
+  const [terms5, setTerms5] = useState(DEFAULT_INVOICE_TEMPLATE.terms5);
+  const [signatoryLabel, setSignatoryLabel] = useState(DEFAULT_INVOICE_TEMPLATE.signatoryLabel);
+
+  // Line items state
+  const [items, setItems] = useState<TaxInvoiceItem[]>(order.items || []);
+
+  // Fetch initial global template settings and order overrides
+  useEffect(() => {
+    fetch("/api/admin/invoice-settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setTemplate(data);
+          let overrides: any = {};
+          if (order.templateOverrides) {
+            try {
+              overrides =
+                typeof order.templateOverrides === "string"
+                  ? JSON.parse(order.templateOverrides)
+                  : order.templateOverrides;
+            } catch {}
+          }
+          const merged = { ...data, ...overrides };
+          setCompanyName(merged.companyName || data.companyName);
+          setAddressLine1(merged.addressLine1 || data.addressLine1);
+          setAddressLine2(merged.addressLine2 || data.addressLine2);
+          setPhone(merged.phone || data.phone);
+          setEmail(merged.email || data.email);
+          setGstNo(merged.gstNo || data.gstNo);
+          setPanNo(merged.panNo || data.panNo);
+          setPlaceOfSupply(merged.placeOfSupply || data.placeOfSupply);
+          setBankName(merged.bankName || data.bankName);
+          setAccountNo(merged.accountNo || data.accountNo);
+          setIfscCode(merged.ifscCode || data.ifscCode);
+          setTerms1(merged.terms1 || data.terms1);
+          setTerms2(merged.terms2 || data.terms2);
+          setTerms3(merged.terms3 || data.terms3);
+          setTerms4(merged.terms4 || data.terms4);
+          setTerms5(merged.terms5 || data.terms5);
+          setCreditNotePrefix(merged.creditNotePrefix || data.creditNotePrefix);
+          setSignatoryLabel(merged.signatoryLabel || data.signatoryLabel);
+        }
+      })
+      .catch(() => {});
+  }, [order.orderNumber, order.templateOverrides]);
+
+  // Recalculate Totals
+  const totalPcs = items.reduce((acc, it) => acc + (Number(it.totalPcs) || 0), 0);
+  const totalSets = items.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0);
+  const subtotal = items.reduce((acc, it) => acc + (Number(it.itemSubtotal) || 0), 0);
+  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
   const cgst = Math.round((gstAmount / 2) * 100) / 100;
   const sgst = Math.round((gstAmount / 2) * 100) / 100;
-  const grandTotal = Number(order.grandTotal) || Math.round(subtotal + gstAmount);
-  const creditDays = order.creditDays !== undefined ? order.creditDays : 45;
+  const grandTotal = Math.round(subtotal + gstAmount);
 
-  // Calculate target empty filler rows to create classic invoice look with vertical column lines
-  // Standard invoice table should have at least 6 rows of height
-  const itemsCount = order.items?.length || 0;
-  const emptyRowsCount = Math.max(0, 6 - itemsCount);
+  // Dynamic Empty Filler Rows to create classic look
+  const emptyRowsCount = Math.max(0, 6 - items.length);
+
+  // Handle Item Field Edit
+  const handleItemChange = (index: number, field: keyof TaxInvoiceItem, value: any) => {
+    const updated = [...items];
+    const it = { ...updated[index], [field]: value };
+
+    if (field === "unitPrice" || field === "totalPcs" || field === "totalSets" || field === "pcsPerSet") {
+      const uPrice = Number(it.unitPrice) || 0;
+      const pcs = Number(it.totalPcs) || (Number(it.totalSets) || 0) * (Number(it.pcsPerSet) || 5);
+      it.totalPcs = pcs;
+      it.itemSubtotal = Math.round(pcs * uPrice);
+    }
+
+    updated[index] = it;
+    setItems(updated);
+  };
+
+  const handleAddItem = () => {
+    const newItem: TaxInvoiceItem = {
+      productName: "IMP - NEW ITEM",
+      sizeRatio: "30 to 38",
+      pcsPerSet: 5,
+      totalSets: 1,
+      totalPcs: 5,
+      unitPrice: 490,
+      itemSubtotal: 2450,
+      hsnCode: template.defaultHsn || "6203",
+    };
+    setItems([...items, newItem]);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    if (items.length <= 1) {
+      alert("At least one item must remain in invoice.");
+      return;
+    }
+    setItems(items.filter((_, idx) => idx !== index));
+  };
+
+  const handleResetToTemplate = () => {
+    if (confirm("Reset invoice header, bank, and terms to saved template defaults?")) {
+      setCompanyName(template.companyName);
+      setAddressLine1(template.addressLine1);
+      setAddressLine2(template.addressLine2);
+      setPhone(template.phone);
+      setEmail(template.email);
+      setGstNo(template.gstNo);
+      setPanNo(template.panNo);
+      setPlaceOfSupply(template.placeOfSupply);
+      setBankName(template.bankName);
+      setAccountNo(template.accountNo);
+      setIfscCode(template.ifscCode);
+      setTerms1(template.terms1);
+      setTerms2(template.terms2);
+      setTerms3(template.terms3);
+      setTerms4(template.terms4);
+      setTerms5(template.terms5);
+      setCreditNotePrefix(template.creditNotePrefix);
+      setSignatoryLabel(template.signatoryLabel);
+      setTransportName(template.defaultTransport);
+    }
+  };
+
+  const handleSaveEdits = async () => {
+    const overrides = {
+      companyName,
+      addressLine1,
+      addressLine2,
+      phone,
+      email,
+      gstNo,
+      panNo,
+      placeOfSupply,
+      bankName,
+      accountNo,
+      ifscCode,
+      terms1,
+      terms2,
+      terms3,
+      terms4,
+      terms5,
+      creditNotePrefix,
+      signatoryLabel,
+      transportName,
+    };
+
+    setIsSaving(true);
+    try {
+      if (onSaveOverrides) {
+        await onSaveOverrides(overrides);
+      } else {
+        await fetch(`/api/orders/${order.orderNumber}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            templateOverrides: overrides,
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerGstPan,
+            items: items.map((it) => ({
+              productId: it.id || 1,
+              productName: it.productName,
+              sizeRatio: it.sizeRatio,
+              pcsPerSet: it.pcsPerSet || 5,
+              totalSets: it.totalSets || 1,
+              totalPcs: it.totalPcs || 5,
+              unitPrice: it.unitPrice || 0,
+              itemSubtotal: it.itemSubtotal || 0,
+              colorSets: it.colorSets || "[]",
+            })),
+          }),
+        });
+      }
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      setIsEditing(false);
+    } catch (err: any) {
+      alert("Error saving customization: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="a4-invoice-wrapper font-sans text-black leading-tight text-[11px] print:text-[10px]">
@@ -111,7 +341,8 @@ export default function TaxInvoiceA4({
             size: A4 portrait;
             margin: 5mm 7mm;
           }
-          html, body {
+          html,
+          body {
             background: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
@@ -119,7 +350,13 @@ export default function TaxInvoiceA4({
             margin: 0 !important;
             padding: 0 !important;
           }
-          nav, header, footer, aside, .print\\:hidden, #toast-container, .toast-container {
+          nav,
+          header,
+          footer,
+          aside,
+          .print\\:hidden,
+          #toast-container,
+          .toast-container {
             display: none !important;
           }
           .a4-invoice-wrapper {
@@ -141,9 +378,97 @@ export default function TaxInvoiceA4({
         }
       `}</style>
 
+      {/* ═══════════════════════════════════════════
+          INTERACTIVE LIVE EDITOR TOOLBAR (print:hidden)
+          ═══════════════════════════════════════════ */}
+      {allowInlineEdit && (
+        <div className="print:hidden mb-4 p-3 bg-slate-900 text-white rounded-xl shadow-lg border border-slate-700 flex flex-wrap items-center justify-between gap-3 max-w-[780px] mx-auto">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-orange-500/20 text-orange-400 rounded-lg">
+              <Edit3 size={16} />
+            </span>
+            <div>
+              <div className="text-xs font-bold flex items-center gap-2">
+                <span>{isEditing ? "Live Invoice Editor Active" : "Invoice / Order Form Template"}</span>
+                {isEditing && (
+                  <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 font-black text-[9px] rounded uppercase animate-pulse">
+                    Editing
+                  </span>
+                )}
+                {saveSuccess && (
+                  <span className="px-2 py-0.5 bg-emerald-500 text-white font-bold text-[10px] rounded flex items-center gap-1">
+                    <Check size={12} /> Saved!
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-300">
+                {isEditing
+                  ? "Click into any text, header, address, item, rate, bank details, or terms below to edit live."
+                  : "Previewing physical A4 document. Click 'Edit Live' to modify details directly on screen."}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleResetToTemplate}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1 border border-slate-600 transition cursor-pointer"
+                  title="Reset header, bank, and terms back to global template defaults"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset Defaults</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdits}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-50"
+                  title="Save customized details to this order"
+                >
+                  <Save size={13} />
+                  <span>{isSaving ? "Saving..." : "Save to Order"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Check size={14} />
+                  <span>Finish Editing</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                >
+                  <Edit3 size={13} />
+                  <span>Edit Live</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 border border-slate-600 transition cursor-pointer"
+                >
+                  <Printer size={13} />
+                  <span>Print A4</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Single Border Box matching physical invoice */}
       <div
-        className="a4-invoice-box mx-auto bg-white"
+        className={`a4-invoice-box mx-auto bg-white ${
+          isEditing ? "ring-2 ring-orange-400 ring-offset-2" : ""
+        }`}
         style={{
           border: "1.5px solid #000000",
           maxWidth: "780px",
@@ -151,47 +476,78 @@ export default function TaxInvoiceA4({
           boxSizing: "border-box",
         }}
       >
-        {/* 1. TOP HEADER: KRISH CLOTHING CO. */}
+        {/* 1. TOP HEADER: COMPANY NAME & ADDRESS */}
         <div
           style={{
             borderBottom: "1px solid #000000",
             textAlign: "center",
             padding: "6px 12px",
+            backgroundColor: isEditing ? "#fffbeb" : "transparent",
           }}
         >
-          <h1
-            style={{
-              fontFamily: "'Times New Roman', Times, serif",
-              fontSize: "22px",
-              fontWeight: "900",
-              letterSpacing: "1px",
-              textTransform: "uppercase",
-              margin: 0,
-              lineHeight: "1.1",
-            }}
-          >
-            KRISH CLOTHING CO.
-          </h1>
-          <p
-            style={{
-              fontSize: "10px",
-              fontWeight: "700",
-              margin: "2px 0 0 0",
-              letterSpacing: "-0.2px",
-            }}
-          >
-            2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,
-          </p>
-          <p
-            style={{
-              fontSize: "10px",
-              fontWeight: "700",
-              margin: "1px 0 0 0",
-              letterSpacing: "-0.2px",
-            }}
-          >
-            AHMEDABAD - 380008 (M) : 8128756632
-          </p>
+          {isEditing ? (
+            <div className="space-y-1">
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full text-center font-black uppercase text-xl border-b border-orange-300 bg-amber-50/50 outline-none focus:bg-white"
+                placeholder="COMPANY NAME"
+              />
+              <input
+                type="text"
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+                className="w-full text-center text-xs font-bold border-b border-orange-200 bg-amber-50/50 outline-none focus:bg-white"
+                placeholder="ADDRESS LINE 1"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={addressLine2}
+                  onChange={(e) => setAddressLine2(e.target.value)}
+                  className="w-full text-center text-xs font-bold border-b border-orange-200 bg-amber-50/50 outline-none focus:bg-white"
+                  placeholder="CITY, PINCODE & PHONE"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1
+                style={{
+                  fontFamily: "'Times New Roman', Times, serif",
+                  fontSize: "22px",
+                  fontWeight: "900",
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  margin: 0,
+                  lineHeight: "1.1",
+                }}
+              >
+                {companyName || "KRISH CLOTHING CO."}
+              </h1>
+              <p
+                style={{
+                  fontSize: "10px",
+                  fontWeight: "700",
+                  margin: "2px 0 0 0",
+                  letterSpacing: "-0.2px",
+                }}
+              >
+                {addressLine1 || "2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,"}
+              </p>
+              <p
+                style={{
+                  fontSize: "10px",
+                  fontWeight: "700",
+                  margin: "1px 0 0 0",
+                  letterSpacing: "-0.2px",
+                }}
+              >
+                {addressLine2 || "AHMEDABAD - 380008 (M) : 8128756632"}
+              </p>
+            </>
+          )}
         </div>
 
         {/* 2. SUB-HEADER BAR: Debit Memo | TAX INVOICE | Duplicate */}
@@ -206,7 +562,18 @@ export default function TaxInvoiceA4({
             fontWeight: "bold",
           }}
         >
-          <div style={{ width: "25%", textAlign: "left" }}>Debit Memo</div>
+          <div style={{ width: "25%", textAlign: "left" }}>
+            {isEditing ? (
+              <input
+                type="text"
+                value={debitMemoText}
+                onChange={(e) => setDebitMemoText(e.target.value)}
+                className="w-24 px-1 py-0.5 border border-orange-300 bg-amber-50/50 rounded text-xs outline-none"
+              />
+            ) : (
+              debitMemoText
+            )}
+          </div>
           <div
             style={{
               width: "50%",
@@ -217,9 +584,29 @@ export default function TaxInvoiceA4({
               textTransform: "uppercase",
             }}
           >
-            {displayTitle}
+            {isEditing ? (
+              <input
+                type="text"
+                value={docTitleText}
+                onChange={(e) => setDocTitleText(e.target.value)}
+                className="text-center font-black tracking-widest uppercase border border-orange-300 bg-amber-50/50 rounded px-2 py-0.5 outline-none text-xs"
+              />
+            ) : (
+              docTitleText
+            )}
           </div>
-          <div style={{ width: "25%", textAlign: "right" }}>{copyTitle}</div>
+          <div style={{ width: "25%", textAlign: "right" }}>
+            {isEditing ? (
+              <input
+                type="text"
+                value={copyTitleText}
+                onChange={(e) => setCopyTitleText(e.target.value)}
+                className="w-24 text-right px-1 py-0.5 border border-orange-300 bg-amber-50/50 rounded text-xs outline-none"
+              />
+            ) : (
+              copyTitleText
+            )}
+          </div>
         </div>
 
         {/* 3. RECEIVER (LEFT ~58%) & INVOICE / TRANSPORT DETAILS (RIGHT ~42%) */}
@@ -245,20 +632,32 @@ export default function TaxInvoiceA4({
             <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
                 <span style={{ fontWeight: "bold", flexShrink: 0 }}>M/s. :</span>
-                <span
-                  style={{
-                    fontWeight: "900",
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.3px",
-                  }}
-                >
-                  {order.customerName || "WALK-IN CUSTOMER"}
-                </span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full font-black uppercase text-xs px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                    placeholder="BUYER SHOP / FIRM NAME"
+                  />
+                ) : (
+                  <span
+                    style={{
+                      fontWeight: "900",
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.3px",
+                    }}
+                  >
+                    {customerName || "WALK-IN CUSTOMER"}
+                  </span>
+                )}
               </div>
+
+              {/* Address */}
               <div
                 style={{
-                  paddingLeft: "34px",
+                  paddingLeft: isEditing ? "0" : "34px",
                   fontSize: "10px",
                   lineHeight: "1.25",
                   color: "#111",
@@ -266,19 +665,49 @@ export default function TaxInvoiceA4({
                   textTransform: "uppercase",
                 }}
               >
-                {order.customerAddress || "Direct Delivery"}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={customerAddress}
+                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    className="w-full text-[10px] uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none mt-1"
+                    placeholder="BUYER FULL ADDRESS"
+                  />
+                ) : (
+                  customerAddress || "Direct Delivery"
+                )}
               </div>
+
+              {/* City & State */}
               <div
                 style={{
-                  paddingLeft: "34px",
+                  paddingLeft: isEditing ? "0" : "34px",
                   fontSize: "10px",
                   fontWeight: "600",
                   marginTop: "1px",
                   textTransform: "uppercase",
                 }}
               >
-                {order.customerCity || "AHMEDABAD"}{" "}
-                {order.customerState ? `- ${order.customerState}` : "- 363001"}
+                {isEditing ? (
+                  <div className="flex gap-1 mt-1">
+                    <input
+                      type="text"
+                      value={customerCity}
+                      onChange={(e) => setCustomerCity(e.target.value)}
+                      className="w-1/2 text-[10px] uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      placeholder="CITY"
+                    />
+                    <input
+                      type="text"
+                      value={customerState}
+                      onChange={(e) => setCustomerState(e.target.value)}
+                      className="w-1/2 text-[10px] uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      placeholder="STATE"
+                    />
+                  </div>
+                ) : (
+                  `${customerCity || "AHMEDABAD"} - ${customerState || "Gujarat"}`
+                )}
               </div>
             </div>
 
@@ -293,31 +722,60 @@ export default function TaxInvoiceA4({
               >
                 <div>
                   <span style={{ fontWeight: "600" }}>Place of Supply :</span>{" "}
-                  <strong>24-Gujarat</strong>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={placeOfSupply}
+                      onChange={(e) => setPlaceOfSupply(e.target.value)}
+                      className="w-24 text-[10px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                    />
+                  ) : (
+                    <strong>{placeOfSupply || "24-Gujarat"}</strong>
+                  )}
                 </div>
-                {order.customerPhone && (
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                      color: "#000",
-                    }}
-                  >
-                    Mob No. {order.customerPhone}
-                  </div>
-                )}
+
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                    color: "#000",
+                  }}
+                >
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-28 text-[10px] font-mono px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      placeholder="Mob No."
+                    />
+                  ) : (
+                    customerPhone && `Mob No. ${customerPhone}`
+                  )}
+                </div>
               </div>
+
               <div style={{ fontSize: "10px", marginTop: "1px" }}>
                 <span style={{ fontWeight: "600" }}>GSTIN No. :</span>{" "}
-                <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
-                  {order.customerGstPan || "URP (Unregistered)"}
-                </span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={customerGstPan}
+                    onChange={(e) => setCustomerGstPan(e.target.value)}
+                    className="w-40 font-mono text-[10px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none uppercase"
+                    placeholder="GSTIN/PAN"
+                  />
+                ) : (
+                  <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
+                    {customerGstPan || "URP (Unregistered)"}
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right Column: Order No / Invoice No, Date, Transport (Clean: NO GST or LR) */}
+          {/* Right Column: Order No / Invoice No, Date, Transport */}
           <div
             style={{
               width: "42%",
@@ -331,11 +789,33 @@ export default function TaxInvoiceA4({
                 borderBottom: "1px solid #000000",
                 padding: "5px 10px",
                 display: "flex",
+                alignItems: "center",
               }}
             >
-              <span style={{ fontWeight: "bold", width: "95px" }}>{numberLabel}</span>
+              <span style={{ fontWeight: "bold", width: "95px" }}>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={numberLabel}
+                    onChange={(e) => setNumberLabel(e.target.value)}
+                    className="w-20 px-1 border border-orange-300 bg-amber-50/50 rounded text-xs outline-none font-bold"
+                  />
+                ) : (
+                  numberLabel
+                )}
+              </span>
               <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>
-                : {displayDocNumber}
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                    className="w-32 font-mono px-1 border border-orange-300 bg-amber-50/50 rounded text-xs outline-none font-bold"
+                  />
+                ) : (
+                  docNumber
+                )}
               </span>
             </div>
 
@@ -344,11 +824,23 @@ export default function TaxInvoiceA4({
                 borderBottom: "1px solid #000000",
                 padding: "5px 10px",
                 display: "flex",
+                alignItems: "center",
               }}
             >
               <span style={{ fontWeight: "bold", width: "95px" }}>Date</span>
               <span style={{ fontFamily: "monospace", fontWeight: "600" }}>
-                : {formattedDate}
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    className="w-28 font-mono px-1 border border-orange-300 bg-amber-50/50 rounded text-xs outline-none"
+                    placeholder="DD/MM/YYYY"
+                  />
+                ) : (
+                  dateStr
+                )}
               </span>
             </div>
 
@@ -366,9 +858,20 @@ export default function TaxInvoiceA4({
                   fontWeight: "900",
                   textTransform: "uppercase",
                   color: "#000",
+                  flex: 1,
                 }}
               >
-                : {resolvedTransport || "Patel Transport Co."}
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={transportName}
+                    onChange={(e) => setTransportName(e.target.value)}
+                    className="w-full text-xs font-bold uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                  />
+                ) : (
+                  transportName || "Patel Transport Co."
+                )}
               </span>
             </div>
           </div>
@@ -392,8 +895,8 @@ export default function TaxInvoiceA4({
                 backgroundColor: "#fafafa",
               }}
             >
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "5%" }}>
-                SrNo
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "4%" }}>
+                Sr
               </th>
               <th
                 style={{
@@ -409,64 +912,59 @@ export default function TaxInvoiceA4({
                 HSN/SAC
               </th>
               <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "9%" }}>
-                Size
-              </th>
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "13%" }}>
-                Color
-              </th>
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "7%" }}>
-                Set
-              </th>
-              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "11%" }}>
-                Qty
+                Size Ratio
               </th>
               <th
                 style={{
                   borderRight: "1px solid #000000",
                   padding: "4px 4px",
-                  width: "8%",
+                  width: "20%",
+                  textAlign: "left",
+                }}
+              >
+                Color Wise Sets
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "7%" }}>
+                SET
+              </th>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 4px", width: "9%" }}>
+                PCS
+              </th>
+              <th
+                style={{
+                  borderRight: "1px solid #000000",
+                  padding: "4px 4px",
+                  width: "9%",
                   textAlign: "right",
                 }}
               >
                 Rate
               </th>
-              <th style={{ padding: "4px 6px", width: "9%", textAlign: "right" }}>
+              <th style={{ borderRight: "1px solid #000000", padding: "4px 2px", width: "5%" }}>
+                GST %
+              </th>
+              <th style={{ padding: "4px 6px", width: "10%", textAlign: "right" }}>
                 Amount
               </th>
+              {isEditing && (
+                <th className="print:hidden bg-orange-100 p-1 w-6 text-center text-[10px]">
+                  Del
+                </th>
+              )}
             </tr>
           </thead>
 
           <tbody>
-            {order.items.map((it, idx) => {
-              // Parse color sets
-              let colorSummary = "";
-              let totalSets = it.totalSets || 0;
-              let colorArr: { color: string; sets: number }[] = [];
-              try {
-                if (Array.isArray(it.colorSets)) {
-                  colorArr = it.colorSets;
-                } else if (typeof it.colorSets === "string") {
-                  colorArr = JSON.parse(it.colorSets || "[]");
-                }
-              } catch {
-                colorArr = [];
-              }
-
+            {items.map((it, idx) => {
               const colorLines = formatColorAlphabetLines(
                 it.colorSets,
                 it.colorMapping,
                 it.colorsAvailable
               );
 
-              if (colorArr.length > 0) {
-                if (!totalSets) {
-                  totalSets = colorArr.reduce((acc, c) => acc + (Number(c.sets) || 0), 0);
-                }
-              }
-
-              const totalPcs = it.totalPcs || totalSets * (it.pcsPerSet || 5);
-              const unitPrice = Number(it.unitPrice) || 0;
-              const itemAmount = Number(it.itemSubtotal) || totalPcs * unitPrice;
+              const totalPcsVal = Number(it.totalPcs) || (Number(it.totalSets) || 0) * (it.pcsPerSet || 5);
+              const unitPriceVal = Number(it.unitPrice) || 0;
+              const itemAmountVal = Number(it.itemSubtotal) || totalPcsVal * unitPriceVal;
 
               return (
                 <tr key={idx} style={{ verticalAlign: "top" }}>
@@ -481,10 +979,23 @@ export default function TaxInvoiceA4({
                     {idx + 1}
                   </td>
                   <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
-                    <div style={{ fontWeight: "bold", color: "#000" }}>
-                      {formatProductNameWithMrp(it.productName, it.mrp || (it as any).product?.mrp, it.unitPrice)}
-                    </div>
-                    {it.sizeRatio && (
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={it.productName}
+                        onChange={(e) => handleItemChange(idx, "productName", e.target.value)}
+                        className="w-full font-bold text-xs px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      />
+                    ) : (
+                      <div style={{ fontWeight: "bold", color: "#000" }}>
+                        {formatProductNameWithMrp(
+                          it.productName,
+                          it.mrp || (it as any).product?.mrp,
+                          it.unitPrice
+                        )}
+                      </div>
+                    )}
+                    {it.sizeRatio && !isEditing && (
                       <div
                         style={{
                           fontSize: "9px",
@@ -505,7 +1016,16 @@ export default function TaxInvoiceA4({
                       fontSize: "10px",
                     }}
                   >
-                    {it.hsnCode || "6203"}
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={it.hsnCode || "6203"}
+                        onChange={(e) => handleItemChange(idx, "hsnCode", e.target.value)}
+                        className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      />
+                    ) : (
+                      it.hsnCode || template.defaultHsn || "6203"
+                    )}
                   </td>
                   <td
                     style={{
@@ -515,7 +1035,16 @@ export default function TaxInvoiceA4({
                       fontFamily: "monospace",
                     }}
                   >
-                    {it.sizeRatio || "28-36"}
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={it.sizeRatio || "30 to 38"}
+                        onChange={(e) => handleItemChange(idx, "sizeRatio", e.target.value)}
+                        className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      />
+                    ) : (
+                      it.sizeRatio || "30 to 38"
+                    )}
                   </td>
                   <td
                     style={{
@@ -547,7 +1076,18 @@ export default function TaxInvoiceA4({
                       fontFamily: "monospace",
                     }}
                   >
-                    {totalSets ? totalSets.toFixed(2) : "1.00"}
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={it.totalSets || 0}
+                        onChange={(e) => handleItemChange(idx, "totalSets", parseFloat(e.target.value) || 0)}
+                        className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      />
+                    ) : (
+                      it.totalSets ? Number(it.totalSets).toFixed(2) : "1.00"
+                    )}
                   </td>
                   <td
                     style={{
@@ -558,7 +1098,17 @@ export default function TaxInvoiceA4({
                       fontFamily: "monospace",
                     }}
                   >
-                    {totalPcs.toFixed(2)} PCS
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={it.totalPcs || 0}
+                        onChange={(e) => handleItemChange(idx, "totalPcs", parseInt(e.target.value) || 0)}
+                        className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                      />
+                    ) : (
+                      `${totalPcsVal.toFixed(2)} PCS`
+                    )}
                   </td>
                   <td
                     style={{
@@ -568,7 +1118,17 @@ export default function TaxInvoiceA4({
                       fontFamily: "monospace",
                     }}
                   >
-                    {unitPrice.toFixed(2)}
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={it.unitPrice || 0}
+                        onChange={(e) => handleItemChange(idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                        className="w-full text-right font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none font-bold"
+                      />
+                    ) : (
+                      unitPriceVal.toFixed(2)
+                    )}
                   </td>
                   <td
                     style={{
@@ -588,11 +1148,39 @@ export default function TaxInvoiceA4({
                       fontFamily: "monospace",
                     }}
                   >
-                    {itemAmount.toFixed(2)}
+                    {itemAmountVal.toFixed(2)}
                   </td>
+                  {isEditing && (
+                    <td className="print:hidden text-center p-1">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(idx)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        title="Remove Item"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
+
+            {/* Add Item Row in Edit Mode */}
+            {isEditing && (
+              <tr className="print:hidden bg-orange-50/60">
+                <td colSpan={11} className="p-2 text-center">
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    className="px-3 py-1 bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 text-xs font-bold rounded-lg inline-flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    <span>Add New Line Item</span>
+                  </button>
+                </td>
+              </tr>
+            )}
 
             {/* Empty filler rows with vertical grid borders to match physical tax invoice layout */}
             {Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
@@ -607,6 +1195,7 @@ export default function TaxInvoiceA4({
                 <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
                 <td style={{ borderRight: "1px solid #000000" }}>&nbsp;</td>
                 <td>&nbsp;</td>
+                {isEditing && <td className="print:hidden">&nbsp;</td>}
               </tr>
             ))}
           </tbody>
@@ -631,7 +1220,7 @@ export default function TaxInvoiceA4({
                   textAlign: "left",
                 }}
               >
-                <span style={{ fontWeight: "bold" }}>GSTIN No.:</span> 24LAAPS9916E1ZD
+                <span style={{ fontWeight: "bold" }}>GSTIN No.:</span> {gstNo || template.gstNo}
               </td>
               <td
                 style={{
@@ -642,7 +1231,7 @@ export default function TaxInvoiceA4({
                   fontWeight: "bold",
                 }}
               >
-                {order.totalPcs.toFixed(3)}
+                {totalPcs.toFixed(3)}
               </td>
               <td
                 colSpan={2}
@@ -667,6 +1256,7 @@ export default function TaxInvoiceA4({
               >
                 {subtotal.toFixed(2)}
               </td>
+              {isEditing && <td className="print:hidden">&nbsp;</td>}
             </tr>
           </tfoot>
         </table>
@@ -679,7 +1269,7 @@ export default function TaxInvoiceA4({
             fontSize: "10px",
           }}
         >
-          {/* Left Column: Bank Details (No amounts in words as requested) */}
+          {/* Left Column: Bank Details */}
           <div
             style={{
               width: "58%",
@@ -691,17 +1281,53 @@ export default function TaxInvoiceA4({
               minHeight: "70px",
             }}
           >
-            <div style={{ display: "flex" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ fontWeight: "bold", width: "110px" }}>Bank Name</span>
-              <span style={{ fontFamily: "monospace", fontWeight: "600" }}>: ICICI BANK</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "600", flex: 1 }}>
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    className="w-48 font-mono text-[10px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                  />
+                ) : (
+                  bankName || template.bankName
+                )}
+              </span>
             </div>
-            <div style={{ display: "flex" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ fontWeight: "bold", width: "110px" }}>Bank A/c. No.</span>
-              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>: 750705000692</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold", flex: 1 }}>
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={accountNo}
+                    onChange={(e) => setAccountNo(e.target.value)}
+                    className="w-48 font-mono text-[10px] font-bold px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                  />
+                ) : (
+                  accountNo || template.accountNo
+                )}
+              </span>
             </div>
-            <div style={{ display: "flex" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ fontWeight: "bold", width: "110px" }}>RTGS/IFSC Code</span>
-              <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>: ICIC0007507</span>
+              <span style={{ fontFamily: "monospace", fontWeight: "bold", flex: 1 }}>
+                :{" "}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={ifscCode}
+                    onChange={(e) => setIfscCode(e.target.value)}
+                    className="w-48 font-mono text-[10px] font-bold uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                  />
+                ) : (
+                  ifscCode || template.ifscCode
+                )}
+              </span>
             </div>
           </div>
 
@@ -768,7 +1394,7 @@ export default function TaxInvoiceA4({
           </div>
         </div>
 
-        {/* 7. NOTE: PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN X DAYS */}
+        {/* 7. NOTE: PAYMENT TERMS */}
         <div
           style={{
             borderBottom: "1px solid #000000",
@@ -779,8 +1405,19 @@ export default function TaxInvoiceA4({
         >
           <span style={{ textTransform: "uppercase" }}>Note : </span>
           <span style={{ textTransform: "uppercase", letterSpacing: "0.4px" }}>
-            PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN{" "}
-            {creditDays > 0 ? `${creditDays} DAYS` : "_____ DAYS"}.
+            {creditNotePrefix || template.creditNotePrefix}{" "}
+            {isEditing ? (
+              <input
+                type="number"
+                min="0"
+                value={creditDaysVal}
+                onChange={(e) => setCreditDaysVal(parseInt(e.target.value) || 0)}
+                className="w-16 text-center font-mono text-[10px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none font-bold"
+              />
+            ) : (
+              creditDaysVal > 0 ? `${creditDaysVal} DAYS` : "45 DAYS"
+            )}
+            .
           </span>
         </div>
 
@@ -812,13 +1449,50 @@ export default function TaxInvoiceA4({
             >
               Terms &amp; Condition :
             </div>
-            <div>1. Goods once sold will not be taken back.</div>
-            <div>2. Interest @18% p.a. will be charged if payment is not made within due date.</div>
-            <div>3. Our risk and responsibility ceases as soon as the goods leave our premises.</div>
-            <div>4. &ldquo;Subject to &apos;AHMEDABAD&apos; Jurisdiction only. E.&amp;.O.E&rdquo;</div>
-            <div style={{ fontWeight: "700", textDecoration: "underline" }}>
-              5. Any damages or problem in any products should be informed within 7 days of purchase.
-            </div>
+            {isEditing ? (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  value={terms1}
+                  onChange={(e) => setTerms1(e.target.value)}
+                  className="w-full text-[9px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                />
+                <input
+                  type="text"
+                  value={terms2}
+                  onChange={(e) => setTerms2(e.target.value)}
+                  className="w-full text-[9px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                />
+                <input
+                  type="text"
+                  value={terms3}
+                  onChange={(e) => setTerms3(e.target.value)}
+                  className="w-full text-[9px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                />
+                <input
+                  type="text"
+                  value={terms4}
+                  onChange={(e) => setTerms4(e.target.value)}
+                  className="w-full text-[9px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                />
+                <input
+                  type="text"
+                  value={terms5}
+                  onChange={(e) => setTerms5(e.target.value)}
+                  className="w-full text-[9px] px-1 border border-orange-300 bg-amber-50/50 rounded outline-none font-bold"
+                />
+              </div>
+            ) : (
+              <>
+                <div>{terms1 || template.terms1}</div>
+                <div>{terms2 || template.terms2}</div>
+                <div>{terms3 || template.terms3}</div>
+                <div>{terms4 || template.terms4}</div>
+                <div style={{ fontWeight: "700", textDecoration: "underline" }}>
+                  {terms5 || template.terms5}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Signature Area */}
@@ -840,7 +1514,16 @@ export default function TaxInvoiceA4({
                 letterSpacing: "0.5px",
               }}
             >
-              For, KRISH CLOTHING CO.
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={signatoryLabel}
+                  onChange={(e) => setSignatoryLabel(e.target.value)}
+                  className="w-full text-right text-[10px] font-bold uppercase px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                />
+              ) : (
+                signatoryLabel || template.signatoryLabel
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", padding: "1px 0" }}>
               <img
@@ -853,7 +1536,7 @@ export default function TaxInvoiceA4({
               />
             </div>
             <div style={{ fontSize: "10px", fontWeight: "bold", color: "#111" }}>
-              (Authorised Signatory)
+              {template.signatoryTitle || "(Authorised Signatory)"}
             </div>
           </div>
         </div>

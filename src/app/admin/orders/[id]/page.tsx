@@ -48,6 +48,7 @@ export default function OrderInvoicePage() {
 
   // Active Format Switcher: "ORDER_FORM" vs "TAX_INVOICE"
   const [formatType, setFormatType] = useState<"ORDER_FORM" | "TAX_INVOICE">("TAX_INVOICE");
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Tax Invoice Editing Modal State
   const [isTaxInvoiceModalOpen, setIsTaxInvoiceModalOpen] = useState(false);
@@ -731,6 +732,17 @@ export default function OrderInvoicePage() {
                 ? "Send Tax Invoice"
                 : "Send Order Form"}
             </span>
+          </button>
+
+          {/* Live Preview & In-place Editor */}
+          <button
+            type="button"
+            onClick={() => setIsPreviewModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Open live interactive A4 invoice/order form editor"
+          >
+            <Edit3 size={14} />
+            <span>Live Edit &amp; Preview</span>
           </button>
 
           {/* Download PDF File directly */}
@@ -1554,6 +1566,113 @@ export default function OrderInvoicePage() {
           </div>
         </form>
       </Modal>
+
+      {/* ═══════════════════════════════════════════
+          ON-SCREEN A4 TAX INVOICE & ORDER FORM LIVE EDITOR MODAL
+          ═══════════════════════════════════════════ */}
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4 overflow-y-auto print:hidden">
+          <div className="bg-slate-100 rounded-2xl w-full max-w-4xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-900 text-white shrink-0">
+              <div className="flex items-center gap-2">
+                <Edit3 size={18} className="text-orange-500" />
+                <div>
+                  <span className="font-bold text-sm block">
+                    {isTaxInvoiceActive ? "Tax Invoice (Format 2)" : "Order Form (Format 1)"} — Live Editor &amp; Preview
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Click 'Edit Live' to modify headers, addresses, items, rates, or terms directly on screen.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreviewModalOpen(false);
+                    setTimeout(() => window.print(), 100);
+                  }}
+                  className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                >
+                  <Printer size={14} />
+                  <span>Print A4</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  title="Close Preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: A4 Paper Preview */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-300/80 flex justify-center">
+              <div className="bg-white shadow-xl p-3 sm:p-5 w-full max-w-[780px] rounded-sm">
+                <TaxInvoiceA4
+                  formatType={formatType}
+                  allowInlineEdit={true}
+                  order={{
+                    orderNumber: order.orderNumber,
+                    orderDate: order.orderDate,
+                    taxInvoiceNumber: isTaxInvoiceActive ? order.taxInvoiceNumber : null,
+                    taxInvoiceDate: isTaxInvoiceActive ? order.taxInvoiceDate : null,
+                    status: order.status,
+                    customerName: order.customer?.shopName || order.customerName,
+                    customerGstPan: order.customer?.gstPanNo || order.customerGstPan,
+                    customerPhone: order.customer?.phoneNumber || order.customerPhone,
+                    customerAddress: order.customer?.address || order.customerAddress,
+                    customerCity: order.customer?.city,
+                    customerState: order.customer?.state,
+                    businessType: order.businessType || order.customer?.businessType,
+                    creditDays: order.creditDays !== undefined ? order.creditDays : order.customer?.creditDays || 45,
+                    subtotal: activeSubtotal,
+                    gstRate: order.gstRate,
+                    gstAmount: activeGst,
+                    grandTotal: activeGrandTotal,
+                    totalPcs: activeTotalPcs,
+                    totalSets: activeTotalSets,
+                    placedBy: order.placedBy,
+                    notes: order.notes,
+                    templateOverrides: (order as any).templateOverrides,
+                    items: activeDisplayItems.map((it: any) => ({
+                      id: it.id,
+                      productName: it.productName,
+                      mrp: it.mrp || it.product?.mrp,
+                      product: it.product,
+                      colorSets: it.colorSets,
+                      colorMapping: it.product?.colorMapping || it.colorMapping,
+                      colorsAvailable: it.product?.colorsAvailable || it.colorsAvailable,
+                      sizeRatio: it.sizeRatio,
+                      pcsPerSet: it.pcsPerSet,
+                      totalSets: it.totalSets,
+                      totalPcs: it.totalPcs,
+                      unitPrice: it.unitPrice,
+                      itemSubtotal: it.itemSubtotal,
+                    })),
+                  }}
+                  onSaveOverrides={async (overrides) => {
+                    const res = await fetch(`/api/orders/${order.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ templateOverrides: overrides }),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json();
+                      throw new Error(d.error || "Failed to save template edits");
+                    }
+                    toast("Invoice customization saved successfully!", "success");
+                    loadOrder();
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

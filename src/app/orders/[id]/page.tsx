@@ -88,6 +88,7 @@ export default function OrderEditPage() {
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState<string>("");
   const [taxInvoiceDate, setTaxInvoiceDate] = useState<string>("");
   const [taxInvoiceItems, setTaxInvoiceItems] = useState<EditableOrderItem[]>([]);
+  const [templateOverrides, setTemplateOverrides] = useState<any>(null);
   const [formatType, setFormatType] = useState<"ORDER_FORM" | "TAX_INVOICE">("ORDER_FORM");
 
   // WhatsApp Sender Handler
@@ -172,6 +173,7 @@ export default function OrderEditPage() {
 
       setTaxInvoiceNumber(data.taxInvoiceNumber || "");
       setTaxInvoiceDate(data.taxInvoiceDate || "");
+      setTemplateOverrides(data.templateOverrides || null);
 
       // Parse order items
       const parsedItems: EditableOrderItem[] = (data.items || []).map((it: any) => {
@@ -678,6 +680,7 @@ export default function OrderEditPage() {
           totalSets,
           placedBy,
           notes: orderNotes,
+          templateOverrides,
           items: activeItems.map((it) => ({
             id: it.id,
             productName: it.productName,
@@ -763,6 +766,7 @@ export default function OrderEditPage() {
                   totalSets,
                   placedBy,
                   notes: orderNotes,
+                  templateOverrides,
                   items: activeItems.map((it) => ({
                     id: it.id,
                     productName: it.productName,
@@ -778,6 +782,20 @@ export default function OrderEditPage() {
                     unitPrice: it.unitPrice,
                     itemSubtotal: it.itemSubtotal,
                   })),
+                }}
+                allowInlineEdit={true}
+                onSaveOverrides={async (overrides) => {
+                  const res = await fetch(`/api/orders/${orderId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ templateOverrides: overrides }),
+                  });
+                  if (!res.ok) {
+                    const d = await res.json();
+                    throw new Error(d.error || "Failed to save template edits");
+                  }
+                  toast("Invoice customization saved successfully!", "success");
+                  fetchOrder();
                 }}
               />
             </div>

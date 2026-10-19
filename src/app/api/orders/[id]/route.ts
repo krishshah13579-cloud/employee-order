@@ -71,6 +71,7 @@ export async function PUT(
       taxInvoiceNumber,
       taxInvoiceDate,
       taxInvoiceItems,
+      templateOverrides,
     } = body;
 
     if (status === "Confirmed" && existingOrder.status !== "Confirmed") {
@@ -245,6 +246,12 @@ export async function PUT(
                 ? taxInvoiceItems
                 : JSON.stringify(taxInvoiceItems)
               : existingOrder.taxInvoiceItems,
+          templateOverrides:
+            templateOverrides !== undefined
+              ? typeof templateOverrides === "string"
+                ? templateOverrides
+                : JSON.stringify(templateOverrides)
+              : (existingOrder as any).templateOverrides,
         },
         include: {
           customer: true,

@@ -123,6 +123,7 @@ model Order {
   taxInvoiceNumber String?     // Set by admin once order is ready (e.g. TI-2026-001)
   taxInvoiceDate   DateTime?   // Tax Invoice date set by admin
   taxInvoiceItems  String?     // JSON string of updated items with modified quantities/amounts for tax invoice
+  templateOverrides String?    // JSON string of order-specific template overrides (e.g. customized company name, terms, bank details)
   notes            String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -224,5 +225,34 @@ model SalesInvoice {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+}
+
+// 9. Invoice & Order Form Template Settings
+model InvoiceTemplate {
+  id               Int      @id @default(autoincrement())
+  companyName      String   @default("KRISH CLOTHING CO.")
+  addressLine1     String   @default("2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,")
+  addressLine2     String   @default("AHMEDABAD - 380008 (M) : 8128756632")
+  phone            String   @default("+91 8128756632")
+  email            String   @default("krishclothingco3@gmail.com")
+  gstNo            String   @default("24LAAPS9916E1ZD")
+  panNo            String   @default("LAAPS9916E")
+  placeOfSupply    String   @default("24-Gujarat")
+  bankName         String   @default("ICICI BANK")
+  accountNo        String   @default("750705000692")
+  ifscCode         String   @default("ICIC0007507")
+  beneficiaryName  String   @default("KRISH CLOTHING CO.")
+  branch           String   @default("Khokhra Maninagar, Ahmedabad")
+  terms1           String   @default("1. Goods once sold will not be taken back.")
+  terms2           String   @default("2. Interest @18% p.a. will be charged if payment is not made within due date.")
+  terms3           String   @default("3. Our risk and responsibility ceases as soon as the goods leave our premises.")
+  terms4           String   @default("4. \"Subject to 'AHMEDABAD' Jurisdiction only. E.&.O.E\"")
+  terms5           String   @default("5. Any damages or problem in any products should be informed within 7 days of purchase.")
+  creditNotePrefix String   @default("PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN")
+  signatoryLabel   String   @default("For, KRISH CLOTHING CO.")
+  signatoryTitle   String   @default("(Authorised Signatory)")
+  defaultTransport String   @default("Patel Transport Co.")
+  defaultHsn       String   @default("6203")
+  updatedAt        DateTime @updatedAt
 }
 

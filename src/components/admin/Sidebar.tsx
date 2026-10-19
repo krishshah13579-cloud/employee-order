@@ -18,6 +18,7 @@ import {
   LogOut,
   Sparkles,
   BadgePercent,
+  SlidersHorizontal,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -90,6 +91,12 @@ const navItems = [
     label: "Reports",
     href: "/admin/reports",
     icon: FileText,
+  },
+  {
+    id: "invoice-settings",
+    label: "Invoice Settings",
+    href: "/admin/invoice-settings",
+    icon: SlidersHorizontal,
   },
 ];
 
