@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { parseColorwiseSets, getTotalAvailableSets, getAllProductColors, parseDetailedColorRatioSets } from "@/lib/stock";
+import {
+  parseColorwiseSets,
+  getTotalAvailableSets,
+  getAllProductColors,
+  parseDetailedColorRatioSets,
+  isColorSoldOut,
+  getColorShadeLetter,
+} from "@/lib/stock";
+import { sendColorSoldOutNotification } from "@/lib/email";
 import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth-security";
 
@@ -105,6 +113,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
     }
 
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
     const updateData: any = {};
     if (mixPcs !== undefined) {
       updateData.mixPcs = Math.max(0, parseInt(String(mixPcs), 10) || 0);
@@ -120,6 +133,30 @@ export async function PUT(request: NextRequest) {
       where: { id },
       data: updateData,
     });
+
+    // Check if any color variant became sold out after this stock update
+    if (updateData.setsColorwise !== undefined && existing.setsColorwise) {
+      const allColors = getAllProductColors(existing.colorsAvailable, existing.setsColorwise, existing.colorMapping);
+      const newlySoldOut: Array<{ productName: string; colorName: string; colorAlphabet: string }> = [];
+      for (let colIdx = 0; colIdx < allColors.length; colIdx++) {
+        const col = allColors[colIdx];
+        const wasInStock = !isColorSoldOut(existing.setsColorwise, col, existing.colorMapping);
+        const isNowSoldOut = isColorSoldOut(updateData.setsColorwise, col, existing.colorMapping);
+        if (wasInStock && isNowSoldOut) {
+          const colorAlphabet = getColorShadeLetter(existing, col, colIdx);
+          newlySoldOut.push({
+            productName: existing.name,
+            colorName: col,
+            colorAlphabet,
+          });
+        }
+      }
+      if (newlySoldOut.length > 0) {
+        sendColorSoldOutNotification(newlySoldOut).catch((err) =>
+          console.error("Sold out email notification error on stock update:", err)
+        );
+      }
+    }
 
     // Real-time auto-sync to Storefront (iq-trousers-store-uge4.vercel.app)
     try {

@@ -488,3 +488,86 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
 
   return { success: false, error: "Email credentials not configured in environment." };
 }
+
+export interface SoldOutColorItem {
+  productName: string;
+  colorName: string;
+  colorAlphabet: string;
+  orderNumber?: string;
+}
+
+/**
+ * Dispatch instant email alert when a product color variant sells out.
+ * Requirement format: "[PRODUCT NAME] ([COLOR ALPHABET]) IS SOLD OUT"
+ */
+export async function sendColorSoldOutNotification(items: SoldOutColorItem[]) {
+  if (!items || items.length === 0) return;
+
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const adminEmail = await getAdminRecipientEmail();
+  if (!adminEmail) return;
+
+  for (const item of items) {
+    const alertMessage = `${item.productName} (${item.colorAlphabet}) IS SOLD OUT`;
+    console.log(`\n🚨 [STOCK ALERT - SOLD OUT]`);
+    console.log(`Notice    : ${alertMessage}`);
+    console.log(`Color     : ${item.colorName}`);
+    console.log(`Order No. : ${item.orderNumber || "Stock Update"}`);
+
+    if (gmailUser && gmailAppPassword) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: gmailUser.trim(),
+            pass: gmailAppPassword.replace(/\s+/g, "").trim(),
+          },
+        });
+
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px;">
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid #fee2e2; padding-bottom: 16px;">
+              <h1 style="color: #dc2626; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase;">SOLD OUT NOTIFICATION</h1>
+              <p style="color: #991b1b; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Inventory Alert</p>
+            </div>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 20px; text-align: center;">
+              <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+              <h2 style="color: #991b1b; font-size: 22px; font-weight: 900; margin: 0 0 10px 0; letter-spacing: 0.5px;">
+                ${alertMessage}
+              </h2>
+              <p style="color: #4b5563; font-size: 14px; margin: 0 0 16px 0;">
+                Color Variant: <strong style="color: #111827;">${item.colorName}</strong> (Shade <strong style="color: #ea580c;">${item.colorAlphabet}</strong>) has reached <strong>0 stock</strong>.
+              </p>
+              ${
+                item.orderNumber
+                  ? `<div style="display: inline-block; background: #ffffff; border: 1px solid #fca5a5; padding: 8px 16px; border-radius: 8px; font-size: 12px; color: #991b1b; font-weight: 600;">
+                      Sold out after Order <strong>#${item.orderNumber}</strong> was placed
+                    </div>`
+                  : `<div style="display: inline-block; background: #ffffff; border: 1px solid #fca5a5; padding: 8px 16px; border-radius: 8px; font-size: 12px; color: #991b1b; font-weight: 600;">
+                      Triggered during stock adjustment
+                    </div>`
+              }
+            </div>
+
+            <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+              IQ Trousers Wholesale Automation System &bull; Automatic Inventory Tracker
+            </p>
+          </div>
+        `;
+
+        await transporter.sendMail({
+          from: `"IQ TROUSERS Stock Alert" <${gmailUser.trim()}>`,
+          to: adminEmail,
+          subject: `🚨 [SOLD OUT] ${alertMessage}`,
+          html,
+        });
+        console.log(`✅ Sold-out notification email successfully dispatched to ${adminEmail} for ${alertMessage}`);
+      } catch (err: any) {
+        console.error("Failed to send sold out email alert:", err.message);
+      }
+    }
+  }
+}
+

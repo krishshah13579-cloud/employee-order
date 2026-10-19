@@ -800,6 +800,49 @@ export function getTotalAvailableSets(setsColorwise: string | null | undefined):
 }
 
 /**
+ * Checks if a specific color variant of a product is sold out.
+ * Returns true if the product tracks setsColorwise and this color has 0 available sets AND 0 loose/mix pieces.
+ */
+export function isColorSoldOut(
+  setsColorwise: string | null | undefined,
+  color: string,
+  colorMapping?: string | null | undefined
+): boolean {
+  if (!setsColorwise || !setsColorwise.trim()) return false;
+  const sets = getAvailableSetsForColor(setsColorwise, color, colorMapping);
+  if (sets > 0) return false;
+
+  // Check loose / mix pieces for this color
+  const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
+  const cleanTarget = cleanColorName(color).toLowerCase();
+  let looseTotal = 0;
+
+  for (const [key, detail] of Object.entries(stockWithLoose)) {
+    if (key.toLowerCase() === color.toLowerCase() || cleanColorName(key).toLowerCase() === cleanTarget) {
+      looseTotal += Object.values(detail.loosePcs || {}).reduce((s, cnt) => s + Math.max(0, cnt || 0), 0);
+    }
+  }
+
+  if (colorMapping) {
+    try {
+      const map = JSON.parse(colorMapping);
+      for (const [letter, mappedName] of Object.entries(map)) {
+        if (typeof mappedName === "string" && cleanColorName(mappedName).toLowerCase() === cleanTarget) {
+          if (stockWithLoose[letter]) {
+            looseTotal += Object.values(stockWithLoose[letter].loosePcs || {}).reduce(
+              (s, cnt) => s + Math.max(0, cnt || 0),
+              0
+            );
+          }
+        }
+      }
+    } catch {}
+  }
+
+  return looseTotal <= 0;
+}
+
+/**
  * Converts Record<string, number> into a clean JSON string for storage in database.
  */
 export function stringifyColorwiseSets(stockMap: Record<string, number>): string {

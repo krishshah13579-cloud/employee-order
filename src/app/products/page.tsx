@@ -28,6 +28,7 @@ import {
   parseDetailedColorRatioSets,
   getPcsFromRatio,
   getProductMixSizesInfo,
+  isColorSoldOut,
 } from "@/lib/stock";
 import type { ProductData } from "@/lib/types";
 
@@ -333,10 +334,10 @@ function ProductsContent() {
                 product.setsColorwise,
                 product.colorMapping
               );
-              // Show in-stock colors on employee panel
+              // Show in-stock colors on employee panel (hide sold out colors)
               const colorList = allColors.filter((col) => {
                 if (!product.setsColorwise || !product.setsColorwise.trim()) return true;
-                return getAvailableSetsForColor(product.setsColorwise, col, product.colorMapping) > 0;
+                return !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
               });
 
               // Extract and sort ratios: 28 to 36 (5 pcs) FIRST, then 28 to 34 (4 pc set)

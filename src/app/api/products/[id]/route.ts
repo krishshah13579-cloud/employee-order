@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-security";
+import { getAllProductColors, isColorSoldOut, getColorShadeLetter } from "@/lib/stock";
+import { sendColorSoldOutNotification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -71,6 +73,11 @@ export async function PUT(
       ? parseFloat(body.wholesalerPrice)
       : Math.max(0, retailerPrice - 100);
 
+    const existing = await prisma.product.findUnique({ where: { id: productId } });
+    if (!existing) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
@@ -94,6 +101,34 @@ export async function PUT(
         isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
       },
     });
+
+    // Check if any color variant became sold out from this update
+    if (body.setsColorwise !== undefined && existing.setsColorwise) {
+      const allColors = getAllProductColors(
+        product.colorsAvailable,
+        product.setsColorwise,
+        product.colorMapping
+      );
+      const newlySoldOut: Array<{ productName: string; colorName: string; colorAlphabet: string }> = [];
+      for (let colIdx = 0; colIdx < allColors.length; colIdx++) {
+        const col = allColors[colIdx];
+        const wasInStock = !isColorSoldOut(existing.setsColorwise, col, existing.colorMapping);
+        const isNowSoldOut = isColorSoldOut(product.setsColorwise, col, product.colorMapping);
+        if (wasInStock && isNowSoldOut) {
+          const colorAlphabet = getColorShadeLetter(product, col, colIdx);
+          newlySoldOut.push({
+            productName: product.name,
+            colorName: col,
+            colorAlphabet,
+          });
+        }
+      }
+      if (newlySoldOut.length > 0) {
+        sendColorSoldOutNotification(newlySoldOut).catch((err) =>
+          console.error("Sold out email alert error on product edit:", err)
+        );
+      }
+    }
 
     return NextResponse.json(product);
   } catch (error: any) {

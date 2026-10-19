@@ -45,6 +45,8 @@ import {
   getSizesFromRatio,
   getProductMixSizesInfo,
   parseDetailedColorStockWithLoose,
+  isColorSoldOut,
+  getColorShadeLetter,
   type ColorStockDetail,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
@@ -166,7 +168,10 @@ function ProductDetailContent() {
   const [customColors, setCustomColors] = useState<string[]>([]);
   const [customColorInput, setCustomColorInput] = useState<string>("");
 
-  // All colors for this product (takes all product colors automatically and any custom colors)
+  // Selected mix single pieces per color: Record<colorName, Record<size, count>>
+  const [colorMixPcs, setColorMixPcs] = useState<Record<string, Record<string, number>>>({});
+
+  // All colors for this product (takes all in-stock product colors, hides sold-out colors, and keeps custom shades)
   const availableColors = useMemo(() => {
     if (!product) return [];
     const colors = getAllProductColors(
@@ -175,7 +180,16 @@ function ProductDetailContent() {
       product.colorMapping
     );
 
-    const merged = [...colors];
+    // Strict rule: IF ANY COLOR IS SOLD OUT DON'T SHOW THAT COLOR OPTION
+    const inStockColors = colors.filter((col) => {
+      // If user currently has active sets or mix pieces selected in this view, keep visible
+      if ((colorSetsSelection[col] || 0) > 0) return true;
+      const mixMap = colorMixPcs[col] || {};
+      if (Object.values(mixMap).some((c) => (c || 0) > 0)) return true;
+      return !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
+    });
+
+    const merged = [...inStockColors];
     customColors.forEach((cc) => {
       if (!merged.some((c) => c.toLowerCase() === cc.toLowerCase())) {
         merged.push(cc);
@@ -183,7 +197,7 @@ function ProductDetailContent() {
     });
 
     return merged;
-  }, [product, customColors]);
+  }, [product, customColors, colorSetsSelection, colorMixPcs]);
 
   // Active selected color for photo and quick sets order
   const [activeColor, setActiveColor] = useState<string>("");
@@ -237,9 +251,6 @@ function ProductDetailContent() {
     }
     return Array.from(sizesSet);
   }, [product, activeRatio]);
-
-  // Selected mix single pieces per color: Record<colorName, Record<size, count>>
-  const [colorMixPcs, setColorMixPcs] = useState<Record<string, Record<string, number>>>({});
 
   // Selected ratio per color: Record<colorName, ratioString>
   const [colorSelectedRatio, setColorSelectedRatio] = useState<Record<string, string>>({});
@@ -1033,16 +1044,7 @@ function ProductDetailContent() {
                     {availableColors.map((col, idx) => {
                       const isSelected = activeColor.toLowerCase() === col.toLowerCase();
                       const hex = getColorHex(col).hex;
-                      let letter = String.fromCharCode(65 + idx);
-                      if (product.colorMapping) {
-                        try {
-                          const map = JSON.parse(product.colorMapping);
-                          const found = Object.entries(map).find(
-                            ([_, c]) => String(c).toLowerCase() === col.toLowerCase()
-                          );
-                          if (found) letter = found[0];
-                        } catch {}
-                      }
+                      const letter = getColorShadeLetter(product, col, idx);
                       const currentSets = colorSetsSelection[col] || 0;
 
                       return (

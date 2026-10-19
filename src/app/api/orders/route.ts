@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAvailableSetsForColor, deductSetsFromStock, calculateOrderedColorSetsPieces } from "@/lib/stock";
-import { sendNewOrderNotification } from "@/lib/email";
+import {
+  getAvailableSetsForColor,
+  deductSetsFromStock,
+  calculateOrderedColorSetsPieces,
+  isColorSoldOut,
+  getColorShadeLetter,
+  getAllProductColors,
+} from "@/lib/stock";
+import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { requireAdmin } from "@/lib/auth-security";
 
@@ -270,6 +277,12 @@ export async function POST(request: NextRequest) {
     const customTaxInvoiceNumber = body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null;
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
 
+    const newlySoldOutColors: Array<{
+      productName: string;
+      colorName: string;
+      colorAlphabet: string;
+    }> = [];
+
     const createdOrder = await prisma.$transaction(async (tx) => {
       // Deduct stock for all products that have setsColorwise
       for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
@@ -279,6 +292,26 @@ export async function POST(request: NextRequest) {
             where: { id: product.id },
             data: { setsColorwise: updatedStock },
           });
+
+          // Check which color variants became sold out from this order deduction
+          const allColors = getAllProductColors(
+            product.colorsAvailable,
+            product.setsColorwise,
+            product.colorMapping
+          );
+          for (let colIdx = 0; colIdx < allColors.length; colIdx++) {
+            const col = allColors[colIdx];
+            const wasInStock = !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
+            const isNowSoldOut = isColorSoldOut(updatedStock, col, product.colorMapping);
+            if (wasInStock && isNowSoldOut) {
+              const colorAlphabet = getColorShadeLetter(product, col, colIdx);
+              newlySoldOutColors.push({
+                productName: product.name,
+                colorName: col,
+                colorAlphabet,
+              });
+            }
+          }
         }
       }
 
@@ -326,6 +359,16 @@ export async function POST(request: NextRequest) {
       totalSets: createdOrder.totalSets,
       placedBy: createdOrder.placedBy || undefined,
     }).catch((err) => console.error("Order email notification background error:", err));
+
+    // Send immediate email alert for any colors that reached 0 stock (Sold Out)
+    if (newlySoldOutColors.length > 0) {
+      sendColorSoldOutNotification(
+        newlySoldOutColors.map((it) => ({
+          ...it,
+          orderNumber: createdOrder.orderNumber,
+        }))
+      ).catch((err) => console.error("Sold out email notification background error:", err));
+    }
 
     // Send immediate automated WhatsApp message directly to customer via Meta Cloud API
     const customerPhone = createdOrder.customerPhone || (createdOrder.customer as any)?.phoneNumber;
