@@ -26,6 +26,7 @@ import {
   Plus,
   Trash2,
   Clock,
+  Tag,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -99,6 +100,7 @@ function CustomerRegistrationContent() {
   const [businessType, setBusinessType] = useState<
     "RETAILER" | "WHOLESALER" | "RETAILER WITH SPECIAL DISCOUNT"
   >("RETAILER");
+  const [specialDiscount, setSpecialDiscount] = useState<number | "">(50);
   const [creditDays, setCreditDays] = useState<number | "">(0);
 
   // Tracking which fields were auto-filled by OCR
@@ -309,6 +311,7 @@ function CustomerRegistrationContent() {
         shopName: shopName.trim().toUpperCase(),
         gstPanNo: gstPanNo.trim().toUpperCase(),
         businessType: businessType,
+        specialDiscount: businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (Number(specialDiscount) || 0) : 0,
         creditDays: Number(creditDays) || 0,
         phoneNumber: phoneNumber.trim(),
         contactPerson: contactPerson.trim().toUpperCase() || undefined,
@@ -671,6 +674,44 @@ function CustomerRegistrationContent() {
                       </button>
                     )}
                   </div>
+
+                  {/* Special Discount Box for Retailer (Special Discount) */}
+                  {businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+                    <div className="mt-3 p-4 bg-emerald-50/80 rounded-2xl border-2 border-emerald-300 shadow-xs space-y-2 animate-in fade-in duration-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <label className="text-xs font-black uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                          <Tag size={15} className="text-emerald-700" />
+                          <span>What special discount would you like to give? *</span>
+                        </label>
+                        <span className="text-[11px] font-bold text-emerald-700">
+                          Formula: (MRP / 2) - Special Discount
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                        <div className="relative w-full sm:w-56">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-800 font-black text-sm">
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={specialDiscount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSpecialDiscount(val === "" ? "" : Math.max(0, parseFloat(val) || 0));
+                            }}
+                            placeholder="e.g. 50"
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border-2 border-emerald-400 rounded-xl text-emerald-950 font-black text-base font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                        <p className="text-xs text-emerald-800 font-medium">
+                          Enter the discount per PC (e.g. Special Discount 50 will deduct ₹50 per piece from MRP/2).
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ═══════════════════════════════════════════

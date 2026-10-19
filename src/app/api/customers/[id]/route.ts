@@ -98,6 +98,13 @@ export async function PUT(
         }
       }
       updateData.businessType = bType;
+      if (bType !== "RETAILER WITH SPECIAL DISCOUNT") {
+        updateData.specialDiscount = 0;
+      }
+    }
+
+    if (body.specialDiscount !== undefined) {
+      updateData.specialDiscount = Math.max(0, parseFloat(body.specialDiscount) || 0);
     }
 
     if (body.contactPersons) {

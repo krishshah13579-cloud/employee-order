@@ -99,6 +99,7 @@ interface CustomerOption {
   address?: string | null;
   businessType?: string | null;
   creditDays?: number;
+  specialDiscount?: number | null;
 }
 
 export default function AdminSalesPage() {
@@ -275,10 +276,13 @@ export default function AdminSalesPage() {
           item.color = colors[0] || "Standard";
           item.sizeRatio = prod.sizesRatio || "30 to 38";
           item.pcsPerSet = prod.pcsPerSet || 5;
-          item.unitPrice =
-            businessType === "WHOLESALER" && prod.wholesalerPrice
-              ? prod.wholesalerPrice
-              : prod.retailerPrice || prod.price;
+          const isWholesaler = businessType === "WHOLESALER" || businessType === "WHOLESALER WITHOUT GST";
+          const isSpecialDiscount = businessType === "RETAILER WITH SPECIAL DISCOUNT";
+          const customerObj = availableCustomers.find((c) => c.id === selectedCustomerId);
+          const splDisc = isSpecialDiscount ? (Number(customerObj?.specialDiscount) || 0) : 0;
+          const ret = prod.retailerPrice || prod.price;
+          const who = prod.wholesalerPrice || Math.max(0, ret - 100);
+          item.unitPrice = isWholesaler ? who : isSpecialDiscount ? Math.max(0, ret - splDisc) : ret;
           item.totalPcs = item.totalSets * item.pcsPerSet;
           item.itemSubtotal = item.totalPcs * item.unitPrice;
         }
@@ -380,12 +384,26 @@ export default function AdminSalesPage() {
       setBusinessType((c.businessType as any) || "RETAILER");
       setCreditDays(c.creditDays || 0);
 
-      // Recalculate prices if wholesaler
+      // Recalculate prices if wholesaler or retailer with special discount
       if (c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST") {
         setFormItems((prev) =>
           prev.map((it) => {
             const prod = availableProducts.find((p) => p.id === it.productId);
             const price = prod?.wholesalerPrice || it.unitPrice;
+            return {
+              ...it,
+              unitPrice: price,
+              itemSubtotal: it.totalPcs * price,
+            };
+          })
+        );
+      } else if (c.businessType === "RETAILER WITH SPECIAL DISCOUNT") {
+        const splDisc = Number(c.specialDiscount) || 0;
+        setFormItems((prev) =>
+          prev.map((it) => {
+            const prod = availableProducts.find((p) => p.id === it.productId);
+            const ret = prod?.retailerPrice || prod?.price || it.unitPrice;
+            const price = Math.max(0, ret - splDisc);
             return {
               ...it,
               unitPrice: price,

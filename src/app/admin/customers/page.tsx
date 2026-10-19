@@ -333,10 +333,15 @@ export default function CustomersPage() {
                           </span>
                         ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                           <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
-                            title="Retailer with Special Discount"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
+                            title={`Retailer with Special Discount: ₹${c.specialDiscount || 0} off MRP/2`}
                           >
-                            RETAILER (SPL DISC)
+                            <span>RETAILER (SPL DISC)</span>
+                            {c.specialDiscount ? (
+                              <span className="bg-teal-200/80 text-teal-900 px-1 rounded font-mono">
+                                -₹{c.specialDiscount}
+                              </span>
+                            ) : null}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">

@@ -43,6 +43,7 @@ export interface CreateCustomerPayload {
   gstPanNo?: string;
   businessType?: "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
   creditDays?: number;
+  specialDiscount?: number;
   address?: string;
   city?: string;
   state?: string;
@@ -92,6 +93,7 @@ export interface CustomerData {
   gstPanNo: string;
   businessType?: "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
   creditDays?: number;
+  specialDiscount?: number | null;
   address: string; // Shop Address
   city?: string | null;
   state?: string | null;

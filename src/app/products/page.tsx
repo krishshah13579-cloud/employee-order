@@ -54,6 +54,7 @@ function ProductsContent() {
     customerName?: string;
     customerGstPan?: string;
     businessType?: string;
+    specialDiscount?: number;
     itemsCount: number;
   } | null>(null);
 
@@ -68,6 +69,7 @@ function ProductsContent() {
             customerName: parsed.customer?.shopName || parsed.customerName,
             customerGstPan: parsed.customer?.gstPanNo,
             businessType: parsed.customer?.businessType,
+            specialDiscount: parsed.customer?.specialDiscount || 0,
             itemsCount: parsed.items?.length || 0,
           });
         }
@@ -438,20 +440,28 @@ function ProductsContent() {
                           {draftInfo?.customerName && (
                             <span
                               className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                draftInfo.businessType === "WHOLESALER"
+                                draftInfo.businessType === "WHOLESALER" || draftInfo.businessType === "WHOLESALER WITHOUT GST"
                                   ? "bg-purple-100 text-purple-800"
+                                  : draftInfo.businessType === "RETAILER WITH SPECIAL DISCOUNT"
+                                  ? "bg-teal-100 text-teal-800"
                                   : "bg-blue-100 text-blue-800"
                               }`}
                             >
-                              {draftInfo.businessType === "WHOLESALER" ? "Wholesaler" : "Retailer"}
+                              {draftInfo.businessType === "WHOLESALER" || draftInfo.businessType === "WHOLESALER WITHOUT GST"
+                                ? "Wholesaler"
+                                : draftInfo.businessType === "RETAILER WITH SPECIAL DISCOUNT"
+                                ? `Spl Disc (-₹${draftInfo.specialDiscount || 0})`
+                                : "Retailer"}
                             </span>
                           )}
                         </div>
                         {(() => {
-                          const isWholesaler = draftInfo?.businessType === "WHOLESALER";
+                          const isWholesaler = draftInfo?.businessType === "WHOLESALER" || draftInfo?.businessType === "WHOLESALER WITHOUT GST";
+                          const isSpecialDiscount = draftInfo?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+                          const splDisc = isSpecialDiscount ? (draftInfo?.specialDiscount || 0) : 0;
                           const ret = product.retailerPrice || product.price;
                           const who = product.wholesalerPrice || Math.max(0, ret - 100);
-                          const activePrice = isWholesaler ? who : ret;
+                          const activePrice = isWholesaler ? who : isSpecialDiscount ? Math.max(0, ret - splDisc) : ret;
 
                           return (
                             <div className="flex items-baseline gap-1.5 flex-wrap">

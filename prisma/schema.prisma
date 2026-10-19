@@ -59,6 +59,7 @@ model Customer {
   gstPanNo        String   // GST No. / PAN No.
   businessType    String   @default("RETAILER") // RETAILER or WHOLESALER
   creditDays      Int      @default(0) // Credit payment days (Super Admin only can edit)
+  specialDiscount Float    @default(0) // Special discount per piece for RETAILER WITH SPECIAL DISCOUNT
   address         String   // Shop Address
   city            String?  // City
   state           String?  // State

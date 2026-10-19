@@ -246,6 +246,7 @@ export default function OrderFormPage() {
               city: cust.city,
               state: cust.state,
               businessType: cust.businessType || "RETAILER",
+              specialDiscount: cust.specialDiscount || 0,
               creditDays: cust.creditDays || 0,
               visitingCardUrl: cust.visitingCardUrl,
             }
@@ -364,12 +365,17 @@ export default function OrderFormPage() {
 
     // Dynamic Price sync:
     // If selected customer is Retailer or Retailer with Special Discount -> Base Price is Retailer Price (MRP / 2)
+    // If selected customer is Retailer with Special Discount -> Base Price is (MRP / 2) - specialDiscount
     // If selected customer is Wholesaler (with or without GST) -> use Wholesaler Price (MRP / 2 - 100)
     const isWholesaler = c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST";
+    const isSpecialDiscount = c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+    const specialDiscountAmt = isSpecialDiscount ? (Number(c.specialDiscount) || 0) : 0;
     const updatedItems = items.map((it) => {
       let applicableUnitPrice = it.unitPrice;
       if (isWholesaler && it.wholesalerPrice !== undefined) {
         applicableUnitPrice = it.wholesalerPrice;
+      } else if (isSpecialDiscount && it.retailerPrice !== undefined) {
+        applicableUnitPrice = Math.max(0, it.retailerPrice - specialDiscountAmt);
       } else if (!isWholesaler && it.retailerPrice !== undefined) {
         applicableUnitPrice = it.retailerPrice;
       }
@@ -1109,7 +1115,7 @@ export default function OrderFormPage() {
                       </span>
                     ) : selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-900 border border-teal-300 rounded-xl text-xs font-bold">
-                        <span>Retailer (Special Discount: Base MRP/2)</span>
+                        <span>Retailer (Spl Disc: ₹{selectedCustomer.specialDiscount || 0} off MRP/2)</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
@@ -1331,7 +1337,9 @@ export default function OrderFormPage() {
                             <div>
                               <span className="font-mono">{formatCurrency(item.unitPrice)}</span>
                               {selectedCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
-                                <span className="text-[10px] text-teal-600 block font-semibold">MRP/2 Special</span>
+                                <span className="text-[10px] text-teal-600 block font-semibold">
+                                  MRP/2 (-₹{selectedCustomer.specialDiscount || 0})
+                                </span>
                               )}
                             </div>
                           )}

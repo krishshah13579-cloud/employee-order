@@ -18,6 +18,7 @@ import {
   Lock,
   ShieldCheck,
   Clock,
+  Tag,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { CustomerData } from "@/lib/types";
@@ -63,6 +64,7 @@ export default function CustomerForm({
     visitingCardUrl: initialData?.visitingCardUrl || "",
     contactPerson: initialData?.contactPerson || "",
     businessType: initialData?.businessType || "RETAILER",
+    specialDiscount: initialData?.specialDiscount !== undefined && initialData?.specialDiscount !== null ? initialData.specialDiscount : 50,
     creditDays: initialData?.creditDays || 0,
   });
 
@@ -238,6 +240,45 @@ export default function CustomerForm({
               <option value="RETAILER WITH SPECIAL DISCOUNT">Retailer with Special Discount</option>
             </select>
           </div>
+
+          {/* Special Discount Field for Retailer with Special Discount */}
+          {formData.businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+            <div className="col-span-1 sm:col-span-2 p-4 bg-emerald-50/80 border-2 border-emerald-300 rounded-xl space-y-2 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-xs font-black text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag size={14} className="text-emerald-700" />
+                  <span>What special discount would you like to give? *</span>
+                </label>
+                <span className="text-[11px] font-bold text-emerald-700">
+                  Formula: (MRP / 2) - Special Discount
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="relative w-full sm:w-48">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-800 font-black text-sm">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.specialDiscount}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        specialDiscount: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="e.g. 50"
+                    className="w-full pl-8 pr-3 py-2 bg-white border border-emerald-400 rounded-lg text-emerald-950 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <span className="text-xs text-emerald-800 font-medium">
+                  Enter discount per PC (e.g. Special Discount 50 will deduct ₹50 per piece from MRP/2).
+                </span>
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-1.5">

@@ -389,6 +389,7 @@ function ProductDetailContent() {
     shopName?: string;
     gstPanNo?: string;
     businessType?: string;
+    specialDiscount?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -427,10 +428,12 @@ function ProductDetailContent() {
     return Object.values(colorPiecesMap).reduce((sum, item) => sum + item.totalPcs, 0);
   }, [colorPiecesMap]);
 
-  const isWholesaler = draftCustomer?.businessType === "WHOLESALER";
+  const isWholesaler = draftCustomer?.businessType === "WHOLESALER" || draftCustomer?.businessType === "WHOLESALER WITHOUT GST";
+  const isSpecialDiscount = draftCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+  const specialDiscountAmt = isSpecialDiscount ? (Number(draftCustomer?.specialDiscount) || 0) : 0;
   const retPrice = product?.retailerPrice ?? product?.price ?? 0;
   const whoPrice = product?.wholesalerPrice ?? Math.max(0, retPrice - 100);
-  const unitPrice = isWholesaler ? whoPrice : retPrice;
+  const unitPrice = isWholesaler ? whoPrice : isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice;
   const totalAmount = totalPcs * unitPrice;
 
   // Add To Order Form Action
@@ -697,10 +700,16 @@ function ProductDetailContent() {
                         className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
                           isWholesaler
                             ? "bg-purple-100 text-purple-800 border border-purple-200"
+                            : isSpecialDiscount
+                            ? "bg-teal-100 text-teal-800 border border-teal-200"
                             : "bg-blue-100 text-blue-800 border border-blue-200"
                         }`}
                       >
-                        {isWholesaler ? "Wholesaler" : "Retailer"}
+                        {isWholesaler
+                          ? "Wholesaler"
+                          : isSpecialDiscount
+                          ? `Spl Disc (-₹${specialDiscountAmt})`
+                          : "Retailer"}
                       </span>
                     )}
                   </div>

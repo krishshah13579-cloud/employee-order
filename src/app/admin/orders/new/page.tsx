@@ -119,6 +119,13 @@ export default function NewOrderPage() {
       prod.colorMapping
     );
 
+    const isWholesaler = activeCustomer?.businessType === "WHOLESALER" || activeCustomer?.businessType === "WHOLESALER WITHOUT GST";
+    const isSpecialDiscount = activeCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+    const splDisc = isSpecialDiscount ? (Number(activeCustomer?.specialDiscount) || 0) : 0;
+    const baseRetail = prod.retailerPrice || prod.price;
+    const baseWhole = prod.wholesalerPrice || Math.max(0, baseRetail - 100);
+    const initialPrice = isWholesaler ? baseWhole : isSpecialDiscount ? Math.max(0, baseRetail - splDisc) : baseRetail;
+
     setOrderItems((prev) => [
       ...prev,
       {
@@ -129,7 +136,7 @@ export default function NewOrderPage() {
         sizesRatio: prod.sizesRatio,
         sizesList: prod.sizesList,
         pcsPerSet: prod.pcsPerSet,
-        unitPrice: prod.price,
+        unitPrice: initialPrice,
         notes: "",
       },
     ]);

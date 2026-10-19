@@ -125,6 +125,9 @@ export async function POST(request: NextRequest) {
     }
     const businessType = rawBusinessType;
     const creditDays = parseInt(body.creditDays, 10) || 0;
+    const specialDiscount = businessType === "RETAILER WITH SPECIAL DISCOUNT"
+      ? Math.max(0, parseFloat(body.specialDiscount) || 0)
+      : 0;
 
     const customer = await prisma.customer.create({
       data: {
@@ -132,6 +135,7 @@ export async function POST(request: NextRequest) {
         gstPanNo: gstPanNo,
         businessType: businessType,
         creditDays: creditDays,
+        specialDiscount: specialDiscount,
         address: finalAddress || "Direct Delivery",
         city: finalCity || null,
         state: finalState || null,
