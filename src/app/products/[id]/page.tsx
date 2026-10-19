@@ -39,6 +39,10 @@ import {
   getProductColorImage,
   cleanColorName,
   calculateOrderedColorSetsPieces,
+  sortSizeRatioKeys,
+  parseDetailedColorRatioSets,
+  getPcsFromRatio,
+  getSizesFromRatio,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
 
@@ -181,29 +185,55 @@ function ProductDetailContent() {
   // Active selected color for photo and quick sets order
   const [activeColor, setActiveColor] = useState<string>("");
 
-  // Extract all sizes available for this specific product (e.g. from sizesList or sizesRatio)
+  // Extract all available size ratios for this product from setsColorwise and product.sizesRatio
+  const availableRatios = useMemo(() => {
+    if (!product) return [];
+    const ratioSet = new Set<string>();
+    if (product.sizesRatio) {
+      ratioSet.add(product.sizesRatio.trim());
+    }
+    if (product.setsColorwise) {
+      try {
+        const detailed = parseDetailedColorRatioSets(product.setsColorwise);
+        for (const rMap of Object.values(detailed)) {
+          for (const rKey of Object.keys(rMap)) {
+            if (rKey.trim()) ratioSet.add(rKey.trim());
+          }
+        }
+      } catch {}
+    }
+    // Strict business rule: "28 to 36" (5 pcs) FIRST, then "28 to 34" (4 pc set) SECOND
+    return sortSizeRatioKeys(Array.from(ratioSet));
+  }, [product]);
+
+  // Selected Size Ratio state (defaults to 28 to 36 if present)
+  const [selectedRatio, setSelectedRatio] = useState<string>("");
+
+  useEffect(() => {
+    if (availableRatios.length > 0 && (!selectedRatio || !availableRatios.includes(selectedRatio))) {
+      setSelectedRatio(availableRatios[0]);
+    }
+  }, [availableRatios, selectedRatio]);
+
+  const activeRatio = selectedRatio || availableRatios[0] || product?.sizesRatio || "28 to 36";
+  const activePcsPerSet = getPcsFromRatio(activeRatio, product?.pcsPerSet || 5);
+
+  // Extract all sizes available for this specific product (e.g. from activeRatio or sizesList)
   const productAvailableSizes = useMemo(() => {
     if (!product) return [];
     const sizesSet = new Set<string>();
-    if (product.sizesList) {
+    const ratioSizes = getSizesFromRatio(activeRatio);
+    if (ratioSizes.length > 0 && ratioSizes[0] !== activeRatio) {
+      ratioSizes.forEach((s) => sizesSet.add(s));
+    } else if (product.sizesList) {
       product.sizesList
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
         .forEach((s) => sizesSet.add(s));
     }
-    if (product.sizesRatio && sizesSet.size === 0) {
-      const match = product.sizesRatio.match(/(\d+)\s*(?:to|-)\s*(\d+)/i);
-      if (match) {
-        const start = parseInt(match[1], 10);
-        const end = parseInt(match[2], 10);
-        for (let sz = start; sz <= end; sz += 2) {
-          sizesSet.add(String(sz));
-        }
-      }
-    }
     return Array.from(sizesSet);
-  }, [product]);
+  }, [product, activeRatio]);
 
   // Size guide synced with product database and filtered to ONLY available sizes for this product
   const sizeGuideData = useMemo(() => {
@@ -374,7 +404,7 @@ function ProductDetailContent() {
   }, []);
 
   // Wholesale Calculations & Dynamic Selling Price (Retailer vs Wholesaler)
-  const pcsPerSet = product?.pcsPerSet || 5;
+  const pcsPerSet = activePcsPerSet;
   const totalSets = selectedEntries.reduce((sum, item) => sum + item.sets, 0);
 
   // Dynamically calculate accurate pieces across size ratio packs
@@ -385,12 +415,13 @@ function ProductDetailContent() {
         product?.setsColorwise,
         entry.color,
         entry.sets,
-        pcsPerSet
+        activePcsPerSet,
+        activeRatio
       );
       map[entry.color] = calc;
     }
     return map;
-  }, [product, selectedEntries, pcsPerSet]);
+  }, [product, selectedEntries, activePcsPerSet, activeRatio]);
 
   const totalPcs = useMemo(() => {
     return Object.values(colorPiecesMap).reduce((sum, item) => sum + item.totalPcs, 0);
@@ -459,9 +490,9 @@ function ProductDetailContent() {
       category: product.category,
       imageUrl: getProductCoverImage(product.imageUrl),
       colorSets: selectedEntries,
-      sizeRatio: product.sizesRatio,
-      sizesList: product.sizesList,
-      pcsPerSet: pcsPerSet,
+      sizeRatio: activeRatio,
+      sizesList: getSizesFromRatio(activeRatio).join(", ") || product.sizesList,
+      pcsPerSet: activePcsPerSet,
       totalSets: totalSets,
       totalPcs: totalPcs,
       retailerPrice: retPrice,
@@ -695,7 +726,7 @@ function ProductDetailContent() {
                     Packaging Ratio
                   </div>
                   <div className="text-xl font-black text-slate-900 mt-0.5">
-                    {product.pcsPerSet || 5} Pcs
+                    {activePcsPerSet} Pcs
                     <span className="text-xs font-semibold text-slate-500 ml-1">/ set</span>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-0.5">
@@ -704,14 +735,58 @@ function ProductDetailContent() {
                 </div>
               </div>
 
-              {/* Mandatory Size Ratio */}
-              <div className="space-y-1.5 text-xs">
+              {/* Size Ratio: Prioritizing 28 to 36 first, then 28 to 34 (4 pc set) */}
+              <div className="space-y-2 text-xs pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between text-slate-600">
-                  <span className="font-bold">Mandatory Size Ratio:</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {product.sizesRatio}
-                  </span>
+                  <span className="font-bold">Size Ratio:</span>
+                  {availableRatios.length > 1 && (
+                    <span className="text-[10px] font-bold text-orange-600">
+                      28 to 36 first, then 28 to 34
+                    </span>
+                  )}
                 </div>
+
+                {availableRatios.length > 1 ? (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {availableRatios.map((rKey) => {
+                      const pcs = getPcsFromRatio(rKey, 5);
+                      const isSelected = activeRatio === rKey;
+                      const isFourPc = rKey.includes("28 to 34") || pcs === 4;
+                      return (
+                        <button
+                          key={rKey}
+                          type="button"
+                          onClick={() => setSelectedRatio(rKey)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                            isSelected
+                              ? "bg-slate-900 text-white ring-2 ring-orange-500 ring-offset-1"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                          }`}
+                        >
+                          <span>{rKey}</span>
+                          <span
+                            className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                              isSelected
+                                ? "bg-orange-500 text-white font-bold"
+                                : "bg-white text-slate-600 border border-slate-300"
+                            }`}
+                          >
+                            {pcs} Pcs{isFourPc ? " Set" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                      {activeRatio}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      ({activePcsPerSet} Pcs / Set)
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Collapsible Size Guide */}
@@ -893,7 +968,8 @@ function ProductDetailContent() {
                       product.setsColorwise,
                       color,
                       currentSets,
-                      pcsPerSet
+                      activePcsPerSet,
+                      activeRatio
                     );
                     const calculatedColorPcs = pcsInfo.totalPcs;
                     const isPhotoActive = activeColor.toLowerCase() === color.toLowerCase();

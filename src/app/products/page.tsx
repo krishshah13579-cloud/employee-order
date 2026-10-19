@@ -24,6 +24,9 @@ import {
   parseColorwiseSets,
   getAllProductColors,
   getAvailableSetsForColor,
+  sortSizeRatioKeys,
+  parseDetailedColorRatioSets,
+  getPcsFromRatio,
 } from "@/lib/stock";
 import type { ProductData } from "@/lib/types";
 
@@ -333,6 +336,23 @@ function ProductsContent() {
                 return getAvailableSetsForColor(product.setsColorwise, col, product.colorMapping) > 0;
               });
 
+              // Extract and sort ratios: 28 to 36 (5 pcs) FIRST, then 28 to 34 (4 pc set)
+              const ratioSet = new Set<string>();
+              if (product.sizesRatio) ratioSet.add(product.sizesRatio.trim());
+              if (product.setsColorwise) {
+                try {
+                  const detailed = parseDetailedColorRatioSets(product.setsColorwise);
+                  for (const rMap of Object.values(detailed)) {
+                    for (const rKey of Object.keys(rMap)) {
+                      if (rKey.trim()) ratioSet.add(rKey.trim());
+                    }
+                  }
+                } catch {}
+              }
+              const sortedRatios = sortSizeRatioKeys(Array.from(ratioSet));
+              const displayRatio = sortedRatios[0] || product.sizesRatio || "28 to 36";
+              const displayPcs = getPcsFromRatio(displayRatio, product.pcsPerSet || 5);
+
               return (
                 <div
                   key={product.id}
@@ -383,9 +403,9 @@ function ProductsContent() {
 
                       {/* Sizes Ratio */}
                       <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                        <span>Sizes: {product.sizesRatio}</span>
+                        <span>Sizes: {displayRatio}</span>
                         <span className="font-semibold text-slate-700">
-                          {product.pcsPerSet || 5} Pcs / Set
+                          {displayPcs} Pcs / Set
                         </span>
                       </div>
 

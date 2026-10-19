@@ -344,7 +344,8 @@ export function calculateOrderedColorSetsPieces(
   setsColorwise: string | null | undefined,
   color: string,
   requestedSets: number,
-  fallbackPcsPerSet: number = 5
+  fallbackPcsPerSet: number = 5,
+  preferredRatio?: string
 ): {
   totalPcs: number;
   breakdownText: string;
@@ -366,8 +367,19 @@ export function calculateOrderedColorSetsPieces(
   let totalPcs = 0;
   const allocations: { ratio: string; sets: number; pcsPerSet: number; pcs: number }[] = [];
 
+  // Sort ratio keys strictly: "28 to 36" (5 pcs) FIRST, then "28 to 34" (4 pc set) SECOND
+  const sortedRatioKeys = sortSizeRatioKeys(Object.keys(ratios));
+  if (preferredRatio && ratios[preferredRatio] !== undefined) {
+    const prefIdx = sortedRatioKeys.indexOf(preferredRatio);
+    if (prefIdx > 0) {
+      sortedRatioKeys.splice(prefIdx, 1);
+      sortedRatioKeys.unshift(preferredRatio);
+    }
+  }
+
   // Allocate across available ratio packs
-  for (const [ratioKey, availableCount] of Object.entries(ratios)) {
+  for (const ratioKey of sortedRatioKeys) {
+    const availableCount = ratios[ratioKey];
     if (remaining <= 0) break;
     const count = Math.max(0, availableCount || 0);
     if (count <= 0) continue;
@@ -389,12 +401,15 @@ export function calculateOrderedColorSetsPieces(
 
   // If requested more sets than configured in ratio packs, or if no ratio packs exist
   if (remaining > 0) {
-    const pieces = remaining * fallbackPcsPerSet;
+    const fallbackRatio = preferredRatio || sortedRatioKeys[0] || "Standard";
+    const sizes = getSizesFromRatio(fallbackRatio);
+    const pcsInSet = sizes.length > 0 ? sizes.length : fallbackPcsPerSet;
+    const pieces = remaining * pcsInSet;
     totalPcs += pieces;
     allocations.push({
-      ratio: "Standard",
+      ratio: fallbackRatio,
       sets: remaining,
-      pcsPerSet: fallbackPcsPerSet,
+      pcsPerSet: pcsInSet,
       pcs: pieces,
     });
   }
@@ -823,8 +838,12 @@ export function deductSetsFromStock(
         ratios[orderItem.ratio] -= canDeduct;
         remainingToDeduct -= canDeduct;
       }
-      for (const [r, count] of Object.entries(ratios)) {
+      // Prioritize 28 to 36 first, then 28 to 34 (4 pc set)
+      const sortedKeys = sortSizeRatioKeys(Object.keys(ratios));
+      for (const r of sortedKeys) {
         if (remainingToDeduct <= 0) break;
+        const count = ratios[r];
+        if (count <= 0) continue;
         const canDeduct = Math.min(remainingToDeduct, count);
         ratios[r] -= canDeduct;
         remainingToDeduct -= canDeduct;
