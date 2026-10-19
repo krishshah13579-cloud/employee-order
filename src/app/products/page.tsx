@@ -62,21 +62,33 @@ function ProductsContent() {
 
   // Load active draft from localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("garmentpro_order_draft");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.customer || (parsed.items && parsed.items.length > 0))) {
-          setDraftInfo({
-            customerName: parsed.customer?.shopName || parsed.customerName,
-            customerGstPan: parsed.customer?.gstPanNo,
-            businessType: parsed.customer?.businessType,
-            specialDiscount: parsed.customer?.specialDiscount || 0,
-            itemsCount: parsed.items?.length || 0,
-          });
+    const loadDraft = () => {
+      try {
+        const raw = localStorage.getItem("garmentpro_order_draft");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.customer || (parsed.items && parsed.items.length > 0))) {
+            setDraftInfo({
+              customerName: parsed.customer?.shopName || parsed.customerName,
+              customerGstPan: parsed.customer?.gstPanNo,
+              businessType: parsed.customer?.businessType || parsed.businessType,
+              specialDiscount: parsed.customer?.specialDiscount || 0,
+              itemsCount: parsed.items?.length || 0,
+            });
+            return;
+          }
         }
-      }
-    } catch {}
+        setDraftInfo(null);
+      } catch {}
+    };
+
+    loadDraft();
+    window.addEventListener("garmentpro_draft_updated", loadDraft);
+    window.addEventListener("storage", loadDraft);
+    return () => {
+      window.removeEventListener("garmentpro_draft_updated", loadDraft);
+      window.removeEventListener("storage", loadDraft);
+    };
   }, []);
 
   // Fetch active products
@@ -466,7 +478,7 @@ function ProductsContent() {
                               }`}
                             >
                               {draftInfo.businessType === "WHOLESALER" || draftInfo.businessType === "WHOLESALER WITHOUT GST"
-                                ? "Wholesaler"
+                                ? "Wholesale"
                                 : draftInfo.businessType === "RETAILER WITH SPECIAL DISCOUNT"
                                 ? `Spl Disc (-₹${draftInfo.specialDiscount || 0})`
                                 : "Retailer"}

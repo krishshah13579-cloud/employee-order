@@ -494,16 +494,45 @@ function ProductDetailContent() {
   } | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("garmentpro_order_draft");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.customer) {
-          setDraftCustomer(parsed.customer);
+    const loadDraftCustomer = () => {
+      try {
+        const raw = localStorage.getItem("garmentpro_order_draft");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.customer) {
+            setDraftCustomer(parsed.customer);
+            return;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    };
+
+    loadDraftCustomer();
+    window.addEventListener("garmentpro_draft_updated", loadDraftCustomer);
+    window.addEventListener("storage", loadDraftCustomer);
+    return () => {
+      window.removeEventListener("garmentpro_draft_updated", loadDraftCustomer);
+      window.removeEventListener("storage", loadDraftCustomer);
+    };
   }, []);
+
+  const handleToggleBusinessType = (newType: string) => {
+    setDraftCustomer((prev) => {
+      const updated = prev ? { ...prev, businessType: newType } : { businessType: newType };
+      try {
+        const raw = localStorage.getItem("garmentpro_order_draft");
+        const draft = raw ? JSON.parse(raw) : {};
+        if (draft.customer) {
+          draft.customer.businessType = newType;
+        }
+        draft.businessType = newType;
+        localStorage.setItem("garmentpro_order_draft", JSON.stringify(draft));
+        window.dispatchEvent(new Event("garmentpro_draft_updated"));
+      } catch {}
+      return updated;
+    });
+    toast(`Pricing updated immediately to ${newType === "WHOLESALER" ? "Wholesale" : "Retailer"}`);
+  };
 
   // Wholesale Calculations & Dynamic Selling Price (Retailer vs Wholesaler)
   const pcsPerSet = activePcsPerSet;
@@ -809,21 +838,26 @@ function ProductDetailContent() {
                       Selling Rate / PC
                     </span>
                     {draftCustomer && (
-                      <span
-                        className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                          isWholesaler
-                            ? "bg-purple-100 text-purple-800 border border-purple-200"
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBusinessType(isWholesaler ? "RETAILER" : "WHOLESALER")}
+                          title="Click to switch business type & update price immediately"
+                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded cursor-pointer transition hover:opacity-85 active:scale-95 ${
+                            isWholesaler
+                              ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : isSpecialDiscount
+                              ? "bg-teal-100 text-teal-800 border border-teal-200"
+                              : "bg-blue-100 text-blue-800 border border-blue-200"
+                          }`}
+                        >
+                          {isWholesaler
+                            ? "Wholesale ⇄"
                             : isSpecialDiscount
-                            ? "bg-teal-100 text-teal-800 border border-teal-200"
-                            : "bg-blue-100 text-blue-800 border border-blue-200"
-                        }`}
-                      >
-                        {isWholesaler
-                          ? "Wholesaler"
-                          : isSpecialDiscount
-                          ? `Spl Disc (-₹${specialDiscountAmt})`
-                          : "Retailer"}
-                      </span>
+                            ? `Spl Disc (-₹${specialDiscountAmt})`
+                            : "Retailer ⇄"}
+                        </button>
+                      </div>
                     )}
                   </div>
                   {/* BESIDE SELLING PRICE WRITE MRP (STRIKED OUT) SELLING PRICE */}

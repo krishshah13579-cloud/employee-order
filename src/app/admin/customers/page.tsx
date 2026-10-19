@@ -322,14 +322,14 @@ export default function CustomersPage() {
                       <td className="py-4 px-6">
                         {isWholesaler ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            WHOLESALER
+                            WHOLESALE
                           </span>
                         ) : c.businessType === "WHOLESALER WITHOUT GST" ? (
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300"
-                            title="Wholesaler Without GST"
+                            title="Wholesale Without GST"
                           >
-                            WHOLESALER (NO GST)
+                            WHOLESALE (NO GST)
                           </span>
                         ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                           <span

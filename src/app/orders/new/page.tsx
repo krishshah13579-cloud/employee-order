@@ -102,7 +102,7 @@ export default function OrderFormPage() {
   // Credit Days on Order Form (Locks permanently if 45 days is selected)
   const [orderCreditDays, setOrderCreditDays] = useState<number>(0);
   const [isCreditLocked, setIsCreditLocked] = useState<boolean>(false);
-
+  const [orderBusinessType, setOrderBusinessType] = useState<string>("");
 
   // Order Items in Draft
   const [items, setItems] = useState<DraftOrderItem[]>([]);
@@ -234,6 +234,9 @@ export default function OrderFormPage() {
               setIsCreditLocked(true);
             }
           }
+          if (draft.businessType || draft.customer?.businessType) {
+            setOrderBusinessType(draft.businessType || draft.customer?.businessType);
+          }
         }
       }
     } catch (err) {
@@ -247,13 +250,16 @@ export default function OrderFormPage() {
     customerId: number | null,
     notes: string,
     employee: string,
-    creditDaysVal?: number
+    creditDaysVal?: number,
+    customBType?: string
   ) => {
     try {
       const cust = customers.find((c) => c.id === customerId);
       const cd = creditDaysVal !== undefined ? creditDaysVal : orderCreditDays;
+      const bType = customBType || orderBusinessType || cust?.businessType || "RETAILER";
       const draftObj = {
         customerId,
+        businessType: bType,
         customer: cust
           ? {
               id: cust.id,
@@ -264,7 +270,7 @@ export default function OrderFormPage() {
               address: cust.address,
               city: cust.city,
               state: cust.state,
-              businessType: cust.businessType || "RETAILER",
+              businessType: bType,
               specialDiscount: cust.specialDiscount || 0,
               creditDays: cust.creditDays || 0,
               visitingCardUrl: cust.visitingCardUrl,
@@ -286,6 +292,9 @@ export default function OrderFormPage() {
   const selectedCustomer = useMemo(() => {
     return customers.find((c) => c.id === selectedCustomerId) || null;
   }, [customers, selectedCustomerId]);
+
+  // Effective Business Type across Order Form & Dynamic Pricing
+  const effectiveBusinessType = orderBusinessType || selectedCustomer?.businessType || "RETAILER";
 
   // Check whether the selected customer is registered with GST/PAN
   const isCustomerGstRegistered = useMemo(() => {
@@ -385,31 +394,89 @@ export default function OrderFormPage() {
     // Dynamic Price sync:
     // If selected customer is Retailer or Retailer with Special Discount -> Base Price is Retailer Price (MRP / 2)
     // If selected customer is Retailer with Special Discount -> Base Price is (MRP / 2) - specialDiscount
-    // If selected customer is Wholesaler (with or without GST) -> use Wholesaler Price (MRP / 2 - 100)
-    const isWholesaler = c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST";
-    const isSpecialDiscount = c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+    // If selected customer is Wholesale -> use Wholesaler Price (MRP / 2 - 100)
+    const custBusinessType = c.businessType || "RETAILER";
+    setOrderBusinessType(custBusinessType);
+
+    const isWholesaler = custBusinessType === "WHOLESALER" || custBusinessType === "WHOLESALER WITHOUT GST";
+    const isSpecialDiscount = custBusinessType === "RETAILER WITH SPECIAL DISCOUNT";
     const specialDiscountAmt = isSpecialDiscount ? (Number(c.specialDiscount) || 0) : 0;
     const updatedItems = items.map((it) => {
+      const prod = productsMap[it.productId];
+      const retPrice = it.retailerPrice ?? prod?.retailerPrice ?? prod?.price ?? it.unitPrice;
+      const whoPrice = it.wholesalerPrice ?? prod?.wholesalerPrice ?? Math.max(0, retPrice - 100);
+
       let applicableUnitPrice = it.unitPrice;
-      if (isWholesaler && it.wholesalerPrice !== undefined) {
-        applicableUnitPrice = it.wholesalerPrice;
-      } else if (isSpecialDiscount && it.retailerPrice !== undefined) {
-        applicableUnitPrice = Math.max(0, it.retailerPrice - specialDiscountAmt);
-      } else if (!isWholesaler && it.retailerPrice !== undefined) {
-        applicableUnitPrice = it.retailerPrice;
+      if (isWholesaler) {
+        applicableUnitPrice = whoPrice;
+      } else if (isSpecialDiscount) {
+        applicableUnitPrice = Math.max(0, retPrice - specialDiscountAmt);
+      } else {
+        applicableUnitPrice = retPrice;
       }
       return {
         ...it,
+        retailerPrice: retPrice,
+        wholesalerPrice: whoPrice,
         unitPrice: applicableUnitPrice,
         itemSubtotal: (it.totalPcs || 0) * applicableUnitPrice,
       };
     });
 
     setItems(updatedItems);
-    saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit);
+    saveDraft(updatedItems, c.id, orderNotes, placedBy, custCredit, custBusinessType);
     if (isRegistered) {
-      toast(`Customer selected: ${c.shopName.toUpperCase()} (${isWholesaler ? "Wholesaler" : "Retailer"})`);
+      toast(`Customer selected: ${c.shopName.toUpperCase()} (${isWholesaler ? "Wholesale" : "Retailer"})`);
     }
+  };
+
+  // Immediate Business Type Change & Price Recalculation Handler
+  const handleBusinessTypeChange = (newType: string) => {
+    setOrderBusinessType(newType);
+
+    // Update customer in state and DB
+    if (selectedCustomerId) {
+      setCustomers((prev) =>
+        prev.map((c) => (c.id === selectedCustomerId ? { ...c, businessType: newType } : c))
+      );
+      fetch(`/api/customers/${selectedCustomerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessType: newType }),
+      }).catch((err) => console.error("Error updating customer businessType:", err));
+    }
+
+    const isWholesaler = newType === "WHOLESALER" || newType === "WHOLESALER WITHOUT GST";
+    const isSpecialDiscount = newType === "RETAILER WITH SPECIAL DISCOUNT";
+    const specialDiscountAmt = isSpecialDiscount ? (Number(selectedCustomer?.specialDiscount) || 0) : 0;
+
+    const updatedItems = items.map((it) => {
+      const prod = productsMap[it.productId];
+      const retPrice = it.retailerPrice ?? prod?.retailerPrice ?? prod?.price ?? it.unitPrice;
+      const whoPrice = it.wholesalerPrice ?? prod?.wholesalerPrice ?? Math.max(0, retPrice - 100);
+
+      let applicableUnitPrice = it.unitPrice;
+      if (isWholesaler) {
+        applicableUnitPrice = whoPrice;
+      } else if (isSpecialDiscount) {
+        applicableUnitPrice = Math.max(0, retPrice - specialDiscountAmt);
+      } else {
+        applicableUnitPrice = retPrice;
+      }
+
+      return {
+        ...it,
+        retailerPrice: retPrice,
+        wholesalerPrice: whoPrice,
+        unitPrice: applicableUnitPrice,
+        itemSubtotal: (it.totalPcs || 0) * applicableUnitPrice,
+      };
+    });
+
+    setItems(updatedItems);
+    saveDraft(updatedItems, selectedCustomerId, orderNotes, placedBy, orderCreditDays, newType);
+
+    toast(`Type of Business changed to ${newType === "WHOLESALER" ? "Wholesale" : newType}. Prices updated immediately!`);
   };
 
   // Handle Save / Register Customer GST/PAN (registers customer and unlocks adding products)
@@ -483,7 +550,7 @@ export default function OrderFormPage() {
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const isWithoutGst = selectedCustomer?.businessType === "WHOLESALER WITHOUT GST";
+  const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST";
   const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
   const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
@@ -555,7 +622,7 @@ export default function OrderFormPage() {
         orderNumber: customOrderNumber.trim() || undefined,
         customerId: selectedCustomerId,
         placedBy: finalPlacedBy,
-        businessType: selectedCustomer?.businessType || "RETAILER",
+        businessType: effectiveBusinessType,
         creditDays: orderCreditDays,
         notes: finalNotes || undefined,
         items: items.map((it) => ({
@@ -1124,27 +1191,67 @@ export default function OrderFormPage() {
               {/* 3. Business Type & Order Credit Days Terms */}
               <div className="pt-3 border-t border-orange-200/80 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
-                      Type of Business
+                  <div className="space-y-1.5">
+                    <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
+                      Type of Business (Click to change & update prices immediately)
                     </span>
-                    {selectedCustomer.businessType === "WHOLESALER" ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold">
-                        <span>Wholesaler (With 5% GST)</span>
-                      </span>
-                    ) : selectedCustomer.businessType === "WHOLESALER WITHOUT GST" ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 rounded-xl text-xs font-bold">
-                        <span>Wholesaler (Without GST)</span>
-                      </span>
-                    ) : selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-900 border border-teal-300 rounded-xl text-xs font-bold">
-                        <span>Retailer (Spl Disc: ₹{selectedCustomer.specialDiscount || 0} off MRP/2)</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleBusinessTypeChange("RETAILER")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                          effectiveBusinessType === "RETAILER"
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/40"
+                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                        }`}
+                      >
+                        {effectiveBusinessType === "RETAILER" && <CheckCircle2 size={13} className="text-white" />}
                         <span>Retailer</span>
-                      </span>
-                    )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleBusinessTypeChange("WHOLESALER")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                          effectiveBusinessType === "WHOLESALER"
+                            ? "bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-400/40"
+                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                        }`}
+                      >
+                        {effectiveBusinessType === "WHOLESALER" && <CheckCircle2 size={13} className="text-white" />}
+                        <span>Wholesale</span>
+                      </button>
+
+                      {(selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" || canAdjustSpecialDiscount) && (
+                        <button
+                          type="button"
+                          onClick={() => handleBusinessTypeChange("RETAILER WITH SPECIAL DISCOUNT")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                            effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT"
+                              ? "bg-teal-600 text-white border-teal-600 shadow-xs ring-2 ring-teal-400/40"
+                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                          }`}
+                        >
+                          {effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" && <CheckCircle2 size={13} className="text-white" />}
+                          <span>Retailer (Spl Disc{selectedCustomer.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""})</span>
+                        </button>
+                      )}
+
+                      {selectedCustomer.businessType === "WHOLESALER WITHOUT GST" && (
+                        <button
+                          type="button"
+                          onClick={() => handleBusinessTypeChange("WHOLESALER WITHOUT GST")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                            effectiveBusinessType === "WHOLESALER WITHOUT GST"
+                              ? "bg-fuchsia-600 text-white border-fuchsia-600 shadow-xs ring-2 ring-fuchsia-400/40"
+                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                          }`}
+                        >
+                          {effectiveBusinessType === "WHOLESALER WITHOUT GST" && <CheckCircle2 size={13} className="text-white" />}
+                          <span>Wholesale (Without GST)</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>

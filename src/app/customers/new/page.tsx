@@ -645,7 +645,7 @@ function CustomerRegistrationContent() {
                           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                       }`}
                     >
-                      <div className="font-black text-sm text-purple-900">Wholesaler</div>
+                      <div className="font-black text-sm text-purple-900">Wholesale</div>
                       {businessType === "WHOLESALER" && (
                         <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
                       )}
