@@ -147,8 +147,9 @@ async function connectToWhatsApp() {
           } catch {}
           connectedUser = null;
           setTimeout(connectToWhatsApp, 2000);
-        } else if (shouldReconnect) {
-          setTimeout(connectToWhatsApp, 4000);
+        } else {
+          console.log("🔄 Reconnecting WhatsApp connection in 3 seconds...");
+          setTimeout(connectToWhatsApp, 3000);
         }
       }
     });
@@ -156,9 +157,18 @@ async function connectToWhatsApp() {
     console.error("Failed to initialize Baileys WhatsApp client:", err);
     connectionState = "DISCONNECTED";
     lastError = err.message;
-    setTimeout(connectToWhatsApp, 5000);
+    setTimeout(connectToWhatsApp, 4000);
   }
 }
+
+// Global safety crash-guards for 24/7/365 uninterrupted runtime
+process.on("uncaughtException", (err) => {
+  console.error("⚠️ [GATEWAY UNCAUGHT EXCEPTION - PREVENTED CRASH]:", err?.message || err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ [GATEWAY UNHANDLED REJECTION - PREVENTED CRASH]:", reason?.message || reason);
+});
 
 // Automated Weekly Payment Reminders Job
 async function triggerWeeklyRemindersJob() {

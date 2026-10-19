@@ -43,3 +43,4 @@ prisma/*.db*
 .vercel
 .env*
 .whatsapp-auth/
+*.log

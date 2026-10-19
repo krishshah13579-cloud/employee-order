@@ -16,7 +16,10 @@
     "db:use-sqlite": "node scripts/switch-db.js sqlite && prisma generate",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "auto-push": "node scripts/auto-git-push.js",
-    "whatsapp:gateway": "node scripts/whatsapp-gateway.mjs"
+    "whatsapp:gateway": "node scripts/whatsapp-gateway.mjs",
+    "whatsapp:service:start": "bash scripts/service-start.sh",
+    "whatsapp:service:stop": "bash scripts/service-stop.sh",
+    "whatsapp:service:status": "bash scripts/service-status.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
