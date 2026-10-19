@@ -1280,7 +1280,7 @@ function ProductDetailContent() {
                         </div>
 
                         {/* ─── INLINE SIZE RATIO & MIX SIZES SELECTOR (RIGHT BELOW COLOR) ─── */}
-                        {isExpanded && (
+                        {isExpanded && hasMixStockForColor && (
                           <div
                             className="mt-3.5 pt-3.5 border-t border-slate-200/90 space-y-3 cursor-default"
                             onClick={(e) => e.stopPropagation()}
