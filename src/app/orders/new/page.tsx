@@ -103,6 +103,7 @@ export default function OrderFormPage() {
   // Order Items in Draft
   const [items, setItems] = useState<DraftOrderItem[]>([]);
   const [orderNotes, setOrderNotes] = useState<string>("");
+  const [customOrderNumber, setCustomOrderNumber] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Transport Popup Modal State
@@ -511,6 +512,7 @@ export default function OrderFormPage() {
       const finalNotes = [transportDetails, orderNotes.trim()].filter(Boolean).join("\n");
 
       const payload = {
+        orderNumber: customOrderNumber.trim() || undefined,
         customerId: selectedCustomerId,
         placedBy: finalPlacedBy,
         businessType: selectedCustomer?.businessType || "RETAILER",
@@ -1330,6 +1332,21 @@ export default function OrderFormPage() {
                   className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-slate-100 border border-slate-300 rounded-xl text-slate-900 font-bold cursor-not-allowed select-none"
                 />
               </div>
+            </div>
+
+            {/* Written Order Form # */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                <span>Written Order Slip / Book No.</span>
+                <span className="text-[10px] text-slate-400 font-normal">Optional (from printed book)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1042 or ORD-2024 (leave blank for auto)"
+                value={customOrderNumber}
+                onChange={(e) => setCustomOrderNumber(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono font-medium"
+              />
             </div>
 
             {/* Order Notes */}

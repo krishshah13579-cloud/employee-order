@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sidebar } from "@/components/admin/Sidebar";
 import { useToast } from "@/components/ui/Toast";
 import {
   FileEdit,
@@ -79,10 +78,7 @@ export default function InvoiceSettingsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar activePage="invoice-settings" />
-
-      <main className="flex-1 ml-0 md:ml-64 p-4 sm:p-8 max-w-7xl">
+    <div className="max-w-5xl mx-auto pb-16 space-y-6">
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
@@ -505,7 +501,6 @@ export default function InvoiceSettingsPage() {
             </div>
           </form>
         )}
-      </main>
     </div>
   );
 }

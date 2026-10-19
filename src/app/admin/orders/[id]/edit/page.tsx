@@ -69,6 +69,9 @@ export default function EditOrderPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Form Fields
+  const [editOrderNumber, setEditOrderNumber] = useState("");
+  const [editTaxInvoiceNumber, setEditTaxInvoiceNumber] = useState("");
+  const [editTaxInvoiceDate, setEditTaxInvoiceDate] = useState("");
   const [editStatus, setEditStatus] = useState<OrderStatus>("Pending");
   const [editCustomerPhone, setEditCustomerPhone] = useState("");
   const [editCustomerGstPan, setEditCustomerGstPan] = useState("");
@@ -124,6 +127,11 @@ export default function EditOrderPage() {
         const orderData = await orderRes.json();
         setOrder(orderData);
 
+        setEditOrderNumber(orderData.orderNumber || "");
+        setEditTaxInvoiceNumber(orderData.taxInvoiceNumber || "");
+        setEditTaxInvoiceDate(
+          orderData.taxInvoiceDate ? new Date(orderData.taxInvoiceDate).toISOString().slice(0, 10) : ""
+        );
         setEditStatus(orderData.status || "Pending");
         setEditCustomerPhone(
           orderData.customer?.phoneNumber || orderData.customerPhone || ""
@@ -378,6 +386,9 @@ export default function EditOrderPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          orderNumber: editOrderNumber.trim() || undefined,
+          taxInvoiceNumber: editTaxInvoiceNumber.trim() || null,
+          taxInvoiceDate: editTaxInvoiceDate || null,
           status: editStatus,
           notes: editNotes,
           placedBy: editPlacedBy,
@@ -844,6 +855,57 @@ export default function EditOrderPage() {
               placeholder="e.g. [TRANSPORT: Patel Transport] urgent parcel"
               className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+          </div>
+        </div>
+
+        {/* Order No. & Tax Invoice No. based on previous accounting bills & written order forms */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-100">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Order No. (Written Book #)*
+            </label>
+            <input
+              type="text"
+              required
+              value={editOrderNumber}
+              onChange={(e) => setEditOrderNumber(e.target.value)}
+              placeholder="e.g. 101, ORD-45"
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Based on your handwritten order form book
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Tax Invoice No. (Accounting Bill #)
+            </label>
+            <input
+              type="text"
+              value={editTaxInvoiceNumber}
+              onChange={(e) => setEditTaxInvoiceNumber(e.target.value.toUpperCase())}
+              placeholder="e.g. INV-2425-001 (Optional)"
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold uppercase text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Based on previous bill in your accounting software
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Tax Invoice Date
+            </label>
+            <input
+              type="date"
+              value={editTaxInvoiceDate}
+              onChange={(e) => setEditTaxInvoiceDate(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Date on accounting software invoice bill
+            </p>
           </div>
         </div>
 

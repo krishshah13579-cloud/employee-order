@@ -200,23 +200,42 @@ export async function POST(request: NextRequest) {
     const gstAmount = Math.round(orderSubtotal * 0.05 * 100) / 100;
     const grandTotal = Math.round(orderSubtotal + gstAmount);
 
-    // Generate Order Number GO-YYMMDD-NNN
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const datePrefix = `GO-${yy}${mm}${dd}`;
+    // Determine Order Number: use custom Order No. from previous written form, or auto-generate
+    const customOrderNumber = body.orderNumber ? String(body.orderNumber).trim() : "";
+    let orderNumber = customOrderNumber;
 
-    const todayCount = await prisma.order.count({
-      where: { orderNumber: { startsWith: datePrefix } },
-    });
+    if (!orderNumber) {
+      // Auto-generate Order Number GO-YYMMDD-NNN
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const datePrefix = `GO-${yy}${mm}${dd}`;
 
-    let sequence = todayCount + 1;
-    let orderNumber = `${datePrefix}-${String(sequence).padStart(3, "0")}`;
-    while (await prisma.order.findUnique({ where: { orderNumber } })) {
-      sequence++;
+      const todayCount = await prisma.order.count({
+        where: { orderNumber: { startsWith: datePrefix } },
+      });
+
+      let sequence = todayCount + 1;
       orderNumber = `${datePrefix}-${String(sequence).padStart(3, "0")}`;
+      while (await prisma.order.findUnique({ where: { orderNumber } })) {
+        sequence++;
+        orderNumber = `${datePrefix}-${String(sequence).padStart(3, "0")}`;
+      }
+    } else {
+      // Validate unique custom orderNumber
+      const existing = await prisma.order.findUnique({ where: { orderNumber } });
+      if (existing) {
+        return NextResponse.json(
+          { error: `Order Number "${orderNumber}" already exists in the system. Please use a unique Order No. (e.g. ${orderNumber}-A) or leave blank to auto-generate.` },
+          { status: 400 }
+        );
+      }
     }
+
+    // Determine custom Tax Invoice Number from previous accounting software bills
+    const customTaxInvoiceNumber = body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null;
+    const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
 
     const createdOrder = await prisma.$transaction(async (tx) => {
       // Deduct stock for all products that have setsColorwise
@@ -241,7 +260,7 @@ export async function POST(request: NextRequest) {
           businessType: body.businessType || (customer as any).businessType || "RETAILER",
           creditDays: body.creditDays !== undefined ? (parseInt(body.creditDays, 10) || 0) : ((customer as any).creditDays || 0),
           orderDate: orderDate ? new Date(orderDate) : new Date(),
-          status: "Pending",
+          status: body.status || (customTaxInvoiceNumber ? "Ready" : "Pending"),
           subtotal: orderSubtotal,
           gstRate: gstRate,
           gstAmount: gstAmount,
@@ -250,6 +269,8 @@ export async function POST(request: NextRequest) {
           totalSets: orderTotalSets,
           placedBy: placedBy || "Admin",
           notes: notes || null,
+          taxInvoiceNumber: customTaxInvoiceNumber,
+          taxInvoiceDate: customTaxInvoiceDate,
           items: {
             create: validatedItems,
           },

@@ -19,6 +19,7 @@ import {
   LogOut,
   ExternalLink,
   BadgePercent,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 
@@ -97,6 +98,12 @@ const navItems = [
     name: "Reports",
     href: "/admin/reports",
     icon: FileText,
+    exact: false,
+  },
+  {
+    name: "Invoice Settings",
+    href: "/admin/invoice-settings",
+    icon: SlidersHorizontal,
     exact: false,
   },
   {

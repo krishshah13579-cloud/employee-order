@@ -62,6 +62,7 @@ export async function PUT(
 
     const body = await request.json();
     const {
+      orderNumber,
       customerId,
       placedBy,
       notes,
@@ -89,6 +90,21 @@ export async function PUT(
     let targetCustomerGstPan = existingOrder.customerGstPan;
     let targetCustomerPhone = existingOrder.customerPhone;
     let targetCustomerAddress = existingOrder.customerAddress;
+
+    let targetOrderNumber = existingOrder.orderNumber;
+    if (orderNumber && String(orderNumber).trim()) {
+      const cleanNum = String(orderNumber).trim();
+      if (cleanNum !== existingOrder.orderNumber) {
+        const conflict = await prisma.order.findUnique({ where: { orderNumber: cleanNum } });
+        if (conflict && conflict.id !== orderId) {
+          return NextResponse.json(
+            { error: `Order Number "${cleanNum}" is already used by another order.` },
+            { status: 400 }
+          );
+        }
+        targetOrderNumber = cleanNum;
+      }
+    }
 
     if (customerId) {
       const cust = await prisma.customer.findUnique({
@@ -213,6 +229,7 @@ export async function PUT(
       return await tx.order.update({
         where: { id: orderId },
         data: {
+          orderNumber: targetOrderNumber,
           customerId: targetCustomerId,
           customerName: targetCustomerName,
           customerGstPan: targetCustomerGstPan,

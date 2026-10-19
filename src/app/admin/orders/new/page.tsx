@@ -44,6 +44,9 @@ export default function NewOrderPage() {
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "">("");
+  const [customOrderNumber, setCustomOrderNumber] = useState("");
+  const [customTaxInvoiceNumber, setCustomTaxInvoiceNumber] = useState("");
+  const [customTaxInvoiceDate, setCustomTaxInvoiceDate] = useState("");
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [placedBy, setPlacedBy] = useState("Krish Sandip Shah (Admin)");
   const [orderNotes, setOrderNotes] = useState("");
@@ -232,6 +235,9 @@ export default function NewOrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: selectedCustomerId,
+          orderNumber: customOrderNumber.trim() || undefined,
+          taxInvoiceNumber: customTaxInvoiceNumber.trim() || undefined,
+          taxInvoiceDate: customTaxInvoiceDate || undefined,
           orderDate,
           placedBy,
           notes: orderNotes,
@@ -240,7 +246,7 @@ export default function NewOrderPage() {
           gstRate: 5.0,
           gstAmount: orderGst,
           totalAmount: orderGrandTotal,
-          status: "Confirmed",
+          status: customTaxInvoiceNumber.trim() ? "Ready" : "Confirmed",
         }),
       });
 
@@ -395,6 +401,56 @@ export default function NewOrderPage() {
               placeholder="e.g. Transport via Shreeji Logistics, urgent dispatch"
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
+          </div>
+        </div>
+
+        {/* Custom Order No. & Tax Invoice No. based on previous accounting bills & written order forms */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-gray-100">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Order No. (Written Book #)
+            </label>
+            <input
+              type="text"
+              value={customOrderNumber}
+              onChange={(e) => setCustomOrderNumber(e.target.value)}
+              placeholder="e.g. 101, ORD-45 (or leave blank to auto-generate)"
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Based on your handwritten order form book
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Tax Invoice No. (Accounting Bill #)
+            </label>
+            <input
+              type="text"
+              value={customTaxInvoiceNumber}
+              onChange={(e) => setCustomTaxInvoiceNumber(e.target.value.toUpperCase())}
+              placeholder="e.g. INV-2425-001 (Optional)"
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono font-bold uppercase focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              From previous bills in accounting software
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Tax Invoice Date
+            </label>
+            <input
+              type="date"
+              value={customTaxInvoiceDate}
+              onChange={(e) => setCustomTaxInvoiceDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Date on accounting software invoice bill
+            </p>
           </div>
         </div>
       </div>
