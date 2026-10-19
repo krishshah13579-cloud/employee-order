@@ -166,20 +166,26 @@ export async function PUT(
           0
         );
 
+        const hasMixPcs = it.mixPcs > 0 || (it.colorMixPcs && typeof it.colorMixPcs === "object" && Object.keys(it.colorMixPcs).length > 0);
+
         if (itemTotalSets === 0) {
-          if (it.totalSets) {
-            itemTotalSets = parseInt(String(it.totalSets), 10) || 1;
-          } else if (it.quantity) {
+          if (it.totalSets !== undefined && it.totalSets !== null && !isNaN(parseInt(String(it.totalSets), 10))) {
+            itemTotalSets = Math.max(0, parseInt(String(it.totalSets), 10));
+          } else if (!hasMixPcs && it.quantity && parseInt(String(it.quantity), 10) > 0) {
             itemTotalSets = Math.max(1, Math.round(parseInt(String(it.quantity), 10) / pcsPerSet));
           } else {
-            itemTotalSets = 1;
+            itemTotalSets = 0;
           }
-          colorSetsArray = [{ color: it.color || "Standard", sets: itemTotalSets }];
+
+          if (itemTotalSets > 0 && colorSetsArray.length === 0) {
+            colorSetsArray = [{ color: it.color || "Standard", sets: itemTotalSets }];
+          }
         }
 
         let itemTotalPcs = 0;
         for (const cs of colorSetsArray) {
           const requested = parseInt(String(cs.sets), 10) || 0;
+          if (requested <= 0) continue;
           const pcsCalc = calculateOrderedColorSetsPieces(
             product ? product.setsColorwise : null,
             cs.color,
@@ -188,8 +194,12 @@ export async function PUT(
           );
           itemTotalPcs += pcsCalc.totalPcs;
         }
+
+        const itemMixPcs = parseInt(String(it.mixPcs), 10) || 0;
+        itemTotalPcs += itemMixPcs;
+
         if (itemTotalPcs === 0) {
-          itemTotalPcs = Number(it.totalPcs) || (itemTotalSets * pcsPerSet);
+          itemTotalPcs = Number(it.totalPcs) || (itemTotalSets * pcsPerSet) + itemMixPcs;
         }
 
         const unitPrice = parseFloat(String(it.unitPrice)) || product?.price || 0;

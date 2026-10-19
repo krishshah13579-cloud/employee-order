@@ -121,22 +121,40 @@ export async function POST(request: NextRequest) {
         0
       );
 
+      // Check if item has mix single pieces
+      let itemMixPcs = parseInt(it.mixPcs, 10) || 0;
+      if (itemMixPcs === 0 && it.colorMixPcs && typeof it.colorMixPcs === "object") {
+        for (const sMap of Object.values(it.colorMixPcs)) {
+          if (typeof sMap === "object" && sMap !== null) {
+            for (const cnt of Object.values(sMap as Record<string, any>)) {
+              itemMixPcs += Math.max(0, parseInt(String(cnt), 10) || 0);
+            }
+          }
+        }
+      }
+      const hasMixPcs = itemMixPcs > 0 || (it.colorMixPcs && typeof it.colorMixPcs === "object" && Object.keys(it.colorMixPcs).length > 0);
+
       if (itemTotalSets === 0) {
-        if (it.totalSets) {
-          itemTotalSets = parseInt(it.totalSets, 10) || 1;
-        } else if (it.quantity) {
+        if (it.totalSets !== undefined && it.totalSets !== null && !isNaN(parseInt(it.totalSets, 10))) {
+          itemTotalSets = Math.max(0, parseInt(it.totalSets, 10));
+        } else if (!hasMixPcs && it.quantity && parseInt(it.quantity, 10) > 0) {
           itemTotalSets = Math.max(1, Math.round(parseInt(it.quantity, 10) / pcsPerSet));
         } else {
-          itemTotalSets = 1;
+          itemTotalSets = 0;
         }
-        colorSetsArray = [{ color: it.color || "Standard", sets: itemTotalSets }];
+
+        if (itemTotalSets > 0 && colorSetsArray.length === 0) {
+          colorSetsArray = [{ color: it.color || "Standard", sets: itemTotalSets }];
+        }
       }
 
-      // Enforce stock availability
+      // Enforce stock availability only for requested sets (> 0)
       if (product.setsColorwise && product.setsColorwise.trim() !== "") {
         for (const cs of colorSetsArray) {
           const requestedSets = parseInt(cs.sets, 10) || 0;
-          const availableStock = getAvailableSetsForColor(product.setsColorwise, cs.color);
+          if (requestedSets <= 0) continue; // Skip items with 0 sets (e.g. mix pieces only)
+
+          const availableStock = getAvailableSetsForColor(product.setsColorwise, cs.color, product.colorMapping);
 
           // Check how many sets of this color have already been reserved in previous items of this order
           const existingDeduction =
@@ -163,10 +181,13 @@ export async function POST(request: NextRequest) {
         productDeductionsMap.set(product.id, { product, orderedSets: [], orderedLoose: {} });
       }
       for (const cs of colorSetsArray) {
-        productDeductionsMap.get(product.id)!.orderedSets.push({
-          color: cs.color,
-          sets: parseInt(cs.sets, 10) || 0,
-        });
+        const setsCount = parseInt(cs.sets, 10) || 0;
+        if (setsCount > 0) {
+          productDeductionsMap.get(product.id)!.orderedSets.push({
+            color: cs.color,
+            sets: setsCount,
+          });
+        }
       }
 
       // Collect loose single pieces for deduction
@@ -186,6 +207,7 @@ export async function POST(request: NextRequest) {
       let itemTotalPcs = 0;
       for (const cs of colorSetsArray) {
         const requested = parseInt(cs.sets, 10) || 0;
+        if (requested <= 0) continue;
         const pcsCalc = calculateOrderedColorSetsPieces(
           product.setsColorwise,
           cs.color,
@@ -196,7 +218,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Add mix single pieces
-      const itemMixPcs = parseInt(it.mixPcs, 10) || 0;
       itemTotalPcs += itemMixPcs;
 
       if (itemTotalPcs === 0) {
