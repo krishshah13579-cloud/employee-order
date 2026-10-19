@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
-import { syncExistingConfirmedOrdersToSales } from "@/lib/sales";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +8,6 @@ export async function GET(request: NextRequest) {
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // Ensure all confirmed orders are properly represented in the sales register
-    await syncExistingConfirmedOrdersToSales();
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.toLowerCase() || "";

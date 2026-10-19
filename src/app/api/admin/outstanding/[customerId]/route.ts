@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
-import { syncExistingConfirmedOrdersToSales } from "@/lib/sales";
 
 export async function GET(
   request: NextRequest,
@@ -12,8 +11,6 @@ export async function GET(
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    await syncExistingConfirmedOrdersToSales();
 
     const { customerId } = await params;
     const cid = parseInt(customerId, 10);

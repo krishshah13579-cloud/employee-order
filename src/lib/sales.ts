@@ -189,8 +189,10 @@ export async function syncExistingConfirmedOrdersToSales() {
       select: { id: true },
     });
 
-    for (const ord of confirmedOrders) {
-      await createOrUpdateSalesInvoiceFromOrder(ord.id);
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < confirmedOrders.length; i += CHUNK_SIZE) {
+      const chunk = confirmedOrders.slice(i, i + CHUNK_SIZE);
+      await Promise.all(chunk.map((ord) => createOrUpdateSalesInvoiceFromOrder(ord.id)));
     }
   } catch (error: any) {
     console.error("Error in syncExistingConfirmedOrdersToSales:", error);
