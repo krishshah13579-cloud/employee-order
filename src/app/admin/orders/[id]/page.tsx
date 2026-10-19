@@ -95,10 +95,20 @@ export default function OrderInvoicePage() {
       }
 
       // Initialize Tax Invoice Form Fields
-      const defaultTaxNo =
-        data.taxInvoiceNumber ||
-        `TI-${new Date().getFullYear().toString().slice(-2)}-${String(data.id).padStart(3, "0")}`;
-      setTaxInvoiceNoInput(defaultTaxNo);
+      if (data.taxInvoiceNumber) {
+        setTaxInvoiceNoInput(data.taxInvoiceNumber);
+      } else {
+        fetch("/api/orders/next-numbers")
+          .then((r) => r.json())
+          .then((numData) => {
+            if (numData?.nextTaxInvoiceNumber) {
+              setTaxInvoiceNoInput(numData.nextTaxInvoiceNumber);
+            }
+          })
+          .catch(() => {
+            setTaxInvoiceNoInput(String(data.id));
+          });
+      }
 
       if (data.taxInvoiceDate) {
         try {

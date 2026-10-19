@@ -483,7 +483,11 @@ export default function EditOrderPage() {
           </Link>
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <span>Edit Order #{order.orderNumber}</span>
+              <span>
+                {order.taxInvoiceNumber
+                  ? `Edit Invoice #${order.taxInvoiceNumber}`
+                  : `Edit Order #${order.orderNumber}`}
+              </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                 Product &amp; Ratio Editor
               </span>

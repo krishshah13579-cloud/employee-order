@@ -120,7 +120,10 @@ export default function OrdersPage() {
 
       if (res.ok) {
         const data = await res.json();
-        toast(`Order ${statusModalOrder.orderNumber} status updated to ${newStatus}`, "success");
+        const docLabel = statusModalOrder.taxInvoiceNumber
+          ? `Invoice #${statusModalOrder.taxInvoiceNumber}`
+          : `Order #${statusModalOrder.orderNumber}`;
+        toast(`${docLabel} status updated to ${newStatus}`, "success");
         setStatusModalOrder(null);
         fetchOrders();
 
@@ -229,7 +232,7 @@ export default function OrdersPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-                <th className="py-3.5 px-6">Order # & Date</th>
+                <th className="py-3.5 px-6">Invoice / Order # & Date</th>
                 <th className="py-3.5 px-6">Customer Shop & GST</th>
                 <th className="py-3.5 px-6">Items & Color Sets Breakdown</th>
                 <th className="py-3.5 px-6">Total Amount (5% GST Incl.)</th>
@@ -254,12 +257,36 @@ export default function OrdersPage() {
                 orders.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="py-4 px-6">
-                      <div className="font-mono font-bold text-gray-900 text-sm">{o.orderNumber}</div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">
-                        {formatDate(o.orderDate || o.createdAt)}
-                      </div>
-                      {o.placedBy && (
-                        <span className="text-[10px] text-gray-500 font-medium">By: {o.placedBy}</span>
+                      {o.taxInvoiceNumber ? (
+                        <div>
+                          <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
+                            <span className="font-black text-amber-950">Invoice #{o.taxInvoiceNumber}</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              Tax Invoice
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {formatDate(o.taxInvoiceDate || o.orderDate || o.createdAt)}
+                          </div>
+                          {o.placedBy && (
+                            <span className="text-[10px] text-gray-500 font-medium">By: {o.placedBy}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-900">Order Form #{o.orderNumber}</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              Order Form
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {formatDate(o.orderDate || o.createdAt)}
+                          </div>
+                          {o.placedBy && (
+                            <span className="text-[10px] text-gray-500 font-medium">By: {o.placedBy}</span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="py-4 px-6">
@@ -407,7 +434,11 @@ export default function OrdersPage() {
         <Modal
           isOpen={!!statusModalOrder}
           onClose={() => setStatusModalOrder(null)}
-          title={`Update Status — Order ${statusModalOrder.orderNumber}`}
+          title={`Update Status — ${
+            statusModalOrder.taxInvoiceNumber
+              ? `Invoice #${statusModalOrder.taxInvoiceNumber}`
+              : `Order #${statusModalOrder.orderNumber}`
+          }`}
           size="sm"
         >
           <div className="space-y-4 pt-2">

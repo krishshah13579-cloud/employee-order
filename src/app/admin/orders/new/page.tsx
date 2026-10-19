@@ -65,6 +65,16 @@ export default function NewOrderPage() {
           const prods: ProductData[] = await pRes.json();
           setProducts(prods);
 
+          // Fetch next order form number starting from 1
+          fetch("/api/orders/next-numbers")
+            .then((r) => r.json())
+            .then((numData) => {
+              if (numData?.nextOrderNumber) {
+                setCustomOrderNumber(numData.nextOrderNumber);
+              }
+            })
+            .catch(() => {});
+
           // Pre-populate with first product if available
           if (prods.length > 0) {
             const first = prods[0];
@@ -414,11 +424,11 @@ export default function NewOrderPage() {
               type="text"
               value={customOrderNumber}
               onChange={(e) => setCustomOrderNumber(e.target.value)}
-              placeholder="e.g. 101, ORD-45 (or leave blank to auto-generate)"
+              placeholder="e.g. 1, 2, 3 (Auto-generates sequentially from 1)"
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              Based on your handwritten order form book
+              Order Form starts from 1, or enter custom handwritten order book #
             </p>
           </div>
 
@@ -430,11 +440,11 @@ export default function NewOrderPage() {
               type="text"
               value={customTaxInvoiceNumber}
               onChange={(e) => setCustomTaxInvoiceNumber(e.target.value.toUpperCase())}
-              placeholder="e.g. INV-2425-001 (Optional)"
+              placeholder="e.g. 42 (Leave blank if Order Form only)"
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono font-bold uppercase focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              From previous bills in accounting software
+              Invoice starts from 1 (Leave blank to generate later when transferring)
             </p>
           </div>
 

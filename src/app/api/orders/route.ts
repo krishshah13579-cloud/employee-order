@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       const term = search.trim();
       where.OR = [
         { orderNumber: { contains: term } },
+        { taxInvoiceNumber: { contains: term } },
         { customerName: { contains: term } },
         { customerGstPan: { contains: term } },
         { placedBy: { contains: term } },
@@ -205,22 +206,25 @@ export async function POST(request: NextRequest) {
     let orderNumber = customOrderNumber;
 
     if (!orderNumber) {
-      // Auto-generate Order Number GO-YYMMDD-NNN
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      const datePrefix = `GO-${yy}${mm}${dd}`;
-
-      const todayCount = await prisma.order.count({
-        where: { orderNumber: { startsWith: datePrefix } },
+      // Auto-generate Order Form number starting from 1
+      const allOrders = await prisma.order.findMany({
+        select: { orderNumber: true },
       });
 
-      let sequence = todayCount + 1;
-      orderNumber = `${datePrefix}-${String(sequence).padStart(3, "0")}`;
+      let maxNum = 0;
+      for (const ord of allOrders) {
+        const raw = (ord.orderNumber || "").trim();
+        if (/^\d+$/.test(raw)) {
+          const val = parseInt(raw, 10);
+          if (val > maxNum) maxNum = val;
+        }
+      }
+
+      let sequence = maxNum + 1;
+      orderNumber = String(sequence);
       while (await prisma.order.findUnique({ where: { orderNumber } })) {
         sequence++;
-        orderNumber = `${datePrefix}-${String(sequence).padStart(3, "0")}`;
+        orderNumber = String(sequence);
       }
     } else {
       // Validate unique custom orderNumber
