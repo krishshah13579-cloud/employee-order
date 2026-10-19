@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
 import { getInvoiceTemplateSettings } from "@/lib/invoice-template";
+import fs from "fs";
+import path from "path";
 
 export async function GET(
   request: NextRequest,
@@ -124,10 +126,23 @@ export async function GET(
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    // Margins
-    const margin = 36;
+    // Try loading authorised signature image
+    let signatureImage = null;
+    try {
+      const sigPath = path.join(process.cwd(), "public", "images", "krish-clothing-signature.png");
+      if (fs.existsSync(sigPath)) {
+        const sigBytes = fs.readFileSync(sigPath);
+        signatureImage = await pdfDoc.embedPng(sigBytes);
+      }
+    } catch (e) {
+      console.warn("Could not load signature image for PDF:", e);
+    }
+
+    // Margins (A4 page: 595.28 x 841.89)
+    const margin = 26;
     const contentWidth = width - margin * 2;
-    let y = height - margin;
+    const startTopY = height - margin;
+    let y = startTopY;
 
     // Helper: draw text
     const drawText = (
@@ -137,7 +152,7 @@ export async function GET(
       options: { font?: any; size?: number; color?: any } = {}
     ) => {
       const f = options.font || fontRegular;
-      const s = options.size || 9;
+      const s = options.size || 8.5;
       const c = options.color || rgb(0, 0, 0);
       page.drawText(String(text || ""), { x: xPos, y: yPos, font: f, size: s, color: c });
     };
@@ -153,164 +168,164 @@ export async function GET(
     };
 
     // Helper: draw rectangle
-    const drawRect = (xPos: number, yPos: number, w: number, h: number, fillColor?: any) => {
+    const drawRect = (xPos: number, yPos: number, w: number, h: number, fillColor?: any, borderWidth = 1) => {
       page.drawRectangle({
         x: xPos,
         y: yPos,
         width: w,
         height: h,
-        borderWidth: 1,
+        borderWidth,
         borderColor: rgb(0, 0, 0),
         color: fillColor || undefined,
       });
     };
 
-    // Outer border around the page
-    const boxHeight = height - margin * 2;
-    drawRect(margin, margin, contentWidth, boxHeight);
-
-    // 1. TOP HEADER: KRISH CLOTHING CO.
-    y = height - margin - 20;
+    // ══════════════════════════════════════════════════════════════════
+    // 1. TOP HEADER: COMPANY NAME & ADDRESS (CENTERED)
+    // ══════════════════════════════════════════════════════════════════
+    y -= 18;
     const headerTitle = String(tpl.companyName || "KRISH CLOTHING CO.").toUpperCase();
-    const titleWidth = fontBold.widthOfTextAtSize(headerTitle, 16);
-    drawText(headerTitle, margin + (contentWidth - titleWidth) / 2, y, { font: fontBold, size: 16 });
-
-    y -= 12;
-    const subTitle = `${tpl.addressLine1 || ""} ${tpl.addressLine2 || ""}`.trim() || "Samet Business Park, Khokhra Circle, Maninagar, Ahmedabad - 380008, Gujarat";
-    const subTitleWidth = fontRegular.widthOfTextAtSize(subTitle, 7.5);
-    drawText(subTitle, margin + (contentWidth - subTitleWidth) / 2, y, { size: 7.5, color: rgb(0.2, 0.2, 0.2) });
+    const titleWidth = fontBold.widthOfTextAtSize(headerTitle, 15);
+    drawText(headerTitle, margin + (contentWidth - titleWidth) / 2, y, { font: fontBold, size: 15 });
 
     y -= 11;
-    const contactLine = `Mobile: ${tpl.phone || "+91 8128756632"}  |  Email: ${tpl.email || "krishclothingco3@gmail.com"}`;
-    const contactLineWidth = fontRegular.widthOfTextAtSize(contactLine, 8);
-    drawText(contactLine, margin + (contentWidth - contactLineWidth) / 2, y, { size: 8 });
+    const addr1 = String(tpl.addressLine1 || "2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,").trim();
+    const addr1Width = fontBold.widthOfTextAtSize(addr1, 7.5);
+    drawText(addr1, margin + (contentWidth - addr1Width) / 2, y, { font: fontBold, size: 7.5 });
 
-    y -= 11;
-    const gstinLine = `GSTIN: ${tpl.gstNo || "24LAAPS9916E1ZD"}    PAN: ${tpl.panNo || "LAAPS9916E"}`;
-    const gstinLineWidth = fontBold.widthOfTextAtSize(gstinLine, 8);
-    drawText(gstinLine, margin + (contentWidth - gstinLineWidth) / 2, y, { font: fontBold, size: 8 });
-
-    // Divider line
     y -= 10;
+    const addr2 = String(tpl.addressLine2 || "AHMEDABAD - 380008 (M) : 8128756632").trim();
+    const addr2Width = fontBold.widthOfTextAtSize(addr2, 7.5);
+    drawText(addr2, margin + (contentWidth - addr2Width) / 2, y, { font: fontBold, size: 7.5 });
+
+    y -= 7;
     drawLine(margin, y, width - margin, y, 1);
 
-    // 2. DOCUMENT TITLE BAR (TAX INVOICE / ORDER FORM)
-    const titleBarHeight = 22;
-    y -= titleBarHeight;
-    page.drawRectangle({
-      x: margin,
-      y,
-      width: contentWidth,
-      height: titleBarHeight,
-      color: rgb(0.92, 0.94, 0.96),
-    });
-    const docTitleWidth = fontBold.widthOfTextAtSize(docTitle, 11);
-    drawText(docTitle, margin + (contentWidth - docTitleWidth) / 2, y + 6, {
+    // ══════════════════════════════════════════════════════════════════
+    // 2. SUB-HEADER BAR: Debit Memo | ORDER FORM / TAX INVOICE | Original
+    // ══════════════════════════════════════════════════════════════════
+    const subBarHeight = 16;
+    y -= subBarHeight;
+    const barCenterY = y + 4;
+    drawText("Debit Memo", margin + 8, barCenterY, { font: fontBold, size: 8 });
+
+    const titleStr = docTitle.toUpperCase();
+    const titleW = fontBold.widthOfTextAtSize(titleStr, 11);
+    drawText(titleStr, margin + (contentWidth - titleW) / 2, barCenterY, {
       font: fontBold,
       size: 11,
-      color: rgb(0.1, 0.1, 0.1),
+      color: rgb(0, 0, 0),
     });
+
+    const copyStr = "Original";
+    const copyW = fontBold.widthOfTextAtSize(copyStr, 8);
+    drawText(copyStr, width - margin - copyW - 8, barCenterY, { font: fontBold, size: 8 });
+
     drawLine(margin, y, width - margin, y, 1);
 
-    // 3. INVOICE META & CUSTOMER DETAILS SECTION
+    // ══════════════════════════════════════════════════════════════════
+    // 3. CUSTOMER & ORDER DETAILS SECTION
+    // ══════════════════════════════════════════════════════════════════
     const detailsTopY = y;
-    const detailsHeight = 85;
     const colSplit = margin + contentWidth * 0.58;
 
-    // Vertical divider between customer info and invoice meta
-    drawLine(colSplit, detailsTopY, colSplit, detailsTopY - detailsHeight, 0.75);
-
-    // Left Column: Customer (Billed To)
-    let leftY = detailsTopY - 14;
-    drawText("BILLED TO (CUSTOMER / FIRM):", margin + 10, leftY, { font: fontBold, size: 8, color: rgb(0.4, 0.4, 0.4) });
-    leftY -= 12;
+    // Left Column Customer Info
     const custName = (order.customer?.shopName || order.customerName || "RETAIL CUSTOMER").toUpperCase();
-    drawText(custName.slice(0, 42), margin + 10, leftY, { font: fontBold, size: 10 });
-    leftY -= 12;
-    const custAddress = (order.customer?.address || order.customerAddress || "Address on File").toUpperCase();
-    drawText(custAddress.slice(0, 52), margin + 10, leftY, { size: 8 });
-    leftY -= 11;
-    const custCityState = `${order.customer?.city || "AHMEDABAD"}, ${order.customer?.state || "GUJARAT"}`.toUpperCase();
-    drawText(custCityState, margin + 10, leftY, { size: 8 });
-    leftY -= 11;
-    const custPhone = `Phone: ${order.customer?.phoneNumber || order.customerPhone || "—"}`;
-    drawText(custPhone, margin + 10, leftY, { size: 8 });
-    leftY -= 11;
-    const custGst = `GST/PAN: ${(order.customer?.gstPanNo || order.customerGstPan || "UNREGISTERED").toUpperCase()}`;
-    drawText(custGst, margin + 10, leftY, { font: fontBold, size: 8 });
+    const custAddr = (order.customer?.address || order.customerAddress || "").toUpperCase();
+    const custCity = `${order.customer?.city || "AHMEDABAD"} - ${order.customer?.state || "GUJARAT"}`.toUpperCase();
+    const custPhone = order.customer?.phoneNumber || order.customerPhone || "";
+    const custGstPan = (order.customer?.gstPanNo || order.customerGstPan || "—").toUpperCase();
 
-    // Right Column: Invoice / Order Meta
-    let rightY = detailsTopY - 14;
-    drawText(`${isTaxInvoice ? "Tax Invoice No:" : "Order No:"}`, colSplit + 10, rightY, { font: fontBold, size: 8 });
-    drawText(docNo, colSplit + 95, rightY, { font: fontBold, size: 9 });
-
-    rightY -= 13;
-    const formattedDate = docDate ? new Date(docDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN");
-    drawText("Date:", colSplit + 10, rightY, { font: fontBold, size: 8 });
-    drawText(formattedDate, colSplit + 95, rightY, { size: 8 });
-
-    rightY -= 13;
-    drawText("Payment Terms:", colSplit + 10, rightY, { font: fontBold, size: 8 });
-    const creditTerms = (order.creditDays || order.customer?.creditDays || 0) > 0
-      ? `${order.creditDays || order.customer?.creditDays} Days Credit`
-      : "Advance Payment";
-    drawText(creditTerms, colSplit + 95, rightY, { size: 8 });
-
-    rightY -= 13;
-    let transportText = "Direct Transport";
+    // Right Column Order Meta
+    let transportText = "DIRECT TRANSPORT";
     if (order.notes && order.notes.includes("[TRANSPORT:")) {
       const match = order.notes.match(/\[TRANSPORT:\s*([^\]|]+)/i);
-      if (match && match[1]) transportText = match[1].trim();
+      if (match && match[1]) transportText = match[1].trim().toUpperCase();
     }
-    drawText("Transport:", colSplit + 10, rightY, { font: fontBold, size: 8 });
-    drawText(transportText.slice(0, 22), colSplit + 95, rightY, { size: 8 });
+    const formattedDate = docDate
+      ? new Date(docDate).toLocaleDateString("en-IN")
+      : new Date().toLocaleDateString("en-IN");
 
-    rightY -= 13;
-    drawText("Status:", colSplit + 10, rightY, { font: fontBold, size: 8 });
-    drawText(order.status.toUpperCase(), colSplit + 95, rightY, { font: fontBold, size: 8 });
+    const detailsHeight = 64;
+    const detailsBottomY = detailsTopY - detailsHeight;
 
-    y -= detailsHeight;
+    // Draw Left Column: Customer details
+    let lY = detailsTopY - 11;
+    drawText(`M/s. : ${custName.slice(0, 42)}`, margin + 6, lY, { font: fontBold, size: 8 });
+    lY -= 10;
+    if (custAddr) {
+      drawText(custAddr.slice(0, 52), margin + 6, lY, { size: 7.5 });
+      lY -= 10;
+    }
+    drawText(custCity, margin + 6, lY, { size: 7.5 });
+    lY -= 10;
+    drawText(`Place of Supply : 24-Gujarat`, margin + 6, lY, { size: 7.5 });
+    if (custPhone) {
+      drawText(`Mob No. ${custPhone}`, margin + 145, lY, { font: fontBold, size: 7.5 });
+    }
+    lY -= 10;
+    drawText(`GSTIN No. : ${custGstPan}`, margin + 6, lY, { font: fontBold, size: 7.5 });
+
+    // Draw Right Column: Order details with inner horizontal dividing lines
+    const rightRowH = detailsHeight / 3;
+    let rY1 = detailsTopY - rightRowH;
+    let rY2 = detailsTopY - rightRowH * 2;
+
+    // Order / Invoice No row
+    const numLabel = isTaxInvoice ? "Invoice No." : "Order No.";
+    drawText(numLabel, colSplit + 8, detailsTopY - 13, { font: fontBold, size: 8 });
+    drawText(`: ${docNo}`, colSplit + 68, detailsTopY - 13, { font: fontBold, size: 8 });
+    drawLine(colSplit, rY1, width - margin, rY1, 0.75);
+
+    // Date row
+    drawText("Date", colSplit + 8, rY1 - 13, { font: fontBold, size: 8 });
+    drawText(`: ${formattedDate}`, colSplit + 68, rY1 - 13, { font: fontBold, size: 8 });
+    drawLine(colSplit, rY2, width - margin, rY2, 0.75);
+
+    // Transport row
+    drawText("TRANSPORT", colSplit + 8, rY2 - 13, { font: fontBold, size: 8 });
+    drawText(`: ${transportText.slice(0, 24)}`, colSplit + 68, rY2 - 13, { font: fontBold, size: 8 });
+
+    // Vertical line dividing customer & order meta
+    drawLine(colSplit, detailsTopY, colSplit, detailsBottomY, 0.75);
+
+    y = detailsBottomY;
     drawLine(margin, y, width - margin, y, 1);
 
-    // 4. ITEMS TABLE
-    // Columns: # (24), Description (200), Ratio (70), Sets (40), PCS (45), Rate (65), Amount (79)
-    const colX = [
-      margin,
-      margin + 26,
-      margin + 230,
-      margin + 300,
-      margin + 345,
-      margin + 395,
-      margin + 460,
-      width - margin,
-    ];
+    // ══════════════════════════════════════════════════════════════════
+    // 4. ITEMS TABLE (Columns matching physical invoice)
+    // ══════════════════════════════════════════════════════════════════
+    // Columns:
+    // SrNo (24), Product Design No. (132), HSN/SAC (40), Size (50), Color (78), Set (38), Qty (54), Rate (54), Amount (contentWidth - rest)
+    const colW = [24, 132, 40, 50, 78, 38, 54, 54];
+    const colX: number[] = [margin];
+    for (let i = 0; i < colW.length; i++) {
+      colX.push(colX[i] + colW[i]);
+    }
+    colX.push(width - margin); // End at right margin
 
     // Table Header
-    const thHeight = 20;
+    const thHeight = 16;
     y -= thHeight;
-    page.drawRectangle({
-      x: margin,
-      y,
-      width: contentWidth,
-      height: thHeight,
-      color: rgb(0.94, 0.94, 0.94),
-    });
+    const thTextY = y + 4.5;
 
-    drawText("#", colX[0] + 8, y + 6, { font: fontBold, size: 8 });
-    drawText("DESCRIPTION & COLOR SETS", colX[1] + 6, y + 6, { font: fontBold, size: 8 });
-    drawText("SIZE RATIO", colX[2] + 6, y + 6, { font: fontBold, size: 8 });
-    drawText("SETS", colX[3] + 8, y + 6, { font: fontBold, size: 8 });
-    drawText("PCS", colX[4] + 12, y + 6, { font: fontBold, size: 8 });
-    drawText("RATE / PC", colX[5] + 10, y + 6, { font: fontBold, size: 8 });
-    drawText("AMOUNT (Rs.)", colX[6] + 6, y + 6, { font: fontBold, size: 8 });
+    drawText("SrNo", colX[0] + 3, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Product Design No.", colX[1] + 4, thTextY, { font: fontBold, size: 7.5 });
+    drawText("HSN/SAC", colX[2] + 4, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Size", colX[3] + 12, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Color", colX[4] + 14, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Set", colX[5] + 10, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Qty", colX[6] + 16, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Rate", colX[7] + 14, thTextY, { font: fontBold, size: 7.5 });
+    drawText("Amount", colX[8] + 16, thTextY, { font: fontBold, size: 7.5 });
 
-    // Vertical lines for header
+    // Header vertical dividers
     for (let i = 1; i < colX.length - 1; i++) {
       drawLine(colX[i], y + thHeight, colX[i], y, 0.75);
     }
     drawLine(margin, y, width - margin, y, 1);
 
-    // Table Rows
+    // Table Body Rows
     const tableTopY = y;
     let currentY = y;
 
@@ -323,20 +338,20 @@ export async function GET(
       const colorMapping = prod?.colorMapping || (item as any).colorMapping;
       const colorsAvailable = prod?.colorsAvailable || (item as any).colorsAvailable;
 
-      // Format each color's wholesale alphabet and sets (each on next line)
+      // Color lines formatted as A: 2 Sets, B: 2 Sets etc.
       const colorLines = formatColorAlphabetLines(item.colorSets, colorMapping, colorsAvailable);
-      const colorLinesCount = colorLines.length;
+      const colorLinesCount = Math.max(1, colorLines.length);
 
-      const lineSpacing = colorLinesCount > 4 ? 9.5 : 10.5;
-      const rowHeight = Math.max(28, 16 + colorLinesCount * lineSpacing);
-      currentY -= rowHeight;
+      const lineSpacing = 9;
+      // Row height fits the content compactly
+      const rowHeight = Math.max(22, 12 + colorLinesCount * lineSpacing);
+      const rowBottomY = currentY - rowHeight;
+      const rowTextTopY = currentY - 10;
 
-      const topY = currentY + rowHeight - 12;
+      // 1. SrNo
+      drawText(String(index + 1), colX[0] + 8, rowTextTopY, { size: 7.5 });
 
-      // Draw item details
-      drawText(String(index + 1), colX[0] + 8, topY, { size: 8 });
-
-      // Product Name with MRP in bracket: e.g. "IMP - 003 (1770)"
+      // 2. Product Design No. & Ratio
       const resolvedMrp = prod?.mrp || (item as any).mrp;
       const resolvedFallbackPrice = prod?.retailerPrice || prod?.price || item.unitPrice;
       const formattedProdName = formatProductNameWithMrp(
@@ -344,138 +359,219 @@ export async function GET(
         resolvedMrp,
         resolvedFallbackPrice
       );
-      const prodName = formattedProdName.slice(0, 42);
-      drawText(prodName, colX[1] + 6, topY, { font: fontBold, size: 8 });
+      drawText(formattedProdName.slice(0, 26), colX[1] + 4, rowTextTopY, { font: fontBold, size: 7.5 });
 
-      // Each color wholesale alphabet entry on the next line
-      colorLines.forEach((line, lIdx) => {
-        const lineY = topY - 11 - lIdx * lineSpacing;
-        drawText(line, colX[1] + 6, lineY, {
+      const ratio = String(item.sizeRatio || prod?.sizeRatio || "30 to 38");
+      drawText(`Ratio: ${ratio}`, colX[1] + 4, rowTextTopY - 9, { size: 7, color: rgb(0.2, 0.2, 0.2) });
+
+      // 3. HSN/SAC
+      const hsn = String(item.hsnCode || prod?.hsnCode || tpl.defaultHsn || "6203");
+      drawText(hsn, colX[2] + 8, rowTextTopY, { size: 7.5 });
+
+      // 4. Size
+      drawText(ratio, colX[3] + 6, rowTextTopY, { size: 7.5 });
+
+      // 5. Color lines
+      colorLines.forEach((cLine, cIdx) => {
+        drawText(cLine, colX[4] + 4, rowTextTopY - cIdx * lineSpacing, {
           font: fontBold,
-          size: 7.5,
-          color: rgb(0.2, 0.2, 0.2),
+          size: 7,
+          color: rgb(0.15, 0.15, 0.15),
         });
       });
 
-      // Size Ratio
-      const ratio = String(item.sizeRatio || "30 to 38");
-      drawText(ratio, colX[2] + 6, topY, { size: 8 });
+      // 6. Set
+      const setsVal = Number(item.totalSets || 0).toFixed(2);
+      drawText(setsVal, colX[5] + 8, rowTextTopY, { font: fontBold, size: 7.5 });
 
-      // Sets
-      drawText(String(item.totalSets || 0), colX[3] + 12, topY, { font: fontBold, size: 8 });
+      // 7. Qty (PCS)
+      const pcsVal = `${Number(item.totalPcs || 0).toFixed(2)} PCS`;
+      drawText(pcsVal, colX[6] + 4, rowTextTopY, { font: fontBold, size: 7.5 });
 
-      // PCS
-      drawText(String(item.totalPcs || 0), colX[4] + 14, topY, { font: fontBold, size: 8 });
+      // 8. Rate
+      const rateVal = Number(item.unitPrice || 0).toFixed(2);
+      drawText(rateVal, colX[7] + 8, rowTextTopY, { size: 7.5 });
 
-      // Unit Price
-      const unitPriceStr = `Rs. ${Number(item.unitPrice || 0).toLocaleString("en-IN")}`;
-      drawText(unitPriceStr, colX[5] + 8, topY, { size: 8 });
+      // 9. Amount
+      const amtVal = Number(item.itemSubtotal || 0).toFixed(2);
+      const amtW = fontBold.widthOfTextAtSize(amtVal, 7.5);
+      drawText(amtVal, colX[9] - amtW - 6, rowTextTopY, { font: fontBold, size: 7.5 });
 
-      // Amount
-      const subtotalStr = `Rs. ${Number(item.itemSubtotal || 0).toLocaleString("en-IN")}`;
-      drawText(subtotalStr, colX[6] + 8, topY, { font: fontBold, size: 8 });
+      // Row bottom divider
+      drawLine(margin, rowBottomY, width - margin, rowBottomY, 0.5);
 
-      // Row separator
-      drawLine(margin, currentY, width - margin, currentY, 0.5);
+      // Vertical dividers for this row
+      for (let i = 1; i < colX.length - 1; i++) {
+        drawLine(colX[i], currentY, colX[i], rowBottomY, 0.5);
+      }
+
+      currentY = rowBottomY;
     });
 
-    // Minimum table height fill
-    const minTableHeight = 160;
-    const actualHeight = tableTopY - currentY;
-    if (actualHeight < minTableHeight) {
-      currentY = tableTopY - minTableHeight;
-    }
+    // ══════════════════════════════════════════════════════════════════
+    // 5. SUB TOTAL ROW (Aligned perfectly with table columns)
+    // ══════════════════════════════════════════════════════════════════
+    const subtotalH = 15;
+    const subtotalBottomY = currentY - subtotalH;
+    const subTextY = currentY - 11;
 
-    // Vertical lines across all table rows
-    for (let i = 1; i < colX.length - 1; i++) {
-      drawLine(colX[i], tableTopY, colX[i], currentY, 0.75);
-    }
-    drawLine(margin, currentY, width - margin, currentY, 1);
+    // GSTIN No on left
+    drawText(`GSTIN No. : ${tpl.gstNo || "24LAAPS9916E1ZD"}`, colX[0] + 6, subTextY, { font: fontBold, size: 7.5 });
 
-    // 5. SUMMARY TOTALS & BANK DETAILS
-    const summaryTopY = currentY;
-    const summaryHeight = 110;
-    const totalsSplitX = colX[4]; // Align totals to PCS column
+    // Total Qty PCS
+    const totalPcsStr = Number(resolvedTotalPcs).toFixed(3);
+    drawText(totalPcsStr, colX[6] + 8, subTextY, { font: fontBold, size: 7.5 });
 
-    // Bank Details on Left
-    let bankY = summaryTopY - 14;
-    drawText("BANK ACCOUNT DETAILS FOR PAYMENT:", margin + 10, bankY, { font: fontBold, size: 8 });
-    bankY -= 12;
-    drawText(`Bank Name: ${tpl.bankName || "ICICI BANK"}`, margin + 10, bankY, { size: 8 });
-    bankY -= 11;
-    drawText(`Account No: ${tpl.accountNo || "750705000692"}`, margin + 10, bankY, { font: fontBold, size: 8 });
-    bankY -= 11;
-    drawText(`IFSC Code: ${tpl.ifscCode || "ICIC0007507"}`, margin + 10, bankY, { size: 8 });
-    bankY -= 11;
-    drawText(`Beneficiary: ${tpl.beneficiaryName || tpl.companyName || "KRISH CLOTHING CO."}`, margin + 10, bankY, { size: 8 });
-    bankY -= 11;
-    drawText(`Branch: ${tpl.branch || "Khokhra Maninagar, Ahmedabad"}`, margin + 10, bankY, { size: 8 });
+    // SUB TOTAL label
+    drawText("SUB TOTAL", colX[7] + 2, subTextY, { font: fontBold, size: 7.5 });
 
-    // Vertical line between Bank details and Totals
-    drawLine(totalsSplitX, summaryTopY, totalsSplitX, summaryTopY - summaryHeight, 0.75);
+    // Subtotal amount
+    const subtotalValStr = Number(resolvedSubtotal).toFixed(2);
+    const subValW = fontBold.widthOfTextAtSize(subtotalValStr, 7.5);
+    drawText(subtotalValStr, colX[9] - subValW - 6, subTextY, { font: fontBold, size: 7.5 });
 
-    // Totals on Right
-    let totY = summaryTopY - 14;
-    drawText("Total Sets:", totalsSplitX + 8, totY, { size: 8 });
-    drawText(String(resolvedTotalSets), colX[6] + 8, totY, { font: fontBold, size: 8 });
+    // Vertical dividers for subtotal row
+    drawLine(colX[6], currentY, colX[6], subtotalBottomY, 0.5);
+    drawLine(colX[7], currentY, colX[7], subtotalBottomY, 0.5);
+    drawLine(colX[8], currentY, colX[8], subtotalBottomY, 0.5);
+    drawLine(margin, subtotalBottomY, width - margin, subtotalBottomY, 1);
 
-    totY -= 13;
-    drawText("Total Pieces (PCS):", totalsSplitX + 8, totY, { size: 8 });
-    drawText(String(resolvedTotalPcs), colX[6] + 8, totY, { font: fontBold, size: 8 });
+    currentY = subtotalBottomY;
 
-    totY -= 13;
-    drawText("Subtotal (Taxable):", totalsSplitX + 8, totY, { size: 8 });
-    drawText(`Rs. ${resolvedSubtotal.toLocaleString("en-IN")}`, colX[6] + 8, totY, { font: fontBold, size: 8 });
+    // ══════════════════════════════════════════════════════════════════
+    // 6. BANK DETAILS (LEFT) & TAX CALCULATION (RIGHT)
+    // ══════════════════════════════════════════════════════════════════
+    const summaryHeight = 60;
+    const summaryBottomY = currentY - summaryHeight;
+    const summarySplitX = colSplit;
 
-    totY -= 13;
+    // Bank Details (Left)
+    let bY = currentY - 12;
+    drawText("Bank Name", margin + 8, bY, { font: fontBold, size: 7.5 });
+    drawText(`: ${tpl.bankName || "ICICI BANK"}`, margin + 82, bY, { font: fontBold, size: 7.5 });
+
+    bY -= 11;
+    drawText("Bank A/c. No.", margin + 8, bY, { font: fontBold, size: 7.5 });
+    drawText(`: ${tpl.accountNo || "750705000692"}`, margin + 82, bY, { font: fontBold, size: 7.5 });
+
+    bY -= 11;
+    drawText("RTGS/IFSC Code", margin + 8, bY, { font: fontBold, size: 7.5 });
+    drawText(`: ${tpl.ifscCode || "ICIC0007507"}`, margin + 82, bY, { font: fontBold, size: 7.5 });
+
+    // Tax Breakdown (Right)
+    const rightColW = width - margin - summarySplitX;
     const halfGst = Math.round((resolvedGst / 2) * 100) / 100;
-    drawText("CGST (2.5%):", totalsSplitX + 8, totY, { size: 8 });
-    drawText(`Rs. ${halfGst.toLocaleString("en-IN")}`, colX[6] + 8, totY, { size: 8 });
 
-    totY -= 13;
-    drawText("SGST (2.5%):", totalsSplitX + 8, totY, { size: 8 });
-    drawText(`Rs. ${halfGst.toLocaleString("en-IN")}`, colX[6] + 8, totY, { size: 8 });
+    let sY = currentY - 12;
+    drawText("Taxable Amount", summarySplitX + 8, sY, { size: 7.5 });
+    const taxAmtStr = Number(resolvedSubtotal).toFixed(2);
+    const taxAmtW = fontRegular.widthOfTextAtSize(taxAmtStr, 7.5);
+    drawText(taxAmtStr, width - margin - taxAmtW - 8, sY, { size: 7.5 });
 
-    totY -= 16;
-    drawLine(totalsSplitX, totY + 12, width - margin, totY + 12, 1);
-    page.drawRectangle({
-      x: totalsSplitX,
-      y: totY - 4,
-      width: width - margin - totalsSplitX,
-      height: 18,
-      color: rgb(0.92, 0.94, 0.96),
-    });
-    drawText("GRAND TOTAL:", totalsSplitX + 8, totY + 1, { font: fontBold, size: 9 });
-    drawText(`Rs. ${resolvedGrandTotal.toLocaleString("en-IN")}`, colX[6] + 8, totY + 1, {
-      font: fontBold,
-      size: 10,
-      color: rgb(0.1, 0.4, 0.1),
-    });
+    sY -= 11;
+    drawText("Central Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
+    const cgstStr = Number(halfGst).toFixed(2);
+    const cgstW = fontRegular.widthOfTextAtSize(cgstStr, 7.5);
+    drawText(cgstStr, width - margin - cgstW - 8, sY, { size: 7.5 });
 
-    currentY = summaryTopY - summaryHeight;
-    drawLine(margin, currentY, width - margin, currentY, 1);
+    sY -= 11;
+    drawText("State/UT Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
+    const sgstStr = Number(halfGst).toFixed(2);
+    const sgstW = fontRegular.widthOfTextAtSize(sgstStr, 7.5);
+    drawText(sgstStr, width - margin - sgstW - 8, sY, { size: 7.5 });
 
-    // 6. TERMS & SIGNATURE SECTION
-    const footerTopY = currentY;
-    const footerHeight = 70;
+    sY -= 14;
+    // Grand Total Bar
+    drawLine(summarySplitX, sY + 11, width - margin, sY + 11, 0.75);
+    drawText("GRAND TOTAL", summarySplitX + 8, sY, { font: fontBold, size: 9 });
+    const gTotStr = `Rs. ${resolvedGrandTotal.toLocaleString("en-IN")}`;
+    const gTotW = fontBold.widthOfTextAtSize(gTotStr, 10);
+    drawText(gTotStr, width - margin - gTotW - 8, sY, { font: fontBold, size: 10 });
+
+    // Vertical line between Bank details and Tax breakdown
+    drawLine(summarySplitX, currentY, summarySplitX, summaryBottomY, 0.75);
+    drawLine(margin, summaryBottomY, width - margin, summaryBottomY, 1);
+
+    currentY = summaryBottomY;
+
+    // ══════════════════════════════════════════════════════════════════
+    // 7. PAYMENT NOTE BAR
+    // ══════════════════════════════════════════════════════════════════
+    const noteHeight = 15;
+    const noteBottomY = currentY - noteHeight;
+    const noteText = String(
+      tpl.note || "NOTE : PAYMENT EVERY WEEK AND SHOULD BE COMPLETED WITHIN 90 DAYS."
+    );
+    drawText(noteText, margin + 8, currentY - 11, { font: fontBold, size: 7.5 });
+    drawLine(margin, noteBottomY, width - margin, noteBottomY, 1);
+
+    currentY = noteBottomY;
+
+    // ══════════════════════════════════════════════════════════════════
+    // 8. TERMS & CONDITIONS (LEFT) & AUTHORISED SIGNATORY (RIGHT)
+    // ══════════════════════════════════════════════════════════════════
+    const footerHeight = 65;
+    const footerBottomY = currentY - footerHeight;
     const sigSplitX = margin + contentWidth * 0.65;
 
     // Terms on Left
-    let termY = footerTopY - 14;
-    drawText("TERMS & CONDITIONS:", margin + 10, termY, { font: fontBold, size: 7.5 });
-    termY -= 10;
-    drawText(String(tpl.terms1 || "1. Goods once sold will not be taken back without valid Return Invoice.").slice(0, 80), margin + 10, termY, { size: 7 });
-    termY -= 9;
-    drawText(String(tpl.terms2 || `2. Payment strictly due within ${creditTerms}. Weekly payments expected.`).slice(0, 80), margin + 10, termY, { size: 7 });
-    termY -= 9;
-    drawText(String(tpl.terms3 || "3. Interest @ 18% p.a. will be charged on overdue payments beyond credit limit.").slice(0, 80), margin + 10, termY, { size: 7 });
-    termY -= 9;
-    drawText(String(tpl.terms4 || "4. Subject to Ahmedabad jurisdiction only.").slice(0, 80), margin + 10, termY, { size: 7 });
+    let tY = currentY - 11;
+    drawText("TERMS & CONDITION :", margin + 8, tY, { font: fontBold, size: 7.5 });
+    tY -= 9.5;
+    drawText(String(tpl.terms1 || "1. Goods once sold will not be taken back.").slice(0, 78), margin + 8, tY, { size: 6.5 });
+    tY -= 8.5;
+    drawText(String(tpl.terms2 || "2. Interest @18% p.a. will be charged if payment is not made within due date.").slice(0, 78), margin + 8, tY, { size: 6.5 });
+    tY -= 8.5;
+    drawText(String(tpl.terms3 || "3. Our risk and responsibility ceases as soon as the goods leave our premises.").slice(0, 78), margin + 8, tY, { size: 6.5 });
+    tY -= 8.5;
+    drawText(String(tpl.terms4 || '4. "Subject to \'AHMEDABAD\' Jurisdiction only. E.&.O.E"').slice(0, 78), margin + 8, tY, { size: 6.5 });
+    tY -= 8.5;
+    drawText(String(tpl.terms5 || "5. Any damages or problem in any products should be informed within 7 days of purchase.").slice(0, 78), margin + 8, tY, {
+      font: fontBold,
+      size: 6.5,
+    });
 
     // Signature on Right
-    drawLine(sigSplitX, footerTopY, sigSplitX, margin, 0.75);
-    drawText(String(tpl.signatoryLabel || "For, KRISH CLOTHING CO.").slice(0, 32), sigSplitX + 15, footerTopY - 16, { font: fontBold, size: 8 });
-    drawText(String(tpl.signatoryTitle || "(Authorised Signatory)").slice(0, 32), sigSplitX + 22, margin + 10, { size: 8 });
+    drawLine(sigSplitX, currentY, sigSplitX, footerBottomY, 0.75);
+
+    const sigCompany = `FOR, ${String(tpl.companyName || "KRISH CLOTHING CO.").toUpperCase()}`;
+    const sigCompanyW = fontBold.widthOfTextAtSize(sigCompany, 8);
+    drawText(sigCompany, width - margin - sigCompanyW - 12, currentY - 12, { font: fontBold, size: 8 });
+
+    // Draw Signature Image if available
+    if (signatureImage) {
+      try {
+        const sigImgW = 85;
+        const sigImgH = 34;
+        const sigImgX = width - margin - sigImgW - 14;
+        const sigImgY = currentY - 48;
+        page.drawImage(signatureImage, {
+          x: sigImgX,
+          y: sigImgY,
+          width: sigImgW,
+          height: sigImgH,
+        });
+      } catch (err) {
+        console.warn("Error drawing signature image:", err);
+      }
+    }
+
+    const authLabel = String(tpl.signatoryTitle || "(Authorised Signatory)");
+    const authLabelW = fontRegular.widthOfTextAtSize(authLabel, 7.5);
+    drawText(authLabel, width - margin - authLabelW - 16, footerBottomY + 6, { font: fontBold, size: 7.5 });
+
+    // Bottom horizontal line of footer
+    drawLine(margin, footerBottomY, width - margin, footerBottomY, 1);
+
+    currentY = footerBottomY;
+
+    // ══════════════════════════════════════════════════════════════════
+    // 9. OUTER BORDER (TIGHT FIT: ONLY AROUND BILL CONTENT)
+    // ══════════════════════════════════════════════════════════════════
+    // Instead of stretching to the full A4 page, the box height is
+    // exactly the bill's natural content height (startTopY - currentY).
+    const billBoxHeight = startTopY - currentY;
+    drawRect(margin, currentY, contentWidth, billBoxHeight, undefined, 1.25);
 
     // Serialize PDF to bytes
     const pdfBytes = await pdfDoc.save();

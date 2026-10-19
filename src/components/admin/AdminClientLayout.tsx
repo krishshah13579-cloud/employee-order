@@ -35,7 +35,7 @@ export default function AdminClientLayout({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50/70 flex flex-col md:flex-row antialiased selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen print:min-h-0 bg-zinc-50/70 flex flex-col md:flex-row antialiased selection:bg-zinc-900 selection:text-white">
       {/* Desktop Sidebar (Fixed left navigation) */}
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-200/90 shrink-0 flex-col h-screen sticky top-0 z-20 print:hidden">
         <AdminSidebarNav />

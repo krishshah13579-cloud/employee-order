@@ -207,8 +207,8 @@ export default function TaxInvoiceA4({
   const sgst = Math.round((gstAmount / 2) * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
 
-  // Dynamic Empty Filler Rows to create classic look
-  const emptyRowsCount = Math.max(0, 6 - items.length);
+  // No artificial filler rows to prevent stretching table height
+  const emptyRowsCount = 0;
 
   // Handle Item Field Edit
   const handleItemChange = (index: number, field: keyof TaxInvoiceItem, value: any) => {
@@ -364,6 +364,8 @@ export default function TaxInvoiceA4({
             break-inside: avoid !important;
             width: 100% !important;
             max-width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
             margin: 0 auto !important;
             padding: 0 !important;
           }
@@ -371,6 +373,8 @@ export default function TaxInvoiceA4({
             border: 1.5px solid #000 !important;
             width: 100% !important;
             max-width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
             box-shadow: none !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
