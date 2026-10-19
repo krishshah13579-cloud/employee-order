@@ -80,7 +80,11 @@ export async function POST(request: NextRequest) {
     const validatedItems: any[] = [];
     const productDeductionsMap = new Map<
       number,
-      { product: any; orderedSets: { color: string; sets: number }[] }
+      {
+        product: any;
+        orderedSets: { color: string; sets: number }[];
+        orderedLoose: Record<string, Record<string, number>>;
+      }
     >();
 
     for (let i = 0; i < items.length; i++) {
@@ -149,13 +153,26 @@ export async function POST(request: NextRequest) {
 
       // Collect for stock deduction
       if (!productDeductionsMap.has(product.id)) {
-        productDeductionsMap.set(product.id, { product, orderedSets: [] });
+        productDeductionsMap.set(product.id, { product, orderedSets: [], orderedLoose: {} });
       }
       for (const cs of colorSetsArray) {
         productDeductionsMap.get(product.id)!.orderedSets.push({
           color: cs.color,
           sets: parseInt(cs.sets, 10) || 0,
         });
+      }
+
+      // Collect loose single pieces for deduction
+      if (it.colorMixPcs && typeof it.colorMixPcs === "object") {
+        const prodLoose = productDeductionsMap.get(product.id)!.orderedLoose;
+        for (const [col, sMap] of Object.entries(it.colorMixPcs)) {
+          if (!prodLoose[col]) prodLoose[col] = {};
+          if (typeof sMap === "object" && sMap !== null) {
+            for (const [sz, cnt] of Object.entries(sMap)) {
+              prodLoose[col][sz] = (prodLoose[col][sz] || 0) + (parseInt(String(cnt), 10) || 0);
+            }
+          }
+        }
       }
 
       // Accurately calculate pieces by allocating sets across the color's ratio packs
@@ -170,8 +187,13 @@ export async function POST(request: NextRequest) {
         );
         itemTotalPcs += pcsCalc.totalPcs;
       }
+
+      // Add mix single pieces
+      const itemMixPcs = parseInt(it.mixPcs, 10) || 0;
+      itemTotalPcs += itemMixPcs;
+
       if (itemTotalPcs === 0) {
-        itemTotalPcs = it.totalPcs || (itemTotalSets * pcsPerSet);
+        itemTotalPcs = it.totalPcs || (itemTotalSets * pcsPerSet) + itemMixPcs;
       }
 
       const unitPrice = parseFloat(it.unitPrice) || product.price || 0;
@@ -180,6 +202,11 @@ export async function POST(request: NextRequest) {
       orderSubtotal += itemSubtotal;
       orderTotalPcs += itemTotalPcs;
       orderTotalSets += itemTotalSets;
+
+      const itemNotes = [
+        it.notes,
+        it.mixSizes && it.mixSizes !== "None" ? `[Mix Sizes: ${it.mixSizes}]` : null
+      ].filter(Boolean).join(" | ");
 
       validatedItems.push({
         productId: product.id,
@@ -192,7 +219,7 @@ export async function POST(request: NextRequest) {
         totalPcs: itemTotalPcs,
         unitPrice: unitPrice,
         itemSubtotal: itemSubtotal,
-        notes: it.notes || null,
+        notes: itemNotes || null,
       });
     }
 
@@ -245,9 +272,9 @@ export async function POST(request: NextRequest) {
 
     const createdOrder = await prisma.$transaction(async (tx) => {
       // Deduct stock for all products that have setsColorwise
-      for (const { product, orderedSets } of productDeductionsMap.values()) {
+      for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
         if (product.setsColorwise && product.setsColorwise.trim() !== "") {
-          const updatedStock = deductSetsFromStock(product.setsColorwise, orderedSets);
+          const updatedStock = deductSetsFromStock(product.setsColorwise, orderedSets, orderedLoose);
           await tx.product.update({
             where: { id: product.id },
             data: { setsColorwise: updatedStock },

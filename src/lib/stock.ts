@@ -819,7 +819,8 @@ export function stringifyColorwiseSets(stockMap: Record<string, number>): string
  */
 export function deductSetsFromStock(
   setsColorwise: string | null | undefined,
-  orderedColorSets: { color: string; sets: number; ratio?: string }[]
+  orderedColorSets: { color: string; sets: number; ratio?: string }[],
+  orderedLoosePieces?: { color: string; size: string; count: number }[] | Record<string, Record<string, number>>
 ): string {
   const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
 
@@ -847,6 +848,39 @@ export function deductSetsFromStock(
         const canDeduct = Math.min(remainingToDeduct, count);
         ratios[r] -= canDeduct;
         remainingToDeduct -= canDeduct;
+      }
+    }
+  }
+
+  // Deduct loose single pieces if provided
+  if (orderedLoosePieces) {
+    if (Array.isArray(orderedLoosePieces)) {
+      for (const lp of orderedLoosePieces) {
+        const targetColor = cleanColorName(lp.color.trim());
+        const matchedColor = Object.keys(stockWithLoose).find(
+          (c) => c.toLowerCase() === targetColor.toLowerCase()
+        );
+        if (matchedColor && stockWithLoose[matchedColor]?.loosePcs) {
+          const loose = stockWithLoose[matchedColor].loosePcs;
+          if (loose[lp.size] !== undefined) {
+            loose[lp.size] = Math.max(0, loose[lp.size] - Math.max(0, lp.count));
+          }
+        }
+      }
+    } else if (typeof orderedLoosePieces === "object") {
+      for (const [col, sizesMap] of Object.entries(orderedLoosePieces)) {
+        const targetColor = cleanColorName(col.trim());
+        const matchedColor = Object.keys(stockWithLoose).find(
+          (c) => c.toLowerCase() === targetColor.toLowerCase()
+        );
+        if (matchedColor && stockWithLoose[matchedColor]?.loosePcs && typeof sizesMap === "object") {
+          const loose = stockWithLoose[matchedColor].loosePcs;
+          for (const [sz, count] of Object.entries(sizesMap)) {
+            if (loose[sz] !== undefined) {
+              loose[sz] = Math.max(0, loose[sz] - Math.max(0, count));
+            }
+          }
+        }
       }
     }
   }

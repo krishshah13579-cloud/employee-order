@@ -44,6 +44,8 @@ import {
   getPcsFromRatio,
   getSizesFromRatio,
   getProductMixSizesInfo,
+  parseDetailedColorStockWithLoose,
+  type ColorStockDetail,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
 
@@ -236,6 +238,93 @@ function ProductDetailContent() {
     return Array.from(sizesSet);
   }, [product, activeRatio]);
 
+  // Selected mix single pieces per color: Record<colorName, Record<size, count>>
+  const [colorMixPcs, setColorMixPcs] = useState<Record<string, Record<string, number>>>({});
+
+  // Selected ratio per color: Record<colorName, ratioString>
+  const [colorSelectedRatio, setColorSelectedRatio] = useState<Record<string, string>>({});
+
+  // Full parsed stock with loose pieces per color
+  const stockWithLoose = useMemo(() => {
+    if (!product?.setsColorwise) return {};
+    return parseDetailedColorStockWithLoose(product.setsColorwise, activeRatio);
+  }, [product, activeRatio]);
+
+  // Helper: Retrieve detailed stock (ratios & loose pieces) for any color
+  const getColorStockDetail = (colName: string): ColorStockDetail => {
+    if (!stockWithLoose) return { ratios: {}, loosePcs: {} };
+    const cleanTarget = cleanColorName(colName).toLowerCase();
+    for (const [key, detail] of Object.entries(stockWithLoose)) {
+      if (key.toLowerCase() === colName.toLowerCase() || cleanColorName(key).toLowerCase() === cleanTarget) {
+        return detail;
+      }
+    }
+    if (product?.colorMapping) {
+      try {
+        const map = JSON.parse(product.colorMapping);
+        for (const [letter, mappedName] of Object.entries(map)) {
+          if (typeof mappedName === "string" && cleanColorName(mappedName).toLowerCase() === cleanTarget) {
+            if (stockWithLoose[letter]) return stockWithLoose[letter];
+          }
+        }
+      } catch {}
+    }
+    return { ratios: {}, loosePcs: {} };
+  };
+
+  // Helper: update mix piece count for a specific color and size
+  const handleMixPieceChange = (color: string, size: string, count: number) => {
+    setActiveColor(color);
+    setColorMixPcs((prev) => {
+      const next = { ...prev };
+      const colorMap = { ...(next[color] || {}) };
+      if (count <= 0) {
+        delete colorMap[size];
+      } else {
+        colorMap[size] = count;
+      }
+      if (Object.keys(colorMap).length === 0) {
+        delete next[color];
+      } else {
+        next[color] = colorMap;
+      }
+      return next;
+    });
+  };
+
+  // Helper: switch size ratio for a specific color
+  const handleColorRatioChange = (color: string, ratio: string) => {
+    setActiveColor(color);
+    setColorSelectedRatio((prev) => ({
+      ...prev,
+      [color]: ratio,
+    }));
+  };
+
+  // Total mix single pieces across all colors
+  const totalMixPieces = useMemo(() => {
+    let sum = 0;
+    for (const colorMap of Object.values(colorMixPcs)) {
+      for (const cnt of Object.values(colorMap)) {
+        sum += Math.max(0, cnt || 0);
+      }
+    }
+    return sum;
+  }, [colorMixPcs]);
+
+  // Formatted summary of selected mix pieces (e.g. "Jet Black: 30(2), 32(1); Navy: 34(1)")
+  const selectedMixSummary = useMemo(() => {
+    const parts: string[] = [];
+    for (const [col, sizesMap] of Object.entries(colorMixPcs)) {
+      const sizeEntries = Object.entries(sizesMap).filter(([_, c]) => c > 0);
+      if (sizeEntries.length > 0) {
+        const sizeStrs = sizeEntries.map(([sz, c]) => `${sz}(${c})`).join(", ");
+        parts.push(`${col}: ${sizeStrs}`);
+      }
+    }
+    return parts.join("; ");
+  }, [colorMixPcs]);
+
   // Size guide synced with product database and filtered to ONLY available sizes for this product
   const sizeGuideData = useMemo(() => {
     let rows = DEFAULT_SIZE_GUIDE;
@@ -413,21 +502,25 @@ function ProductDetailContent() {
   const colorPiecesMap = useMemo(() => {
     const map: Record<string, { totalPcs: number; breakdownText: string }> = {};
     for (const entry of selectedEntries) {
+      const ratioForThisColor = colorSelectedRatio[entry.color] || activeRatio;
+      const pcsPerSetForThisColor = getPcsFromRatio(ratioForThisColor, activePcsPerSet);
       const calc = calculateOrderedColorSetsPieces(
         product?.setsColorwise,
         entry.color,
         entry.sets,
-        activePcsPerSet,
-        activeRatio
+        pcsPerSetForThisColor,
+        ratioForThisColor
       );
       map[entry.color] = calc;
     }
     return map;
-  }, [product, selectedEntries, activePcsPerSet, activeRatio]);
+  }, [product, selectedEntries, colorSelectedRatio, activePcsPerSet, activeRatio]);
 
-  const totalPcs = useMemo(() => {
+  const totalSetsPcs = useMemo(() => {
     return Object.values(colorPiecesMap).reduce((sum, item) => sum + item.totalPcs, 0);
   }, [colorPiecesMap]);
+
+  const totalPcs = totalSetsPcs + totalMixPieces;
 
   const isWholesaler = draftCustomer?.businessType === "WHOLESALER" || draftCustomer?.businessType === "WHOLESALER WITHOUT GST";
   const isSpecialDiscount = draftCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
@@ -468,8 +561,8 @@ function ProductDetailContent() {
       return;
     }
 
-    if (totalSets === 0 || selectedEntries.length === 0) {
-      toast("Mandatory: Please select at least 1 set of any color before adding to order form", "error");
+    if (totalSets === 0 && totalMixPieces === 0) {
+      toast("Mandatory: Please select at least 1 set or 1 mix piece before adding to order form", "error");
       return;
     }
 
@@ -507,8 +600,9 @@ function ProductDetailContent() {
       retailerPrice: retPrice,
       wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
-      mixPcs: mixInfo.totalMixPcs,
-      mixSizes: mixInfo.sizesSummary,
+      mixPcs: totalMixPieces,
+      mixSizes: selectedMixSummary || (mixInfo.totalMixPcs > 0 ? mixInfo.sizesSummary : "None"),
+      colorMixPcs: colorMixPcs,
       itemSubtotal: totalAmount,
       notes: itemNotes.trim() || undefined,
     };
@@ -1005,15 +1099,57 @@ function ProductDetailContent() {
                     const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
                     const rawStock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
                     const currentSets = colorSetsSelection[color] || 0;
+                    const colorStockDetail = getColorStockDetail(color);
+                    const currentRatioForColor = colorSelectedRatio[color] || activeRatio;
+                    const pcsPerSetForColor = getPcsFromRatio(currentRatioForColor, activePcsPerSet);
                     const pcsInfo = calculateOrderedColorSetsPieces(
                       product.setsColorwise,
                       color,
                       currentSets,
-                      activePcsPerSet,
-                      activeRatio
+                      pcsPerSetForColor,
+                      currentRatioForColor
                     );
                     const calculatedColorPcs = pcsInfo.totalPcs;
                     const isPhotoActive = activeColor.toLowerCase() === color.toLowerCase();
+
+                    // Mix single pieces selected for this color
+                    const colorMixMap = colorMixPcs[color] || {};
+                    const colorSelectedMixTotal = Object.values(colorMixMap).reduce((s, c) => s + (c || 0), 0);
+                    const colorSelectedMixSummary = Object.entries(colorMixMap)
+                      .filter(([_, c]) => c > 0)
+                      .map(([sz, c]) => `${sz}(${c})`)
+                      .join(", ");
+
+                    // Available ratios for this color
+                    const colorRatios = Object.keys(colorStockDetail.ratios).length > 0
+                      ? sortSizeRatioKeys(Object.keys(colorStockDetail.ratios))
+                      : availableRatios.length > 0
+                      ? availableRatios
+                      : [product.sizesRatio || "28 to 36"];
+
+                    // Sizes available for this color (from current ratio, loose stock, and product)
+                    const colorAvailableSizes = (() => {
+                      const sizesSet = new Set<string>();
+                      const ratioSizes = getSizesFromRatio(currentRatioForColor);
+                      if (ratioSizes.length > 0 && ratioSizes[0] !== currentRatioForColor) {
+                        ratioSizes.forEach((s) => sizesSet.add(s));
+                      }
+                      productAvailableSizes.forEach((s) => sizesSet.add(s));
+                      Object.keys(colorStockDetail.loosePcs).forEach((s) => sizesSet.add(s));
+                      return Array.from(sizesSet).sort((a, b) => {
+                        const nA = parseInt(a, 10);
+                        const nB = parseInt(b, 10);
+                        if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+                        return a.localeCompare(b);
+                      });
+                    })();
+
+                    const totalLooseInStockForColor = Object.values(colorStockDetail.loosePcs).reduce(
+                      (s, c) => s + Math.max(0, c || 0),
+                      0
+                    );
+
+                    const isExpanded = isPhotoActive || currentSets > 0 || colorSelectedMixTotal > 0;
 
                     return (
                       <div
@@ -1030,7 +1166,7 @@ function ProductDetailContent() {
                         className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer select-none ${
                           isPhotoActive ? "ring-2 ring-orange-500 shadow-sm" : ""
                         } ${
-                          currentSets > 0
+                          currentSets > 0 || colorSelectedMixTotal > 0
                             ? "bg-orange-50/70 border-orange-300 shadow-xs"
                             : "bg-white border-slate-200 hover:border-slate-300"
                         }`}
@@ -1043,7 +1179,7 @@ function ProductDetailContent() {
                               style={{ backgroundColor: hex }}
                               title={`Palette: ${hex}`}
                             >
-                              {currentSets > 0 && (
+                              {(currentSets > 0 || colorSelectedMixTotal > 0) && (
                                 <Check size={14} className="text-white drop-shadow-md stroke-[3]" />
                               )}
                             </span>
@@ -1056,6 +1192,11 @@ function ProductDetailContent() {
                                     {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs)
                                   </span>
                                 )}
+                                {colorSelectedMixTotal > 0 && (
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-white">
+                                    +{colorSelectedMixTotal} Mix Pcs
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
                                 {isCustom ? (
@@ -1066,7 +1207,7 @@ function ProductDetailContent() {
                                 ) : rawStock > 0 ? (
                                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                    <span>In Stock</span>
+                                    <span>In Stock ({rawStock} Sets)</span>
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
@@ -1091,7 +1232,7 @@ function ProductDetailContent() {
                                   e.stopPropagation();
                                   handleSetChange(color, currentSets - 1);
                                 }}
-                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition"
+                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition cursor-pointer"
                                 aria-label="Decrease sets"
                               >
                                 <Minus size={15} />
@@ -1116,7 +1257,7 @@ function ProductDetailContent() {
                                   e.stopPropagation();
                                   handleSetChange(color, currentSets + 1);
                                 }}
-                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 transition"
+                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                                 aria-label="Increase sets"
                               >
                                 <Plus size={15} />
@@ -1134,7 +1275,7 @@ function ProductDetailContent() {
                                   e.stopPropagation();
                                   handleRemoveCustomColor(color);
                                 }}
-                                className="p-1 text-slate-400 hover:text-red-500 transition"
+                                className="p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
                                 title="Remove custom shade"
                               >
                                 <Trash2 size={14} />
@@ -1142,6 +1283,197 @@ function ProductDetailContent() {
                             )}
                           </div>
                         </div>
+
+                        {/* ─── INLINE SIZE RATIO & MIX SIZES SELECTOR (RIGHT BELOW COLOR) ─── */}
+                        {isExpanded && (
+                          <div
+                            className="mt-3.5 pt-3.5 border-t border-slate-200/90 space-y-3 cursor-default"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* 1. Size Ratio Available for this exact color */}
+                            <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/80 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                  <Layers size={13} className="text-orange-600" />
+                                  <span>Size Ratio Available ({color})</span>
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  Selected: <strong className="text-slate-900">{currentRatioForColor}</strong> ({pcsPerSetForColor} pcs/set)
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                {colorRatios.map((rKey) => {
+                                  const rStock = colorStockDetail.ratios[rKey] ?? rawStock;
+                                  const isSelectedRatio = currentRatioForColor === rKey;
+                                  const rPcs = getPcsFromRatio(rKey);
+
+                                  return (
+                                    <button
+                                      key={rKey}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleColorRatioChange(color, rKey);
+                                      }}
+                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                                        isSelectedRatio
+                                          ? "bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-orange-500/70"
+                                          : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300"
+                                      }`}
+                                    >
+                                      <span>{rKey}</span>
+                                      <span className={`text-[10px] ${isSelectedRatio ? "text-slate-300" : "text-slate-500"}`}>
+                                        ({rPcs} pcs)
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-black px-1.5 py-0.2 rounded-full ${
+                                          rStock > 0
+                                            ? isSelectedRatio
+                                              ? "bg-emerald-500 text-white"
+                                              : "bg-emerald-100 text-emerald-800"
+                                            : isSelectedRatio
+                                            ? "bg-amber-500 text-white"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {rStock > 0 ? `${rStock} sets in stock` : "Made to order"}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* 2. Mix Sizes (Loose Single Pieces) of the same color */}
+                            <div className="bg-amber-50/60 rounded-xl p-3 border border-amber-200/90 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                  <Sparkles size={13} className="text-amber-600" />
+                                  <span>Mix Sizes Available — Single Pieces ({color})</span>
+                                </span>
+                                <span className="text-[10px] font-bold">
+                                  {totalLooseInStockForColor > 0 ? (
+                                    <span className="text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300">
+                                      {totalLooseInStockForColor} Loose Pcs In Stock
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-normal italic">
+                                      0 loose pcs in stock
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                                {colorAvailableSizes.map((sz) => {
+                                  const availLoose = colorStockDetail.loosePcs[sz] || 0;
+                                  const selectedLoose = colorMixMap[sz] || 0;
+                                  const isSelected = selectedLoose > 0;
+
+                                  return (
+                                    <div
+                                      key={sz}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className={`p-2 rounded-xl border transition-all ${
+                                        isSelected
+                                          ? "bg-amber-100/90 border-amber-400 ring-1 ring-amber-400 shadow-2xs"
+                                          : "bg-white border-slate-200 hover:border-slate-300"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <span className="font-black text-xs text-slate-900">
+                                          Size {sz}
+                                        </span>
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                            availLoose > 0
+                                              ? "bg-emerald-100 text-emerald-800"
+                                              : "bg-slate-100 text-slate-500"
+                                          }`}
+                                        >
+                                          {availLoose > 0 ? `${availLoose} in stock` : "0 in stock"}
+                                        </span>
+                                      </div>
+
+                                      {/* Stepper buttons */}
+                                      <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+                                        <button
+                                          type="button"
+                                          disabled={selectedLoose <= 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMixPieceChange(color, sz, selectedLoose - 1);
+                                          }}
+                                          className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
+                                          title={`Decrease Size ${sz}`}
+                                        >
+                                          <Minus size={11} />
+                                        </button>
+
+                                        <span className="font-mono font-black text-xs text-slate-900">
+                                          {selectedLoose}
+                                        </span>
+
+                                        <button
+                                          type="button"
+                                          disabled={availLoose > 0 && selectedLoose >= availLoose && !isCustom}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMixPieceChange(color, sz, selectedLoose + 1);
+                                          }}
+                                          className="w-6 h-6 flex items-center justify-center text-slate-700 hover:bg-white rounded disabled:opacity-30 transition cursor-pointer"
+                                          title={`Increase Size ${sz}`}
+                                        >
+                                          <Plus size={11} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* 3. Color Piece & Mix Summary Bar */}
+                            <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-black text-slate-900">{color}:</span>
+                                <span className="font-semibold text-slate-700">
+                                  {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} pcs)
+                                </span>
+                                {colorSelectedMixTotal > 0 && (
+                                  <>
+                                    <span className="text-slate-400 font-bold">+</span>
+                                    <span className="font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                      {colorSelectedMixTotal} Mix {colorSelectedMixTotal === 1 ? "Pc" : "Pcs"} ({colorSelectedMixSummary})
+                                    </span>
+                                  </>
+                                )}
+                                <span className="text-slate-400 font-bold">=</span>
+                                <span className="font-black text-orange-600 text-sm">
+                                  {calculatedColorPcs + colorSelectedMixTotal} Total Pcs
+                                </span>
+                              </div>
+
+                              {colorSelectedMixTotal > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setColorMixPcs((prev) => {
+                                      const next = { ...prev };
+                                      delete next[color];
+                                      return next;
+                                    });
+                                  }}
+                                  className="text-[11px] text-red-500 hover:text-red-700 font-semibold cursor-pointer underline"
+                                >
+                                  Clear {color} Mix
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -1220,38 +1552,65 @@ function ProductDetailContent() {
                   </div>
                 </div>
 
-                {/* Selected Colors Breakdown */}
-                {selectedEntries.length > 0 ? (
+                {/* Selected Colors & Mix Breakdown */}
+                {selectedEntries.length > 0 || totalMixPieces > 0 ? (
                   <div className="space-y-1 text-xs">
                     <div className="text-slate-400 text-[11px] font-semibold mb-1">
-                      Selected Color Sets Breakdown:
+                      Selected Colors &amp; Mix Breakdown:
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {selectedEntries.map((entry) => (
-                        <span
-                          key={entry.color}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs"
-                        >
+                      {selectedEntries.map((entry) => {
+                        const cMix = colorMixPcs[entry.color];
+                        const cMixTotal = cMix ? Object.values(cMix).reduce((s, c) => s + (c || 0), 0) : 0;
+                        return (
                           <span
-                            className="w-2.5 h-2.5 rounded-full inline-block"
-                            style={{ backgroundColor: getColorHex(entry.color).hex }}
-                          />
-                          <span className="font-bold text-white">{entry.color}:</span>
-                          <span className="text-orange-400 font-bold">
-                            {entry.sets} {entry.sets === 1 ? "set" : "sets"} ({colorPiecesMap[entry.color]?.totalPcs ?? entry.sets * pcsPerSet} pcs)
+                            key={entry.color}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs"
+                          >
+                            <span
+                              className="w-2.5 h-2.5 rounded-full inline-block"
+                              style={{ backgroundColor: getColorHex(entry.color).hex }}
+                            />
+                            <span className="font-bold text-white">{entry.color}:</span>
+                            <span className="text-orange-400 font-bold">
+                              {entry.sets} {entry.sets === 1 ? "set" : "sets"} ({colorPiecesMap[entry.color]?.totalPcs ?? entry.sets * pcsPerSet} pcs)
+                            </span>
+                            {cMixTotal > 0 && (
+                              <span className="text-amber-300 font-bold bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-600/50">
+                                +{cMixTotal} mix
+                              </span>
+                            )}
                           </span>
-                        </span>
-                      ))}
+                        );
+                      })}
+                      {Object.entries(colorMixPcs).map(([col, m]) => {
+                        if ((colorSetsSelection[col] || 0) > 0) return null;
+                        const totalM = Object.values(m).reduce((s, c) => s + (c || 0), 0);
+                        if (totalM === 0) return null;
+                        return (
+                          <span
+                            key={col}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-700/80 text-amber-200 text-xs"
+                          >
+                            <span
+                              className="w-2.5 h-2.5 rounded-full inline-block"
+                              style={{ backgroundColor: getColorHex(col).hex }}
+                            />
+                            <span className="font-bold text-white">{col}:</span>
+                            <span className="text-amber-400 font-bold">{totalM} mix pcs</span>
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400 italic">
-                    Select sets for any of the colors above to see the live total.
+                    Select sets or mix sizes for any of the colors above to see the live total.
                   </p>
                 )}
 
                 {/* Math Row */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
+                <div className={`grid gap-2 pt-2 border-t border-slate-800 text-center ${totalMixPieces > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
                   <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
                     <div className="text-[10px] uppercase font-bold text-slate-400">
                       Total Sets
@@ -1260,6 +1619,17 @@ function ProductDetailContent() {
                       {totalSets}
                     </div>
                   </div>
+
+                  {totalMixPieces > 0 && (
+                    <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">
+                        Mix Pcs
+                      </div>
+                      <div className="text-lg font-black text-amber-400">
+                        {totalMixPieces}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
                     <div className="text-[10px] uppercase font-bold text-slate-400">
@@ -1283,12 +1653,14 @@ function ProductDetailContent() {
                 {/* Big Action Button */}
                 <button
                   type="button"
-                  disabled={totalSets === 0}
+                  disabled={totalSets === 0 && totalMixPieces === 0}
                   onClick={handleAddToOrderForm}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm sm:text-base rounded-xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm sm:text-base rounded-xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
                 >
                   <FilePlus size={20} />
-                  <span>Add To Order Form ({totalSets} Sets · {totalPcs} Pcs)</span>
+                  <span>
+                    Add To Order Form ({totalSets} Sets{totalMixPieces > 0 ? ` · ${totalMixPieces} Mix` : ""} · {totalPcs} Pcs)
+                  </span>
                 </button>
               </div>
             </div>
