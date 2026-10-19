@@ -25,6 +25,7 @@ import {
   type ColorSetEntry,
   type OrderStatus,
 } from "@/lib/types";
+import DeleteOrderModal from "@/components/orders/DeleteOrderModal";
 
 export default function OrdersPage() {
   const { toast } = useToast();
@@ -38,6 +39,9 @@ export default function OrdersPage() {
   const [newStatus, setNewStatus] = useState<OrderStatus>("Confirmed");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Delete Order Modal
+  const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/check")
@@ -115,22 +119,7 @@ export default function OrdersPage() {
     }
   };
 
-  const handleDelete = async (id: number, orderNum: string) => {
-    if (!confirm(`Are you sure you want to delete wholesale order "${orderNum}"?`)) return;
 
-    try {
-      const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        toast("Order deleted successfully", "success");
-        fetchOrders();
-      } else {
-        const err = await res.json();
-        toast(err.error || "Failed to delete order", "error");
-      }
-    } catch (err: any) {
-      toast("Error: " + err.message, "error");
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -357,7 +346,7 @@ export default function OrdersPage() {
                         <Clock size={15} />
                       </button>
                       <button
-                        onClick={() => handleDelete(o.id, o.orderNumber)}
+                        onClick={() => setOrderToDelete(o)}
                         className="p-1.5 inline-flex text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                         title="Delete Order"
                       >
@@ -417,6 +406,24 @@ export default function OrdersPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Prompt Delete Order Modal */}
+      {orderToDelete && (
+        <DeleteOrderModal
+          isOpen={!!orderToDelete}
+          onClose={() => setOrderToDelete(null)}
+          order={orderToDelete}
+          onDeleted={(stockRestored, orderNum) => {
+            toast(
+              stockRestored
+                ? `Order ${orderNum} deleted and stock sets added back to inventory!`
+                : `Order ${orderNum} deleted (stock kept unchanged).`,
+              "success"
+            );
+            fetchOrders();
+          }}
+        />
       )}
     </div>
   );

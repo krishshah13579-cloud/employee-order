@@ -84,7 +84,7 @@ export function parseColorwiseSets(raw: string | null | undefined): Record<strin
  */
 export function parseDetailedColorRatioSets(
   raw: string | null | undefined,
-  defaultRatio: string = "30 to 38"
+  defaultRatio: string = "28 to 36"
 ): Record<string, Record<string, number>> {
   const result: Record<string, Record<string, number>> = {};
   if (!raw) return result;
@@ -140,7 +140,7 @@ export interface ColorStockDetail {
  */
 export function parseDetailedColorStockWithLoose(
   raw: string | null | undefined,
-  defaultRatio: string = "30 to 38"
+  defaultRatio: string = "28 to 36"
 ): Record<string, ColorStockDetail> {
   const result: Record<string, ColorStockDetail> = {};
   if (!raw) return result;
@@ -821,18 +821,18 @@ export function deductSetsFromStock(
   setsColorwise: string | null | undefined,
   orderedColorSets: { color: string; sets: number; ratio?: string }[]
 ): string {
-  const detailed = parseDetailedColorRatioSets(setsColorwise);
+  const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
 
   for (const orderItem of orderedColorSets) {
     const targetColor = cleanColorName(orderItem.color.trim());
     let remainingToDeduct = Math.max(0, orderItem.sets);
 
-    let matchedColor = Object.keys(detailed).find(
+    let matchedColor = Object.keys(stockWithLoose).find(
       (c) => c.toLowerCase() === targetColor.toLowerCase()
     );
 
-    if (matchedColor && detailed[matchedColor]) {
-      const ratios = detailed[matchedColor];
+    if (matchedColor && stockWithLoose[matchedColor]) {
+      const ratios = stockWithLoose[matchedColor].ratios;
       if (orderItem.ratio && ratios[orderItem.ratio] !== undefined) {
         const canDeduct = Math.min(remainingToDeduct, ratios[orderItem.ratio]);
         ratios[orderItem.ratio] -= canDeduct;
@@ -851,7 +851,7 @@ export function deductSetsFromStock(
     }
   }
 
-  return JSON.stringify(detailed);
+  return JSON.stringify(stockWithLoose);
 }
 
 /**
@@ -862,25 +862,28 @@ export function restoreSetsToStock(
   setsColorwise: string | null | undefined,
   returnedColorSets: { color: string; sets: number; ratio?: string }[]
 ): string {
-  const detailed = parseDetailedColorRatioSets(setsColorwise);
+  const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
 
   for (const orderItem of returnedColorSets) {
     const targetColor = cleanColorName(orderItem.color.trim());
     const setsToRestore = Math.max(0, orderItem.sets);
     if (setsToRestore === 0) continue;
 
-    let matchedColor = Object.keys(detailed).find(
+    let matchedColor = Object.keys(stockWithLoose).find(
       (c) => c.toLowerCase() === targetColor.toLowerCase()
     );
 
     if (!matchedColor) {
       matchedColor = targetColor;
-      detailed[matchedColor] = {};
+      stockWithLoose[matchedColor] = { ratios: {}, loosePcs: {} };
     }
 
-    const defaultRatioKey = orderItem.ratio || Object.keys(detailed[matchedColor])[0] || "30 to 38";
-    detailed[matchedColor][defaultRatioKey] = (detailed[matchedColor][defaultRatioKey] || 0) + setsToRestore;
+    const ratioKeys = Object.keys(stockWithLoose[matchedColor].ratios);
+    const sortedRatioKeys = sortSizeRatioKeys(ratioKeys);
+    const defaultRatioKey = orderItem.ratio || sortedRatioKeys[0] || "28 to 36";
+    stockWithLoose[matchedColor].ratios[defaultRatioKey] =
+      (stockWithLoose[matchedColor].ratios[defaultRatioKey] || 0) + setsToRestore;
   }
 
-  return JSON.stringify(detailed);
+  return JSON.stringify(stockWithLoose);
 }

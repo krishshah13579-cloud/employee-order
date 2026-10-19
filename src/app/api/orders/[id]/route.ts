@@ -363,11 +363,139 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
 
+    // Determine whether to restore stock:
+    // Support URL param ?restoreStock=true/false
+    // Support JSON body { restoreStock: true/false }
+    let restoreStock = true;
+    const url = new URL(_request.url);
+    if (url.searchParams.has("restoreStock")) {
+      restoreStock = url.searchParams.get("restoreStock") !== "false";
+    } else {
+      try {
+        const body = await _request.json();
+        if (typeof body.restoreStock === "boolean") {
+          restoreStock = body.restoreStock;
+        }
+      } catch {
+        // No JSON body provided, default to true
+      }
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // 1. Preserve any generated Tax Invoice in Sales Register!
+    // If taxInvoiceNumber was assigned, ensure a SalesInvoice record exists before deleting the order
+    if (order.taxInvoiceNumber) {
+      try {
+        const existingInvoice = await prisma.salesInvoice.findFirst({
+          where: {
+            OR: [
+              { orderId: order.id },
+              { invoiceNumber: order.taxInvoiceNumber },
+            ],
+          },
+        });
+        if (!existingInvoice) {
+          await createOrUpdateSalesInvoiceFromOrder(order.id);
+        }
+      } catch (invErr) {
+        console.error("Error ensuring sales invoice before order delete:", invErr);
+      }
+    }
+
+    // Detach any linked SalesInvoice records so they are safely preserved in Sales Register
+    try {
+      await prisma.salesInvoice.updateMany({
+        where: { orderId: order.id },
+        data: {
+          orderId: null,
+          notes: order.orderNumber ? `Origin Order Form: ${order.orderNumber} (Order form deleted)` : undefined,
+        },
+      });
+    } catch (detachErr) {
+      console.error("Error detaching sales invoice from order:", detachErr);
+    }
+
+    // 2. If restoreStock is requested, restore the stock sets back to product setsColorwise
+    if (restoreStock && order.items && order.items.length > 0) {
+      const productItemsMap = new Map<number, { color: string; sets: number; ratio?: string }[]>();
+
+      for (const item of order.items) {
+        if (!productItemsMap.has(item.productId)) {
+          productItemsMap.set(item.productId, []);
+        }
+
+        let colorSetsList: { color: string; sets: number }[] = [];
+        try {
+          if (typeof item.colorSets === "string") {
+            colorSetsList = JSON.parse(item.colorSets);
+          } else if (Array.isArray(item.colorSets)) {
+            colorSetsList = item.colorSets;
+          }
+        } catch {
+          colorSetsList = [];
+        }
+
+        if (Array.isArray(colorSetsList) && colorSetsList.length > 0) {
+          for (const cs of colorSetsList) {
+            const numSets = parseInt(String(cs.sets), 10) || 0;
+            if (numSets > 0 && cs.color) {
+              productItemsMap.get(item.productId)!.push({
+                color: cs.color,
+                sets: numSets,
+                ratio: item.sizeRatio,
+              });
+            }
+          }
+        } else if (item.totalSets > 0) {
+          productItemsMap.get(item.productId)!.push({
+            color: "Standard",
+            sets: item.totalSets,
+            ratio: item.sizeRatio,
+          });
+        }
+      }
+
+      // Perform stock restoration for each affected product
+      for (const [productId, returnedSets] of productItemsMap.entries()) {
+        if (returnedSets.length === 0) continue;
+        const product = await prisma.product.findUnique({
+          where: { id: productId },
+          select: { id: true, setsColorwise: true },
+        });
+
+        if (product && product.setsColorwise && product.setsColorwise.trim() !== "") {
+          const { restoreSetsToStock } = await import("@/lib/stock");
+          const updatedStock = restoreSetsToStock(product.setsColorwise, returnedSets);
+          await prisma.product.update({
+            where: { id: productId },
+            data: { setsColorwise: updatedStock },
+          });
+        }
+      }
+    }
+
+    // 3. Delete the order (Prisma cascades deletion to OrderItem)
     await prisma.order.delete({
       where: { id: orderId },
     });
 
-    return NextResponse.json({ message: "Order deleted successfully", id: orderId });
+    return NextResponse.json({
+      message: restoreStock
+        ? "Order deleted and stock added back to inventory successfully"
+        : "Order form deleted successfully (stock unchanged)",
+      id: orderId,
+      stockRestored: restoreStock,
+    });
   } catch (error: any) {
     console.error("Error deleting order:", error);
     return NextResponse.json({ error: "Failed to delete order: " + error.message }, { status: 500 });

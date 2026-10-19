@@ -32,12 +32,7 @@ export async function createOrUpdateSalesInvoiceFromOrder(orderId: number) {
     // Only process orders with Confirmed, In Production, Ready, Dispatched, Delivered status
     const confirmedStatuses = ["Confirmed", "In Production", "Ready", "Dispatched", "Delivered"];
     if (!confirmedStatuses.includes(order.status)) {
-      // If order was cancelled, remove or mark invoice as cancelled
-      if (order.status === "Cancelled") {
-        await prisma.salesInvoice.deleteMany({
-          where: { orderId: order.id },
-        });
-      }
+      // Never delete sales invoices from Sales Register even if order is cancelled
       return null;
     }
 

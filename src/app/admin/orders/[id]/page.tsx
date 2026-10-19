@@ -33,6 +33,7 @@ import { getColorHex } from "@/lib/colors";
 import { ORDER_STATUSES, type OrderData, type ColorSetEntry } from "@/lib/types";
 import { calculateOrderedColorSetsPieces } from "@/lib/stock";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
+import DeleteOrderModal from "@/components/orders/DeleteOrderModal";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 
@@ -46,6 +47,7 @@ export default function OrderInvoicePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Active Format Switcher: "ORDER_FORM" vs "TAX_INVOICE"
   const [formatType, setFormatType] = useState<"ORDER_FORM" | "TAX_INVOICE">("TAX_INVOICE");
@@ -530,6 +532,17 @@ export default function OrderInvoicePage() {
           >
             <Printer size={14} />
             <span>Print A4</span>
+          </button>
+
+          {/* Delete Order Button */}
+          <button
+            type="button"
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer border border-red-200"
+            title="Delete order form with option to restore stock"
+          >
+            <Trash2 size={14} className="text-red-600" />
+            <span>Delete</span>
           </button>
         </div>
       </div>
@@ -1125,6 +1138,23 @@ export default function OrderInvoicePage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Prompt Delete Order Modal */}
+      {order && (
+        <DeleteOrderModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          order={order}
+          onDeleted={(stockRestored, orderNum) => {
+            toast(
+              stockRestored
+                ? `Order ${orderNum} deleted and stock sets added back to inventory!`
+                : `Order ${orderNum} deleted (stock kept unchanged).`,
+              "success"
+            );
+            router.push("/admin/orders");
+          }}
+        />
       )}
     </div>
   );
