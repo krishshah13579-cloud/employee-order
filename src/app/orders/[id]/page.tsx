@@ -22,7 +22,7 @@ import {
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate, getColorAlphabetLetter } from "@/lib/utils";
+import { formatCurrency, formatDate, getColorAlphabetLetter, formatProductNameWithMrp } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus } from "@/lib/types";
@@ -33,6 +33,8 @@ interface EditableOrderItem {
   id?: number;
   productId: number;
   productName: string;
+  mrp?: number | null;
+  product?: any;
   category?: string;
   colorSets: ColorSetEntry[];
   colorMapping?: string | null;
@@ -188,6 +190,8 @@ export default function OrderEditPage() {
           id: it.id,
           productId: it.productId,
           productName: it.productName,
+          mrp: it.product?.mrp || it.mrp || null,
+          product: it.product,
           category: it.product?.category,
           colorSets: colorSets,
           colorMapping: it.product?.colorMapping || it.colorMapping || null,
@@ -498,7 +502,11 @@ export default function OrderEditPage() {
                       {/* Product Name */}
                       <td className="py-4 px-4">
                         <div className="font-black text-slate-900 text-sm">
-                          {item.productName}
+                          {formatProductNameWithMrp(
+                            item.productName,
+                            item.mrp || item.product?.mrp,
+                            item.product?.retailerPrice || item.product?.price || item.unitPrice
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-500">
                           Ratio: {item.sizeRatio} ({item.pcsPerSet || 5} pcs/set)
@@ -673,6 +681,8 @@ export default function OrderEditPage() {
           items: activeItems.map((it) => ({
             id: it.id,
             productName: it.productName,
+            mrp: it.mrp || it.product?.mrp,
+            product: it.product,
             colorSets: it.colorSets,
             colorMapping: it.colorMapping,
             colorsAvailable: it.colorsAvailable,
@@ -756,6 +766,8 @@ export default function OrderEditPage() {
                   items: activeItems.map((it) => ({
                     id: it.id,
                     productName: it.productName,
+                    mrp: it.mrp || it.product?.mrp,
+                    product: it.product,
                     colorSets: it.colorSets,
                     colorMapping: it.colorMapping,
                     colorsAvailable: it.colorsAvailable,

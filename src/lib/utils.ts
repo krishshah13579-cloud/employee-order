@@ -280,3 +280,26 @@ export function formatColorAlphabetLines(
     return `${letter}: ${sets} ${sets === 1 ? "Set" : "Sets"}`;
   });
 }
+
+/**
+ * Formats a product name to include the MRP in brackets: e.g. "IMP - 003 (1770)".
+ * If the product name already contains bracketed MRP/number at the end, it avoids duplicate brackets.
+ * If mrp is not provided, calculates from retailerPrice or fallbackPrice (retailerPrice * 2).
+ */
+export function formatProductNameWithMrp(
+  productName: string,
+  mrp?: number | null,
+  fallbackPrice?: number | null
+): string {
+  const name = String(productName || "Garment Item").trim();
+  if (/\(\s*\d+\s*\)$/.test(name)) return name;
+
+  const resolvedMrp =
+    (mrp && Number(mrp) > 0 ? Number(mrp) : null) ||
+    (fallbackPrice && Number(fallbackPrice) > 0 ? Math.round(Number(fallbackPrice) * 2) : null);
+
+  if (resolvedMrp && resolvedMrp > 0) {
+    return `${name} (${Math.round(resolvedMrp)})`;
+  }
+  return name;
+}

@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
-import { formatCurrency, formatColorAlphabetLines } from "@/lib/utils";
+import { formatCurrency, formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
 
 export interface TaxInvoiceItem {
   id?: number;
   productName: string;
+  mrp?: number | null;
+  product?: any;
   colorSets?: any;
   colorMapping?: string | null;
   colorsAvailable?: string | null;
@@ -479,7 +481,9 @@ export default function TaxInvoiceA4({
                     {idx + 1}
                   </td>
                   <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
-                    <div style={{ fontWeight: "bold", color: "#000" }}>{it.productName}</div>
+                    <div style={{ fontWeight: "bold", color: "#000" }}>
+                      {formatProductNameWithMrp(it.productName, it.mrp || (it as any).product?.mrp, it.unitPrice)}
+                    </div>
                     {it.sizeRatio && (
                       <div
                         style={{

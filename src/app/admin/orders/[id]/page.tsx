@@ -27,7 +27,7 @@ import {
   Save,
   Package,
 } from "lucide-react";
-import { formatCurrency, formatDate, getColorAlphabetLetter } from "@/lib/utils";
+import { formatCurrency, formatDate, getColorAlphabetLetter, formatProductNameWithMrp } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf, sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import { ORDER_STATUSES, type OrderData, type ColorSetEntry } from "@/lib/types";
@@ -903,7 +903,13 @@ export default function OrderInvoicePage() {
                   <tr key={idx} className="hover:bg-gray-50/50">
                     <td className="p-3 border-r border-gray-200 text-center font-mono">{idx + 1}</td>
                     <td className="p-3 border-r border-gray-200">
-                      <div className="font-bold text-gray-900 text-sm">{it.productName}</div>
+                      <div className="font-bold text-gray-900 text-sm">
+                        {formatProductNameWithMrp(
+                          it.productName,
+                          it.product?.mrp || it.mrp,
+                          it.product?.retailerPrice || it.product?.price || it.unitPrice
+                        )}
+                      </div>
                       <div className="flex flex-col gap-1 mt-1.5">
                         {colorSetsParsed
                           ?.filter((cs) => cs.sets > 0)
@@ -1033,6 +1039,8 @@ export default function OrderInvoicePage() {
             items: activeDisplayItems.map((it: any) => ({
               id: it.id,
               productName: it.productName,
+              mrp: it.mrp || it.product?.mrp,
+              product: it.product,
               colorSets: it.colorSets,
               colorMapping: it.product?.colorMapping || it.colorMapping,
               colorsAvailable: it.product?.colorsAvailable || it.colorsAvailable,
@@ -1115,7 +1123,13 @@ export default function OrderInvoicePage() {
                   className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between font-bold text-slate-900">
-                    <span className="text-sm font-black">{item.productName}</span>
+                    <span className="text-sm font-black">
+                      {formatProductNameWithMrp(
+                        item.productName,
+                        (item as any).mrp || (item as any).product?.mrp,
+                        item.unitPrice
+                      )}
+                    </span>
                     <span className="font-mono text-orange-600">
                       {item.totalSets} Sets ({item.totalPcs} Pcs) = {formatCurrency(item.itemSubtotal)}
                     </span>
@@ -1363,7 +1377,13 @@ export default function OrderInvoicePage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-black text-slate-900">{item.productName}</span>
+                      <span className="text-sm font-black text-slate-900">
+                        {formatProductNameWithMrp(
+                          item.productName,
+                          (item as any).mrp || (item as any).product?.mrp,
+                          item.unitPrice
+                        )}
+                      </span>
                       <span className="ml-2 text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                         Ratio: {item.sizeRatio}
                       </span>

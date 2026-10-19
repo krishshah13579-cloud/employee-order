@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { formatColorAlphabetLines } from "@/lib/utils";
+import { formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
 
 export async function GET(
   request: NextRequest,
@@ -322,8 +322,15 @@ export async function GET(
       // Draw item details
       drawText(String(index + 1), colX[0] + 8, topY, { size: 8 });
 
-      // Product Name
-      const prodName = String(item.productName || "Garment Item").slice(0, 34);
+      // Product Name with MRP in bracket: e.g. "IMP - 003 (1770)"
+      const resolvedMrp = prod?.mrp || (item as any).mrp;
+      const resolvedFallbackPrice = prod?.retailerPrice || prod?.price || item.unitPrice;
+      const formattedProdName = formatProductNameWithMrp(
+        item.productName,
+        resolvedMrp,
+        resolvedFallbackPrice
+      );
+      const prodName = formattedProdName.slice(0, 42);
       drawText(prodName, colX[1] + 6, topY, { font: fontBold, size: 8 });
 
       // Each color wholesale alphabet entry on the next line

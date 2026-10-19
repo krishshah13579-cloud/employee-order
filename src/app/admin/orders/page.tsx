@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatProductNameWithMrp } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf, sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
 import {
@@ -250,7 +250,13 @@ export default function OrdersPage() {
 
                           return (
                             <div key={idx} className="text-xs">
-                              <span className="font-semibold text-gray-800">{item.productName}</span>
+                              <span className="font-semibold text-gray-800">
+                                {formatProductNameWithMrp(
+                                  item.productName,
+                                  (item as any).mrp || (item as any).product?.mrp,
+                                  item.unitPrice
+                                )}
+                              </span>
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                 <span className="text-[11px] text-gray-500">Ratio:</span>
                                 <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-1 rounded">{item.sizeRatio}</span>
