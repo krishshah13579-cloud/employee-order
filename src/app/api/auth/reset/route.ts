@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { hashPassword } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     // Security check: Emergency reset is restricted and requires the recovery secret key
     const recoveryKey = req.headers.get("x-admin-recovery-key") || "";
     const expectedKey =
@@ -42,21 +45,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upsert or update admin account
+    const hashedPassword = hashPassword(password);
+
+    // Upsert or update admin account with cryptographically hashed password
     await prisma.adminAccount.upsert({
       where: { username },
       update: {
-        password,
+        password: hashedPassword,
         twoFactorEnabled: true,
         lastOtp: null,
         otpExpiresAt: null,
       },
       create: {
         username,
-        password,
+        password: hashedPassword,
         twoFactorSecret: (body.twoFactorSecret || Math.floor(100000 + Math.random() * 900000).toString()).trim(),
         twoFactorEnabled: true,
       },
+    });
+
+    await recordAuditLog({
+      action: "AUTH_CREDENTIALS_RESET",
+      actorType: "ADMIN",
+      actorName: username,
+      entityType: "AdminAccount",
+      details: "Administrator password securely reset with cryptographic scrypt hash",
+      ipAddress: ip,
+      status: "SUCCESS",
     });
 
     const existingProfile = await prisma.adminProfile.findFirst();

@@ -4,6 +4,7 @@ import { ORDER_STATUSES, OrderStatus } from "@/lib/types";
 import { restoreSetsToStock, deductSetsFromStock } from "@/lib/stock";
 import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function PUT(
   request: NextRequest,
@@ -117,6 +118,16 @@ export async function PUT(
 
     // Automatically send/sync confirmed order to Sales Register
     await createOrUpdateSalesInvoiceFromOrder(orderId);
+
+    await recordAuditLog({
+      action: "ORDER_STATUS_CHANGED",
+      actorType: admin ? "ADMIN" : "EMPLOYEE",
+      actorName: admin?.username || employee?.name || "Staff",
+      entityType: "Order",
+      entityId: orderId,
+      details: `Order #${existingOrder.orderNumber} status transitioned from "${existingOrder.status}" to "${status}"`,
+      status: "SUCCESS",
+    });
 
     // Automated WhatsApp trigger on status change
     const customerPhone = updatedOrder.customerPhone || updatedOrder.customer?.phoneNumber;

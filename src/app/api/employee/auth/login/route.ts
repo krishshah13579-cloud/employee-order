@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
-import { signToken } from "@/lib/auth-security";
+import { signToken, verifyPassword, hashPassword } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     const body = await req.json();
     const name = (body.name || "").trim();
     const pin = (body.pin || "").trim();
@@ -36,17 +38,49 @@ export async function POST(req: NextRequest) {
     );
 
     if (!employee) {
+      await recordAuditLog({
+        action: "EMPLOYEE_LOGIN_FAILED",
+        actorType: "EMPLOYEE",
+        actorName: name,
+        entityType: "Employee",
+        details: `No active employee matching "${name}"`,
+        ipAddress: ip,
+        status: "FAILURE",
+      });
       return NextResponse.json(
         { error: `No active employee found matching "${name}". Please check the name or contact admin.` },
         { status: 401 }
       );
     }
 
-    if (employee.pin !== pin) {
+    const isPinValid = verifyPassword(pin, employee.pin);
+    if (!isPinValid) {
+      await recordAuditLog({
+        action: "EMPLOYEE_LOGIN_FAILED",
+        actorType: "EMPLOYEE",
+        actorName: employee.name,
+        entityType: "Employee",
+        entityId: employee.id,
+        details: "Incorrect PIN entered",
+        ipAddress: ip,
+        status: "FAILURE",
+      });
       return NextResponse.json(
         { error: "Incorrect PIN entered. Please try again." },
         { status: 401 }
       );
+    }
+
+    // Seamless zero-downtime auto-upgrade: hash PIN with scrypt if still in plaintext
+    if (!employee.pin.startsWith("scrypt:")) {
+      try {
+        await prisma.employee.update({
+          where: { id: employee.id },
+          data: { pin: hashPassword(pin) },
+        });
+      } catch (err) {
+        console.warn("Failed to auto-upgrade employee PIN hash:", err);
+      }
     }
 
     const isTL = isEmployeeTeamLeader(employee);
@@ -77,6 +111,17 @@ export async function POST(req: NextRequest) {
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    await recordAuditLog({
+      action: "EMPLOYEE_LOGIN_SUCCESS",
+      actorType: "EMPLOYEE",
+      actorName: employee.name,
+      entityType: "Employee",
+      entityId: employee.id,
+      details: `Employee authenticated successfully${isTL ? " [Team Leader]" : ""}`,
+      ipAddress: ip,
+      status: "SUCCESS",
     });
 
     return NextResponse.json({

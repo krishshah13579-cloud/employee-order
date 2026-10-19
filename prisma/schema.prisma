@@ -257,3 +257,17 @@ model InvoiceTemplate {
   updatedAt        DateTime @updatedAt
 }
 
+// 10. Security & Compliance Audit Log
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String   // e.g. "AUTH_LOGIN", "AUTH_2FA_SUCCESS", "AUTH_2FA_FAIL", "ORDER_STATUS_UPDATE", "CUSTOMER_UPDATE"
+  actorType  String   // "ADMIN", "EMPLOYEE", "SYSTEM"
+  actorName  String   // username or employee name
+  entityType String?  // "Order", "Customer", "Product", "AdminAccount", etc.
+  entityId   String?  // ID of affected entity
+  details    String?  // Description or JSON summary
+  ipAddress  String?  // Client IP address
+  status     String   @default("SUCCESS") // "SUCCESS", "FAILURE", "BLOCKED"
+  createdAt  DateTime @default(now())
+}
+

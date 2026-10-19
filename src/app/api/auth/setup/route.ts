@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { signToken } from "@/lib/auth-security";
+import { signToken, hashPassword } from "@/lib/auth-security";
 
 export async function GET() {
   try {
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       const admin = await tx.adminAccount.create({
         data: {
           username,
-          password,
+          password: hashPassword(password),
           twoFactorSecret,
           twoFactorEnabled: true,
         },

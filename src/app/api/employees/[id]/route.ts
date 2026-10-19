@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-security";
+import { requireAdmin, hashPassword } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 const SAFE_EMPLOYEE_SELECT = {
   id: true,
@@ -64,7 +65,7 @@ export async function PUT(
       data: {
         name: body.name,
         email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
-        pin: body.pin !== undefined ? body.pin.trim() : undefined,
+        pin: body.pin !== undefined && body.pin.trim() ? hashPassword(body.pin.trim()) : undefined,
         mobileNumber: body.mobileNumber,
         address: body.address,
         proofUrl: body.proofUrl,
@@ -73,6 +74,16 @@ export async function PUT(
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,
+    });
+
+    await recordAuditLog({
+      action: "EMPLOYEE_UPDATED",
+      actorType: "ADMIN",
+      actorName: auth.user?.username || "Admin",
+      entityType: "Employee",
+      entityId: employee.id,
+      details: `Updated employee profile for "${employee.name}"`,
+      status: "SUCCESS",
     });
 
     return NextResponse.json(employee);
@@ -114,14 +125,24 @@ export async function PATCH(
     if (body.isActive !== undefined) {
       updateData.isActive = Boolean(body.isActive);
     }
-    if (body.pin !== undefined) {
-      updateData.pin = body.pin.trim();
+    if (body.pin !== undefined && body.pin.trim()) {
+      updateData.pin = hashPassword(body.pin.trim());
     }
 
     const employee = await prisma.employee.update({
       where: { id: empId },
       data: updateData,
       select: SAFE_EMPLOYEE_SELECT,
+    });
+
+    await recordAuditLog({
+      action: "EMPLOYEE_PATCHED",
+      actorType: "ADMIN",
+      actorName: auth.user?.username || "Admin",
+      entityType: "Employee",
+      entityId: employee.id,
+      details: `Patched employee fields (${Object.keys(updateData).join(", ")}) for "${employee.name}"`,
+      status: "SUCCESS",
     });
 
     return NextResponse.json(employee);
@@ -147,9 +168,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid employee ID" }, { status: 400 });
     }
 
+    const employee = await prisma.employee.findUnique({
+      where: { id: empId },
+      select: { id: true, name: true },
+    });
+
     await prisma.employee.delete({
       where: { id: empId },
     });
+
+    await recordAuditLog({
+      action: "EMPLOYEE_DELETED",
+      actorType: "ADMIN",
+      actorName: auth.user?.username || "Admin",
+      entityType: "Employee",
+      entityId: empId,
+      details: `Deleted employee record for "${employee?.name || empId}"`,
+      status: "SUCCESS",
+    });
+
     return NextResponse.json({ message: "Employee deleted successfully" });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

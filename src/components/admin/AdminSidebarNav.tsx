@@ -20,6 +20,7 @@ import {
   ExternalLink,
   BadgePercent,
   SlidersHorizontal,
+  ShieldAlert,
   X,
 } from "lucide-react";
 
@@ -110,6 +111,12 @@ const navItems = [
     name: "WhatsApp Gateway",
     href: "/admin/whatsapp",
     icon: MessageCircle,
+    exact: false,
+  },
+  {
+    name: "Security Audit",
+    href: "/admin/audit",
+    icon: ShieldAlert,
     exact: false,
   },
 ];

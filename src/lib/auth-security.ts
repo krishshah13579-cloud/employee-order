@@ -10,6 +10,54 @@ const SECRET_KEY =
   "krish-clothing-co-super-secure-production-secret-2026-fallback-key";
 
 /**
+ * Cryptographic Password & PIN Hashing using Node.js scrypt (NIST SP 800-132 / OWASP standard)
+ * Stored format: scrypt:<salt_hex>:<hash_hex>
+ */
+export function hashPassword(plainText: string): string {
+  if (!plainText) return "";
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derivedKey = crypto.scryptSync(plainText.trim(), salt, 64);
+  return `scrypt:${salt}:${derivedKey.toString("hex")}`;
+}
+
+/**
+ * Constant-time verification of passwords and PINs.
+ * Backward-compatible with existing plaintext credentials for seamless zero-downtime auto-migration.
+ */
+export function verifyPassword(plainText: string, storedValue: string | null | undefined): boolean {
+  if (!storedValue || !plainText) return false;
+
+  const cleanPlain = plainText.trim();
+  const cleanStored = storedValue.trim();
+
+  // 1. Check if storedValue is an scrypt hash
+  if (cleanStored.startsWith("scrypt:")) {
+    const parts = cleanStored.split(":");
+    if (parts.length !== 3) return false;
+    const [, salt, expectedHashHex] = parts;
+    try {
+      const derivedKey = crypto.scryptSync(cleanPlain, salt, 64);
+      const keyBuffer = Buffer.from(derivedKey.toString("hex"), "hex");
+      const expectedBuffer = Buffer.from(expectedHashHex, "hex");
+      if (keyBuffer.length !== expectedBuffer.length) return false;
+      return crypto.timingSafeEqual(keyBuffer, expectedBuffer);
+    } catch {
+      return false;
+    }
+  }
+
+  // 2. Backward compatibility with plaintext credentials using constant-time comparison
+  try {
+    const plainBuf = Buffer.from(cleanPlain);
+    const storedBuf = Buffer.from(cleanStored);
+    if (plainBuf.length !== storedBuf.length) return false;
+    return crypto.timingSafeEqual(plainBuf, storedBuf);
+  } catch {
+    return cleanPlain === cleanStored;
+  }
+}
+
+/**
  * Cryptographically sign a JSON payload with HMAC-SHA256
  */
 export function signToken(payload: Record<string, any>, expiresInSeconds: number = 60 * 60 * 24 * 7): string {

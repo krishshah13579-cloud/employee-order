@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, verifyToken } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -98,6 +99,16 @@ export async function PUT(req: NextRequest) {
         },
       });
     }
+
+    await recordAuditLog({
+      action: "ADMIN_PROFILE_UPDATED",
+      actorType: "ADMIN",
+      actorName: auth.user?.username || "Admin",
+      entityType: "AdminProfile",
+      entityId: profile.id,
+      details: `Updated company details for "${profile.companyName}" via 2FA unlock token`,
+      status: "SUCCESS",
+    });
 
     return NextResponse.json(profile);
   } catch (error: any) {

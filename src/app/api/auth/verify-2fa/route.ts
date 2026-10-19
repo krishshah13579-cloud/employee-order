@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkOtpRateLimit, recordFailedOtpAttempt, resetOtpAttempts, signToken } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     const { username, code } = await req.json();
 
     if (!username || !code) {
@@ -19,6 +21,15 @@ export async function POST(req: NextRequest) {
     // Rate Limit / Brute-force protection
     const rateCheck = checkOtpRateLimit(cleanUser);
     if (!rateCheck.allowed) {
+      await recordAuditLog({
+        action: "AUTH_2FA_LOCKED",
+        actorType: "ADMIN",
+        actorName: cleanUser,
+        entityType: "AdminAccount",
+        details: rateCheck.error,
+        ipAddress: ip,
+        status: "BLOCKED",
+      });
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
@@ -38,6 +49,16 @@ export async function POST(req: NextRequest) {
 
     if (!isOtpMatch) {
       recordFailedOtpAttempt(cleanUser);
+      await recordAuditLog({
+        action: "AUTH_2FA_FAILED",
+        actorType: "ADMIN",
+        actorName: cleanUser,
+        entityType: "AdminAccount",
+        entityId: admin.id,
+        details: "Invalid or expired 2FA code entered",
+        ipAddress: ip,
+        status: "FAILURE",
+      });
       return NextResponse.json(
         {
           error: "Invalid or expired 2FA code. Please enter the 6-digit code sent to your email.",
@@ -56,6 +77,17 @@ export async function POST(req: NextRequest) {
         lastOtp: null,
         otpExpiresAt: null,
       },
+    });
+
+    await recordAuditLog({
+      action: "AUTH_2FA_SUCCESS",
+      actorType: "ADMIN",
+      actorName: cleanUser,
+      entityType: "AdminAccount",
+      entityId: admin.id,
+      details: "2FA successfully verified; authenticated session token issued",
+      ipAddress: ip,
+      status: "SUCCESS",
     });
 
     // Generate Cryptographically Signed Session Token (HMAC-SHA256)

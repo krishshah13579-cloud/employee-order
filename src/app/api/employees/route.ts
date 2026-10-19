@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-security";
+import { requireAdmin, hashPassword } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 // Safe fields to expose to frontend (never expose secret pin)
 const SAFE_EMPLOYEE_SELECT = {
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       data: {
         name: name.trim(),
         email: (email || "").trim() || null,
-        pin: (pin || "1234").trim(),
+        pin: hashPassword((pin || "1234").trim()),
         mobileNumber: mobileNumber.trim(),
         address: address.trim(),
         proofUrl: proofUrl || null,
@@ -77,6 +78,16 @@ export async function POST(req: NextRequest) {
         isActive: isActive !== undefined ? isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,
+    });
+
+    await recordAuditLog({
+      action: "EMPLOYEE_CREATED",
+      actorType: "ADMIN",
+      actorName: auth.user?.username || "Admin",
+      entityType: "Employee",
+      entityId: employee.id,
+      details: `Created employee record for "${employee.name}" with hashed PIN`,
+      status: "SUCCESS",
     });
 
     return NextResponse.json(employee, { status: 201 });

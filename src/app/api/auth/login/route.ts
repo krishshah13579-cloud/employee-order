@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendOtpEmail } from "@/lib/email";
+import { verifyPassword, hashPassword } from "@/lib/auth-security";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     const { username, password } = await req.json();
 
     if (!username || !password) {
@@ -22,18 +25,50 @@ export async function POST(req: NextRequest) {
     });
 
     if (!admin) {
+      await recordAuditLog({
+        action: "AUTH_LOGIN_FAILED",
+        actorType: "ADMIN",
+        actorName: cleanUser,
+        entityType: "AdminAccount",
+        details: "Login attempt with non-existent administrator username",
+        ipAddress: ip,
+        status: "FAILURE",
+      });
       return NextResponse.json(
         { error: "Invalid administrator email or password." },
         { status: 401 }
       );
     }
 
-    // Verify password against stored password in database
-    if (admin.password.trim() !== cleanPass) {
+    // Cryptographically verify password against stored scrypt hash or legacy plaintext
+    const isPasswordValid = verifyPassword(cleanPass, admin.password);
+    if (!isPasswordValid) {
+      await recordAuditLog({
+        action: "AUTH_LOGIN_FAILED",
+        actorType: "ADMIN",
+        actorName: cleanUser,
+        entityType: "AdminAccount",
+        entityId: admin.id,
+        details: "Incorrect administrator password entered",
+        ipAddress: ip,
+        status: "FAILURE",
+      });
       return NextResponse.json(
         { error: "Invalid administrator email or password." },
         { status: 401 }
       );
+    }
+
+    // Seamless zero-downtime auto-upgrade: hash password with scrypt if still in plaintext
+    if (!admin.password.startsWith("scrypt:")) {
+      try {
+        await prisma.adminAccount.update({
+          where: { id: admin.id },
+          data: { password: hashPassword(cleanPass) },
+        });
+      } catch (err) {
+        console.warn("Failed to auto-upgrade admin password hash:", err);
+      }
     }
 
     // Generate fresh 6-digit OTP code (Valid for 10 minutes)
@@ -47,6 +82,17 @@ export async function POST(req: NextRequest) {
         lastOtp: generatedOtp,
         otpExpiresAt: expiry,
       },
+    });
+
+    await recordAuditLog({
+      action: "AUTH_LOGIN_PASSWORD_VERIFIED",
+      actorType: "ADMIN",
+      actorName: cleanUser,
+      entityType: "AdminAccount",
+      entityId: admin.id,
+      details: "Password verified; 2FA OTP dispatched to administrator email",
+      ipAddress: ip,
+      status: "SUCCESS",
     });
 
     // Lookup Admin Profile for greeting name and contact info
