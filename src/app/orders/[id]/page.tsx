@@ -29,6 +29,8 @@ import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus, type ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
 import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
+import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { sanitizePositiveInt } from "@/lib/navigation";
 
 interface EditableOrderItem {
   id?: number;
@@ -54,10 +56,12 @@ export default function OrderEditPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { employee } = useEmployee();
   const orderId = params?.id as string;
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
 
   // Order Details
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -134,7 +138,29 @@ export default function OrderEditPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/orders/${orderId}`);
+      setAccessDenied(null);
+
+      const safeId = sanitizePositiveInt(orderId);
+      if (!safeId) {
+        setError("Invalid order ID. Only valid positive numbers are accepted.");
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/orders/${safeId}`);
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (res.status === 403) {
+        const errData = await res.json().catch(() => ({}));
+        setAccessDenied(
+          errData.error ||
+            "Access Denied: You do not have permission to view this order. Customer/order belongs to another employee."
+        );
+        setLoading(false);
+        return;
+      }
       if (!res.ok) {
         throw new Error(`Failed to load order #${orderId} (${res.status})`);
       }
@@ -265,6 +291,28 @@ export default function OrderEditPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 flex flex-col items-center justify-center">
           <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
           <p className="text-sm font-bold text-slate-600">Loading Order Form #{orderId}...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <UserHeader showBack />
+        <div className="max-w-md mx-auto px-4 py-16 text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mx-auto mb-4">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">Portfolio Access Restricted</h2>
+          <p className="text-xs text-slate-600 mt-2">{accessDenied}</p>
+          <Link
+            href="/orders"
+            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition shadow-sm"
+          >
+            <ArrowLeft size={16} />
+            <span>Return to My Orders</span>
+          </Link>
         </div>
       </div>
     );

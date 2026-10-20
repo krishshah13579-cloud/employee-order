@@ -10,20 +10,30 @@ import { getInvoiceTemplateSettings } from "@/lib/invoice-template";
 import fs from "fs";
 import path from "path";
 
+import { getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
+import { sanitizePositiveInt } from "@/lib/navigation";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+
+    if (!admin && !employee) {
+      return NextResponse.json({ error: "Unauthorized. Please log in to download order PDFs." }, { status: 401 });
+    }
+
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const formatType = searchParams.get("type") === "tax_invoice" ? "TAX_INVOICE" : "ORDER_FORM";
 
-    const orderId = parseInt(id, 10);
+    const orderId = sanitizePositiveInt(id);
     const order = await prisma.order.findFirst({
       where: {
         OR: [
-          ...(isNaN(orderId) ? [] : [{ id: orderId }]),
+          ...(orderId ? [{ id: orderId }] : []),
           { orderNumber: id },
         ],
       },
@@ -39,6 +49,27 @@ export async function GET(
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Role-based IDOR Defense
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
+    if (!admin && !isTLKrishShah && employee) {
+      const empName = (employee.name || "").trim().toLowerCase();
+      const placedBy = (order.placedBy || "").trim().toLowerCase();
+      const custAllocatedEmpId = order.customer?.allocatedEmployeeId;
+      const custAllocatedEmpName = (order.customer?.allocatedEmployeeName || "").trim().toLowerCase();
+
+      const isMyOrder = placedBy === empName;
+      const isMyAllocatedCustomer =
+        (custAllocatedEmpId && custAllocatedEmpId === employee.id) ||
+        (custAllocatedEmpName && custAllocatedEmpName === empName);
+
+      if (!isMyOrder && !isMyAllocatedCustomer) {
+        return NextResponse.json(
+          { error: "Forbidden: You cannot access or download PDFs for another employee's order." },
+          { status: 403 }
+        );
+      }
     }
 
     // Determine whether to use Tax Invoice data or Order Form data

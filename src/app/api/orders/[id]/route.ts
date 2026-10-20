@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, requireAdmin } from "@/lib/auth-security";
+import { getAdminSession, requireAdmin, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { calculateOrderedColorSetsPieces } from "@/lib/stock";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
+import { sanitizePositiveInt } from "@/lib/navigation";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const orderId = parseInt(id, 10);
+    const admin = await getAdminSession(_request);
+    const employee = await getEmployeeSession(_request);
 
-    if (isNaN(orderId)) {
+    if (!admin && !employee) {
+      return NextResponse.json({ error: "Unauthorized. Please log in to view this order." }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const orderId = sanitizePositiveInt(id);
+
+    if (!orderId) {
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
 
@@ -33,6 +41,28 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    // Role-based Order Isolation (IDOR Defense):
+    // If not Admin and not Krish Shah (Team Leader), verify order belongs to this employee
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
+    if (!admin && !isTLKrishShah && employee) {
+      const empName = (employee.name || "").trim().toLowerCase();
+      const placedBy = (order.placedBy || "").trim().toLowerCase();
+      const custAllocatedEmpId = order.customer?.allocatedEmployeeId;
+      const custAllocatedEmpName = (order.customer?.allocatedEmployeeName || "").trim().toLowerCase();
+
+      const isMyOrder = placedBy === empName;
+      const isMyAllocatedCustomer =
+        (custAllocatedEmpId && custAllocatedEmpId === employee.id) ||
+        (custAllocatedEmpName && custAllocatedEmpName === empName);
+
+      if (!isMyOrder && !isMyAllocatedCustomer) {
+        return NextResponse.json(
+          { error: "Forbidden: You do not have permission to view this order. Customer/order belongs to another employee." },
+          { status: 403 }
+        );
+      }
+    }
+
     return NextResponse.json(order);
   } catch (error: any) {
     console.error("Error fetching order:", error);
@@ -45,20 +75,47 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const orderId = parseInt(id, 10);
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
 
-    if (isNaN(orderId)) {
+    if (!admin && !employee) {
+      return NextResponse.json({ error: "Unauthorized. Please log in to edit this order." }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const orderId = sanitizePositiveInt(id);
+
+    if (!orderId) {
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
 
     const existingOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: { items: true, customer: true },
     });
 
     if (!existingOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
+    if (!admin && !isTLKrishShah && employee) {
+      const empName = (employee.name || "").trim().toLowerCase();
+      const placedBy = (existingOrder.placedBy || "").trim().toLowerCase();
+      const custAllocatedEmpId = existingOrder.customer?.allocatedEmployeeId;
+      const custAllocatedEmpName = (existingOrder.customer?.allocatedEmployeeName || "").trim().toLowerCase();
+
+      const isMyOrder = placedBy === empName;
+      const isMyAllocatedCustomer =
+        (custAllocatedEmpId && custAllocatedEmpId === employee.id) ||
+        (custAllocatedEmpName && custAllocatedEmpName === empName);
+
+      if (!isMyOrder && !isMyAllocatedCustomer) {
+        return NextResponse.json(
+          { error: "Forbidden: You do not have permission to edit this order." },
+          { status: 403 }
+        );
+      }
     }
 
     const body = await request.json();
