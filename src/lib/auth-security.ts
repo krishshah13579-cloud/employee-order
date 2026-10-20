@@ -162,6 +162,7 @@ export async function getEmployeeSession(req: NextRequest) {
       select: {
         id: true,
         name: true,
+        designation: true,
         isTeamLeader: true,
         isActive: true,
       },
@@ -173,6 +174,26 @@ export async function getEmployeeSession(req: NextRequest) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Team Leader Permission Check:
+ * "JUST TEAM LEADER CAN HAVE A LOOK I.E. KRISH SHAH NO OTHER T.L. CAN CHECK ANY OTHER EMPLOYEES DATA."
+ */
+export function isSpecialTeamLeaderKrishShah(
+  emp: { name?: string | null; isTeamLeader?: boolean | null; designation?: string | null } | null | undefined
+): boolean {
+  if (!emp) return false;
+  const name = (emp.name || "").trim().toLowerCase();
+  const des = (emp.designation || "").trim().toLowerCase();
+  const isTL =
+    Boolean(emp.isTeamLeader) ||
+    des === "t.l." ||
+    des === "tl" ||
+    des === "team leader" ||
+    des.includes("team leader") ||
+    des.includes("t.l.");
+  return isTL && (name.includes("krish") || name === "krish shah");
 }
 
 /**

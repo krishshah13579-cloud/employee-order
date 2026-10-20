@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendNewCustomerNotification } from "@/lib/email";
 import { cookies } from "next/headers";
-import { getAdminSession, verifyToken } from "@/lib/auth-security";
+import { getAdminSession, getEmployeeSession, verifyToken, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { isEmployeeTeamLeader } from "@/lib/time";
 
 async function canUserAssignSpecialDiscount(request: NextRequest): Promise<boolean> {
@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
+    const allocatedToQuery = searchParams.get("allocatedTo") || searchParams.get("employeeId");
+
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
 
     const where: any = {};
     if (search && search.trim() !== "") {
@@ -43,6 +48,38 @@ export async function GET(request: NextRequest) {
         { address: { contains: term } },
         { city: { contains: term } },
         { state: { contains: term } },
+      ];
+    }
+
+    // Role-based Customer Isolation:
+    // "IF THERE IS ANY NEW EMPLOYEE AND NO CUSTOMERS ARE ALLOCATED DO NOT SHOW ANY CUSTOMERS PRESENT IN THE CUSTOMERS TAB."
+    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
+    // "JUST TEAM LEADER CAN HAVE A LOOK I.E. KRISH SHAH NO OTHER T.L. CAN CHECK ANY OTHER EMPLOYEES DATA."
+    if (!admin && !isTLKrishShah) {
+      if (employee) {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { allocatedEmployeeId: employee.id },
+              { allocatedEmployeeName: { equals: employee.name, mode: "insensitive" } },
+            ],
+          },
+        ];
+      } else {
+        // Unknown or missing employee session
+        return NextResponse.json([]);
+      }
+    } else if (allocatedToQuery && allocatedToQuery.trim() !== "") {
+      const queryEmpId = parseInt(allocatedToQuery.trim(), 10);
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            ...(isNaN(queryEmpId) ? [] : [{ allocatedEmployeeId: queryEmpId }]),
+            { allocatedEmployeeName: { equals: allocatedToQuery.trim(), mode: "insensitive" } },
+          ],
+        },
       ];
     }
 

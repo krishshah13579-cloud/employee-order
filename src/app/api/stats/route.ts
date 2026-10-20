@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { DashboardStats } from "@/lib/types";
 import { getTotalAvailableSets } from "@/lib/stock";
-import { getEmployeeSession, getAdminSession } from "@/lib/auth-security";
+import { getEmployeeSession, getAdminSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { syncSequentialOrderNumbers } from "@/lib/order-numbers";
 
 export async function GET(req: NextRequest) {
@@ -17,10 +17,19 @@ export async function GET(req: NextRequest) {
     // Auto-sync sequential order numbers starting from 1
     await syncSequentialOrderNumbers().catch(() => {});
 
-    // Filter recent orders by employee if logged in or passed via query
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(isEmployee);
+
+    // Filter recent orders by employee
     const { searchParams } = new URL(req.url);
     const placedByQuery = searchParams.get("placedBy")?.trim();
-    const effectivePlacedBy = placedByQuery || (isEmployee ? isEmployee.name : "");
+
+    // If regular employee (not Admin, not Krish Shah), strictly enforce their own name
+    let effectivePlacedBy = "";
+    if (isAdmin || isTLKrishShah) {
+      effectivePlacedBy = placedByQuery || (isEmployee ? isEmployee.name : "");
+    } else if (isEmployee) {
+      effectivePlacedBy = isEmployee.name;
+    }
 
     const recentOrdersWhere: any = {};
     if (effectivePlacedBy) {
@@ -29,6 +38,21 @@ export async function GET(req: NextRequest) {
         mode: "insensitive",
       };
     }
+
+    // For non-admin, non-KrishShah employees, scope all summary stats to their own data
+    const isRestrictedEmployee = Boolean(isEmployee && !isAdmin && !isTLKrishShah);
+    const empOrderScope: any = isRestrictedEmployee
+      ? { placedBy: { equals: isEmployee!.name, mode: "insensitive" } }
+      : {};
+
+    const empCustomerScope: any = isRestrictedEmployee
+      ? {
+          OR: [
+            { allocatedEmployeeId: isEmployee!.id },
+            { allocatedEmployeeName: { equals: isEmployee!.name, mode: "insensitive" } },
+          ],
+        }
+      : {};
 
     // Calculate today's start and end accurately in Indian Standard Time (IST)
     const istDateString = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
@@ -48,9 +72,10 @@ export async function GET(req: NextRequest) {
       revenueAggregation,
       recentOrdersRaw,
     ] = await Promise.all([
-      prisma.order.count().catch(() => 0),
+      prisma.order.count({ where: empOrderScope }).catch(() => 0),
       prisma.order.count({
         where: {
+          ...empOrderScope,
           OR: [
             { createdAt: { gte: startOfToday, lte: endOfToday } },
             { orderDate: { gte: startOfToday, lte: endOfToday } },
@@ -60,6 +85,7 @@ export async function GET(req: NextRequest) {
       prisma.order.aggregate({
         _sum: { grandTotal: true },
         where: {
+          ...empOrderScope,
           OR: [
             { createdAt: { gte: startOfToday, lte: endOfToday } },
             { orderDate: { gte: startOfToday, lte: endOfToday } },
@@ -67,8 +93,13 @@ export async function GET(req: NextRequest) {
           status: { not: "Cancelled" },
         },
       }).catch(() => ({ _sum: { grandTotal: 0 } })),
-      prisma.order.count({ where: { status: "Pending" } }).catch(() => 0),
-      prisma.customer.count().catch(() => 0),
+      prisma.order.count({
+        where: {
+          ...empOrderScope,
+          status: "Pending",
+        },
+      }).catch(() => 0),
+      prisma.customer.count({ where: empCustomerScope }).catch(() => 0),
       prisma.employee.count({ where: { isActive: true } }).catch(() => 0),
       prisma.product.count({ where: { isActive: true } }).catch(() => 0),
       prisma.product.findMany({
@@ -81,6 +112,7 @@ export async function GET(req: NextRequest) {
           grandTotal: true,
         },
         where: {
+          ...empOrderScope,
           status: {
             not: "Cancelled",
           },

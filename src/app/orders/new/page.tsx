@@ -302,19 +302,31 @@ export default function OrderFormPage() {
   const effectiveBusinessType = orderBusinessType || selectedCustomer?.businessType || "RETAILER";
 
   // Check whether the selected customer is registered with GST/PAN
+  const isWithoutGst = useMemo(() => {
+    const bt = (effectiveBusinessType || selectedCustomer?.businessType || orderBusinessType || "").toUpperCase();
+    return (
+      bt.includes("WITHOUT GST") ||
+      bt.includes("NO GST") ||
+      bt === "WHOLESALER WITHOUT GST" ||
+      bt === "WHOLESELLER (WITHOUT GST)" ||
+      bt === "WHOLESALE WITHOUT GST"
+    );
+  }, [effectiveBusinessType, selectedCustomer, orderBusinessType]);
+
   const isCustomerGstRegistered = useMemo(() => {
     if (!selectedCustomer) return false;
-    if (effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST") {
+    if (isWithoutGst) {
       return true; // No GST/PAN needed for without GST customers
     }
     return isGstPanRegistered(selectedCustomer.gstPanNo);
-  }, [selectedCustomer, effectiveBusinessType]);
+  }, [selectedCustomer, isWithoutGst]);
 
   // Automatically open editable GST/PAN field if customer is NOT registered
   useEffect(() => {
     if (selectedCustomer) {
-      if (effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST") {
+      if (isWithoutGst) {
         setIsEditingGstPan(false);
+        setCustomGstPan(selectedCustomer.gstPanNo || "NOT REQUIRED");
       } else if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
         setIsEditingGstPan(true);
         setCustomGstPan("");
@@ -326,7 +338,7 @@ export default function OrderFormPage() {
       setIsEditingGstPan(false);
       setCustomGstPan("");
     }
-  }, [selectedCustomer, effectiveBusinessType]);
+  }, [selectedCustomer, isWithoutGst]);
 
   // Handle Credit Days Change with permanent lock when set to 45 Days
   const handleCreditDaysChange = (days: number) => {
@@ -346,8 +358,24 @@ export default function OrderFormPage() {
   const filteredCustomers = useMemo(() => {
     const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
     const activeEmpId = employee?.id;
+    const isKrishShah = isTL && activeEmpName.includes("krish");
 
     let list = customers;
+
+    // Strict customer isolation for non-admin, non-KrishShah employees:
+    // "IF THERE IS ANY NEW EMPLOYEE AND NO CUSTOMERS ARE ALLOCATED DO NOT SHOW ANY CUSTOMERS PRESENT IN THE CUSTOMERS TAB."
+    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
+    if (!isAdmin && !isKrishShah) {
+      list = list.filter((c) => {
+        const matchesId = activeEmpId && c.allocatedEmployeeId === activeEmpId;
+        const matchesName =
+          activeEmpName &&
+          c.allocatedEmployeeName &&
+          c.allocatedEmployeeName.trim().toLowerCase() === activeEmpName;
+        return matchesId || matchesName;
+      });
+    }
+
     if (customerSearchQuery.trim()) {
       const term = customerSearchQuery.toLowerCase().trim();
       list = list.filter(
@@ -371,7 +399,7 @@ export default function OrderFormPage() {
       if (!aAllocated && bAllocated) return 1;
       return a.shopName.localeCompare(b.shopName);
     });
-  }, [customers, customerSearchQuery, employee, placedBy]);
+  }, [customers, customerSearchQuery, employee, placedBy, isAdmin, isTL]);
 
   // Handle customer unselection / clear
   const handleUnselectCustomer = () => {
@@ -399,15 +427,24 @@ export default function OrderFormPage() {
     setCustomerDropdownOpen(false);
     setCustomerSearchQuery("");
 
-    // GST/PAN check: if not registered, open the field immediately and warn
+    const custBusinessType = c.businessType || "RETAILER";
+    setOrderBusinessType(custBusinessType);
+
+    const isCustWithoutGst =
+      custBusinessType.toUpperCase().includes("WITHOUT GST") ||
+      custBusinessType.toUpperCase().includes("NO GST") ||
+      custBusinessType === "WHOLESALER WITHOUT GST" ||
+      custBusinessType === "WHOLESELLER (WITHOUT GST)";
+
+    // GST/PAN check: if not registered AND NOT wholesaler without GST, open the field immediately and warn
     const isRegistered = isGstPanRegistered(c.gstPanNo);
-    if (!isRegistered) {
+    if (!isCustWithoutGst && !isRegistered) {
       setIsEditingGstPan(true);
       setCustomGstPan("");
       toast(`⚠️ Customer ${c.shopName.toUpperCase()} is NOT GST/PAN registered. Please enter & save GST/PAN details below to unlock product addition.`, "error");
     } else {
       setIsEditingGstPan(false);
-      setCustomGstPan(c.gstPanNo.toUpperCase());
+      setCustomGstPan(c.gstPanNo ? c.gstPanNo.toUpperCase() : "NOT REQUIRED");
     }
 
     // Credit Days handling: if set to 45, lock permanently
@@ -423,9 +460,6 @@ export default function OrderFormPage() {
     // If selected customer is Retailer or Retailer with Special Discount -> Base Price is Retailer Price (MRP / 2)
     // If selected customer is Retailer with Special Discount -> Base Price is (MRP / 2) - specialDiscount
     // If selected customer is Wholesale -> use Wholesaler Price (MRP / 2 - 100)
-    const custBusinessType = c.businessType || "RETAILER";
-    setOrderBusinessType(custBusinessType);
-
     const isWholesaler = custBusinessType === "WHOLESALER" || custBusinessType === "WHOLESALER WITHOUT GST";
     const isSpecialDiscount = custBusinessType === "RETAILER WITH SPECIAL DISCOUNT";
     const specialDiscountAmt = isSpecialDiscount ? (Number(c.specialDiscount) || 0) : 0;
@@ -584,7 +618,6 @@ export default function OrderFormPage() {
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST";
   const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
   const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
@@ -1013,9 +1046,16 @@ export default function OrderFormPage() {
                     <div className="p-4 text-center text-xs text-slate-500">
                       Loading customers...
                     </div>
+                  ) : customers.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-amber-700 bg-amber-50/50 rounded-xl space-y-1">
+                      <div className="font-bold">No Customers Allocated Yet</div>
+                      <div className="text-[11px] text-slate-500">
+                        You do not have any customers assigned to your account. Please ask the administrator to allocate customer accounts to your portfolio.
+                      </div>
+                    </div>
                   ) : filteredCustomers.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-500">
-                      No matching customer found. Please verify the firm name, GST/PAN, or phone.
+                      No matching customer found in your allocated portfolio.
                     </div>
                   ) : (
                     filteredCustomers.map((cust) => {
@@ -1023,6 +1063,9 @@ export default function OrderFormPage() {
                       const isAllocatedToMe =
                         (employee?.id && cust.allocatedEmployeeId === employee.id) ||
                         (activeEmpName && cust.allocatedEmployeeName && cust.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
+                      const isWholesaleNoGst =
+                        (cust.businessType || "").toUpperCase().includes("WITHOUT GST") ||
+                        (cust.businessType || "").toUpperCase().includes("NO GST");
 
                       return (
                         <div
@@ -1042,7 +1085,11 @@ export default function OrderFormPage() {
                               )}
                             </div>
                             <div className="text-[11px] text-slate-500 font-mono uppercase flex items-center gap-1.5 flex-wrap">
-                              {!isGstPanRegistered(cust.gstPanNo) ? (
+                              {isWholesaleNoGst ? (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded">
+                                  WHOLESALER (WITHOUT GST)
+                                </span>
+                              ) : !isGstPanRegistered(cust.gstPanNo) ? (
                                 <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1 py-0.2 rounded">
                                   ⚠️ NOT GST/PAN REGISTERED
                                 </span>
@@ -1080,7 +1127,24 @@ export default function OrderFormPage() {
                   </div>
 
                   <div className="sm:col-span-2 lg:col-span-2">
-                    {!isCustomerGstRegistered ? (
+                    {isWithoutGst ? (
+                      <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-emerald-900 block font-bold text-[10px] uppercase tracking-wider">
+                            GST NO. / PAN NO.
+                          </span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded uppercase">
+                            Not Required
+                          </span>
+                        </div>
+                        <div className="font-bold text-emerald-800 text-xs uppercase flex items-center gap-1.5">
+                          <span>WHOLESALER WITHOUT GST (TAX EXEMPT)</span>
+                        </div>
+                        <p className="text-[10px] text-emerald-700 font-medium">
+                          No GST/PAN required. Products can be added directly without GST.
+                        </p>
+                      </div>
+                    ) : !isCustomerGstRegistered ? (
                       <div className="bg-amber-50/90 border-2 border-amber-400 p-3 rounded-xl space-y-1.5 shadow-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-amber-900 block font-black text-[10px] uppercase tracking-wider flex items-center gap-1">

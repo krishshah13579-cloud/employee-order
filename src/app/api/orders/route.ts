@@ -10,7 +10,7 @@ import {
 } from "@/lib/stock";
 import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
-import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-security";
+import { requireAdmin, getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
 
 export async function GET(request: NextRequest) {
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
 
     const admin = await getAdminSession(request);
     const employee = await getEmployeeSession(request);
+    const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
 
     const where: any = {};
     if (status && status !== "All") {
@@ -41,15 +42,28 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Role-based Order Isolation: Non-admin employees ONLY see orders placed by them
+    // Role-based Order Isolation:
+    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
+    // "JUST TEAM LEADER CAN HAVE A LOOK I.E. KRISH SHAH NO OTHER T.L. CAN CHECK ANY OTHER EMPLOYEES DATA."
     if (!admin) {
-      if (employee?.name) {
-        where.placedBy = employee.name;
-      } else if (placedByQuery && placedByQuery.trim() !== "") {
-        where.placedBy = placedByQuery.trim();
+      if (isTLKrishShah) {
+        // Team Leader Krish Shah can view specific team member's orders if queried, or his own
+        if (placedByQuery && placedByQuery.trim() !== "") {
+          where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
+        } else if (employee?.name) {
+          where.placedBy = { equals: employee.name, mode: "insensitive" };
+        }
+      } else {
+        // All other employees (including any other TL): STRICTLY lock to their own placed orders!
+        // Never allow them to see Krish Shah or any other colleague's data!
+        if (employee?.name) {
+          where.placedBy = { equals: employee.name, mode: "insensitive" };
+        } else {
+          return NextResponse.json([]);
+        }
       }
     } else if (placedByQuery && placedByQuery.trim() !== "") {
-      where.placedBy = placedByQuery.trim();
+      where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
     }
 
     // High performance query: exclude heavy base64 imageUrl/colorImages/visitingCardUrl

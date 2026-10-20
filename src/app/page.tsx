@@ -24,6 +24,8 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+import { isEmployeeTeamLeader } from "@/lib/time";
+import MyTeamSection from "@/components/home/MyTeamSection";
 
 interface OrderItemSummary {
   id?: number;
@@ -73,6 +75,9 @@ export default function HomePage() {
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [empName, setEmpName] = useState<string>("");
   const [myAllocatedCustomers, setMyAllocatedCustomers] = useState<any[]>([]);
+
+  const isTL = isEmployeeTeamLeader(employee);
+  const isSpecialTLKrishShah = isTL && (employee?.name || "").toLowerCase().includes("krish");
 
   useEffect(() => {
     if (!empName) return;
@@ -340,61 +345,9 @@ export default function HomePage() {
         </section>
 
         {/* ═══════════════════════════════════════════
-            MY ALLOCATED CUSTOMER PORTFOLIO (QUICK SELECTOR)
+            MY TEAM SUPERVISION SECTION (TEAM LEADER KRISH SHAH ONLY)
             ═══════════════════════════════════════════ */}
-        {myAllocatedCustomers.length > 0 && (
-          <section className="bg-amber-50/40 rounded-3xl border border-amber-200 p-6 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-2xs">
-                  <Briefcase size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                    ⭐ My Allocated Customers ({myAllocatedCustomers.length})
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Accounts assigned to you by admin. Click any customer to immediately start a new order.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/orders/new"
-                className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 hover:underline cursor-pointer"
-              >
-                <span>Go to Order Form</span>
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
-              {myAllocatedCustomers.map((cust) => (
-                <div
-                  key={cust.id}
-                  onClick={() => router.push(`/orders/new?customerId=${cust.id}`)}
-                  className="bg-white rounded-2xl p-4 border border-amber-200/70 hover:border-amber-400 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div>
-                    <div className="font-bold text-xs text-slate-900 uppercase group-hover:text-amber-800 transition">
-                      {cust.shopName}
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                      <span>{cust.phoneNumber}</span>
-                      <span>•</span>
-                      <span>{cust.city || "—"}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition flex items-center gap-1">
-                      <span>Book</span>
-                      <ArrowRight size={11} />
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {isSpecialTLKrishShah && <MyTeamSection />}
 
         {/* ═══════════════════════════════════════════
             RECENT ORDERS (10 CUSTOMER ORDERS SHOWN)
@@ -561,6 +514,64 @@ export default function HomePage() {
             </table>
           </div>
         </section>
+
+        {/* ═══════════════════════════════════════════
+            MY ALLOCATED CUSTOMER PORTFOLIO (QUICK SELECTOR)
+            MOVED BELOW RECENT ORDERS WITH EXACT SAME COLORS AND LAYOUT
+            ═══════════════════════════════════════════ */}
+        {myAllocatedCustomers.length > 0 && (
+          <section className="bg-amber-50/40 rounded-3xl border border-amber-200 p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-2xs">
+                  <Briefcase size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                    ⭐ My Allocated Customers ({myAllocatedCustomers.length})
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Accounts assigned to you by admin. Click any customer to immediately start a new order.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/orders/new"
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 hover:underline cursor-pointer"
+              >
+                <span>Go to Order Form</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
+              {myAllocatedCustomers.map((cust) => (
+                <div
+                  key={cust.id}
+                  onClick={() => router.push(`/orders/new?customerId=${cust.id}`)}
+                  className="bg-white rounded-2xl p-4 border border-amber-200/70 hover:border-amber-400 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div>
+                    <div className="font-bold text-xs text-slate-900 uppercase group-hover:text-amber-800 transition">
+                      {cust.shopName}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                      <span>{cust.phoneNumber}</span>
+                      <span>•</span>
+                      <span>{cust.city || "—"}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition flex items-center gap-1">
+                      <span>Book</span>
+                      <ArrowRight size={11} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
