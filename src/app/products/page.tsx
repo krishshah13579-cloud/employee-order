@@ -514,6 +514,35 @@ function ProductsContent() {
           </div>
         )}
       </main>
+
+      {/* Floating Bottom Bar: Order In Progress */}
+      {draftInfo && draftInfo.itemsCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 pointer-events-none">
+          <div className="bg-slate-950/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 pointer-events-auto transition-all hover:scale-[1.02]">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-orange-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-md">
+                {draftInfo.itemsCount}
+              </span>
+              <div>
+                <p className="text-xs font-bold text-white leading-tight">
+                  {draftInfo.itemsCount} Product{draftInfo.itemsCount > 1 ? "s" : ""} Added
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Select more or finalize order
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href={returnTo}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-xs font-black rounded-xl shadow-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <span>Go to Order Form</span>
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

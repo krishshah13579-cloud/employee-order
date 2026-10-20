@@ -375,7 +375,7 @@ export default function HomePage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredRecentOrders.map((order) => {
+                  filteredRecentOrders.map((order, idx) => {
                     const statusStyle =
                       STATUS_COLORS[order.status] ||
                       "bg-neutral-100 text-neutral-700 border-neutral-200";
@@ -388,11 +388,7 @@ export default function HomePage() {
                         title="Click to open and edit Order Form"
                       >
                         <td className="py-4 px-5 font-mono font-bold text-slate-900 group-hover:text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
-                          <span>
-                            {order.orderNumber?.startsWith("#")
-                              ? order.orderNumber
-                              : `#${order.orderNumber}`}
-                          </span>
+                          <span>#{idx + 1}</span>
                           <ExternalLink
                             size={12}
                             className="opacity-0 group-hover:opacity-100 text-orange-500 transition-opacity"

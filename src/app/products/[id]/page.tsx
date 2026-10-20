@@ -639,8 +639,9 @@ function ProductDetailContent() {
       localStorage.setItem("garmentpro_order_draft", JSON.stringify(draft));
       window.dispatchEvent(new Event("garmentpro_draft_updated"));
 
-      toast(`Added ${product.name} (${totalSets} sets, ${totalPcs} pcs) to Order Form!`);
-      router.push(returnTo);
+      toast(`Added ${product.name} (${totalSets} sets, ${totalPcs} pcs) to Order Form!`, "success");
+      const targetCatalog = `/products?returnTo=${encodeURIComponent(returnTo)}`;
+      router.push(targetCatalog);
     } catch (err: any) {
       console.error("Error saving to draft:", err);
       toast("Failed to update order draft: " + err.message, "error");
@@ -861,43 +862,38 @@ function ProductDetailContent() {
                 </div>
               </div>
 
-              {/* Mix Sizes Available / Sold Out Status */}
+              {/* Mix Sizes Available Status */}
               <div
                 className={`p-3.5 rounded-xl border text-xs space-y-1.5 shadow-2xs ${
                   mixInfo.totalMixPcs > 0
                     ? "bg-amber-50/90 border-amber-300 text-amber-950"
-                    : "bg-slate-100/80 border-slate-200 text-slate-600"
+                    : "bg-amber-50/40 border-amber-200/80 text-amber-950"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-black uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Layers size={14} className={mixInfo.totalMixPcs > 0 ? "text-amber-700" : "text-slate-500"} />
+                    <Layers size={14} className="text-amber-700" />
                     <span>
-                      {mixInfo.totalMixPcs > 0
-                        ? `Mix Sizes Available: ${mixInfo.totalMixPcs} Pieces`
-                        : "Mix Sizes: 0 Available"}
+                      MIX SIZES AVAILABLE: {mixInfo.totalMixPcs > 0 ? `${mixInfo.totalMixPcs} PIECES` : "0 PIECES"}
                     </span>
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-md font-mono font-bold text-xs ${
                       mixInfo.totalMixPcs > 0
                         ? "bg-amber-200 text-amber-950"
-                        : "bg-slate-200 text-slate-600"
+                        : "bg-amber-100 text-amber-900 border border-amber-200"
                     }`}
                   >
-                    {mixInfo.totalMixPcs > 0 ? `${mixInfo.totalMixPcs} Pcs Available` : "Sold Out"}
+                    {mixInfo.totalMixPcs > 0 ? `${mixInfo.totalMixPcs} Pcs Available` : "0 Pcs Available"}
                   </span>
                 </div>
                 <div>
-                  {mixInfo.totalMixPcs > 0 ? (
-                    <span className="font-semibold text-amber-900">
-                      Available Sizes: <strong className="font-mono text-amber-950">{mixInfo.sizesSummary}</strong>
-                    </span>
-                  ) : (
-                    <span className="text-slate-500 italic">
-                      Mix Sizes: 0 Available (Only full standard sets available).
-                    </span>
-                  )}
+                  <span className="font-semibold text-slate-700">
+                    Available Sizes:{" "}
+                    <strong className="font-mono text-slate-900">
+                      {mixInfo.totalMixPcs > 0 ? mixInfo.sizesSummary : "0 Pcs"}
+                    </strong>
+                  </span>
                 </div>
               </div>
 
@@ -1376,51 +1372,6 @@ function ProductDetailContent() {
                     );
                   })
                 )}
-              </div>
-
-              {/* + Add Custom Shade Form */}
-              <div className="p-3.5 bg-slate-50/90 rounded-2xl border border-dashed border-slate-300 space-y-2">
-                <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                  <span>Need a custom shade / color not listed above?</span>
-                  {customColorInput.trim() && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs inline-block"
-                        style={{ backgroundColor: getColorHex(customColorInput).hex }}
-                      />
-                      Palette preview: {getColorHex(customColorInput).hex}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="e.g. Dark Indigo, Olive, Wine, Rust, Pista, #1a2538..."
-                      value={customColorInput}
-                      onChange={(e) => setCustomColorInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddCustomColor();
-                        }
-                      }}
-                      className="w-full px-3.5 py-2 pl-9 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-                    />
-                    <span
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-slate-300 shadow-2xs"
-                      style={{ backgroundColor: customColorInput.trim() ? getColorHex(customColorInput).hex : "#cbd5e1" }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddCustomColor}
-                    disabled={!customColorInput.trim()}
-                    className="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition disabled:opacity-40 shrink-0"
-                  >
-                    + Add Shade
-                  </button>
-                </div>
               </div>
 
               {/* Special Order Notes */}

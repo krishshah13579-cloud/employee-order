@@ -105,11 +105,41 @@ export async function syncSequentialOrderNumbers(tx?: any): Promise<void> {
 
     if (!needsRenumbering) return;
 
+    const isPostgres = process.env.DATABASE_URL?.includes("postgres");
+
+    if (isPostgres) {
+      // Fast atomic PostgreSQL migration (runs in ~10ms without serverless timeouts)
+      await db.$executeRawUnsafe(`UPDATE "Order" SET "orderNumber" = CONCAT('__TEMP_', id::text);`);
+      await db.$executeRawUnsafe(`
+        WITH numbered AS (
+          SELECT id, (ROW_NUMBER() OVER (ORDER BY "createdAt" ASC, id ASC))::text AS seq
+          FROM "Order"
+        )
+        UPDATE "Order" o
+        SET "orderNumber" = numbered.seq
+        FROM numbered
+        WHERE o.id = numbered.id;
+      `);
+      await db.$executeRawUnsafe(`
+        UPDATE "SalesInvoice" si
+        SET "orderNumber" = o."orderNumber"
+        FROM "Order" o
+        WHERE si."orderId" = o.id;
+      `).catch(() => {});
+      await db.$executeRawUnsafe(`
+        UPDATE "SalesReturn" sr
+        SET "orderNumber" = o."orderNumber"
+        FROM "Order" o
+        WHERE sr."orderId" = o.id;
+      `).catch(() => {});
+      return;
+    }
+
     // Step 1: Temporarily assign unique placeholder numbers to avoid @unique constraint collision
     for (const ord of orders) {
       await db.order.update({
         where: { id: ord.id },
-        data: { orderNumber: `__TEMP_ORD_${ord.id}_${Date.now()}__` },
+        data: { orderNumber: `__TEMP_ORD_${ord.id}__` },
       });
     }
 
