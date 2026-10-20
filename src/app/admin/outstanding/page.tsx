@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   Pencil,
   Trash2,
+  Printer,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
@@ -478,6 +479,14 @@ export default function AdminOutstandingPage() {
             <span>Sales Returns Tab</span>
           </Link>
 
+          <Link
+            href="/admin/ledger"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-amber-400 hover:bg-black transition shadow-xs cursor-pointer"
+          >
+            <Printer size={14} />
+            <span>Print Ledger</span>
+          </Link>
+
           <button
             type="button"
             onClick={loadOutstandingData}
@@ -837,6 +846,15 @@ export default function AdminOutstandingPage() {
                     <MessageCircle size={14} />
                     <span>Send Reminder</span>
                   </button>
+
+                  <Link
+                    href={`/admin/ledger?customerId=${customerLedger.customer.id}`}
+                    className="px-3.5 py-2 bg-zinc-950 hover:bg-black text-amber-400 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm border border-zinc-800"
+                    title="Open A4 Print Ledger and Statement"
+                  >
+                    <Printer size={14} />
+                    <span>Print Ledger (A4)</span>
+                  </Link>
                 </>
               )}
 

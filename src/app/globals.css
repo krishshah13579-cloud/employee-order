@@ -86,8 +86,9 @@
     overflow: visible !important;
   }
 
-  /* Clean full-width bill container (natural height, not stretched to full page) */
-  .printable-invoice-container {
+  /* Clean full-width bill / ledger container (natural height, not stretched to full page) */
+  .printable-invoice-container,
+  .printable-ledger-container {
     display: block !important;
     width: 100% !important;
     height: auto !important;

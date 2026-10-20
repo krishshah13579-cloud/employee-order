@@ -15,6 +15,7 @@ import {
   Boxes,
   Receipt,
   RotateCcw,
+  BookOpen,
   MessageCircle,
   LogOut,
   ExternalLink,
@@ -87,6 +88,12 @@ const navItems = [
     name: "Outstanding",
     href: "/admin/outstanding",
     icon: Receipt,
+    exact: false,
+  },
+  {
+    name: "Print Ledger",
+    href: "/admin/ledger",
+    icon: BookOpen,
     exact: false,
   },
   {

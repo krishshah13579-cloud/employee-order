@@ -39,6 +39,7 @@ export default function AdminTopHeader({
     if (pathname.startsWith("/admin/orders")) return "Wholesale Order Forms";
     if (pathname.startsWith("/admin/sales")) return "Sales Register & Invoices";
     if (pathname.startsWith("/admin/outstanding")) return "Customer Outstanding & Bills";
+    if (pathname.startsWith("/admin/ledger")) return "Print Ledger & Customer Statement";
     if (pathname.startsWith("/admin/returns")) return "Sales Returns & Credits";
     if (pathname.startsWith("/admin/stock")) return "Stock & Inventory Control";
     if (pathname.startsWith("/admin/reports")) return "Sales & Financial Reports";
