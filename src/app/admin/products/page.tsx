@@ -29,6 +29,8 @@ import {
   getAllProductColors,
   getAvailableSetsForColor,
   parseDetailedColorStockWithLoose,
+  parseDetailedColorRatioSets,
+  getSizesFromRatio,
   stringifyColorwiseSets,
   cleanColorName,
 } from "@/lib/stock";
@@ -349,21 +351,61 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-gray-900 flex items-center gap-1 text-xs">
-                          <Layers size={13} className="text-blue-600" />
-                          {p.sizesRatio}
-                        </span>
-                        <span className="text-[11px] text-gray-500 font-mono">
-                          [{p.sizesList}] • <span className="font-bold text-blue-700">{p.pcsPerSet} pcs/set</span>
-                        </span>
-                      </div>
+                      {(() => {
+                        const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "28 to 36");
+                        const distinctRatios = new Set<string>();
+                        if (p.sizesRatio) distinctRatios.add(p.sizesRatio);
+                        for (const ratios of Object.values(detailedRatioSets)) {
+                          for (const [rKey, cnt] of Object.entries(ratios)) {
+                            if (cnt > 0) distinctRatios.add(rKey);
+                          }
+                        }
+                        const ratioList = Array.from(distinctRatios);
+                        const hasMultiple = ratioList.length > 1;
+
+                        return (
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 flex items-center gap-1 text-xs">
+                              <Layers size={13} className="text-blue-600" />
+                              {p.sizesRatio}
+                            </span>
+                            <span className="text-[11px] text-gray-500 font-mono">
+                              [{p.sizesList}] • <span className="font-bold text-blue-700">{p.pcsPerSet} pcs/set</span>
+                            </span>
+                            {hasMultiple && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {ratioList.map((r) => (
+                                  <span key={r} className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    {r}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-4 px-6 text-xs max-w-xs">
                       {(() => {
                         const total = p.setsColorwise ? getTotalAvailableSets(p.setsColorwise) : 0;
+                        const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "28 to 36");
+                        let accurateSetPcs = 0;
+                        let hasRatioBreakdown = false;
+                        for (const ratios of Object.values(detailedRatioSets)) {
+                          for (const [rKey, count] of Object.entries(ratios)) {
+                            const cnt = Math.max(0, count || 0);
+                            if (cnt > 0) {
+                              hasRatioBreakdown = true;
+                              const rSizes = getSizesFromRatio(rKey);
+                              const rPcs = rSizes.length > 0 && rSizes[0] !== rKey ? rSizes.length : (p.pcsPerSet || 5);
+                              accurateSetPcs += cnt * rPcs;
+                            }
+                          }
+                        }
+                        const totalSetPcs = hasRatioBreakdown ? accurateSetPcs : total * (p.pcsPerSet || 5);
+                        const totalPcs = totalSetPcs + ((p as any).mixPcs || 0);
                         const parsed = p.setsColorwise ? parseColorwiseSets(p.setsColorwise) : {};
-                        const isZero = !p.setsColorwise || total === 0;
+                        const isZero = !p.setsColorwise || (total === 0 && ((p as any).mixPcs || 0) === 0);
 
                         return (
                           <div className="flex flex-col gap-1.5">
@@ -375,7 +417,7 @@ export default function ProductsPage() {
                                     : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                                 }`}
                               >
-                                {isZero ? "0 Sets (Sold Out)" : `${total} Sets in Stock`}
+                                {isZero ? "0 Sets (Sold Out)" : `${total} Sets (${totalPcs} pcs)`}
                               </span>
                               <button
                                 type="button"

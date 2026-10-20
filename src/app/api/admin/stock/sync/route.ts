@@ -10,13 +10,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Call external storefront API server-to-server to avoid browser CORS restrictions
+    // Call external storefront API server-to-server with browser headers
     const storefrontRes = await fetch(
       "https://www.iqtrousers.in/api/sync-stock",
       {
         method: "GET",
         headers: {
           Accept: "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
         },
         cache: "no-store",
       }

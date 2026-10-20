@@ -76,18 +76,42 @@ export default function AdminStockPage() {
   const handleSyncStore = async () => {
     try {
       setSyncingStore(true);
-      const res = await fetch("/api/admin/stock/sync", {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      let data: any = null;
+      let ok = false;
+
+      // 1. Direct browser fetch to storefront (human browser passes Cloudflare Bot Fight Mode with clearance cookies)
+      try {
+        const directRes = await fetch("https://www.iqtrousers.in/api/sync-stock", {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (directRes.ok) {
+          data = await directRes.json();
+          ok = Boolean(data?.success);
+        }
+      } catch (browserErr) {
+        console.warn("Direct browser sync attempt failed, trying backend proxy:", browserErr);
+      }
+
+      // 2. If direct browser fetch couldn't connect, fallback to backend proxy
+      if (!ok) {
+        const res = await fetch("/api/admin/stock/sync", {
+          method: "POST",
+        });
+        data = await res.json();
+        ok = res.ok && Boolean(data?.success);
+      }
+
+      if (ok && data?.success) {
         toast(
           `Synced ${data.syncedStylesCount || 0} styles with E-Commerce Storefront! Out-of-stock items hidden automatically.`,
           "success"
         );
         fetchStock();
       } else {
-        toast(data.error || "Storefront sync encountered an issue", "error");
+        toast(data?.error || "Storefront sync encountered an issue (Cloudflare Bot Check). Please open www.iqtrousers.in once in another tab.", "error");
       }
     } catch (e: any) {
       toast("Storefront sync error: " + e.message, "error");

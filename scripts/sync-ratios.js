@@ -49,43 +49,8 @@ async function syncProductRatios() {
       needsUpdate = true;
     }
 
-    // Inspect and harmonize setsColorwise
-    if (p.setsColorwise && p.setsColorwise.trim().startsWith("{")) {
-      try {
-        const parsed = JSON.parse(p.setsColorwise);
-        let modifiedStock = false;
-
-        for (const [col, val] of Object.entries(parsed)) {
-          if (typeof val === "object" && val !== null) {
-            const ratios = val.ratios || val;
-            const ratioKeys = Object.keys(ratios).filter((k) => k !== "loose" && k !== "loosePcs");
-
-            // Discrepancy detection: e.g. IMP-012 where product.sizesRatio is "28 TO 40" but ratioKeys is ["38 to 40"]
-            if (
-              ratioKeys.length === 1 &&
-              ratioKeys[0].toLowerCase() !== primaryRatio.toLowerCase()
-            ) {
-              const oldKey = ratioKeys[0];
-              const count = ratios[oldKey];
-              // Align single ratio entry to product's primary sizesRatio if mismatched
-              console.log(
-                `🔄 Aligning ${p.name} color [${col}]: migrating ratio from "${oldKey}" to "${primaryRatio}" (${count} sets)`
-              );
-              delete ratios[oldKey];
-              ratios[primaryRatio] = count;
-              modifiedStock = true;
-            }
-          }
-        }
-
-        if (modifiedStock) {
-          nextSetsColorwise = JSON.stringify(parsed);
-          needsUpdate = true;
-        }
-      } catch (err) {
-        console.warn(`Could not parse setsColorwise for product ${p.name}:`, err.message);
-      }
-    }
+    // Individual colors can have different ratios (e.g. 2 sizes ratio or 8 sizes ratio).
+    // We strictly preserve each color's ratios in setsColorwise as set by the user.
 
     if (needsUpdate) {
       await prisma.product.update({
