@@ -47,7 +47,6 @@ import {
   getProductMixSizesInfo,
   parseDetailedColorStockWithLoose,
   isColorSoldOut,
-  getColorShadeLetter,
   type ColorStockDetail,
 } from "@/lib/stock";
 import type { ProductData, ColorSetEntry } from "@/lib/types";
@@ -227,12 +226,22 @@ function ProductDetailContent() {
       product.colorMapping
     );
 
-    // Strict rule: IF ANY COLOR IS SOLD OUT DON'T SHOW THAT COLOR OPTION
+    // Strict rule: IF THERE ARE ANY OUT OF STOCK COLORS DON'T SHOW THOSE COLORS ON PRODUCT/<ID> PAGE
     const inStockColors = colors.filter((col) => {
       // If user currently has active sets or mix pieces selected in this view, keep visible
       if ((colorSetsSelection[col] || 0) > 0) return true;
       const mixMap = colorMixPcs[col] || {};
       if (Object.values(mixMap).some((c) => (c || 0) > 0)) return true;
+
+      // Check live stock reservations
+      if (liveStock[col] !== undefined) {
+        return liveStock[col].availableForMe > 0;
+      }
+
+      // Check product setsColorwise
+      const rawSets = getAvailableSetsForColor(product.setsColorwise, col, product.colorMapping);
+      if (rawSets <= 0) return false;
+
       return !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
     });
 
@@ -244,7 +253,7 @@ function ProductDetailContent() {
     });
 
     return merged;
-  }, [product, customColors, colorSetsSelection, colorMixPcs]);
+  }, [product, customColors, colorSetsSelection, colorMixPcs, liveStock]);
 
   // Active selected color for photo and quick sets order
   const [activeColor, setActiveColor] = useState<string>("");
@@ -1186,13 +1195,11 @@ function ProductDetailContent() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                    {availableColors.map((col, idx) => {
+                    {availableColors.map((col) => {
                       const isSelected = activeColor.toLowerCase() === col.toLowerCase();
                       const hex = getColorHex(col).hex;
-                      const letter = getColorShadeLetter(product, col, idx);
                       const currentSets = colorSetsSelection[col] || 0;
                       const maxAllowed = getMaxAllowedSets(col);
-                      const isSoldOut = maxAllowed <= 0 && currentSets === 0;
 
                       return (
                         <button
@@ -1207,8 +1214,6 @@ function ProductDetailContent() {
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
                             isSelected
                               ? "bg-slate-950 text-white shadow-md ring-2 ring-orange-500"
-                              : isSoldOut
-                              ? "bg-slate-100 text-slate-400 border border-slate-200 opacity-60"
                               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
                           }`}
                         >
@@ -1216,24 +1221,13 @@ function ProductDetailContent() {
                             className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
                             style={{ backgroundColor: hex }}
                           />
-                          <span className={isSoldOut ? "line-through" : ""}>{col}</span>
-                          <span
-                            className={`text-[9px] px-1 py-0.2 rounded font-black ${
-                              isSelected ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-700"
-                            }`}
-                          >
-                            {letter}
-                          </span>
+                          <span>{col}</span>
                           {currentSets > 0 ? (
                             <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
                               {currentSets}
                             </span>
-                          ) : isSoldOut ? (
-                            <span className="bg-slate-300 text-slate-600 text-[9px] px-1 py-0.2 rounded font-bold">
-                              0
-                            </span>
                           ) : (
-                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1 py-0.2 rounded font-bold">
+                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.2 rounded font-bold">
                               {maxAllowed}
                             </span>
                           )}

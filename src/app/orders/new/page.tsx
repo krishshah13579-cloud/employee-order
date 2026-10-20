@@ -185,33 +185,10 @@ export default function OrderFormPage() {
   };
 
   useEffect(() => {
-    fetchCustomers().then(() => {
-      try {
-        const storedId = localStorage.getItem("garmentpro_selected_customer_id");
-        if (storedId) {
-          const parsedId = parseInt(storedId, 10);
-          if (!isNaN(parsedId)) {
-            setSelectedCustomerId(parsedId);
-          }
-          localStorage.removeItem("garmentpro_selected_customer_id");
-          return;
-        }
-        if (typeof window !== "undefined") {
-          const params = new URLSearchParams(window.location.search);
-          const urlParam = params.get("customerId");
-          if (urlParam) {
-            const parsedId = parseInt(urlParam, 10);
-            if (!isNaN(parsedId)) {
-              setSelectedCustomerId(parsedId);
-            }
-          }
-          const bParam = params.get("businessType");
-          if (bParam) {
-            setOrderBusinessType(bParam);
-          }
-        }
-      } catch {}
-    });
+    fetchCustomers();
+    try {
+      localStorage.removeItem("garmentpro_selected_customer_id");
+    } catch {}
   }, []);
 
   // Load active draft from localStorage
@@ -221,9 +198,7 @@ export default function OrderFormPage() {
       if (raw) {
         const draft = JSON.parse(raw);
         if (draft) {
-          if (draft.customerId) {
-            setSelectedCustomerId(draft.customerId);
-          }
+          // Strictly do not pre-select any customer automatically on order/new
           if (Array.isArray(draft.items)) {
             setItems(draft.items);
           }
