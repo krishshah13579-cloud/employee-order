@@ -12,6 +12,7 @@ import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/em
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { requireAdmin, getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
+import { releaseReservations } from "@/lib/reservations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -416,6 +417,11 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // Release any temporary stock reservations held by this session
+    if (body.sessionId) {
+      await releaseReservations(body.sessionId).catch(() => {});
+    }
 
     // Send immediate email notification alert to admin (non-blocking)
     sendNewOrderNotification({

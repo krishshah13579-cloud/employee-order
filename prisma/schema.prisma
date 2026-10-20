@@ -273,3 +273,20 @@ model AuditLog {
   createdAt  DateTime @default(now())
 }
 
+// 11. Live Real-Time Stock Reservations (Prevents over-allocation when multiple employees add sets)
+model StockReservation {
+  id           Int      @id @default(autoincrement())
+  sessionId    String   // Unique browser/employee session ID
+  employeeName String?  // Name of the employee holding the reservation
+  productId    Int
+  color        String   // Color name, e.g. "Black", "Navy Blue"
+  sets         Int      @default(0) // Reserved number of sets
+  expiresAt    DateTime // Reservation expiry timestamp (TTL: e.g. 15 minutes)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([productId, color])
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+

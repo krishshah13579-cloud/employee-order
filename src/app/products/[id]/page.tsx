@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { getClientSessionId } from "@/lib/session";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -81,6 +82,45 @@ function ProductDetailContent() {
   // Multiple Color Selection State: Map of colorName -> sets count
   const [colorSetsSelection, setColorSetsSelection] = useState<Record<string, number>>({});
 
+  // Real-time stock reservation state across all concurrent employees
+  const [liveStock, setLiveStock] = useState<
+    Record<
+      string,
+      {
+        totalStock: number;
+        reservedByOthers: number;
+        reservedByMe: number;
+        availableForMe: number;
+        isSoldOut: boolean;
+      }
+    >
+  >({});
+
+  const sessionId = useMemo(() => getClientSessionId(), []);
+
+  // Fetch real-time active reservations and available stock
+  const fetchLiveStock = useCallback(async () => {
+    if (!productId) return;
+    try {
+      const res = await fetch(
+        `/api/stock/reservations?productId=${productId}&sessionId=${sessionId}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.stock) {
+          setLiveStock(data.stock);
+        }
+      }
+    } catch {}
+  }, [productId, sessionId]);
+
+  useEffect(() => {
+    fetchLiveStock();
+    const interval = setInterval(fetchLiveStock, 8000);
+    return () => clearInterval(interval);
+  }, [fetchLiveStock]);
+
   // Size Guide Collapse Toggle
   const [sizeGuideOpen, setSizeGuideOpen] = useState<boolean>(false);
 
@@ -143,11 +183,18 @@ function ProductDetailContent() {
           console.error("Error reading draft:", e);
         }
 
-        // Auto-select 1 set for the first available color if draft has no sets yet
+        // Auto-select 1 set for the first available in-stock color if draft has no sets yet
         const hasExisting = Object.values(initial).some((s) => s > 0);
         if (!hasExisting && colors.length > 0) {
-          initial[colors[0]] = 1;
-          setActiveColor(colors[0]);
+          const firstInStock = colors.find(
+            (c) => getAvailableSetsForColor(data.setsColorwise, c, data.colorMapping) > 0
+          );
+          if (firstInStock) {
+            initial[firstInStock] = 1;
+            setActiveColor(firstInStock);
+          } else {
+            setActiveColor(colors[0]);
+          }
         }
 
         setColorSetsSelection(initial);
@@ -394,15 +441,76 @@ function ProductDetailContent() {
     return parseColorwiseSets(product.setsColorwise);
   }, [product]);
 
-  // Handle color set count change (employees can order any number of sets without stock restrictions)
+  // Helper: Get live maximum allowed sets for a specific color taking other active reservations into account
+  const getMaxAllowedSets = useCallback(
+    (color: string): number => {
+      const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
+      if (isCustom) return 9999;
+      if (!product) return 9999;
+
+      const live = liveStock[color];
+      if (live) {
+        return Math.max(0, live.availableForMe);
+      }
+      return Math.max(0, getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping));
+    },
+    [product, liveStock, customColors]
+  );
+
+  // Handle color set count change: strictly capped at available in-stock sets and atomically reserved on server
   const handleSetChange = (color: string, requestedSets: number) => {
     setActiveColor(color);
-    const validCount = Math.max(0, Math.min(requestedSets, 9999));
+    const maxAllowed = getMaxAllowedSets(color);
+    let validCount = Math.max(0, requestedSets);
+
+    if (validCount > maxAllowed) {
+      validCount = maxAllowed;
+      const live = liveStock[color];
+      const reserved = live?.reservedByOthers || 0;
+      toast(
+        `Maximum ${maxAllowed} ${maxAllowed === 1 ? "set is" : "sets are"} available for "${color}"${
+          reserved > 0 ? ` (${reserved} reserved by other active orders)` : ""
+        }.`,
+        "error"
+      );
+    }
 
     setColorSetsSelection((prev) => ({
       ...prev,
       [color]: validCount,
     }));
+
+    // Atomically reserve or release on server
+    if (product?.id) {
+      const empName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("garmentpro_employee_name") || "Employee"
+          : "Employee";
+
+      fetch("/api/stock/reserve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          employeeName: empName,
+          productId: product.id,
+          color,
+          sets: validCount,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.allocatedSets !== undefined && data.allocatedSets !== validCount) {
+            setColorSetsSelection((prev) => ({
+              ...prev,
+              [color]: data.allocatedSets,
+            }));
+            if (data.message) toast(data.message, "error");
+          }
+          fetchLiveStock();
+        })
+        .catch(() => {});
+    }
   };
 
   // Helper: Add custom shade with live color palette recognition
@@ -436,25 +544,83 @@ function ProductDetailContent() {
       delete next[colorToRemove];
       return next;
     });
+    if (product?.id) {
+      fetch("/api/stock/reserve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          productId: product.id,
+          color: colorToRemove,
+          sets: 0,
+        }),
+      }).catch(() => {});
+    }
   };
 
-  // Helper: Select 1 set of each available color
+  // Helper: Select 1 set of each available color (skipping sold out / reserved colors)
   const handleSelectOneEach = () => {
-    const updated: Record<string, number> = {};
+    const updated: Record<string, number> = { ...colorSetsSelection };
+    let selectedCount = 0;
+    let skippedSoldOut = 0;
+
     availableColors.forEach((color) => {
-      updated[color] = 1;
+      const maxAllowed = getMaxAllowedSets(color);
+      if (maxAllowed >= 1) {
+        updated[color] = 1;
+        selectedCount++;
+        if (product?.id) {
+          const empName =
+            typeof window !== "undefined"
+              ? localStorage.getItem("garmentpro_employee_name") || "Employee"
+              : "Employee";
+          fetch("/api/stock/reserve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId,
+              employeeName: empName,
+              productId: product.id,
+              color,
+              sets: 1,
+            }),
+          }).catch(() => {});
+        }
+      } else {
+        updated[color] = 0;
+        skippedSoldOut++;
+      }
     });
+
     setColorSetsSelection(updated);
-    toast("Selected 1 set of each available color");
+    fetchLiveStock();
+    if (selectedCount > 0) {
+      toast(
+        `Selected 1 set for ${selectedCount} available ${
+          selectedCount === 1 ? "color" : "colors"
+        }${skippedSoldOut > 0 ? ` (${skippedSoldOut} out of stock/reserved)` : ""}.`
+      );
+    } else {
+      toast("All colors are currently out of stock or reserved by other orders.", "info");
+    }
   };
 
-  // Helper: Clear all selection
+  // Helper: Clear all selection and release reservations
   const handleClearSelection = () => {
     const cleared: Record<string, number> = {};
     availableColors.forEach((col) => {
       cleared[col] = 0;
     });
     setColorSetsSelection(cleared);
+    if (product?.id) {
+      fetch("/api/stock/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, productId: product.id }),
+      }).catch(() => {});
+    }
+    fetchLiveStock();
+    toast("Cleared all selected sets.");
   };
 
   // Selected Color Sets list
@@ -590,7 +756,20 @@ function ProductDetailContent() {
       return;
     }
 
-    // Verify stock limits (only for non-custom colors when inventory is tracked and positive)
+    // Verify stock limits: ensure no selected color exceeds available stock
+    for (const entry of selectedEntries) {
+      const maxAllowed = getMaxAllowedSets(entry.color);
+      if (entry.sets > maxAllowed) {
+        toast(
+          `Stock limit reached for "${entry.color}": you selected ${entry.sets} sets, but only ${maxAllowed} ${
+            maxAllowed === 1 ? "set is" : "sets are"
+          } available in stock.`,
+          "error"
+        );
+        handleSetChange(entry.color, maxAllowed);
+        return;
+      }
+    }
 
     // Prepare wholesale draft item
     const draftItem = {
@@ -1012,6 +1191,8 @@ function ProductDetailContent() {
                       const hex = getColorHex(col).hex;
                       const letter = getColorShadeLetter(product, col, idx);
                       const currentSets = colorSetsSelection[col] || 0;
+                      const maxAllowed = getMaxAllowedSets(col);
+                      const isSoldOut = maxAllowed <= 0 && currentSets === 0;
 
                       return (
                         <button
@@ -1026,6 +1207,8 @@ function ProductDetailContent() {
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
                             isSelected
                               ? "bg-slate-950 text-white shadow-md ring-2 ring-orange-500"
+                              : isSoldOut
+                              ? "bg-slate-100 text-slate-400 border border-slate-200 opacity-60"
                               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
                           }`}
                         >
@@ -1033,7 +1216,7 @@ function ProductDetailContent() {
                             className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
                             style={{ backgroundColor: hex }}
                           />
-                          <span>{col}</span>
+                          <span className={isSoldOut ? "line-through" : ""}>{col}</span>
                           <span
                             className={`text-[9px] px-1 py-0.2 rounded font-black ${
                               isSelected ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-700"
@@ -1041,9 +1224,17 @@ function ProductDetailContent() {
                           >
                             {letter}
                           </span>
-                          {currentSets > 0 && (
+                          {currentSets > 0 ? (
                             <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
                               {currentSets}
+                            </span>
+                          ) : isSoldOut ? (
+                            <span className="bg-slate-300 text-slate-600 text-[9px] px-1 py-0.2 rounded font-bold">
+                              0
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1 py-0.2 rounded font-bold">
+                              {maxAllowed}
                             </span>
                           )}
                         </button>
@@ -1065,7 +1256,10 @@ function ProductDetailContent() {
                   availableColors.map((color) => {
                     const hex = getColorHex(color).hex;
                     const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
-                    const rawStock = getAvailableSetsForColor(product.setsColorwise, color, product.colorMapping);
+                    const maxAllowed = getMaxAllowedSets(color);
+                    const stockInfo = liveStock[color];
+                    const reservedByOthers = stockInfo?.reservedByOthers || 0;
+                    const isAvailable = maxAllowed > 0;
                     const currentSets = colorSetsSelection[color] || 0;
                     const colorStockDetail = getColorStockDetail(color);
                     const currentRatioForColor = colorSelectedRatio[color] || activeRatio;
@@ -1123,7 +1317,14 @@ function ProductDetailContent() {
                           const fIdx = allImages.findIndex((i) => i === colImg);
                           if (fIdx !== -1) setActiveImageIndex(fIdx);
                           if (currentSets === 0) {
-                            handleSetChange(color, 1);
+                            if (!isAvailable) {
+                              toast(
+                                `"${color}" is currently out of stock or reserved by another active order.`,
+                                "info"
+                              );
+                            } else {
+                              handleSetChange(color, 1);
+                            }
                           }
                         }}
                         className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer select-none ${
@@ -1131,6 +1332,8 @@ function ProductDetailContent() {
                         } ${
                           currentSets > 0 || colorSelectedMixTotal > 0
                             ? "bg-orange-50/70 border-orange-300 shadow-xs"
+                            : !isAvailable
+                            ? "bg-slate-50/80 border-slate-200 opacity-75"
                             : "bg-white border-slate-200 hover:border-slate-300"
                         }`}
                       >
@@ -1148,8 +1351,23 @@ function ProductDetailContent() {
                             </span>
 
                             <div>
-                              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                              <div className="font-bold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
                                 <span>{color}</span>
+
+                                {/* Stock Availability Badge */}
+                                {isAvailable ? (
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <span>{maxAllowed} {maxAllowed === 1 ? "Set" : "Sets"} Available</span>
+                                    {reservedByOthers > 0 && (
+                                      <span className="text-[9px] text-amber-700 font-medium">({reservedByOthers} reserved)</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-300">
+                                    0 Available {reservedByOthers > 0 ? "(Reserved by other order)" : "(Out of Stock)"}
+                                  </span>
+                                )}
+
                                 {currentSets > 0 && (
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-600 text-white">
                                     {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs)
@@ -1205,6 +1423,8 @@ function ProductDetailContent() {
                               <input
                                 type="number"
                                 min={0}
+                                max={maxAllowed}
+                                disabled={!isAvailable && currentSets === 0}
                                 value={currentSets === 0 ? "" : currentSets}
                                 placeholder="0"
                                 onClick={(e) => e.stopPropagation()}
@@ -1212,17 +1432,19 @@ function ProductDetailContent() {
                                   const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
                                   handleSetChange(color, isNaN(val) ? 0 : val);
                                 }}
-                                className="w-14 h-9 text-center font-bold text-slate-900 text-sm focus:outline-none focus:bg-orange-50/50"
+                                className="w-14 h-9 text-center font-bold text-slate-900 text-sm focus:outline-none focus:bg-orange-50/50 disabled:bg-slate-100 disabled:text-slate-400"
                               />
 
                               <button
                                 type="button"
+                                disabled={currentSets >= maxAllowed || !isAvailable}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleSetChange(color, currentSets + 1);
                                 }}
-                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                                className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition cursor-pointer"
                                 aria-label="Increase sets"
+                                title={currentSets >= maxAllowed ? `Maximum ${maxAllowed} sets available in stock` : "Increase sets"}
                               >
                                 <Plus size={15} />
                               </button>

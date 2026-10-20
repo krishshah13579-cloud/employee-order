@@ -44,6 +44,7 @@ import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
 import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
+import { getClientSessionId } from "@/lib/session";
 
 interface DraftOrderItem {
   productId: number;
@@ -595,9 +596,20 @@ export default function OrderFormPage() {
 
   // Handle Remove Item
   const handleRemoveItem = (index: number) => {
+    const removedItem = items[index];
     const updated = items.filter((_, idx) => idx !== index);
     setItems(updated);
     saveDraft(updated, selectedCustomerId, orderNotes, placedBy);
+    if (removedItem?.productId) {
+      fetch("/api/stock/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: getClientSessionId(),
+          productId: removedItem.productId,
+        }),
+      }).catch(() => {});
+    }
     toast("Item removed from order form");
   };
 
@@ -607,6 +619,11 @@ export default function OrderFormPage() {
       setItems([]);
       setSelectedCustomerId(null);
       setOrderNotes("");
+      fetch("/api/stock/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: getClientSessionId() }),
+      }).catch(() => {});
       localStorage.removeItem("garmentpro_order_draft");
       window.dispatchEvent(new Event("garmentpro_draft_updated"));
       toast("Order form cleared");
@@ -686,6 +703,7 @@ export default function OrderFormPage() {
       const finalNotes = [transportDetails, orderNotes.trim()].filter(Boolean).join("\n");
 
       const payload = {
+        sessionId: getClientSessionId(),
         orderNumber: customOrderNumber.trim() || undefined,
         customerId: selectedCustomerId,
         placedBy: finalPlacedBy,
