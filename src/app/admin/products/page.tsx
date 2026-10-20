@@ -28,6 +28,7 @@ import {
   getTotalAvailableSets,
   getAllProductColors,
   getAvailableSetsForColor,
+  parseDetailedColorStockWithLoose,
   stringifyColorwiseSets,
   cleanColorName,
 } from "@/lib/stock";
@@ -61,7 +62,20 @@ export default function ProductsPage() {
     if (!quickStockProduct) return;
     setSavingQuickStock(true);
     try {
-      const serialized = stringifyColorwiseSets(quickStockMap);
+      const primaryRatio = quickStockProduct.sizesRatio || "28 to 36";
+      const existingStockWithLoose = parseDetailedColorStockWithLoose(quickStockProduct.setsColorwise, primaryRatio);
+      const nextStockMap: Record<string, { ratios: Record<string, number>; loosePcs: Record<string, number> }> = {};
+
+      for (const [col, cnt] of Object.entries(quickStockMap)) {
+        const clean = cleanColorName(col);
+        const existingLoose = existingStockWithLoose[clean]?.loosePcs || {};
+        nextStockMap[clean] = {
+          ratios: { [primaryRatio]: Math.max(0, parseInt(String(cnt), 10) || 0) },
+          loosePcs: existingLoose,
+        };
+      }
+      const serialized = JSON.stringify(nextStockMap);
+
       const res = await fetch(`/api/products/${quickStockProduct.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

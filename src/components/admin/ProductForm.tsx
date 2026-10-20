@@ -530,6 +530,45 @@ export default function ProductForm({
     });
   };
 
+  const handlePrimaryRatioChange = (newRatio: string, syncToAllColors: boolean = true) => {
+    if (!newRatio.trim()) return;
+    const cleanRatio = newRatio.trim();
+    const sizes = getSizesFromRatio(cleanRatio);
+    const pcs = sizes.length > 0 && sizes[0] !== cleanRatio ? sizes.length : 5;
+    const sizesStr = sizes.join(", ");
+
+    setFormData((prev) => ({
+      ...prev,
+      sizesRatio: cleanRatio,
+      sizesList: sizesStr,
+      pcsPerSet: pcs,
+    }));
+
+    if (syncToAllColors) {
+      setColorRatioStockMap((prev) => {
+        const next: Record<string, Record<string, number>> = {};
+        for (const c of selectedColors) {
+          const clean = cleanColorName(c);
+          const existing = prev[clean] || {};
+          const keys = Object.keys(existing);
+          if (keys.length <= 1) {
+            // Preserve existing quantity count under the new ratio
+            const count = keys.length === 1 ? existing[keys[0]] : 4;
+            next[clean] = { [cleanRatio]: Math.max(0, count) };
+          } else {
+            // Multi-ratio: keep existing, but ensure cleanRatio exists
+            next[clean] = { ...existing };
+            if (next[clean][cleanRatio] === undefined) {
+              next[clean][cleanRatio] = 0;
+            }
+          }
+        }
+        return next;
+      });
+      toast(`Updated Mandatory Size Ratio to "${cleanRatio}" (${pcs} pcs/set) for all colors`, "success");
+    }
+  };
+
   const handleAddRatioToColor = (color: string, newRatio: string) => {
     const clean = cleanColorName(color);
     setColorRatioStockMap((prev) => {
@@ -551,7 +590,7 @@ export default function ProductForm({
       const current = { ...(prev[clean] || {}) };
       delete current[ratioToRemove];
       if (Object.keys(current).length === 0) {
-        current[formData.sizesRatio] = 0;
+        current[formData.sizesRatio || "28 to 36"] = 0;
       }
       return {
         ...prev,
@@ -1166,14 +1205,7 @@ export default function ProductForm({
         const rawRatios = colorRatioStockMap[clean] || {};
         let ratios = { ...rawRatios };
         if (Object.keys(ratios).length === 0) {
-          ratios = { [formData.sizesRatio]: 0 };
-        } else if (
-          Object.keys(ratios).length === 1 &&
-          formData.sizesRatio &&
-          ratios[formData.sizesRatio] === undefined
-        ) {
-          const singleCount = Object.values(ratios)[0] ?? 0;
-          ratios = { [formData.sizesRatio]: singleCount };
+          ratios = { [formData.sizesRatio || "28 to 36"]: 0 };
         }
         const loose = colorLooseStockMap[clean] || {};
 
@@ -1202,13 +1234,13 @@ export default function ProductForm({
         ? parseFloat(String(formData.wholesalerPrice))
         : Math.max(0, retPrice - 100);
 
-      // Derive primary sizesRatio, sizesList, and pcsPerSet from activeStockColor or first color
+      // Primary size ratio is explicitly formData.sizesRatio (or the primary ratio from colors)
       const primaryClean = cleanColorName(activeStockColor || selectedColors[0] || "");
       const primaryRatios = colorRatioStockMap[primaryClean] || {};
-      const sortedKeys = sortSizeRatioKeys(Object.keys(primaryRatios));
-      const primaryRatioName = sortedKeys[0] || formData.sizesRatio || "28 to 36";
+      const sortedKeys = sortSizeRatioKeys(Object.keys(primaryRatios), formData.sizesRatio);
+      const primaryRatioName = formData.sizesRatio || sortedKeys[0] || "28 to 36";
       const primarySizes = getSizesFromRatio(primaryRatioName);
-      const primaryPcs = primarySizes.length > 0 ? primarySizes.length : (formData.pcsPerSet || 5);
+      const primaryPcs = primarySizes.length > 0 && primarySizes[0] !== primaryRatioName ? primarySizes.length : (formData.pcsPerSet || 5);
 
       const sortedColors = sortColorsByAlphabet(selectedColors, colorAlphabetMap);
 
@@ -1596,6 +1628,62 @@ export default function ProductForm({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Mandatory Size Set Ratio (Wholesale Set Architecture) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+                Mandatory Size Ratio *
+              </label>
+              <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                {formData.sizesRatio} • {formData.pcsPerSet} pcs/set
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <select
+                value={
+                  STANDARD_SIZE_RATIOS.some(
+                    (s) => s.value.toLowerCase() === (formData.sizesRatio || "").toLowerCase()
+                  )
+                    ? STANDARD_SIZE_RATIOS.find(
+                        (s) => s.value.toLowerCase() === (formData.sizesRatio || "").toLowerCase()
+                      )!.value
+                    : "__custom__"
+                }
+                onChange={(e) => {
+                  if (e.target.value !== "__custom__") {
+                    handlePrimaryRatioChange(e.target.value, true);
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all cursor-pointer font-medium"
+              >
+                {STANDARD_SIZE_RATIOS.map((std) => (
+                  <option key={std.value} value={std.value}>
+                    {std.label}
+                  </option>
+                ))}
+                <option value="__custom__">Custom Ratio (Type below)...</option>
+              </select>
+
+              {/* Custom Ratio Input or quick editor */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 28 to 40, 28 to 42, 38 to 40"
+                  value={formData.sizesRatio}
+                  onChange={(e) => handlePrimaryRatioChange(e.target.value, true)}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-black"
+                />
+                <span className="text-[11px] text-gray-500 font-mono whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                  [{formData.sizesList}]
+                </span>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-1">
+              Supports 2-size sets (e.g. 38 to 40), 5-size sets (28 to 36), up to 8-size sets (28 to 42, 26 to 40).
+            </p>
           </div>
 
           {/* Dual Selling Price Configuration */}
@@ -2651,18 +2739,16 @@ export default function ProductForm({
                                   </button>
 
                                   {/* Remove Ratio */}
-                                  {Object.keys(ratios).length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleRemoveRatioFromColor(currentColor, ratioKey)
-                                      }
-                                      className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                                      title="Remove this ratio pack"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveRatioFromColor(currentColor, ratioKey)
+                                    }
+                                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="Remove this ratio pack"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
                             );

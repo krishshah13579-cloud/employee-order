@@ -209,7 +209,26 @@ export function parseDetailedColorStockWithLoose(
  * Supports "30 to 38", "30x38", "32 to 38", "28 to 36", etc.
  */
 export function getSizesFromRatio(ratio: string): string[] {
+  if (!ratio) return [];
   const clean = ratio.trim().toLowerCase();
+  if (clean === "s to xxl") return ["S", "M", "L", "XL", "XXL"];
+  if (clean === "m to 3xl") return ["M", "L", "XL", "XXL", "3XL"];
+
+  // Match any "X to Y", "XxY", "X-Y", "X - Y" with optional surrounding labels (e.g. "28 to 40 - 7 pcs")
+  const match = clean.match(/(\d+)\s*(?:to|x|-)\s*(\d+)/i);
+  if (match) {
+    const start = parseInt(match[1], 10);
+    const end = parseInt(match[2], 10);
+    if (!isNaN(start) && !isNaN(end) && start <= end && (end - start) <= 30) {
+      const sizes: string[] = [];
+      for (let s = start; s <= end; s += 2) {
+        sizes.push(String(s));
+      }
+      return sizes;
+    }
+  }
+
+  // Exact fallback mappings
   if (clean === "28 to 36" || clean === "28x36") return ["28", "30", "32", "34", "36"];
   if (clean === "28 to 34" || clean === "28x34" || clean.includes("28 to 34")) return ["28", "30", "32", "34"];
   if (clean === "30 to 38" || clean === "30x38") return ["30", "32", "34", "36", "38"];
@@ -218,23 +237,11 @@ export function getSizesFromRatio(ratio: string): string[] {
   if (clean === "30 to 40" || clean === "30x40") return ["30", "32", "34", "36", "38", "40"];
   if (clean === "32 to 40" || clean === "32x40") return ["32", "34", "36", "38", "40"];
   if (clean === "28 to 40" || clean === "28x40") return ["28", "30", "32", "34", "36", "38", "40"];
+  if (clean === "28 to 42" || clean === "28x42") return ["28", "30", "32", "34", "36", "38", "40", "42"];
+  if (clean === "38 to 40" || clean === "38x40") return ["38", "40"];
+  if (clean === "26 to 40" || clean === "26x40") return ["26", "28", "30", "32", "34", "36", "38", "40"];
   if (clean === "32 to 42" || clean === "32x42") return ["32", "34", "36", "38", "40", "42"];
-  if (clean === "s to xxl") return ["S", "M", "L", "XL", "XXL"];
-  if (clean === "m to 3xl") return ["M", "L", "XL", "XXL", "3XL"];
 
-  // Generic numeric range "X to Y" or "XxY"
-  const match = clean.match(/^(\d+)\s*(?:to|x|-)\s*(\d+)$/);
-  if (match) {
-    const start = parseInt(match[1], 10);
-    const end = parseInt(match[2], 10);
-    if (!isNaN(start) && !isNaN(end) && start <= end) {
-      const sizes: string[] = [];
-      for (let s = start; s <= end; s += 2) {
-        sizes.push(String(s));
-      }
-      return sizes;
-    }
-  }
   return [ratio];
 }
 
@@ -248,17 +255,23 @@ export function getPcsFromRatio(ratio: string, fallback: number = 5): number {
 
 /**
  * Sorts ratio keys according to garment business rules:
- * "28 to 36" (5 pcs) is prioritized first,
- * followed immediately by "28 to 34" (4 pc set),
- * then "30 to 38" (5 pcs), "32 to 38" (4 pcs), etc.
+ * Product's configured primaryRatio (if given) is prioritized FIRST (0),
+ * followed by standard wholesale ratios:
+ * "28 to 36" (5 pcs), "28 to 34" (4 pc set), "30 to 38" (5 pcs), etc.
  */
-export function sortSizeRatioKeys(ratios: string[]): string[] {
+export function sortSizeRatioKeys(ratios: string[], primaryRatio?: string): string[] {
+  const cleanPrimary = primaryRatio ? primaryRatio.trim().toLowerCase() : "";
+
   const getPriority = (raw: string): number => {
     const clean = raw.trim().toLowerCase();
+    if (cleanPrimary && clean === cleanPrimary) return 0;
     if (clean === "28 to 36" || clean === "28x36") return 1;
     if (clean === "28 to 34" || clean === "28x34" || clean.includes("28 to 34") || clean.includes("4 pc") || clean.includes("4pc")) return 2;
     if (clean === "30 to 38" || clean === "30x38") return 3;
     if (clean === "32 to 38" || clean === "32x38") return 4;
+    if (clean === "28 to 40" || clean === "28x40") return 5;
+    if (clean === "28 to 42" || clean === "28x42") return 6;
+    if (clean === "38 to 40" || clean === "38x40") return 7;
     return 10;
   };
 

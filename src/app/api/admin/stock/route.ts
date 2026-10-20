@@ -5,6 +5,7 @@ import {
   getTotalAvailableSets,
   getAllProductColors,
   parseDetailedColorRatioSets,
+  getSizesFromRatio,
   isColorSoldOut,
   getColorShadeLetter,
 } from "@/lib/stock";
@@ -31,14 +32,29 @@ export async function GET(request: NextRequest) {
     const stockItems = products.map((p) => {
       const colors = getAllProductColors(p.colorsAvailable, p.setsColorwise, p.colorMapping);
       const totalSets = getTotalAvailableSets(p.setsColorwise);
+      const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "30 to 38");
+
+      // Calculate total set pieces dynamically from ratio breakdown (supports 2 to 8 sizes accurately)
+      let accurateSetPcs = 0;
+      let hasRatioBreakdown = false;
+      for (const ratios of Object.values(detailedRatioSets)) {
+        for (const [rKey, count] of Object.entries(ratios)) {
+          const cnt = Math.max(0, count || 0);
+          if (cnt > 0) {
+            hasRatioBreakdown = true;
+            const rSizes = getSizesFromRatio(rKey);
+            const rPcs = rSizes.length > 0 && rSizes[0] !== rKey ? rSizes.length : (p.pcsPerSet || 5);
+            accurateSetPcs += cnt * rPcs;
+          }
+        }
+      }
       const pcsPerSet = p.pcsPerSet || 5;
-      const totalSetPcs = totalSets * pcsPerSet;
+      const totalSetPcs = hasRatioBreakdown ? accurateSetPcs : totalSets * pcsPerSet;
       const mixPcs = (p as any).mixPcs || 0;
       const totalPcs = totalSetPcs + mixPcs;
       const costPrice = (p as any).costPrice !== null && (p as any).costPrice !== undefined ? (p as any).costPrice : Math.round((p.retailerPrice || p.price) * 0.7);
       const sellingRate = p.retailerPrice || p.price;
       const totalValuation = Math.round(totalPcs * (costPrice || sellingRate));
-      const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "30 to 38");
 
       return {
         id: p.id,
@@ -128,6 +144,13 @@ export async function PUT(request: NextRequest) {
     if (setsColorwise !== undefined) {
       updateData.setsColorwise = typeof setsColorwise === "string" ? setsColorwise : JSON.stringify(setsColorwise);
     }
+    if (body.sizesRatio) {
+      const cleanRatio = String(body.sizesRatio).trim();
+      const rSizes = getSizesFromRatio(cleanRatio);
+      updateData.sizesRatio = cleanRatio;
+      updateData.sizesList = rSizes.join(", ");
+      updateData.pcsPerSet = rSizes.length > 0 && rSizes[0] !== cleanRatio ? rSizes.length : (existing.pcsPerSet || 5);
+    }
 
     const updated = await prisma.product.update({
       where: { id },
@@ -161,8 +184,23 @@ export async function PUT(request: NextRequest) {
     // Real-time auto-sync to Storefront (www.iqtrousers.in)
     try {
       const totalSets = getTotalAvailableSets(updated.setsColorwise);
+      const detailedRatioSets = parseDetailedColorRatioSets(updated.setsColorwise, updated.sizesRatio || "30 to 38");
+      let accurateSetPcs = 0;
+      let hasRatioBreakdown = false;
+      for (const ratios of Object.values(detailedRatioSets)) {
+        for (const [rKey, count] of Object.entries(ratios)) {
+          const cnt = Math.max(0, count || 0);
+          if (cnt > 0) {
+            hasRatioBreakdown = true;
+            const rSizes = getSizesFromRatio(rKey);
+            const rPcs = rSizes.length > 0 && rSizes[0] !== rKey ? rSizes.length : (updated.pcsPerSet || 5);
+            accurateSetPcs += cnt * rPcs;
+          }
+        }
+      }
       const pcsPerSet = updated.pcsPerSet || 5;
-      const totalPcs = totalSets * pcsPerSet + (updated.mixPcs || 0);
+      const totalSetPcs = hasRatioBreakdown ? accurateSetPcs : totalSets * pcsPerSet;
+      const totalPcs = totalSetPcs + (updated.mixPcs || 0);
 
       fetch("https://www.iqtrousers.in/api/sync-stock", {
         method: "POST",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
+import { getSizesFromRatio } from "@/lib/stock";
 import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Available colors are required" }, { status: 400 });
     }
 
-    const pcs = parseInt(pcsPerSet, 10) || (sizesList ? sizesList.split(",").length : 5);
+    const ratioSizes = sizesRatio ? getSizesFromRatio(sizesRatio) : [];
+    const pcs = parseInt(pcsPerSet, 10) || (ratioSizes.length > 0 && ratioSizes[0] !== sizesRatio ? ratioSizes.length : (sizesList ? sizesList.split(",").length : 5));
 
     const numMrp = body.mrp !== undefined && body.mrp !== null && String(body.mrp).trim() !== ""
       ? parseFloat(body.mrp)

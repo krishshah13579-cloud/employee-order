@@ -269,6 +269,10 @@ export const STANDARD_SIZE_RATIOS = [
   { label: "28 to 34 (28, 30, 32, 34) - 4 Pc Set", value: "28 to 34", sizes: "28, 30, 32, 34", pcs: 4 },
   { label: "30 to 38 (30, 32, 34, 36, 38) - 5 Pcs", value: "30 to 38", sizes: "30, 32, 34, 36, 38", pcs: 5 },
   { label: "32 to 38 (32, 34, 36, 38) - 4 Pcs", value: "32 to 38", sizes: "32, 34, 36, 38", pcs: 4 },
+  { label: "28 to 40 (28, 30, 32, 34, 36, 38, 40) - 7 Pcs", value: "28 to 40", sizes: "28, 30, 32, 34, 36, 38, 40", pcs: 7 },
+  { label: "28 to 42 (28, 30, 32, 34, 36, 38, 40, 42) - 8 Pcs (8 Size Set)", value: "28 to 42", sizes: "28, 30, 32, 34, 36, 38, 40, 42", pcs: 8 },
+  { label: "38 to 40 (38, 40) - 2 Pcs (2 Size Set)", value: "38 to 40", sizes: "38, 40", pcs: 2 },
+  { label: "26 to 40 (26, 28, 30, 32, 34, 36, 38, 40) - 8 Pcs (8 Size Set)", value: "26 to 40", sizes: "26, 28, 30, 32, 34, 36, 38, 40", pcs: 8 },
 ];
 
 export const PRODUCT_CATEGORIES = [

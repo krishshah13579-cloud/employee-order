@@ -275,8 +275,8 @@ function ProductDetailContent() {
         }
       } catch {}
     }
-    // Strict business rule: "28 to 36" (5 pcs) FIRST, then "28 to 34" (4 pc set) SECOND
-    return sortSizeRatioKeys(Array.from(ratioSet));
+    // Prioritize product's primary size ratio first, then standard ratios
+    return sortSizeRatioKeys(Array.from(ratioSet), product.sizesRatio);
   }, [product]);
 
   // Selected Size Ratio state (defaults to 28 to 36 if present)

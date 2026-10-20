@@ -71,6 +71,7 @@ export default function AdminStockPage() {
   const [editColorRatios, setEditColorRatios] = useState<Record<string, Record<string, number>>>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [syncingStore, setSyncingStore] = useState(false);
+  const [modalCustomRatio, setModalCustomRatio] = useState("");
 
   const handleSyncStore = async () => {
     try {
@@ -199,6 +200,7 @@ export default function AdminStockPage() {
           mixPcs: editMixPcs,
           costPrice: editCostPrice === "" ? null : parseFloat(editCostPrice),
           setsColorwise: JSON.stringify(editColorRatios),
+          sizesRatio: editingItem.sizesRatio,
         }),
       });
 
@@ -620,8 +622,32 @@ export default function AdminStockPage() {
                           <span className="font-bold text-slate-900 text-xs">{color}</span>
                         </div>
 
-                        {/* Add another ratio dropdown */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Add ratio packs */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {editingItem.sizesRatio && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddRatioToColor(clean, editingItem.sizesRatio)}
+                              className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md"
+                            >
+                              + {editingItem.sizesRatio} (Primary)
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleAddRatioToColor(clean, "38 to 40")}
+                            className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md"
+                            title="2 Size Set Ratio (2 pcs: 38, 40)"
+                          >
+                            + 38 to 40 (2 pcs)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddRatioToColor(clean, "28 to 36")}
+                            className="text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md"
+                          >
+                            + 28 to 36
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleAddRatioToColor(clean, "30 to 38")}
@@ -631,19 +657,51 @@ export default function AdminStockPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAddRatioToColor(clean, "32 to 38")}
-                            className="text-[10px] font-bold text-purple-600 hover:text-purple-800 bg-white border border-purple-200 px-2 py-0.5 rounded-md"
+                            onClick={() => handleAddRatioToColor(clean, "28 to 40")}
+                            className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md"
+                            title="7 Size Set Ratio (7 pcs: 28 to 40)"
                           >
-                            + 32 to 38
+                            + 28 to 40 (7 pcs)
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAddRatioToColor(clean, "28 to 36")}
-                            className="text-[10px] font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md"
+                            onClick={() => handleAddRatioToColor(clean, "28 to 42")}
+                            className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md"
+                            title="8 Size Set Ratio (8 pcs: 28 to 42)"
                           >
-                            + 28 to 36
+                            + 28 to 42 (8 pcs)
                           </button>
                         </div>
+                      </div>
+
+                      {/* Custom Ratio Add for this color */}
+                      <div className="flex items-center gap-2 pt-1 pb-1">
+                        <input
+                          type="text"
+                          placeholder="Or Custom Ratio: e.g. 26 to 40, 38 to 40"
+                          value={modalCustomRatio}
+                          onChange={(e) => setModalCustomRatio(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && modalCustomRatio.trim()) {
+                              e.preventDefault();
+                              handleAddRatioToColor(clean, modalCustomRatio.trim());
+                              setModalCustomRatio("");
+                            }
+                          }}
+                          className="flex-1 px-2.5 py-1 text-[11px] bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (modalCustomRatio.trim()) {
+                              handleAddRatioToColor(clean, modalCustomRatio.trim());
+                              setModalCustomRatio("");
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-slate-900 hover:bg-black text-white text-[11px] font-semibold rounded-lg transition shrink-0"
+                        >
+                          + Add Ratio
+                        </button>
                       </div>
 
                       {/* Ratios list for this color */}

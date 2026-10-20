@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-security";
-import { getAllProductColors, isColorSoldOut, getColorShadeLetter } from "@/lib/stock";
+import { getAllProductColors, isColorSoldOut, getColorShadeLetter, getSizesFromRatio } from "@/lib/stock";
 import { sendColorSoldOutNotification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -53,8 +53,11 @@ export async function PUT(
     const productId = parseInt(id, 10);
     const body = await request.json();
 
+    const ratioSizes = body.sizesRatio ? getSizesFromRatio(body.sizesRatio) : [];
     const pcs = body.pcsPerSet
       ? parseInt(body.pcsPerSet, 10)
+      : ratioSizes.length > 0 && ratioSizes[0] !== body.sizesRatio
+      ? ratioSizes.length
       : body.sizesList
       ? body.sizesList.split(",").length
       : 5;
