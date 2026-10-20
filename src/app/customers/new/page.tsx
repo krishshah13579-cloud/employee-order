@@ -4,6 +4,13 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  sanitizeInternalReturnTo,
+  PARAM_RETURN_TO,
+  PARAM_CUSTOMER_ID,
+  STORAGE_KEY_SELECTED_CUSTOMER,
+  APP_ROUTES,
+} from "@/lib/navigation";
+import {
   Users,
   Camera,
   Upload,
@@ -63,7 +70,7 @@ const INDIAN_STATES = [
 function CustomerRegistrationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get("returnTo") || "/orders/new";
+  const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
   const { toast } = useToast();
   const { employee } = useEmployee();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -344,13 +351,13 @@ function CustomerRegistrationContent() {
 
       // Auto-select in order form via localStorage and query param
       if (typeof window !== "undefined") {
-        localStorage.setItem("garmentpro_selected_customer_id", String(newCustomer.id));
+        localStorage.setItem(STORAGE_KEY_SELECTED_CUSTOMER, String(newCustomer.id));
       }
 
-      // Return to order flow
-      const redirectUrl = returnTo.includes("?")
-        ? `${returnTo}&customerId=${newCustomer.id}`
-        : `${returnTo}?customerId=${newCustomer.id}`;
+      // Return to order flow safely without duplicate query parameters
+      const safeReturn = sanitizeInternalReturnTo(returnTo);
+      const urlBase = safeReturn.split("?")[0];
+      const redirectUrl = `${urlBase}?${PARAM_CUSTOMER_ID}=${newCustomer.id}`;
 
       router.push(redirectUrl);
     } catch (err: any) {

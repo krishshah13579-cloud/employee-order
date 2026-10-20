@@ -45,6 +45,19 @@ import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
 import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
 import { getClientSessionId } from "@/lib/session";
+import {
+  PARAM_CUSTOMER_ID,
+  PARAM_BUSINESS_TYPE,
+  PARAM_RETURN_TO,
+  STORAGE_KEY_ORDER_DRAFT,
+  STORAGE_KEY_SELECTED_CUSTOMER,
+  STORAGE_KEY_EMPLOYEE_NAME,
+  APP_ROUTES,
+  sanitizeInternalReturnTo,
+  sanitizePositiveInt,
+  sanitizeBusinessType,
+  buildOrderFormReturnUrl,
+} from "@/lib/navigation";
 
 interface DraftOrderItem {
   productId: number;
@@ -86,8 +99,8 @@ function OrderFormContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const customerIdParam = searchParams.get("customerId");
-  const businessTypeParam = searchParams.get("businessType");
+  const customerIdParam = searchParams.get(PARAM_CUSTOMER_ID);
+  const businessTypeParam = sanitizeBusinessType(searchParams.get(PARAM_BUSINESS_TYPE));
 
   // Employee Name
   const [placedBy, setPlacedBy] = useState<string>("");
@@ -98,28 +111,20 @@ function OrderFormContent() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      const fromUrl = urlParams.get("customerId");
-      if (fromUrl) {
-        const p = parseInt(fromUrl, 10);
-        if (!isNaN(p)) return p;
-      }
+      const fromUrl = sanitizePositiveInt(urlParams.get(PARAM_CUSTOMER_ID));
+      if (fromUrl) return fromUrl;
+
       try {
-        const raw = localStorage.getItem("garmentpro_order_draft");
+        const raw = localStorage.getItem(STORAGE_KEY_ORDER_DRAFT);
         if (raw) {
           const draft = JSON.parse(raw);
-          const cId = draft?.customerId || draft?.customer?.id;
-          if (cId) {
-            const p = parseInt(cId, 10);
-            if (!isNaN(p)) return p;
-          }
+          const cId = sanitizePositiveInt(draft?.customerId || draft?.customer?.id);
+          if (cId) return cId;
         }
       } catch {}
       try {
-        const savedId = localStorage.getItem("garmentpro_selected_customer_id");
-        if (savedId) {
-          const p = parseInt(savedId, 10);
-          if (!isNaN(p)) return p;
-        }
+        const savedId = sanitizePositiveInt(localStorage.getItem(STORAGE_KEY_SELECTED_CUSTOMER));
+        if (savedId) return savedId;
       } catch {}
     }
     return null;
@@ -275,9 +280,9 @@ function OrderFormContent() {
     }
   }, []);
 
-  // Helper for returnTo URL ensuring customerId is carried when navigating to products
+  // Helper for returnTo URL ensuring customerId is carried safely when navigating to products
   const getReturnToUrl = () => {
-    return selectedCustomerId ? `/orders/new?customerId=${selectedCustomerId}` : "/orders/new";
+    return buildOrderFormReturnUrl(selectedCustomerId);
   };
 
   // Sync draft back to localStorage whenever it changes
@@ -317,17 +322,37 @@ function OrderFormContent() {
         notes,
         placedBy: employee,
       };
-      localStorage.setItem("garmentpro_order_draft", JSON.stringify(draftObj));
+      localStorage.setItem(STORAGE_KEY_ORDER_DRAFT, JSON.stringify(draftObj));
       window.dispatchEvent(new Event("garmentpro_draft_updated"));
     } catch (err) {
       console.error("Error saving draft to localStorage:", err);
     }
   };
 
-  // Selected customer object
+  // Selected customer object (with strict customer isolation to prevent IDOR parameter tampering)
   const selectedCustomer = useMemo(() => {
-    return customers.find((c) => c.id === selectedCustomerId) || null;
-  }, [customers, selectedCustomerId]);
+    if (!selectedCustomerId || customers.length === 0) return null;
+    const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
+    const activeEmpId = employee?.id;
+    const isKrishShah = isTL && activeEmpName.includes("krish");
+
+    const found = customers.find((c) => c.id === selectedCustomerId) || null;
+    if (!found) return null;
+
+    // Security check: non-admin, non-KrishShah employees are isolated strictly to their allocated customers
+    if (!isAdmin && !isKrishShah) {
+      const matchesId = activeEmpId && found.allocatedEmployeeId === activeEmpId;
+      const matchesName =
+        activeEmpName &&
+        found.allocatedEmployeeName &&
+        found.allocatedEmployeeName.trim().toLowerCase() === activeEmpName;
+      if (!matchesId && !matchesName) {
+        return null;
+      }
+    }
+
+    return found;
+  }, [customers, selectedCustomerId, employee, placedBy, isAdmin, isTL]);
 
   // Effective Business Type across Order Form & Dynamic Pricing
   const effectiveBusinessType = orderBusinessType || selectedCustomer?.businessType || "RETAILER";

@@ -31,6 +31,7 @@ import {
   isColorSoldOut,
 } from "@/lib/stock";
 import type { ProductData } from "@/lib/types";
+import { sanitizeInternalReturnTo, PARAM_RETURN_TO } from "@/lib/navigation";
 
 const DEFAULT_STORE_CATEGORIES = [
   "All",
@@ -42,7 +43,7 @@ const DEFAULT_STORE_CATEGORIES = [
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get("returnTo") || "/orders/new";
+  const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_STORE_CATEGORIES);

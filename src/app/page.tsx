@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/types";
+import { buildOrderFormReturnUrl } from "@/lib/navigation";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
 import MyTeamSection from "@/components/home/MyTeamSection";
@@ -543,7 +544,7 @@ export default function HomePage() {
               {myAllocatedCustomers.map((cust) => (
                 <div
                   key={cust.id}
-                  onClick={() => router.push(`/orders/new?customerId=${cust.id}`)}
+                  onClick={() => router.push(buildOrderFormReturnUrl(cust.id))}
                   className="bg-white rounded-2xl p-4 border border-amber-200/70 hover:border-amber-400 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
                 >
                   <div>

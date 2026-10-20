@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense } from "reac
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getClientSessionId } from "@/lib/session";
+import { sanitizeInternalReturnTo, PARAM_RETURN_TO } from "@/lib/navigation";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -69,7 +70,7 @@ function ProductDetailContent() {
   const { toast } = useToast();
 
   const productId = params?.id as string;
-  const returnTo = searchParams.get("returnTo") || "/orders/new";
+  const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
 
   const [product, setProduct] = useState<ProductData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
