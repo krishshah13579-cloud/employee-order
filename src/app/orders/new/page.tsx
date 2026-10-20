@@ -1040,18 +1040,16 @@ export default function OrderFormPage() {
                   </div>
 
                   <div className="sm:col-span-2 lg:col-span-2">
-                    {!isCustomerGstRegistered || isEditingGstPan ? (
+                    {!isCustomerGstRegistered ? (
                       <div className="bg-amber-50/90 border-2 border-amber-400 p-3 rounded-xl space-y-1.5 shadow-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-amber-900 block font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
                             <AlertCircle size={13} className="text-amber-600 shrink-0" />
                             GST NO. / PAN NO. (MANDATORY TO ADD PRODUCTS)
                           </span>
-                          {!isCustomerGstRegistered && (
-                            <span className="text-[9px] bg-red-100 text-red-700 font-black px-1.5 py-0.5 rounded uppercase">
-                              Not Registered
-                            </span>
-                          )}
+                          <span className="text-[9px] bg-red-100 text-red-700 font-black px-1.5 py-0.5 rounded uppercase">
+                            Not Registered
+                          </span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <input
@@ -1071,24 +1069,10 @@ export default function OrderFormPage() {
                             {isSavingGstPan ? <Loader2 size={12} className="animate-spin" /> : null}
                             <span>Save &amp; Unlock</span>
                           </button>
-                          {isCustomerGstRegistered && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsEditingGstPan(false);
-                                setCustomGstPan(selectedCustomer.gstPanNo);
-                              }}
-                              className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 font-bold cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                          )}
                         </div>
-                        {!isCustomerGstRegistered && (
-                          <p className="text-[10px] text-amber-800 font-medium">
-                            ⚠️ This customer does not have a registered GST/PAN. Adding products is locked until GST/PAN is entered &amp; saved above.
-                          </p>
-                        )}
+                        <p className="text-[10px] text-amber-800 font-medium">
+                          ⚠️ This customer does not have a registered GST/PAN. Adding products is locked until GST/PAN is entered &amp; saved above.
+                        </p>
                       </div>
                     ) : (
                       <div>
@@ -1096,16 +1080,10 @@ export default function OrderFormPage() {
                           <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
                             GST NO. / PAN NO.
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomGstPan(selectedCustomer.gstPanNo);
-                              setIsEditingGstPan(true);
-                            }}
-                            className="text-[10px] text-orange-600 hover:text-orange-700 font-bold uppercase cursor-pointer hover:underline"
-                          >
-                            Edit
-                          </button>
+                          <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                            <Lock size={10} />
+                            <span>Locked</span>
+                          </span>
                         </div>
                         <span className="font-mono font-black text-orange-600 text-sm uppercase">
                           {selectedCustomer.gstPanNo.toUpperCase()}
@@ -1192,70 +1170,31 @@ export default function OrderFormPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1.5">
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
-                      Type of Business {!isAdmin && "(Locked by Admin - Contact Admin to Change)"}
+                      Type of Business
                     </span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Retailer: Available to all */}
-                      <button
-                        type="button"
-                        onClick={() => (isAdmin || isTL) && handleBusinessTypeChange("RETAILER")}
-                        disabled={!isAdmin && !isTL}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
-                          effectiveBusinessType === "RETAILER"
-                            ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/40"
-                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                        } ${!isAdmin && !isTL ? "cursor-default" : "cursor-pointer"}`}
-                      >
-                        {effectiveBusinessType === "RETAILER" && <CheckCircle2 size={13} className="text-white" />}
-                        <span>Retailer</span>
-                      </button>
-
-                      {/* Wholesale: ONLY shown to Team Leader (T.L.) or Admin */}
-                      {(isTL || isAdmin) && (
-                        <button
-                          type="button"
-                          onClick={() => handleBusinessTypeChange("WHOLESALER")}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                            effectiveBusinessType === "WHOLESALER"
-                              ? "bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-400/40"
-                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                          }`}
-                        >
-                          {effectiveBusinessType === "WHOLESALER" && <CheckCircle2 size={13} className="text-white" />}
-                          <span>Wholesale</span>
-                        </button>
-                      )}
-
-                      {/* Retailer with Special Discount: ONLY shown to Team Leader (T.L.) or Admin */}
-                      {(isTL || isAdmin) && (
-                        <button
-                          type="button"
-                          onClick={() => handleBusinessTypeChange("RETAILER WITH SPECIAL DISCOUNT")}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                            effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT"
-                              ? "bg-teal-600 text-white border-teal-600 shadow-xs ring-2 ring-teal-400/40"
-                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                          }`}
-                        >
-                          {effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" && <CheckCircle2 size={13} className="text-white" />}
-                          <span>Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""})</span>
-                        </button>
-                      )}
-
-                      {/* Wholesale Without GST: ONLY shown to Admin */}
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleBusinessTypeChange("WHOLESALER WITHOUT GST")}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                            effectiveBusinessType === "WHOLESALER WITHOUT GST"
-                              ? "bg-fuchsia-600 text-white border-fuchsia-600 shadow-xs ring-2 ring-fuchsia-400/40"
-                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                          }`}
-                        >
-                          {effectiveBusinessType === "WHOLESALER WITHOUT GST" && <CheckCircle2 size={13} className="text-white" />}
-                          <span>Wholesale (Without GST)</span>
-                        </button>
+                    <div className="flex items-center gap-2">
+                      {effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-purple-500" />
+                          <span>Wholesale (Locked)</span>
+                        </span>
+                      ) : effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-teal-600" />
+                          <span>
+                            Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""}) (Locked)
+                          </span>
+                        </span>
+                      ) : effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-fuchsia-600" />
+                          <span>Wholesale (Without GST) (Locked)</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-blue-500" />
+                          <span>Retailer (Locked)</span>
+                        </span>
                       )}
                     </div>
                   </div>
