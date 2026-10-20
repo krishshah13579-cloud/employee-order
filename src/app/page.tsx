@@ -217,22 +217,22 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 3. PRODUCTS IN STOCK */}
+            {/* 3. PRODUCT CATALOG */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
                   <Package size={22} />
                 </div>
                 <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">
-                  Live Stock
+                  Catalog
                 </span>
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Products In Stock
+                Product Catalog
               </h3>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
-                  {loading ? "..." : stats?.inStockProducts ?? stats?.totalProducts ?? 0}
+                  {loading ? "..." : stats?.totalProducts ?? 0}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
                   designs available

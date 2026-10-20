@@ -395,16 +395,7 @@ function ProductsContent() {
                       {product.category}
                     </span>
 
-                    {/* Stock Badge */}
-                    <span
-                      className={`absolute bottom-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-md shadow-sm ${
-                        totalAvailableStock > 0
-                          ? "bg-emerald-950/80 text-emerald-300 border border-emerald-700/60"
-                          : "bg-red-950/80 text-red-300 border border-red-700/60"
-                      }`}
-                    >
-                      {totalAvailableStock > 0 ? "In Stock" : "Out of Stock"}
-                    </span>
+
                   </Link>
 
                   {/* Card Content */}

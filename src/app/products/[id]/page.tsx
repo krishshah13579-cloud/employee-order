@@ -394,24 +394,10 @@ function ProductDetailContent() {
     return parseColorwiseSets(product.setsColorwise);
   }, [product]);
 
-  // Handle color set count change with flexible stock cap for custom shades
+  // Handle color set count change (employees can order any number of sets without stock restrictions)
   const handleSetChange = (color: string, requestedSets: number) => {
     setActiveColor(color);
-    const isCustom = customColors.some(
-      (c) => c.toLowerCase() === color.toLowerCase()
-    );
-    const rawStock = getAvailableSetsForColor(
-      product?.setsColorwise,
-      color,
-      product?.colorMapping
-    );
-    // Custom shades or products without inventory restriction can have up to 9999 sets
-    const maxStock = isCustom || !product?.setsColorwise || rawStock <= 0 ? 9999 : rawStock;
-    const validCount = Math.max(0, Math.min(requestedSets, maxStock));
-
-    if (rawStock > 0 && requestedSets > rawStock && !isCustom) {
-      toast(`Maximum available stock for ${color} is ${rawStock} sets`, "error");
-    }
+    const validCount = Math.max(0, Math.min(requestedSets, 9999));
 
     setColorSetsSelection((prev) => ({
       ...prev,
@@ -456,13 +442,7 @@ function ProductDetailContent() {
   const handleSelectOneEach = () => {
     const updated: Record<string, number> = {};
     availableColors.forEach((color) => {
-      const isCustom = customColors.some((c) => c.toLowerCase() === color.toLowerCase());
-      const maxStock = getAvailableSetsForColor(
-        product?.setsColorwise,
-        color,
-        product?.colorMapping
-      );
-      updated[color] = isCustom || maxStock > 0 || !product?.setsColorwise ? 1 : 0;
+      updated[color] = 1;
     });
     setColorSetsSelection(updated);
     toast("Selected 1 set of each available color");
@@ -607,23 +587,6 @@ function ProductDetailContent() {
     }
 
     // Verify stock limits (only for non-custom colors when inventory is tracked and positive)
-    for (const entry of selectedEntries) {
-      const isCustom = customColors.some(
-        (c) => c.toLowerCase() === entry.color.toLowerCase()
-      );
-      const maxStock = getAvailableSetsForColor(
-        product.setsColorwise,
-        entry.color,
-        product.colorMapping
-      );
-      if (!isCustom && maxStock > 0 && entry.sets > maxStock) {
-        toast(
-          `Cannot add ${entry.sets} sets for ${entry.color}. Only ${maxStock} available in stock.`,
-          "error"
-        );
-        return;
-      }
-    }
 
     // Prepare wholesale draft item
     const draftItem = {
@@ -783,15 +746,7 @@ function ProductDetailContent() {
                   <span>{activeColor ? `${activeColor}` : product.category}</span>
                 </span>
 
-                <span
-                  className={`absolute bottom-3 right-3 text-xs font-bold px-3 py-1 rounded-lg backdrop-blur-md shadow-sm ${
-                    totalProductStock > 0
-                      ? "bg-emerald-950/80 text-emerald-300 border border-emerald-700/60"
-                      : "bg-red-950/80 text-red-300 border border-red-700/60"
-                  }`}
-                >
-                  {totalProductStock > 0 ? "In Stock" : "Out of Stock"}
-                </span>
+
               </div>
 
               {/* Thumbnails row */}
@@ -1207,20 +1162,10 @@ function ProductDetailContent() {
                                 )}
                               </div>
                               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                                {isCustom ? (
+                                {isCustom && (
                                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
                                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                                     <span>Custom Shade</span>
-                                  </span>
-                                ) : rawStock > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                    <span>In Stock ({rawStock} Sets)</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                    <span>Advance / Made to Order</span>
                                   </span>
                                 )}
 
@@ -1318,8 +1263,8 @@ function ProductDetailContent() {
                                     <Sparkles size={13} className="text-amber-600" />
                                     <span>Mix Sizes Available — Single Pieces ({color})</span>
                                   </span>
-                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300">
-                                    {totalLooseInStockForColor} Loose Pcs In Stock
+                                  <span className="text-[10px] font-bold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-300">
+                                    {totalLooseInStockForColor} Loose Pcs Available
                                   </span>
                                 </div>
 
@@ -1343,8 +1288,8 @@ function ProductDetailContent() {
                                           <span className="font-black text-xs text-slate-900">
                                             Size {sz}
                                           </span>
-                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
-                                            {availLoose} in stock
+                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900">
+                                            {availLoose} pcs
                                           </span>
                                         </div>
 

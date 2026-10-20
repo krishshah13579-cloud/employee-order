@@ -13,6 +13,19 @@ import fs from "fs";
 import path from "path";
 
 /**
+ * WinAnsi Encoding Sanitizer for standard PDF fonts:
+ * Standard PDF fonts (Helvetica, Times, Courier) only support WinAnsi (0x00 - 0xFF).
+ * Converts Unicode Rupee symbol (₹, 0x20b9) to "Rs. " and cleans unsupported characters.
+ */
+export function sanitizeWinAnsi(text: any): string {
+  if (text === null || text === undefined) return "";
+  return String(text)
+    .replace(/₹/g, "Rs. ")
+    .replace(/[\u20B9]/g, "Rs. ")
+    .replace(/[^\x00-\xFF]/g, " ");
+}
+
+/**
  * 1. Generates an A4 PDF Buffer for an Order Form or Tax Invoice
  */
 export async function generateOrderPdfBuffer(
@@ -119,7 +132,8 @@ export async function generateOrderPdfBuffer(
     const f = options.font || fontRegular;
     const s = options.size || 8.5;
     const c = options.color || rgb(0, 0, 0);
-    page.drawText(String(text || ""), { x: xPos, y: yPos, font: f, size: s, color: c });
+    const clean = sanitizeWinAnsi(text);
+    page.drawText(clean, { x: xPos, y: yPos, font: f, size: s, color: c });
   };
 
   const drawLine = (x1: number, y1: number, x2: number, y2: number, thickness = 0.75) => {
@@ -146,17 +160,17 @@ export async function generateOrderPdfBuffer(
   // Header: Company Letterhead
   y -= 18;
   const headerTitle = String(tpl.companyName || "KRISH CLOTHING CO.").toUpperCase();
-  const titleWidth = fontBold.widthOfTextAtSize(headerTitle, 15);
+  const titleWidth = fontBold.widthOfTextAtSize(sanitizeWinAnsi(headerTitle), 15);
   drawText(headerTitle, margin + (contentWidth - titleWidth) / 2, y, { font: fontBold, size: 15 });
 
   y -= 11;
   const addr1 = String(tpl.addressLine1 || "2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,").trim();
-  const addr1Width = fontBold.widthOfTextAtSize(addr1, 7.5);
+  const addr1Width = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr1), 7.5);
   drawText(addr1, margin + (contentWidth - addr1Width) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 10;
   const addr2 = String(tpl.addressLine2 || "AHMEDABAD - 380008 (M) : 8128756632").trim();
-  const addr2Width = fontBold.widthOfTextAtSize(addr2, 7.5);
+  const addr2Width = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr2), 7.5);
   drawText(addr2, margin + (contentWidth - addr2Width) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 8;
@@ -167,7 +181,7 @@ export async function generateOrderPdfBuffer(
   const bannerY = y - 4;
   drawRect(margin, bannerY, contentWidth, 18, rgb(0.92, 0.92, 0.92), 1);
   const docBannerText = docTitle;
-  const docBannerW = fontBold.widthOfTextAtSize(docBannerText, 10);
+  const docBannerW = fontBold.widthOfTextAtSize(sanitizeWinAnsi(docBannerText), 10);
   drawText(docBannerText, margin + (contentWidth - docBannerW) / 2, y + 1, { font: fontBold, size: 10 });
 
   y = bannerY;
@@ -232,7 +246,7 @@ export async function generateOrderPdfBuffer(
   drawText("Sets", colSets + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Pcs", colPcs + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Rate", colRate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Amount (₹)", colTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Amount (Rs.)", colTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
 
   y = thBottomY;
 
@@ -277,13 +291,13 @@ export async function generateOrderPdfBuffer(
 
   const totRightX = margin + contentWidth - 140;
   drawText(`Subtotal:`, totRightX, totBottomY + 28, { size: 7.5 });
-  drawText(`₹${resolvedSubtotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 28, { size: 7.5 });
+  drawText(`Rs. ${resolvedSubtotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 28, { size: 7.5 });
 
   drawText(`GST (5%):`, totRightX, totBottomY + 16, { size: 7.5 });
-  drawText(`₹${resolvedGst.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 16, { size: 7.5 });
+  drawText(`Rs. ${resolvedGst.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 16, { size: 7.5 });
 
   drawText(`Grand Total:`, totRightX, totBottomY + 4, { font: fontBold, size: 8.5 });
-  drawText(`₹${resolvedGrandTotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 4, {
+  drawText(`Rs. ${resolvedGrandTotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 4, {
     font: fontBold,
     size: 8.5,
   });
@@ -483,7 +497,8 @@ export async function generateCustomerLedgerPdfBuffer(
     const f = options.font || fontRegular;
     const s = options.size || 8.5;
     const c = options.color || rgb(0, 0, 0);
-    page.drawText(String(text || ""), { x: xPos, y: yPos, font: f, size: s, color: c });
+    const clean = sanitizeWinAnsi(text);
+    page.drawText(clean, { x: xPos, y: yPos, font: f, size: s, color: c });
   };
 
   const drawLine = (x1: number, y1: number, x2: number, y2: number, thickness = 0.75) => {
@@ -505,17 +520,17 @@ export async function generateCustomerLedgerPdfBuffer(
   // Header Letterhead
   y -= 18;
   const companyName = String(companyTemplate.companyName || "KRISH CLOTHING CO.").toUpperCase();
-  const cNameW = fontBold.widthOfTextAtSize(companyName, 15);
+  const cNameW = fontBold.widthOfTextAtSize(sanitizeWinAnsi(companyName), 15);
   drawText(companyName, margin + (contentWidth - cNameW) / 2, y, { font: fontBold, size: 15 });
 
   y -= 11;
   const addr1 = String(companyTemplate.addressLine1 || "2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,").trim();
-  const addr1W = fontBold.widthOfTextAtSize(addr1, 7.5);
+  const addr1W = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr1), 7.5);
   drawText(addr1, margin + (contentWidth - addr1W) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 10;
   const addr2 = String(companyTemplate.addressLine2 || "AHMEDABAD - 380008 (M) : 8128756632").trim();
-  const addr2W = fontBold.widthOfTextAtSize(addr2, 7.5);
+  const addr2W = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr2), 7.5);
   drawText(addr2, margin + (contentWidth - addr2W) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 8;
@@ -529,7 +544,7 @@ export async function generateCustomerLedgerPdfBuffer(
     formatType === "format1"
       ? "STATEMENT OF PENDING & PARTLY PAID BILLS"
       : "STATEMENT OF ACCOUNT / CUSTOMER LEDGER";
-  const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
+  const titleW = fontBold.widthOfTextAtSize(sanitizeWinAnsi(titleText), 9.5);
   drawText(titleText, margin + (contentWidth - titleW) / 2, y + 1, {
     font: fontBold,
     size: 9.5,
@@ -567,7 +582,7 @@ export async function generateCustomerLedgerPdfBuffer(
   rightY -= 11;
   drawText(`Total Outstanding Due:`, rightX, rightY, { size: 7.5 });
   rightY -= 11;
-  drawText(`₹${totalPendingAmount.toLocaleString("en-IN")}`, rightX, rightY, {
+  drawText(`Rs. ${totalPendingAmount.toLocaleString("en-IN")}`, rightX, rightY, {
     font: fontBold,
     size: 10,
     color: rgb(0.8, 0, 0),
@@ -611,9 +626,9 @@ export async function generateCustomerLedgerPdfBuffer(
   drawText("Bill Date", cDate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Bill / Invoice No.", cBillNo + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Due Date", cDueDate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Bill Total (₹)", cTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Amount Received (₹)", cPaid + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Amount Left (₹)", cPending + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Bill Total (Rs.)", cTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Amount Received (Rs.)", cPaid + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Amount Left (Rs.)", cPending + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
 
   y = thBottomY;
 
@@ -664,7 +679,7 @@ export async function generateCustomerLedgerPdfBuffer(
   const totBottomY = y - totH;
   drawRect(margin, totBottomY, contentWidth, totH, rgb(0.95, 0.95, 0.95), 1);
 
-  drawText(`Total Pending Due: ₹${totalPendingAmount.toLocaleString("en-IN")}`, margin + 8, totBottomY + 19, {
+  drawText(`Total Pending Due: Rs. ${totalPendingAmount.toLocaleString("en-IN")}`, margin + 8, totBottomY + 19, {
     font: fontBold,
     size: 9.5,
     color: rgb(0.8, 0, 0),
@@ -769,7 +784,8 @@ export async function generateSalesInvoicePdfBuffer(
     const f = options.font || fontRegular;
     const s = options.size || 8.5;
     const c = options.color || rgb(0, 0, 0);
-    page.drawText(String(text || ""), { x: xPos, y: yPos, font: f, size: s, color: c });
+    const clean = sanitizeWinAnsi(text);
+    page.drawText(clean, { x: xPos, y: yPos, font: f, size: s, color: c });
   };
 
   const drawLine = (x1: number, y1: number, x2: number, y2: number, thickness = 0.75) => {
@@ -791,17 +807,17 @@ export async function generateSalesInvoicePdfBuffer(
   // Header Letterhead
   y -= 18;
   const compName = String(globalTemplate.companyName || "KRISH CLOTHING CO.").toUpperCase();
-  const cW = fontBold.widthOfTextAtSize(compName, 15);
+  const cW = fontBold.widthOfTextAtSize(sanitizeWinAnsi(compName), 15);
   drawText(compName, margin + (contentWidth - cW) / 2, y, { font: fontBold, size: 15 });
 
   y -= 11;
   const addr1 = String(globalTemplate.addressLine1 || "2ND FLOOR, Q-8,SAMET BUSINESS PARK,NEAR PARISHKAR-2,KHOKHARA CIRCLE,MANINAGAR,").trim();
-  const a1W = fontBold.widthOfTextAtSize(addr1, 7.5);
+  const a1W = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr1), 7.5);
   drawText(addr1, margin + (contentWidth - a1W) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 10;
   const addr2 = String(globalTemplate.addressLine2 || "AHMEDABAD - 380008 (M) : 8128756632").trim();
-  const a2W = fontBold.widthOfTextAtSize(addr2, 7.5);
+  const a2W = fontBold.widthOfTextAtSize(sanitizeWinAnsi(addr2), 7.5);
   drawText(addr2, margin + (contentWidth - a2W) / 2, y, { font: fontBold, size: 7.5 });
 
   y -= 8;
@@ -812,7 +828,7 @@ export async function generateSalesInvoicePdfBuffer(
   const bannerY = y - 4;
   drawRect(margin, bannerY, contentWidth, 18, rgb(0.92, 0.92, 0.92), 1);
   const docBannerText = "TAX INVOICE";
-  const docBannerW = fontBold.widthOfTextAtSize(docBannerText, 10);
+  const docBannerW = fontBold.widthOfTextAtSize(sanitizeWinAnsi(docBannerText), 10);
   drawText(docBannerText, margin + (contentWidth - docBannerW) / 2, y + 1, { font: fontBold, size: 10 });
 
   y = bannerY;
@@ -867,7 +883,7 @@ export async function generateSalesInvoicePdfBuffer(
   drawText("Sets", colSets + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Pcs", colPcs + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Rate", colRate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Amount (₹)", colTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Amount (Rs.)", colTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
 
   y = thBottomY;
 
@@ -906,13 +922,13 @@ export async function generateSalesInvoicePdfBuffer(
 
   const totRightX = margin + contentWidth - 140;
   drawText(`Subtotal:`, totRightX, totBottomY + 24, { size: 7.5 });
-  drawText(`₹${inv.subtotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 24, { size: 7.5 });
+  drawText(`Rs. ${inv.subtotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 24, { size: 7.5 });
 
   drawText(`GST (5%):`, totRightX, totBottomY + 13, { size: 7.5 });
-  drawText(`₹${inv.gstAmount.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 13, { size: 7.5 });
+  drawText(`Rs. ${inv.gstAmount.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 13, { size: 7.5 });
 
   drawText(`Grand Total:`, totRightX, totBottomY + 2, { font: fontBold, size: 8.5 });
-  drawText(`₹${inv.grandTotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 2, {
+  drawText(`Rs. ${inv.grandTotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 2, {
     font: fontBold,
     size: 8.5,
   });
