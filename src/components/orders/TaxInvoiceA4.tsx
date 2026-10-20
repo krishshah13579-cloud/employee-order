@@ -1488,7 +1488,7 @@ export default function TaxInvoiceA4({
                   color: "#222",
                 }}
               >
-                <span>GST (0% - Wholesale Without GST)</span>
+                <span>GST (0%)</span>
                 <span style={{ fontFamily: "monospace" }}>0.00</span>
               </div>
             ) : (

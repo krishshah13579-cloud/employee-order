@@ -326,7 +326,7 @@ export default function OrderFormPage() {
     if (selectedCustomer) {
       if (isWithoutGst) {
         setIsEditingGstPan(false);
-        setCustomGstPan(selectedCustomer.gstPanNo || "NOT REQUIRED");
+        setCustomGstPan(selectedCustomer.gstPanNo || "");
       } else if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
         setIsEditingGstPan(true);
         setCustomGstPan("");
@@ -1128,21 +1128,13 @@ export default function OrderFormPage() {
 
                   <div className="sm:col-span-2 lg:col-span-2">
                     {isWithoutGst ? (
-                      <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-emerald-900 block font-bold text-[10px] uppercase tracking-wider">
-                            GST NO. / PAN NO.
-                          </span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded uppercase">
-                            Not Required
-                          </span>
-                        </div>
-                        <div className="font-bold text-emerald-800 text-xs uppercase flex items-center gap-1.5">
-                          <span>WHOLESALER WITHOUT GST (TAX EXEMPT)</span>
-                        </div>
-                        <p className="text-[10px] text-emerald-700 font-medium">
-                          No GST/PAN required. Products can be added directly without GST.
-                        </p>
+                      <div>
+                        <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
+                          GST NO. / PAN NO.
+                        </span>
+                        <span className="font-mono font-black text-orange-600 text-sm uppercase">
+                          {selectedCustomer.gstPanNo && selectedCustomer.gstPanNo !== "NOT REQUIRED" && selectedCustomer.gstPanNo !== "—" ? selectedCustomer.gstPanNo.toUpperCase() : ""}
+                        </span>
                       </div>
                     ) : !isCustomerGstRegistered ? (
                       <div className="bg-amber-50/90 border-2 border-amber-400 p-3 rounded-xl space-y-1.5 shadow-xs">
@@ -1277,7 +1269,7 @@ export default function OrderFormPage() {
                       Type of Business
                     </span>
                     <div className="flex items-center gap-2">
-                      {effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" ? (
+                      {effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" || effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-purple-500" />
                           <span>Wholesale (Locked)</span>
@@ -1288,11 +1280,6 @@ export default function OrderFormPage() {
                           <span>
                             Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""}) (Locked)
                           </span>
-                        </span>
-                      ) : effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
-                          <Lock size={12} className="text-fuchsia-600" />
-                          <span>Wholesale (Without GST) (Locked)</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">

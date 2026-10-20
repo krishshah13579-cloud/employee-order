@@ -742,7 +742,7 @@ export default function OrderEditPage() {
               </div>
 
               <div className="flex justify-between text-slate-600">
-                <span>{isWithoutGst ? "GST (0% - Without GST):" : "GST (5%):"}</span>
+                <span>{isWithoutGst ? "GST (0%):" : "GST (5%):"}</span>
                 <span className="font-bold text-slate-900 text-sm">
                   {isWithoutGst ? "₹0.00" : formatCurrency(gstAmount)}
                 </span>

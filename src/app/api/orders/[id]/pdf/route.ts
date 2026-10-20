@@ -501,7 +501,7 @@ export async function GET(
 
     if (isWithoutGst) {
       sY -= 11;
-      drawText("GST (0% - Without GST)", summarySplitX + 8, sY, { size: 7.5 });
+      drawText("GST (0%)", summarySplitX + 8, sY, { size: 7.5 });
       const zeroGstStr = "0.00";
       const zeroGstW = fontRegular.widthOfTextAtSize(zeroGstStr, 7.5);
       drawText(zeroGstStr, width - margin - zeroGstW - 8, sY, { size: 7.5 });
