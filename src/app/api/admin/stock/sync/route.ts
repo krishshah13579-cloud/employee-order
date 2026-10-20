@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     // Call external storefront API server-to-server to avoid browser CORS restrictions
     const storefrontRes = await fetch(
-      "https://iq-trousers-store-uge4.vercel.app/api/sync-stock",
+      "https://www.iqtrousers.in/api/sync-stock",
       {
         method: "GET",
         headers: {

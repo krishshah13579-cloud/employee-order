@@ -158,13 +158,13 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Real-time auto-sync to Storefront (iq-trousers-store-uge4.vercel.app)
+    // Real-time auto-sync to Storefront (www.iqtrousers.in)
     try {
       const totalSets = getTotalAvailableSets(updated.setsColorwise);
       const pcsPerSet = updated.pcsPerSet || 5;
       const totalPcs = totalSets * pcsPerSet + (updated.mixPcs || 0);
 
-      fetch("https://iq-trousers-store-uge4.vercel.app/api/sync-stock", {
+      fetch("https://www.iqtrousers.in/api/sync-stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
