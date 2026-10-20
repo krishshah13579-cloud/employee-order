@@ -324,7 +324,9 @@ export default function OrdersView({
                         </div>
                       ) : (
                         <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-slate-900">{o.orderNumber}</span>
+                          <span className="font-bold text-slate-900">
+                            {o.orderNumber?.startsWith("#") ? o.orderNumber : `#${o.orderNumber}`}
+                          </span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                             Order Form
                           </span>

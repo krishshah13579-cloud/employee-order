@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/types";
+import { useEmployee } from "@/components/providers/EmployeeProvider";
 
 interface OrderItemSummary {
   id?: number;
@@ -37,8 +38,9 @@ interface OrderItemSummary {
 interface RecentOrder {
   id: number;
   orderNumber: string;
+  placedBy?: string;
   customerName: string;
-  customerGstPan: string;
+  customerGstPan?: string;
   customerPhone?: string;
   status: string;
   grandTotal: number;
@@ -63,17 +65,45 @@ interface StatsData {
 
 export default function HomePage() {
   const router = useRouter();
+  const { employee } = useEmployee();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState<string>("");
+  const [empName, setEmpName] = useState<string>("");
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (employee?.name) {
+      setEmpName(employee.name);
+    } else {
+      try {
+        const saved =
+          localStorage.getItem("garmentpro_employee_name") ||
+          localStorage.getItem("garmentpro_employee");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed?.name) setEmpName(parsed.name);
+            else setEmpName(saved);
+          } catch {
+            setEmpName(saved);
+          }
+        }
+      } catch {}
+    }
+  }, [employee]);
+
+  const loadData = async (activeEmpName?: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch("/api/stats");
+      const targetEmp = activeEmpName !== undefined ? activeEmpName : empName;
+      const url = targetEmp
+        ? `/api/stats?placedBy=${encodeURIComponent(targetEmp)}`
+        : "/api/stats";
+
+      const res = await fetch(url);
       if (res.ok) {
         const statsData: StatsData = await res.json();
         setStats(statsData);
@@ -89,17 +119,23 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(empName);
+  }, [empName]);
 
-  // Filter recent orders
+  // Strict employee isolation: only show orders placed by this particular logged-in employee
   const filteredRecentOrders = (stats?.recentOrders || []).filter((order) => {
+    if (empName) {
+      const cleanEmp = empName.trim().toLowerCase();
+      if (!order.placedBy || order.placedBy.trim().toLowerCase() !== cleanEmp) {
+        return false;
+      }
+    }
+
     if (!searchFilter.trim()) return true;
     const term = searchFilter.toLowerCase().trim();
     return (
       order.orderNumber.toLowerCase().includes(term) ||
       order.customerName.toLowerCase().includes(term) ||
-      (order.customerGstPan && order.customerGstPan.toLowerCase().includes(term)) ||
       (order.customerPhone && order.customerPhone.toLowerCase().includes(term))
     );
   });
@@ -120,7 +156,7 @@ export default function HomePage() {
               <span>{error}</span>
             </div>
             <button
-              onClick={loadData}
+              onClick={() => loadData()}
               className="font-bold underline hover:text-red-900"
             >
               Retry
@@ -143,7 +179,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => loadData()}
               disabled={loading}
               className="p-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl transition"
               title="Refresh metrics"
@@ -261,9 +297,14 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <Package size={20} className="text-orange-600" />
                 <h2 className="text-lg font-black text-slate-900">
-                  Recent Orders (10 Customer Orders Shown)
+                  Recent Orders {empName ? `(${empName})` : "(10 Customer Orders Shown)"}
                 </h2>
               </div>
+              {empName && (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Showing wholesale orders created by <span className="font-bold text-orange-600">{empName}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -274,7 +315,7 @@ export default function HomePage() {
                 />
                 <input
                   type="text"
-                  placeholder="Filter by Order#, Shop, GST..."
+                  placeholder="Filter by Order#, Shop Name..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-neutral-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -297,8 +338,6 @@ export default function HomePage() {
                 <tr className="bg-neutral-100/70 border-b border-neutral-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3.5 px-5">Order #</th>
                   <th className="py-3.5 px-5">Customer / Shop Name</th>
-                  <th className="py-3.5 px-5">GST / PAN No.</th>
-                  <th className="py-3.5 px-5">Product(s) &amp; Colors</th>
                   <th className="py-3.5 px-5 text-center">PCS (Sets)</th>
                   <th className="py-3.5 px-5 text-right">Grand Total (₹)</th>
                   <th className="py-3.5 px-5 text-center">Status</th>
@@ -310,14 +349,14 @@ export default function HomePage() {
                 {loading ? (
                   Array.from({ length: 4 }).map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
-                      <td colSpan={9} className="py-4 px-5">
+                      <td colSpan={7} className="py-4 px-5">
                         <div className="w-full h-5 bg-neutral-200 rounded" />
                       </td>
                     </tr>
                   ))
                 ) : filteredRecentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="max-w-sm mx-auto flex flex-col items-center">
                         <div className="w-14 h-14 bg-neutral-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
                           <Package size={28} />
@@ -328,7 +367,9 @@ export default function HomePage() {
                             : "No customer orders placed yet"}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          No wholesale customer orders recorded yet.
+                          {empName
+                            ? `No wholesale customer orders recorded for ${empName} yet.`
+                            : "No wholesale customer orders recorded yet."}
                         </p>
                       </div>
                     </td>
@@ -339,23 +380,6 @@ export default function HomePage() {
                       STATUS_COLORS[order.status] ||
                       "bg-neutral-100 text-neutral-700 border-neutral-200";
 
-                    const itemsSummary = (order.items || []).map((it) => {
-                      let colorInfo = "";
-                      try {
-                        const parsedColors = Array.isArray(it.colorSets)
-                          ? it.colorSets
-                          : typeof it.colorSets === "string"
-                          ? JSON.parse(it.colorSets)
-                          : [];
-                        if (parsedColors.length > 0) {
-                          colorInfo = parsedColors
-                            .map((c: any) => `${c.color} (${c.sets}s)`)
-                            .join(", ");
-                        }
-                      } catch {}
-                      return `${it.productName}${colorInfo ? ` [${colorInfo}]` : ""}`;
-                    });
-
                     return (
                       <tr
                         key={order.id}
@@ -364,7 +388,11 @@ export default function HomePage() {
                         title="Click to open and edit Order Form"
                       >
                         <td className="py-4 px-5 font-mono font-bold text-slate-900 group-hover:text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
-                          <span>{order.orderNumber}</span>
+                          <span>
+                            {order.orderNumber?.startsWith("#")
+                              ? order.orderNumber
+                              : `#${order.orderNumber}`}
+                          </span>
                           <ExternalLink
                             size={12}
                             className="opacity-0 group-hover:opacity-100 text-orange-500 transition-opacity"
@@ -379,20 +407,6 @@ export default function HomePage() {
                             <div className="text-[10px] text-slate-500">
                               Ph: {order.customerPhone}
                             </div>
-                          )}
-                        </td>
-
-                        <td className="py-4 px-5 font-mono font-medium text-slate-700 whitespace-nowrap">
-                          {order.customerGstPan || "—"}
-                        </td>
-
-                        <td className="py-4 px-5 max-w-xs truncate text-slate-700">
-                          {itemsSummary.length > 0 ? (
-                            <span title={itemsSummary.join(" | ")}>
-                              {itemsSummary.join("; ")}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic">Wholesale Garments</span>
                           )}
                         </td>
 

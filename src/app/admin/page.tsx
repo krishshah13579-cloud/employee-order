@@ -350,7 +350,7 @@ export default function AdminDashboardPage() {
                 stats.recentOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="py-3.5 px-6 font-mono font-bold text-gray-900">
-                      {o.orderNumber}
+                      {o.orderNumber?.startsWith("#") ? o.orderNumber : `#${o.orderNumber}`}
                     </td>
                     <td className="py-3.5 px-6 font-medium text-gray-900">
                       {o.customerName}

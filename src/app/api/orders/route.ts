@@ -11,10 +11,13 @@ import {
 import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-security";
-import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
+import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
 
 export async function GET(request: NextRequest) {
   try {
+    // Ensure all existing orders start sequentially from 1
+    await syncSequentialOrderNumbers().catch(() => {});
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
@@ -304,26 +307,7 @@ export async function POST(request: NextRequest) {
     let orderNumber = customOrderNumber;
 
     if (!orderNumber) {
-      // Auto-generate Order Form number starting from 1
-      const allOrders = await prisma.order.findMany({
-        select: { orderNumber: true },
-      });
-
-      let maxNum = 0;
-      for (const ord of allOrders) {
-        const raw = (ord.orderNumber || "").trim();
-        if (/^\d+$/.test(raw)) {
-          const val = parseInt(raw, 10);
-          if (val > maxNum) maxNum = val;
-        }
-      }
-
-      let sequence = maxNum + 1;
-      orderNumber = String(sequence);
-      while (await prisma.order.findUnique({ where: { orderNumber } })) {
-        sequence++;
-        orderNumber = String(sequence);
-      }
+      orderNumber = await getNextOrderNumber(prisma);
     } else {
       // Validate unique custom orderNumber
       const existing = await prisma.order.findUnique({ where: { orderNumber } });

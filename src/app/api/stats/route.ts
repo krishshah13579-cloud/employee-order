@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { DashboardStats } from "@/lib/types";
 import { getTotalAvailableSets } from "@/lib/stock";
 import { getEmployeeSession, getAdminSession } from "@/lib/auth-security";
+import { syncSequentialOrderNumbers } from "@/lib/order-numbers";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +13,23 @@ export async function GET(req: NextRequest) {
     if (!isEmployee && !isAdmin) {
       return NextResponse.json({ error: "Unauthorized: Please log in." }, { status: 401 });
     }
+
+    // Auto-sync sequential order numbers starting from 1
+    await syncSequentialOrderNumbers().catch(() => {});
+
+    // Filter recent orders by employee if logged in or passed via query
+    const { searchParams } = new URL(req.url);
+    const placedByQuery = searchParams.get("placedBy")?.trim();
+    const effectivePlacedBy = placedByQuery || (isEmployee ? isEmployee.name : "");
+
+    const recentOrdersWhere: any = {};
+    if (effectivePlacedBy) {
+      recentOrdersWhere.placedBy = {
+        equals: effectivePlacedBy,
+        mode: "insensitive",
+      };
+    }
+
     // Calculate today's start and end accurately in Indian Standard Time (IST)
     const istDateString = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
     const startOfToday = new Date(`${istDateString}T00:00:00+05:30`);
@@ -69,7 +87,8 @@ export async function GET(req: NextRequest) {
         },
       }).catch(() => ({ _sum: { grandTotal: 0 } })),
       prisma.order.findMany({
-        take: 10,
+        where: recentOrdersWhere,
+        take: 15,
         orderBy: {
           createdAt: "desc",
         },
@@ -141,6 +160,7 @@ export async function GET(req: NextRequest) {
       recentOrders: recentOrdersRaw.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
+        placedBy: order.placedBy,
         customerName: order.customerName || (order.customer ? order.customer.shopName : "Unknown"),
         customerGstPan: order.customerGstPan || (order.customer ? order.customer.gstPanNo : "—"),
         customerPhone: order.customerPhone || (order.customer ? order.customer.phoneNumber : "—"),

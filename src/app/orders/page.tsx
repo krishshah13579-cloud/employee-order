@@ -255,7 +255,11 @@ export default function EmployeeOrdersListPage() {
                       >
                         {/* Order # */}
                         <td className="py-4 px-4 font-mono font-bold text-slate-900 group-hover:text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
-                          <span>{order.orderNumber}</span>
+                          <span>
+                            {order.orderNumber?.startsWith("#")
+                              ? order.orderNumber
+                              : `#${order.orderNumber}`}
+                          </span>
                           <ExternalLink
                             size={12}
                             className="opacity-0 group-hover:opacity-100 text-orange-500 transition-opacity"
