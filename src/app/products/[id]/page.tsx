@@ -979,65 +979,46 @@ function ProductDetailContent() {
               </div>
 
               {/* Pricing & Packaging Formula */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-orange-50/60 rounded-xl border border-orange-200/60">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
-                      Selling Rate / PC
-                    </span>
-                    {draftCustomer && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBusinessType(isWholesaler ? "RETAILER" : "WHOLESALER")}
-                          title="Click to switch business type & update price immediately"
-                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded cursor-pointer transition hover:opacity-85 active:scale-95 ${
-                            isWholesaler
-                              ? "bg-purple-100 text-purple-800 border border-purple-200"
-                              : isSpecialDiscount
-                              ? "bg-teal-100 text-teal-800 border border-teal-200"
-                              : "bg-blue-100 text-blue-800 border border-blue-200"
-                          }`}
-                        >
-                          {isWholesaler
-                            ? "Wholesale ⇄"
-                            : isSpecialDiscount
-                            ? `Spl Disc (-₹${specialDiscountAmt})`
-                            : "Retailer ⇄"}
-                        </button>
+              {(() => {
+                const displayMrp = product.mrp && product.mrp > 0 ? product.mrp : Math.round(unitPrice * 2);
+                return (
+                  <div className="p-4 bg-orange-50/60 rounded-xl border border-orange-200/60">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
+                      <div>
+                        <div className="text-[10px] sm:text-xs font-bold text-orange-600 uppercase tracking-wider">
+                          MRP
+                        </div>
+                        <div className="text-base sm:text-xl font-bold text-slate-400 line-through mt-0.5 font-mono">
+                          {formatCurrency(displayMrp)}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  {/* BESIDE SELLING PRICE WRITE MRP (STRIKED OUT) SELLING PRICE */}
-                  <div className="text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-2 font-mono flex-wrap">
-                    {product.mrp && product.mrp > unitPrice && (
-                      <span className="text-xs text-slate-400 line-through">
-                        MRP {formatCurrency(product.mrp)}
-                      </span>
-                    )}
-                    <span>{formatCurrency(unitPrice)}</span>
-                    <span className="text-xs font-semibold text-slate-500 font-sans">/ pc</span>
-                  </div>
-                  {draftCustomer && (
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Applied for <strong>{draftCustomer.shopName}</strong>
-                    </p>
-                  )}
-                </div>
 
-                <div>
-                  <div className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
-                    Packaging Ratio
+                      <div>
+                        <div className="text-[10px] sm:text-xs font-bold text-orange-600 uppercase tracking-wider">
+                          SELLING PRICE
+                        </div>
+                        <div className="text-base sm:text-xl font-black text-slate-900 mt-0.5 font-mono">
+                          {formatCurrency(unitPrice)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] sm:text-xs font-bold text-orange-600 uppercase tracking-wider">
+                          PACKING RATIO
+                        </div>
+                        <div className="text-base sm:text-xl font-black text-slate-900 mt-0.5 uppercase">
+                          {activePcsPerSet} PCS/SET
+                        </div>
+                      </div>
+                    </div>
+                    {draftCustomer && (
+                      <p className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-orange-200/50">
+                        Applied for <strong>{draftCustomer.shopName}</strong>
+                      </p>
+                    )}
                   </div>
-                  <div className="text-xl font-black text-slate-900 mt-0.5">
-                    {activePcsPerSet} Pcs
-                    <span className="text-xs font-semibold text-slate-500 ml-1">/ set</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    1 set = 1 pc of each ratio size
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Size Ratio: Always show primary ratio (28 to 36) without multi-ratio clutter */}
               <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100">
@@ -1222,13 +1203,9 @@ function ProductDetailContent() {
                             style={{ backgroundColor: hex }}
                           />
                           <span>{col}</span>
-                          {currentSets > 0 ? (
+                          {currentSets > 0 && (
                             <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
                               {currentSets}
-                            </span>
-                          ) : (
-                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.2 rounded font-bold">
-                              {maxAllowed}
                             </span>
                           )}
                         </button>
@@ -1348,20 +1325,6 @@ function ProductDetailContent() {
                               <div className="font-bold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
                                 <span>{color}</span>
 
-                                {/* Stock Availability Badge */}
-                                {isAvailable ? (
-                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                                    <span>{maxAllowed} {maxAllowed === 1 ? "Set" : "Sets"} Available</span>
-                                    {reservedByOthers > 0 && (
-                                      <span className="text-[9px] text-amber-700 font-medium">({reservedByOthers} reserved)</span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-300">
-                                    0 Available {reservedByOthers > 0 ? "(Reserved by other order)" : "(Out of Stock)"}
-                                  </span>
-                                )}
-
                                 {currentSets > 0 && (
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-600 text-white">
                                     {currentSets} {currentSets === 1 ? "Set" : "Sets"} ({calculatedColorPcs} Pcs)
@@ -1438,7 +1401,7 @@ function ProductDetailContent() {
                                 }}
                                 className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition cursor-pointer"
                                 aria-label="Increase sets"
-                                title={currentSets >= maxAllowed ? `Maximum ${maxAllowed} sets available in stock` : "Increase sets"}
+                                title={currentSets >= maxAllowed ? "Maximum sets reached" : "Increase sets"}
                               >
                                 <Plus size={15} />
                               </button>
