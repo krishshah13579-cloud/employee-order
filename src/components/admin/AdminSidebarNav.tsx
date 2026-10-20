@@ -22,6 +22,7 @@ import {
   BadgePercent,
   SlidersHorizontal,
   ShieldAlert,
+  FileCheck2,
   X,
 } from "lucide-react";
 
@@ -76,6 +77,12 @@ const navItems = [
     name: "Final Invoices",
     href: "/admin/invoices",
     icon: Receipt,
+    exact: false,
+  },
+  {
+    name: "Bill (Without GST)",
+    href: "/admin/bills",
+    icon: FileCheck2,
     exact: false,
   },
   {

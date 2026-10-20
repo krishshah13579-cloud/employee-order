@@ -427,20 +427,21 @@ export async function DELETE(
 
     // Determine whether to restore stock:
     // Support URL param ?restoreStock=true/false
-    // Support JSON body { restoreStock: true/false }
+    // Support JSON body { restoreStock: true/false, twoFactorCode: string }
     let restoreStock = true;
+    let requestBody: any = {};
+    try {
+      requestBody = await _request.json();
+      if (typeof requestBody.restoreStock === "boolean") {
+        restoreStock = requestBody.restoreStock;
+      }
+    } catch {
+      // No JSON body provided
+    }
+
     const url = new URL(_request.url);
     if (url.searchParams.has("restoreStock")) {
       restoreStock = url.searchParams.get("restoreStock") !== "false";
-    } else {
-      try {
-        const body = await _request.json();
-        if (typeof body.restoreStock === "boolean") {
-          restoreStock = body.restoreStock;
-        }
-      } catch {
-        // No JSON body provided, default to true
-      }
     }
 
     const order = await prisma.order.findUnique({
@@ -461,11 +462,58 @@ export async function DELETE(
       );
     }
 
-    // 1. Preserve any generated Tax Invoice in Sales Register!
-    // If taxInvoiceNumber was assigned, ensure a SalesInvoice record exists before deleting the order
-    if (order.taxInvoiceNumber) {
+    // 1. Super Admin 2FA Authentication for Generated Invoices
+    // "NO ONE CAN DELETE THE INVOICE ONCE GENERATED TO DELETE ONE NEED TO AUTHENTICATE USING THE 2FA OF SUPER ADMIN."
+    if (order.taxInvoiceNumber && order.taxInvoiceNumber.trim()) {
+      const codeFromReq =
+        requestBody.twoFactorCode ||
+        _request.headers.get("x-admin-2fa-code") ||
+        url.searchParams.get("twoFactorCode");
+
+      if (!codeFromReq || String(codeFromReq).trim().length < 4) {
+        return NextResponse.json(
+          {
+            error:
+              "Invoice has been generated. Deletion is locked! Super Admin 2FA authentication code is required to delete this invoice.",
+          },
+          { status: 403 }
+        );
+      }
+
+      const cleanCode = String(codeFromReq).trim();
+      const admin = await prisma.adminAccount.findFirst();
+
+      if (!admin) {
+        return NextResponse.json(
+          { error: "Super Admin account is not configured." },
+          { status: 500 }
+        );
+      }
+
+      const isOtpMatch =
+        admin.lastOtp &&
+        admin.lastOtp === cleanCode &&
+        (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
+      const isSecretMatch = admin.twoFactorSecret && admin.twoFactorSecret === cleanCode;
+
+      if (!isOtpMatch && !isSecretMatch) {
+        return NextResponse.json(
+          { error: "Invalid or expired Super Admin 2FA security code. Invoice deletion rejected." },
+          { status: 401 }
+        );
+      }
+
+      // Clear one-time OTP so it cannot be reused
+      if (admin.lastOtp) {
+        await prisma.adminAccount.update({
+          where: { id: admin.id },
+          data: { lastOtp: null, otpExpiresAt: null },
+        });
+      }
+
+      // Delete the corresponding SalesInvoice as authorized by Super Admin 2FA
       try {
-        const existingInvoice = await prisma.salesInvoice.findFirst({
+        await prisma.salesInvoice.deleteMany({
           where: {
             OR: [
               { orderId: order.id },
@@ -473,25 +521,9 @@ export async function DELETE(
             ],
           },
         });
-        if (!existingInvoice) {
-          await createOrUpdateSalesInvoiceFromOrder(order.id);
-        }
-      } catch (invErr) {
-        console.error("Error ensuring sales invoice before order delete:", invErr);
+      } catch (invDelErr) {
+        console.error("Error deleting sales invoice upon 2FA authorization:", invDelErr);
       }
-    }
-
-    // Detach any linked SalesInvoice records so they are safely preserved in Sales Register
-    try {
-      await prisma.salesInvoice.updateMany({
-        where: { orderId: order.id },
-        data: {
-          orderId: null,
-          notes: order.orderNumber ? `Origin Order Form: ${order.orderNumber} (Order form deleted)` : undefined,
-        },
-      });
-    } catch (detachErr) {
-      console.error("Error detaching sales invoice from order:", detachErr);
     }
 
     // 2. If restoreStock is requested, restore the stock sets back to product setsColorwise

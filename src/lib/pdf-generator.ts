@@ -73,6 +73,13 @@ export async function generateOrderPdfBuffer(
   let resolvedTotalSets = order.totalSets;
   let resolvedTotalPcs = order.totalPcs;
 
+  const isWithoutGst =
+    order.gstRate === 0 ||
+    order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
+    order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+    (order as any).businessType === "WHOLESALER WITHOUT GST" ||
+    (order as any).businessType === "WHOLESALE WITHOUT GST";
+
   if (isTaxInvoice && order.taxInvoiceItems) {
     try {
       const parsed = JSON.parse(order.taxInvoiceItems);
@@ -81,12 +88,15 @@ export async function generateOrderPdfBuffer(
         resolvedTotalSets = parsed.reduce((s: number, it: any) => s + (Number(it.totalSets) || 0), 0);
         resolvedTotalPcs = parsed.reduce((s: number, it: any) => s + (Number(it.totalPcs) || 0), 0);
         resolvedSubtotal = parsed.reduce((s: number, it: any) => s + (Number(it.itemSubtotal) || 0), 0);
-        resolvedGst = Math.round(resolvedSubtotal * 0.05 * 100) / 100;
+        resolvedGst = isWithoutGst ? 0 : Math.round(resolvedSubtotal * 0.05 * 100) / 100;
         resolvedGrandTotal = Math.round(resolvedSubtotal + resolvedGst);
       }
     } catch (e) {
       console.error("Error parsing taxInvoiceItems for PDF:", e);
     }
+  } else if (isWithoutGst) {
+    resolvedGst = 0;
+    resolvedGrandTotal = Math.round(resolvedSubtotal);
   }
 
   const globalTemplate = await getInvoiceTemplateSettings();
@@ -293,8 +303,13 @@ export async function generateOrderPdfBuffer(
   drawText(`Subtotal:`, totRightX, totBottomY + 28, { size: 7.5 });
   drawText(`Rs. ${resolvedSubtotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 28, { size: 7.5 });
 
-  drawText(`GST (5%):`, totRightX, totBottomY + 16, { size: 7.5 });
-  drawText(`Rs. ${resolvedGst.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 16, { size: 7.5 });
+  if (isWithoutGst) {
+    drawText(`GST (0%):`, totRightX, totBottomY + 16, { size: 7.5 });
+    drawText(`Rs. 0`, totRightX + 60, totBottomY + 16, { size: 7.5 });
+  } else {
+    drawText(`GST (5%):`, totRightX, totBottomY + 16, { size: 7.5 });
+    drawText(`Rs. ${resolvedGst.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 16, { size: 7.5 });
+  }
 
   drawText(`Grand Total:`, totRightX, totBottomY + 4, { font: fontBold, size: 8.5 });
   drawText(`Rs. ${resolvedGrandTotal.toLocaleString("en-IN")}`, totRightX + 60, totBottomY + 4, {

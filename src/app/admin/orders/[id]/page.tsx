@@ -440,11 +440,28 @@ export default function OrderInvoicePage() {
           activeTotalSets = parsed.reduce((s, it) => s + (Number(it.totalSets) || 0), 0);
           activeTotalPcs = parsed.reduce((s, it) => s + (Number(it.totalPcs) || 0), 0);
           activeSubtotal = parsed.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
-          activeGst = Math.round(activeSubtotal * 0.05 * 100) / 100;
+          const isWithoutGst =
+            order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
+            order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+            order.businessType === "WHOLESALER WITHOUT GST" ||
+            order.businessType === "WHOLESALE WITHOUT GST" ||
+            order.gstRate === 0;
+          activeGst = isWithoutGst ? 0 : Math.round(activeSubtotal * 0.05 * 100) / 100;
           activeGrandTotal = Math.round(activeSubtotal + activeGst);
         }
       }
     } catch {}
+  }
+
+  const isOrderWithoutGst =
+    order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
+    order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+    order.businessType === "WHOLESALER WITHOUT GST" ||
+    order.businessType === "WHOLESALE WITHOUT GST" ||
+    order.gstRate === 0;
+  if (isOrderWithoutGst) {
+    activeGst = 0;
+    activeGrandTotal = Math.round(activeSubtotal);
   }
 
   if (isTaxInvoiceActive) {

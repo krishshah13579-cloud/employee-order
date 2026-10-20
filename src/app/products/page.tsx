@@ -211,8 +211,12 @@ function ProductsContent() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        {/* Unregistered Customer GST/PAN warning */}
-        {draftInfo && draftInfo.customerName && !isGstPanRegistered(draftInfo.customerGstPan) && (
+        {/* Unregistered Customer GST/PAN warning (skipped for Wholesale Without GST) */}
+        {draftInfo &&
+          draftInfo.customerName &&
+          draftInfo.businessType !== "WHOLESALER WITHOUT GST" &&
+          draftInfo.businessType !== "WHOLESALE WITHOUT GST" &&
+          !isGstPanRegistered(draftInfo.customerGstPan) && (
           <div className="p-4 bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900">
             <div className="flex items-center gap-2.5">
               <AlertCircle size={20} className="text-amber-600 shrink-0" />

@@ -253,8 +253,9 @@ export default function OrderEditPage() {
   const totalSets = activeItems.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = activeItems.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = activeItems.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const gstRate = 5.0; // 5% GST
-  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
+  const isWithoutGst = businessType === "WHOLESALER WITHOUT GST" || businessType === "WHOLESALE WITHOUT GST";
+  const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
+  const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
 
   if (loading) {
@@ -728,9 +729,9 @@ export default function OrderEditPage() {
               </div>
 
               <div className="flex justify-between text-slate-600">
-                <span>GST (5%):</span>
+                <span>{isWithoutGst ? "GST (0% - Without GST):" : "GST (5%):"}</span>
                 <span className="font-bold text-slate-900 text-sm">
-                  {formatCurrency(gstAmount)}
+                  {isWithoutGst ? "₹0.00" : formatCurrency(gstAmount)}
                 </span>
               </div>
 

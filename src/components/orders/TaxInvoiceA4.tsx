@@ -47,6 +47,7 @@ export interface TaxInvoiceOrder {
   customerCity?: string | null;
   customerState?: string | null;
   businessType?: string | null;
+  customer?: any;
   creditDays?: number;
   subtotal: number;
   gstRate?: number;
@@ -202,7 +203,13 @@ export default function TaxInvoiceA4({
   const totalPcs = items.reduce((acc, it) => acc + (Number(it.totalPcs) || 0), 0);
   const totalSets = items.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0);
   const subtotal = items.reduce((acc, it) => acc + (Number(it.itemSubtotal) || 0), 0);
-  const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
+  const isWithoutGst =
+    order.gstRate === 0 ||
+    order.businessType === "WHOLESALER WITHOUT GST" ||
+    order.businessType === "WHOLESALE WITHOUT GST" ||
+    order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
+    order.customer?.businessType === "WHOLESALE WITHOUT GST";
+  const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const cgst = Math.round((gstAmount / 2) * 100) / 100;
   const sgst = Math.round((gstAmount / 2) * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
@@ -1356,28 +1363,44 @@ export default function TaxInvoiceA4({
                 {subtotal.toFixed(2)}
               </span>
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "2px 10px",
-                color: "#222",
-              }}
-            >
-              <span>Central Tax 2.50%</span>
-              <span style={{ fontFamily: "monospace" }}>{cgst.toFixed(2)}</span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "2px 10px",
-                color: "#222",
-              }}
-            >
-              <span>State/UT Tax 2.50%</span>
-              <span style={{ fontFamily: "monospace" }}>{sgst.toFixed(2)}</span>
-            </div>
+            {isWithoutGst ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "2px 10px",
+                  color: "#222",
+                }}
+              >
+                <span>GST (0% - Wholesale Without GST)</span>
+                <span style={{ fontFamily: "monospace" }}>0.00</span>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "2px 10px",
+                    color: "#222",
+                  }}
+                >
+                  <span>Central Tax 2.50%</span>
+                  <span style={{ fontFamily: "monospace" }}>{cgst.toFixed(2)}</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "2px 10px",
+                    color: "#222",
+                  }}
+                >
+                  <span>State/UT Tax 2.50%</span>
+                  <span style={{ fontFamily: "monospace" }}>{sgst.toFixed(2)}</span>
+                </div>
+              </>
+            )}
             <div
               style={{
                 borderTop: "1px solid #000000",

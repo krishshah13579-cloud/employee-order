@@ -196,12 +196,17 @@ export default function OrderFormPage() {
           return;
         }
         if (typeof window !== "undefined") {
-          const urlParam = new URLSearchParams(window.location.search).get("customerId");
+          const params = new URLSearchParams(window.location.search);
+          const urlParam = params.get("customerId");
           if (urlParam) {
             const parsedId = parseInt(urlParam, 10);
             if (!isNaN(parsedId)) {
               setSelectedCustomerId(parsedId);
             }
+          }
+          const bParam = params.get("businessType");
+          if (bParam) {
+            setOrderBusinessType(bParam);
           }
         }
       } catch {}
@@ -299,13 +304,18 @@ export default function OrderFormPage() {
   // Check whether the selected customer is registered with GST/PAN
   const isCustomerGstRegistered = useMemo(() => {
     if (!selectedCustomer) return false;
+    if (effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST") {
+      return true; // No GST/PAN needed for without GST customers
+    }
     return isGstPanRegistered(selectedCustomer.gstPanNo);
-  }, [selectedCustomer]);
+  }, [selectedCustomer, effectiveBusinessType]);
 
   // Automatically open editable GST/PAN field if customer is NOT registered
   useEffect(() => {
     if (selectedCustomer) {
-      if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
+      if (effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST") {
+        setIsEditingGstPan(false);
+      } else if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
         setIsEditingGstPan(true);
         setCustomGstPan("");
       } else {
@@ -316,7 +326,7 @@ export default function OrderFormPage() {
       setIsEditingGstPan(false);
       setCustomGstPan("");
     }
-  }, [selectedCustomer]);
+  }, [selectedCustomer, effectiveBusinessType]);
 
   // Handle Credit Days Change with permanent lock when set to 45 Days
   const handleCreditDaysChange = (days: number) => {
@@ -556,7 +566,7 @@ export default function OrderFormPage() {
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST";
+  const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST";
   const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
   const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
@@ -570,8 +580,8 @@ export default function OrderFormPage() {
       return;
     }
 
-    // 1b. Mandatory GST/PAN Registration Check
-    if (!isGstPanRegistered(selectedCustomer.gstPanNo)) {
+    // 1b. Mandatory GST/PAN Registration Check (skipped for Without GST customers)
+    if (!isWithoutGst && !isGstPanRegistered(selectedCustomer.gstPanNo)) {
       toast("Mandatory: Customer is NOT GST/PAN registered. Please enter and save GST/PAN details before booking order.", "error");
       setIsEditingGstPan(true);
       return;
