@@ -7,6 +7,7 @@ import {
   createWhatsAppNativeLink,
   dispatchAutomatedWhatsApp,
 } from "@/lib/whatsapp";
+import { generateCustomerLedgerPdfBuffer } from "@/lib/pdf-generator";
 
 export async function POST(
   request: NextRequest,
@@ -130,7 +131,21 @@ export async function POST(
       origin
     );
 
-    const autoResult = await dispatchAutomatedWhatsApp(customerPhone, messageText);
+    // Generate the official Pending Bills Reminder PDF Document Buffer
+    let pdfBase64: string | undefined = undefined;
+    let fileName: string = `Statement_${customer.shopName.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    try {
+      const pdfRes = await generateCustomerLedgerPdfBuffer(cid, "format1");
+      pdfBase64 = pdfRes.pdfBuffer.toString("base64");
+      fileName = pdfRes.fileName;
+    } catch (pdfErr) {
+      console.warn("Could not generate PDF buffer for outstanding reminder:", pdfErr);
+    }
+
+    const autoResult = await dispatchAutomatedWhatsApp(customerPhone, messageText, {
+      pdfBase64,
+      filename: fileName,
+    });
     const directLink = createWhatsAppDirectLink(customerPhone, messageText);
     const nativeLink = createWhatsAppNativeLink(customerPhone, messageText);
 
@@ -138,6 +153,7 @@ export async function POST(
       success: true,
       automated: autoResult.success,
       method: autoResult.method,
+      fileName,
       whatsappUrl: directLink,
       nativeUrl: nativeLink,
       message: messageText,

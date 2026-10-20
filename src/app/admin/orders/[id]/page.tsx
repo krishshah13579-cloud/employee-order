@@ -387,21 +387,14 @@ export default function OrderInvoicePage() {
       if (data.automated) {
         toast(
           type === "PAYMENT_REMINDER"
-            ? "✅ Payment reminder sent to customer's WhatsApp!"
+            ? `✅ Payment reminder & PDF sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`
             : isTax
-            ? "✅ Tax Invoice PDF sent directly to customer WhatsApp with updated quantities!"
-            : "✅ Order Form PDF sent directly to customer WhatsApp!",
+            ? `✅ Tax Invoice PDF generated & sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`
+            : `✅ Order Form PDF generated & sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`,
           "success"
         );
-      } else if (data.whatsappUrl || data.nativeUrl) {
-        await shareOrOpenWhatsAppWithPdf({
-          whatsappUrl: data.whatsappUrl,
-          nativeUrl: data.nativeUrl,
-          pdfUrl: data.pdfUrl || `/api/orders/${id}/pdf?type=${isTax ? "tax_invoice" : "order_form"}`,
-          filename: `${isTax ? "Tax_Invoice" : "Order_Form"}_${order?.orderNumber || id}.pdf`,
-          text: data.message,
-          onToast: toast,
-        });
+      } else {
+        toast(data.error || "Could not dispatch WhatsApp message. Please check WhatsApp Gateway.", "error");
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp", "error");

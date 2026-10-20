@@ -8,6 +8,7 @@ import {
   createWhatsAppNativeLink,
   dispatchAutomatedWhatsApp,
 } from "@/lib/whatsapp";
+import { generateOrderPdfBuffer } from "@/lib/pdf-generator";
 
 export async function POST(
   request: NextRequest,
@@ -80,9 +81,19 @@ export async function POST(
     let messageText = "";
     const isTaxInvoice = messageType === "TAX_INVOICE" || formatType === "tax_invoice";
     const pdfDocType = isTaxInvoice ? "tax_invoice" : "order_form";
-    const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${order.id}/pdf?type=${pdfDocType}`;
     const docNo = (isTaxInvoice && order.taxInvoiceNumber ? order.taxInvoiceNumber : order.orderNumber).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const pdfFilename = `${isTaxInvoice ? "Tax_Invoice" : "Order_Form"}_${docNo}.pdf`;
+    let pdfFilename = `${isTaxInvoice ? "Tax_Invoice" : "Order_Form"}_${docNo}.pdf`;
+    let pdfBase64: string | undefined = undefined;
+
+    try {
+      const pdfRes = await generateOrderPdfBuffer(order.id, isTaxInvoice ? "TAX_INVOICE" : "ORDER_FORM");
+      pdfBase64 = pdfRes.pdfBuffer.toString("base64");
+      pdfFilename = pdfRes.fileName;
+    } catch (pdfErr) {
+      console.warn("Could not generate in-memory PDF buffer for order WhatsApp:", pdfErr);
+    }
+
+    const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${order.id}/pdf?type=${pdfDocType}`;
 
     if (messageType === "PAYMENT_REMINDER") {
       messageText = generatePaymentReminderWhatsAppMessage(workingOrder as any, origin);
@@ -92,9 +103,10 @@ export async function POST(
       messageText = generateOrderWhatsAppMessage(workingOrder as any, origin);
     }
 
-    // Try automated background dispatch with PDF document attachment
+    // Automated background dispatch with PDF document attachment (base64 directly)
     const autoResult = await dispatchAutomatedWhatsApp(customerPhone, messageText, {
       pdfUrl,
+      pdfBase64,
       filename: pdfFilename,
     });
 

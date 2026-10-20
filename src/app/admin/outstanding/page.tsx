@@ -342,17 +342,13 @@ export default function AdminOutstandingPage() {
         method: "POST",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send WhatsApp reminder");
-
       if (data.automated) {
-        toast("✅ Weekly payment reminder sent directly to customer WhatsApp!", "success");
-      } else if (data.whatsappUrl || data.nativeUrl) {
-        await shareOrOpenWhatsAppWithPdf({
-          whatsappUrl: data.whatsappUrl,
-          nativeUrl: data.nativeUrl,
-          text: data.message,
-          onToast: toast,
-        });
+        toast(
+          `✅ Weekly reminder & Pending Bills PDF sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`,
+          "success"
+        );
+      } else {
+        toast("Could not send WhatsApp message. Please check WhatsApp Gateway connection in settings.", "error");
       }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp reminder", "error");

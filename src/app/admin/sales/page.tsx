@@ -27,7 +27,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 
@@ -474,46 +473,31 @@ export default function AdminSalesPage() {
   };
 
   // Handle WhatsApp Invoice Dispatch
-  const handleSendWhatsAppInvoice = (inv: SalesInvoiceRecord) => {
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<number | null>(null);
+  const handleSendWhatsAppInvoice = async (inv: SalesInvoiceRecord) => {
     const phone = inv.customerPhone || inv.customer?.phoneNumber;
     if (!phone) {
       toast("No phone number associated with this invoice.", "error");
       return;
     }
 
-    const items = getInvoiceItems(inv);
-    const lines = items
-      .map(
-        (it) =>
-          `• ${it.productName}${it.color ? ` (${it.color})` : ""}: ${it.totalSets} Sets (${it.totalPcs} Pcs) @ ₹${it.unitPrice} = ₹${it.itemSubtotal.toLocaleString("en-IN")}`
-      )
-      .join("\n");
+    try {
+      setSendingInvoiceId(inv.id);
+      const res = await fetch(`/api/admin/sales/${inv.id}/whatsapp`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to dispatch invoice via WhatsApp");
 
-    const message = `🧵 *IQ TROUSERS — SALES INVOICE*
-━━━━━━━━━━━━━━━━━━━━
-📄 *Invoice No:* ${inv.invoiceNumber}
-📅 *Date:* ${formatDate(inv.invoiceDate)}
-👤 *Customer:* ${inv.customerName}
-${inv.customerGstPan ? `🏢 *GST/PAN:* ${inv.customerGstPan}\n` : ""}💳 *Type:* ${inv.paymentType.toUpperCase()} ${inv.paymentType === "Cash" ? "(PAID)" : `(Credit: ${inv.creditDays}d)`}
-━━━━━━━━━━━━━━━━━━━━
-📦 *ITEMIZED BILL:*
-${lines}
-━━━━━━━━━━━━━━━━━━━━
-*Subtotal:* ₹${inv.subtotal.toLocaleString("en-IN")}
-*GST (5%):* ₹${inv.gstAmount.toLocaleString("en-IN")}
-*Grand Total:* ₹${inv.grandTotal.toLocaleString("en-IN")}
-*Amount Paid:* ₹${inv.paidAmount.toLocaleString("en-IN")}
-${inv.balanceAmount > 0 ? `⚠️ *Balance Due:* ₹${inv.balanceAmount.toLocaleString("en-IN")}\n` : "✅ *Status:* FULLY PAID\n"}
-Thank you for your business with IQ TROUSERS!`;
-
-    const cleanPhone = phone.replace(/\D/g, "");
-    const intlPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-    const encodedText = encodeURIComponent(message);
-    openWhatsAppDirectly({
-      nativeUrl: `whatsapp://send?phone=${intlPhone}&text=${encodedText}`,
-      whatsappUrl: `https://web.whatsapp.com/send?phone=${intlPhone}&text=${encodedText}`,
-      text: message,
-    });
+      toast(
+        `✅ Tax Invoice PDF generated & sent directly to ${data.customerName || inv.customerName} (${data.customerPhone || phone}) via WhatsApp!`,
+        "success"
+      );
+    } catch (err: any) {
+      toast(err.message || "Failed to send WhatsApp invoice", "error");
+    } finally {
+      setSendingInvoiceId(null);
+    }
   };
 
   return (
@@ -808,11 +792,16 @@ Thank you for your business with IQ TROUSERS!`;
                             {inv.customerPhone && (
                               <button
                                 type="button"
+                                disabled={sendingInvoiceId === inv.id}
                                 onClick={() => handleSendWhatsAppInvoice(inv)}
-                                className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
-                                title="Send Invoice via WhatsApp"
+                                className="p-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg transition cursor-pointer"
+                                title="Generate PDF & send via WhatsApp directly"
                               >
-                                <MessageCircle size={13} />
+                                {sendingInvoiceId === inv.id ? (
+                                  <RefreshCw size={13} className="animate-spin" />
+                                ) : (
+                                  <MessageCircle size={13} />
+                                )}
                               </button>
                             )}
                           </div>
@@ -849,11 +838,21 @@ Thank you for your business with IQ TROUSERS!`;
                   {viewInvoice.customerPhone && (
                     <button
                       type="button"
+                      disabled={sendingInvoiceId === viewInvoice.id}
                       onClick={() => handleSendWhatsAppInvoice(viewInvoice)}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                     >
-                      <MessageCircle size={14} />
-                      <span>WhatsApp Customer</span>
+                      {sendingInvoiceId === viewInvoice.id ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>Sending PDF...</span>
+                        </>
+                      ) : (
+                        <>
+                          <MessageCircle size={14} />
+                          <span>WhatsApp PDF</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

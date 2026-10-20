@@ -771,16 +771,9 @@ export default function OrderFormPage() {
                       throw new Error(data.error || "Failed to dispatch WhatsApp");
                     }
                     if (data.automated) {
-                      toast("✅ Sent directly to customer's WhatsApp!", "success");
-                    } else if (data.whatsappUrl || data.nativeUrl) {
-                      await shareOrOpenWhatsAppWithPdf({
-                        whatsappUrl: data.whatsappUrl,
-                        nativeUrl: data.nativeUrl,
-                        pdfUrl: data.pdfUrl || `/api/orders/${confirmedOrder.id}/pdf?type=order_form`,
-                        filename: `Order_Form_${confirmedOrder.orderNumber}.pdf`,
-                        text: data.message,
-                        onToast: toast,
-                      });
+                      toast(`✅ Order Form PDF generated & sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`, "success");
+                    } else {
+                      toast(data.error || "Could not dispatch WhatsApp message. Please check WhatsApp Gateway.", "error");
                     }
                   } catch (err: any) {
                     toast(err.message || "Could not send WhatsApp message", "error");

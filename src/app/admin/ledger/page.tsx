@@ -23,7 +23,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatCurrency, formatDate, numberToIndianWords } from "@/lib/utils";
-import { openWhatsAppDirectly } from "@/lib/whatsapp-client";
 import { useToast } from "@/components/ui/Toast";
 
 interface CustomerOption {
@@ -118,6 +117,7 @@ function LedgerContent() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [ledgerData, setLedgerData] = useState<LedgerData | null>(null);
 
   // Active view format: "format1" = Due & Pending Bills Letter | "format2" = Complete Chronological Statement
@@ -185,70 +185,28 @@ function LedgerContent() {
     window.print();
   };
 
-  const handleShareWhatsApp = () => {
-    if (!ledgerData) return;
-    const cust = ledgerData.customer;
-    const phone = cust.phoneNumber ? cust.phoneNumber.replace(/[^0-9]/g, "") : "";
-
-    let message = "";
-    if (activeFormat === "format1") {
-      message = `*OUTSTANDING PAYMENT REMINDER*\n`;
-      message += `*${ledgerData.company.name}*\n\n`;
-      message += `To: *${cust.shopName}*\n`;
-      if (cust.city) message += `City: ${cust.city}\n`;
-      message += `Date: ${formatDate(new Date())}\n\n`;
-      message += `_Note: The bills that are partly paid (amount left after deducting received payments) and unpaid bills are listed below:_\n\n`;
-
-      if (ledgerData.pendingBills.length === 0) {
-        message += `✅ *All previous bills are fully settled! No pending payment.*\n\n`;
-      } else {
-        ledgerData.pendingBills.forEach((b, idx) => {
-          message += `${idx + 1}) *Bill #${b.billNo}* (Dt: ${formatDate(b.billDate)})\n`;
-          message += `   Due Dt: ${formatDate(b.dueDate)}\n`;
-          if (b.status === "PARTIALLY_PAID") {
-            message += `   Bill Amt: ${formatCurrency(b.totalAmount)} | Paid: ${formatCurrency(b.paidAmount)}\n`;
-            message += `   *Pending Left: ${formatCurrency(b.pendingAmount)}*\n\n`;
-          } else {
-            message += `   *Pending Amt: ${formatCurrency(b.pendingAmount)}*\n\n`;
-          }
-        });
-
-        message += `*TOTAL PENDING DUE: ${formatCurrency(ledgerData.summary.totalPendingAmount)}*\n`;
-        message += `(${numberToIndianWords(ledgerData.summary.totalPendingAmount)})\n\n`;
-      }
-
-      message += `*Bank Remittance Details:*\n`;
-      message += `Bank: ${ledgerData.bank.name}\n`;
-      message += `A/C No: ${ledgerData.bank.accountNumber}\n`;
-      message += `IFSC: ${ledgerData.bank.ifscCode}\n`;
-      message += `Branch: ${ledgerData.bank.branch}\n`;
-      message += `Beneficiary: ${ledgerData.bank.beneficiary}\n\n`;
-      message += `Kindly clear the pending balance at your earliest convenience. Thank you!`;
-    } else {
-      message = `*STATEMENT OF ACCOUNT (LEDGER)*\n`;
-      message += `*${ledgerData.company.name}*\n\n`;
-      message += `To: *${cust.shopName}*\n`;
-      if (cust.city) message += `City: ${cust.city}\n`;
-      message += `Date: ${formatDate(new Date())}\n\n`;
-      message += `*Financial Summary:*\n`;
-      message += `• Total Billed: ${formatCurrency(ledgerData.summary.totalBilled)}\n`;
-      message += `• Total Paid/Credits: ${formatCurrency(ledgerData.summary.totalCredits)}\n`;
-      message += `• *Net Outstanding Balance: ${formatCurrency(ledgerData.summary.netOutstanding)}*\n\n`;
-      message += `*Bank Remittance Details:*\n`;
-      message += `Bank: ${ledgerData.bank.name} | A/C: ${ledgerData.bank.accountNumber} | IFSC: ${ledgerData.bank.ifscCode}\n\n`;
-      message += `For detailed statement or queries, please contact ${ledgerData.company.phone}.`;
-    }
-
-    if (phone && phone.length >= 10) {
-      openWhatsAppDirectly({
-        whatsappUrl: `https://web.whatsapp.com/send?phone=91${phone.slice(-10)}&text=${encodeURIComponent(message)}`,
-        nativeUrl: `whatsapp://send?phone=91${phone.slice(-10)}&text=${encodeURIComponent(message)}`,
+  const handleShareWhatsApp = async () => {
+    if (!ledgerData || !selectedCustomerId) return;
+    try {
+      setSendingWhatsApp(true);
+      const res = await fetch(`/api/admin/ledger/${selectedCustomerId}/whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formatType: activeFormat }),
       });
-    } else {
-      openWhatsAppDirectly({
-        whatsappUrl: `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`,
-        nativeUrl: `whatsapp://send?text=${encodeURIComponent(message)}`,
-      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to dispatch ledger via WhatsApp");
+
+      toast(
+        `✅ ${
+          activeFormat === "format1" ? "Pending Bills" : "Statement of Account"
+        } PDF generated and sent directly to ${ledgerData.customer.shopName} (${data.customerPhone})!`,
+        "success"
+      );
+    } catch (err: any) {
+      toast(err.message || "Could not send WhatsApp message", "error");
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
@@ -306,12 +264,21 @@ function LedgerContent() {
             <button
               type="button"
               onClick={handleShareWhatsApp}
-              disabled={!ledgerData || loading}
+              disabled={!ledgerData || loading || sendingWhatsApp}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              title="Send direct reminder on WhatsApp"
+              title="Generate PDF & send directly to customer WhatsApp"
             >
-              <Share2 className="w-4 h-4" />
-              <span>Send WhatsApp</span>
+              {sendingWhatsApp ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Sending PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  <span>Send WhatsApp</span>
+                </>
+              )}
             </button>
 
             <button

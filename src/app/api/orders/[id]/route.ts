@@ -359,10 +359,26 @@ export async function PUT(
         );
 
         const effectivePdfUrl = statusMsgConfig.hasDocument ? statusMsgConfig.pdfUrl : undefined;
-        const effectiveFilename = statusMsgConfig.hasDocument ? statusMsgConfig.filename : undefined;
+        let effectiveFilename = statusMsgConfig.hasDocument ? statusMsgConfig.filename : undefined;
+        let pdfBase64: string | undefined = undefined;
+
+        if (statusMsgConfig.hasDocument) {
+          try {
+            const { generateOrderPdfBuffer } = await import("@/lib/pdf-generator");
+            const pdfRes = await generateOrderPdfBuffer(
+              orderId,
+              statusMsgConfig.pdfType === "tax_invoice" ? "TAX_INVOICE" : "ORDER_FORM"
+            );
+            pdfBase64 = pdfRes.pdfBuffer.toString("base64");
+            effectiveFilename = pdfRes.fileName;
+          } catch (pdfErr) {
+            console.warn("Could not generate PDF buffer for order update WhatsApp:", pdfErr);
+          }
+        }
 
         const autoResult = await dispatchAutomatedWhatsApp(customerPhone, statusMsgConfig.message, {
           pdfUrl: effectivePdfUrl,
+          pdfBase64,
           filename: effectiveFilename || "Invoice.pdf",
         }).catch((err) => ({ success: false, method: "ERROR", error: err.message }));
 

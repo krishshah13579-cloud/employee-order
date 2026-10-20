@@ -224,19 +224,7 @@ export async function sendAutomatedWhatsAppDirect(options: {
     }
   }
 
-  // 2. Fallback to share sheet / direct link if gateway is not connected
-  try {
-    await shareOrOpenWhatsAppWithPdf({
-      pdfUrl: options.pdfUrl,
-      filename: options.filename,
-      text: options.message,
-      nativeUrl: options.nativeUrl,
-      whatsappUrl: options.whatsappUrl,
-      onToast: options.onToast,
-    });
-    return { success: true, method: "SHARE_FALLBACK" };
-  } catch (err: any) {
-    return { success: false, method: "FAILED" };
-  }
+  // 2. If client direct fetch didn't succeed, do not hijack browser to web.whatsapp.com
+  return { success: false, method: "GATEWAY_UNREACHABLE_FROM_BROWSER" };
 }
 

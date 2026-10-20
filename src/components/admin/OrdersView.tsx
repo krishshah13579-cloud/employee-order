@@ -396,16 +396,9 @@ export default function OrdersView({
                             });
                             const data = await res.json();
                             if (data.automated) {
-                              toast(`✅ ${isTax ? "Tax Invoice" : "Order Form"} sent directly to customer WhatsApp!`, "success");
-                            } else if (data.whatsappUrl || data.nativeUrl) {
-                              await shareOrOpenWhatsAppWithPdf({
-                                whatsappUrl: data.whatsappUrl,
-                                nativeUrl: data.nativeUrl,
-                                pdfUrl: data.pdfUrl || `/api/orders/${o.id}/pdf?type=${isTax ? "tax_invoice" : "order_form"}`,
-                                filename: isTax ? `Tax_Invoice_${o.taxInvoiceNumber || o.orderNumber}.pdf` : `Order_Form_${o.orderNumber}.pdf`,
-                                text: data.message,
-                                onToast: toast,
-                              });
+                              toast(`✅ ${isTax ? "Tax Invoice" : "Order Form"} PDF generated & sent directly to ${data.customerName || "customer"} (${data.customerPhone || ""}) via WhatsApp!`, "success");
+                            } else {
+                              toast(data.error || "Could not dispatch WhatsApp message. Please check WhatsApp Gateway.", "error");
                             }
                           } catch {
                             toast("Could not send WhatsApp message", "error");

@@ -7,6 +7,7 @@ import {
   createWhatsAppNativeLink,
   dispatchAutomatedWhatsApp,
 } from "@/lib/whatsapp";
+import { generateCustomerLedgerPdfBuffer } from "@/lib/pdf-generator";
 import { updateWhatsAppSettings } from "@/lib/whatsapp-settings";
 
 export async function POST(request: NextRequest) {
@@ -146,7 +147,18 @@ export async function POST(request: NextRequest) {
     if (autoDispatch && pendingReminders.length > 0) {
       for (const item of pendingReminders) {
         try {
-          const autoResult = await dispatchAutomatedWhatsApp(item.phone, item.message);
+          let pdfBase64: string | undefined = undefined;
+          let fileName = `Statement_${item.customerName.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+          try {
+            const pdfRes = await generateCustomerLedgerPdfBuffer(item.customerId, "format1");
+            pdfBase64 = pdfRes.pdfBuffer.toString("base64");
+            fileName = pdfRes.fileName;
+          } catch {}
+
+          const autoResult = await dispatchAutomatedWhatsApp(item.phone, item.message, {
+            pdfBase64,
+            filename: fileName,
+          });
           dispatchResults.push({
             customerId: item.customerId,
             customerName: item.customerName,
