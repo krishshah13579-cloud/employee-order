@@ -78,25 +78,14 @@ export async function PUT(
     if (body.contactPerson !== undefined) updateData.contactPerson = body.contactPerson;
 
     if (body.businessType) {
+      const admin = await getAdminSession(request);
+      if (!admin) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Admin/Super Admin is allowed to change the Type of Business of an existing customer." },
+          { status: 403 }
+        );
+      }
       const bType = String(body.businessType).trim().toUpperCase();
-      if (bType === "WHOLESALER WITHOUT GST") {
-        const admin = await getAdminSession(request);
-        if (!admin) {
-          return NextResponse.json(
-            { error: "Permission Denied: Only Admin can set 'Wholesaler Without GST'." },
-            { status: 403 }
-          );
-        }
-      }
-      if (bType === "RETAILER WITH SPECIAL DISCOUNT") {
-        const allowed = await canUserAssignSpecialDiscount(request);
-        if (!allowed) {
-          return NextResponse.json(
-            { error: "Permission Denied: Only Team Leaders (T.L.) and Admins can set 'Retailer with Special Discount'." },
-            { status: 403 }
-          );
-        }
-      }
       updateData.businessType = bType;
       if (bType !== "RETAILER WITH SPECIAL DISCOUNT") {
         updateData.specialDiscount = 0;

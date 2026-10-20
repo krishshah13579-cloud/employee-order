@@ -54,12 +54,13 @@ export async function GET(request: NextRequest) {
         })
       : products;
 
-    // Optimize payload size: if full gallery not explicitly requested, return only the primary cover image
+    // Optimize payload size: if full gallery not explicitly requested, return only the primary cover image and strip heavy base64 colorImages
     const optimized = fullGallery
       ? filtered
       : filtered.map((p) => ({
           ...p,
           imageUrl: getProductCoverImage(p.imageUrl),
+          colorImages: null,
         }));
 
     return NextResponse.json(optimized, {

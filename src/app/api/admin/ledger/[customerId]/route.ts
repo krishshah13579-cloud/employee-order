@@ -72,9 +72,8 @@ export async function GET(
     const billsMap = new Map<string, RawBill>();
     const creditDays = Number(customer.creditDays) || 45;
 
-    // Process from salesInvoices first
+    // Process all salesInvoices for this customer
     for (const si of customer.salesInvoices) {
-      if (si.paymentType === "Cash") continue; // Exclude direct cash sales
       const bDate = new Date(si.invoiceDate);
       const dDate = new Date(bDate.getTime() + creditDays * 24 * 60 * 60 * 1000);
       const docNo = (si.invoiceNumber || si.orderNumber || String(si.id)).trim();

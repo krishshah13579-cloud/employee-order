@@ -24,10 +24,12 @@ import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ORDER_STATUSES, STATUS_COLORS, type OrderStatus } from "@/lib/types";
 import type { OrderData } from "@/lib/types";
+import { useEmployee } from "@/components/providers/EmployeeProvider";
 
 export default function EmployeeOrdersListPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { employee } = useEmployee();
 
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -35,15 +37,29 @@ export default function EmployeeOrdersListPage() {
 
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [empName, setEmpName] = useState<string>("");
+
+  useEffect(() => {
+    if (employee?.name) {
+      setEmpName(employee.name);
+    } else {
+      try {
+        const saved = localStorage.getItem("garmentpro_employee_name");
+        if (saved) setEmpName(saved);
+      } catch {}
+    }
+  }, [employee]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const url =
-        selectedStatus === "All"
-          ? "/api/orders"
-          : `/api/orders?status=${encodeURIComponent(selectedStatus)}`;
+      const params = new URLSearchParams();
+      if (selectedStatus !== "All") params.set("status", selectedStatus);
+      if (empName) params.set("placedBy", empName);
+
+      const qs = params.toString();
+      const url = qs ? `/api/orders?${qs}` : "/api/orders";
       const res = await fetch(url);
       if (!res.ok) {
         throw new Error(`Failed to load orders (${res.status})`);
@@ -60,13 +76,19 @@ export default function EmployeeOrdersListPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [selectedStatus]);
+  }, [selectedStatus, empName]);
 
-  // Client-side search filtering
+  // Client-side search and strict employee isolation
   const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
+    let list = orders;
+    if (empName) {
+      const cleanEmp = empName.trim().toLowerCase();
+      list = list.filter((ord) => ord.placedBy && ord.placedBy.trim().toLowerCase() === cleanEmp);
+    }
+
+    if (!searchQuery.trim()) return list;
     const term = searchQuery.toLowerCase().trim();
-    return orders.filter(
+    return list.filter(
       (order) =>
         order.orderNumber.toLowerCase().includes(term) ||
         (order.customerName && order.customerName.toLowerCase().includes(term)) ||
@@ -79,16 +101,23 @@ export default function EmployeeOrdersListPage() {
               (typeof it.colorSets === "string" && it.colorSets.toLowerCase().includes(term))
           ))
     );
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, empName]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* Page Title */}
         <div className="flex items-center justify-between pb-2">
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Customer Order
-          </h1>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Customer Orders
+            </h1>
+            {empName && (
+              <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                Showing orders placed by: <span className="font-bold text-orange-600">{empName}</span>
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={fetchOrders}

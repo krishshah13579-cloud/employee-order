@@ -34,9 +34,9 @@ export default function CustomersPage() {
   const [previewCardUrl, setPreviewCardUrl] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Tab filter: all | credit | 45days | advance | specialDiscount
+  // Tab filter: all | credit | 45days | advance | specialDiscount | wholesaleNoGst
   const [activeCreditTab, setActiveCreditTab] = useState<
-    "all" | "credit" | "45days" | "advance" | "specialDiscount"
+    "all" | "credit" | "45days" | "advance" | "specialDiscount" | "wholesaleNoGst"
   >("all");
 
   // Super Admin Credit Days Quick-Edit Modal state
@@ -135,6 +135,14 @@ export default function CustomersPage() {
       if (activeCreditTab === "specialDiscount") {
         return c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
       }
+      if (activeCreditTab === "wholesaleNoGst") {
+        return (
+          c.businessType === "WHOLESALER WITHOUT GST" ||
+          c.businessType === "WHOLESALE WITHOUT GST" ||
+          ((c.businessType === "WHOLESALER" || c.businessType === "WHOLESALE") &&
+            (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A" || c.gstPanNo === "NOT APPLICABLE"))
+        );
+      }
       const days = c.creditDays || 0;
       if (activeCreditTab === "credit") return days > 0;
       if (activeCreditTab === "45days") return days === 45;
@@ -223,6 +231,16 @@ export default function CustomersPage() {
             }`}
           >
             Special Discount ({customers.filter((c) => c.businessType === "RETAILER WITH SPECIAL DISCOUNT").length})
+          </button>
+          <button
+            onClick={() => setActiveCreditTab("wholesaleNoGst")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              activeCreditTab === "wholesaleNoGst"
+                ? "bg-fuchsia-700 text-white shadow-xs"
+                : "bg-fuchsia-50 text-fuchsia-800 hover:bg-fuchsia-100 border border-fuchsia-200"
+            }`}
+          >
+            Wholesale (No GST) ({customers.filter((c) => c.businessType === "WHOLESALER WITHOUT GST" || c.businessType === "WHOLESALE WITHOUT GST" || ((c.businessType === "WHOLESALER" || c.businessType === "WHOLESALE") && (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A"))).length})
           </button>
         </div>
 

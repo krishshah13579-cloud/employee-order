@@ -10,7 +10,7 @@ import {
 } from "@/lib/stock";
 import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
-import { requireAdmin } from "@/lib/auth-security";
+import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 
 export async function GET(request: NextRequest) {
@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const placedByQuery = searchParams.get("placedBy");
+
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
 
     const where: any = {};
     if (status && status !== "All") {
@@ -34,13 +38,49 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // Role-based Order Isolation: Non-admin employees ONLY see orders placed by them
+    if (!admin) {
+      if (employee?.name) {
+        where.placedBy = employee.name;
+      } else if (placedByQuery && placedByQuery.trim() !== "") {
+        where.placedBy = placedByQuery.trim();
+      }
+    } else if (placedByQuery && placedByQuery.trim() !== "") {
+      where.placedBy = placedByQuery.trim();
+    }
+
+    // High performance query: exclude heavy base64 imageUrl/colorImages/visitingCardUrl
     const orders = await prisma.order.findMany({
       where,
       include: {
-        customer: true,
+        customer: {
+          select: {
+            id: true,
+            shopName: true,
+            gstPanNo: true,
+            businessType: true,
+            creditDays: true,
+            specialDiscount: true,
+            address: true,
+            city: true,
+            state: true,
+            phoneNumber: true,
+            contactPerson: true,
+          },
+        },
         items: {
           include: {
-            product: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+                sizesRatio: true,
+                price: true,
+                retailerPrice: true,
+                wholesalerPrice: true,
+              },
+            },
           },
         },
       },

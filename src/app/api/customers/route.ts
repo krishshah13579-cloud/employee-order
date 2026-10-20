@@ -46,9 +46,26 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    const fullCard = searchParams.get("full_card") === "1";
+
     const customers = await prisma.customer.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        shopName: true,
+        gstPanNo: true,
+        businessType: true,
+        creditDays: true,
+        specialDiscount: true,
+        address: true,
+        city: true,
+        state: true,
+        phoneNumber: true,
+        contactPerson: true,
+        contactPersons: true,
+        createdAt: true,
+        updatedAt: true,
+        visitingCardUrl: fullCard,
         _count: {
           select: { orders: true },
         },
@@ -77,7 +94,7 @@ export async function POST(request: NextRequest) {
     const finalCity = (body.city || "").trim();
     const finalState = (body.state || "").trim();
     const finalContact = (body.contactPerson || body.name || "").trim();
-    const gstPanNo = (body.gstPanNo || "").trim().toUpperCase();
+    let gstPanNo = (body.gstPanNo || "").trim().toUpperCase();
     const contactPersons = body.contactPersons ? JSON.stringify(body.contactPersons) : null;
     const visitingCardUrl = body.visitingCardUrl || null;
 
@@ -88,15 +105,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!gstPanNo || gstPanNo === "N/A") {
-      return NextResponse.json(
-        { error: "GST No. / PAN No. is strictly mandatory" },
-        { status: 400 }
-      );
-    }
-
     const rawBusinessType = (body.businessType || "").trim().toUpperCase();
-    const validTypes = ["RETAILER", "WHOLESALER", "WHOLESALER WITHOUT GST", "RETAILER WITH SPECIAL DISCOUNT"];
+    const validTypes = ["RETAILER", "WHOLESALER", "WHOLESALER WITHOUT GST", "WHOLESALE WITHOUT GST", "RETAILER WITH SPECIAL DISCOUNT"];
     if (!rawBusinessType || !validTypes.includes(rawBusinessType)) {
       return NextResponse.json(
         { error: "Business Type is mandatory. Please select Retailer, Wholesaler, Wholesaler Without GST, or Retailer with Special Discount." },
@@ -104,11 +114,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (rawBusinessType === "WHOLESALER WITHOUT GST") {
+    const isWholesaleNoGst =
+      rawBusinessType === "WHOLESALER WITHOUT GST" || rawBusinessType === "WHOLESALE WITHOUT GST";
+
+    // GST/PAN is strictly mandatory EXCEPT for Wholesale Without GST customers
+    if (isWholesaleNoGst) {
+      if (!gstPanNo || gstPanNo === "N/A") {
+        gstPanNo = "URP"; // Unregistered Person / Non-GST
+      }
+    } else {
+      if (!gstPanNo || gstPanNo === "N/A") {
+        return NextResponse.json(
+          { error: "GST No. / PAN No. is strictly mandatory" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (isWholesaleNoGst) {
       const admin = await getAdminSession(request);
       if (!admin) {
         return NextResponse.json(
           { error: "Permission Denied: Only Admin can create customers under 'Wholesaler Without GST'." },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (rawBusinessType === "WHOLESALER") {
+      const allowed = await canUserAssignSpecialDiscount(request);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "Permission Denied: Regular employees can only create Retailer accounts. Team Leaders (T.L.) or Admins required for Wholesale." },
           { status: 403 }
         );
       }

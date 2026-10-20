@@ -891,80 +891,57 @@ function ProductDetailContent() {
                 </div>
               </div>
 
-              {/* Size Ratio: Prioritizing 28 to 36 first, then 28 to 34 (4 pc set) */}
-              <div className="space-y-2 text-xs pt-2 border-t border-slate-100">
+              {/* Size Ratio: Always show primary ratio (28 to 36) without multi-ratio clutter */}
+              <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between text-slate-600">
                   <span className="font-bold">Size Ratio:</span>
-                  {availableRatios.length > 1 && (
-                    <span className="text-[10px] font-bold text-orange-600">
-                      28 to 36 first, then 28 to 34
-                    </span>
-                  )}
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    ({activePcsPerSet} Pcs / Set)
+                  </span>
                 </div>
-
-                {availableRatios.length > 1 ? (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {availableRatios.map((rKey) => {
-                      const pcs = getPcsFromRatio(rKey, 5);
-                      const isSelected = activeRatio === rKey;
-                      const isFourPc = rKey.includes("28 to 34") || pcs === 4;
-                      return (
-                        <button
-                          key={rKey}
-                          type="button"
-                          onClick={() => setSelectedRatio(rKey)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                            isSelected
-                              ? "bg-slate-900 text-white ring-2 ring-orange-500 ring-offset-1"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
-                          }`}
-                        >
-                          <span>{rKey}</span>
-                          <span
-                            className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                              isSelected
-                                ? "bg-orange-500 text-white font-bold"
-                                : "bg-white text-slate-600 border border-slate-300"
-                            }`}
-                          >
-                            {pcs} Pcs{isFourPc ? " Set" : ""}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                      {activeRatio}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      ({activePcsPerSet} Pcs / Set)
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center">
+                  <span className="font-mono font-black text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                    {activeRatio}
+                  </span>
+                </div>
               </div>
 
-              {/* Mix Sizes Available Highlight */}
-              <div className="p-3.5 bg-amber-50/90 rounded-xl border border-amber-300 text-xs space-y-1.5 shadow-2xs">
+              {/* Mix Sizes Available / Sold Out Status */}
+              <div
+                className={`p-3.5 rounded-xl border text-xs space-y-1.5 shadow-2xs ${
+                  mixInfo.totalMixPcs > 0
+                    ? "bg-amber-50/90 border-amber-300 text-amber-950"
+                    : "bg-slate-100/80 border-slate-200 text-slate-600"
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="font-black text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Layers size={14} className="text-amber-700" />
-                    <span>Mix Sizes Available (Loose Stock)</span>
+                  <span className="font-black uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Layers size={14} className={mixInfo.totalMixPcs > 0 ? "text-amber-700" : "text-slate-500"} />
+                    <span>
+                      {mixInfo.totalMixPcs > 0
+                        ? `Mix Sizes Available: ${mixInfo.totalMixPcs} Pieces`
+                        : "Mix Sizes: 0 Available"}
+                    </span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-xs ${
-                    mixInfo.totalMixPcs > 0 ? "bg-amber-200 text-amber-950" : "bg-slate-200 text-slate-700"
-                  }`}>
-                    {mixInfo.totalMixPcs} Pcs
+                  <span
+                    className={`px-2 py-0.5 rounded-md font-mono font-bold text-xs ${
+                      mixInfo.totalMixPcs > 0
+                        ? "bg-amber-200 text-amber-950"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {mixInfo.totalMixPcs > 0 ? `${mixInfo.totalMixPcs} Pcs Available` : "Sold Out"}
                   </span>
                 </div>
-                <div className="text-amber-900 font-medium text-xs">
+                <div>
                   {mixInfo.totalMixPcs > 0 ? (
-                    <span className="font-semibold">
+                    <span className="font-semibold text-amber-900">
                       Available Sizes: <strong className="font-mono text-amber-950">{mixInfo.sizesSummary}</strong>
                     </span>
                   ) : (
-                    <span className="text-slate-500 italic">No loose single pieces currently in stock (full sets only).</span>
+                    <span className="text-slate-500 italic">
+                      Mix Sizes: 0 Available (Only full standard sets available).
+                    </span>
                   )}
                 </div>
               </div>
@@ -1246,6 +1223,17 @@ function ProductDetailContent() {
                                     <span>Advance / Made to Order</span>
                                   </span>
                                 )}
+
+                                {/* Color Specific Mix Sizes Tag */}
+                                {totalLooseInStockForColor > 0 ? (
+                                  <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                                    <span>Mix Sizes: {totalLooseInStockForColor} Available</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-[10.5px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                    <span>Mix Sizes: 0 Available</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1321,60 +1309,6 @@ function ProductDetailContent() {
                             className="mt-3.5 pt-3.5 border-t border-slate-200/90 space-y-3 cursor-default"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* 1. Size Ratio Available for this exact color */}
-                            <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/80 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                                  <Layers size={13} className="text-orange-600" />
-                                  <span>Size Ratio Available ({color})</span>
-                                </span>
-                                <span className="text-[10px] text-slate-500 font-medium">
-                                  Selected: <strong className="text-slate-900">{currentRatioForColor}</strong> ({pcsPerSetForColor} pcs/set)
-                                </span>
-                              </div>
-
-                              <div className="flex flex-wrap gap-1.5">
-                                {colorRatios.map((rKey) => {
-                                  const rStock = colorStockDetail.ratios[rKey] ?? rawStock;
-                                  const isSelectedRatio = currentRatioForColor === rKey;
-                                  const rPcs = getPcsFromRatio(rKey);
-
-                                  return (
-                                    <button
-                                      key={rKey}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleColorRatioChange(color, rKey);
-                                      }}
-                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                                        isSelectedRatio
-                                          ? "bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-orange-500/70"
-                                          : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300"
-                                      }`}
-                                    >
-                                      <span>{rKey}</span>
-                                      <span className={`text-[10px] ${isSelectedRatio ? "text-slate-300" : "text-slate-500"}`}>
-                                        ({rPcs} pcs)
-                                      </span>
-                                      <span
-                                        className={`text-[9px] font-black px-1.5 py-0.2 rounded-full ${
-                                          rStock > 0
-                                            ? isSelectedRatio
-                                              ? "bg-emerald-500 text-white"
-                                              : "bg-emerald-100 text-emerald-800"
-                                            : isSelectedRatio
-                                            ? "bg-amber-500 text-white"
-                                            : "bg-amber-100 text-amber-800"
-                                        }`}
-                                      >
-                                        {rStock > 0 ? `${rStock} sets in stock` : "Made to order"}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
 
                             {/* 2. Mix Sizes (Loose Single Pieces) of the same color - ONLY shown if mix pieces exist for this color */}
                             {hasMixStockForColor && (

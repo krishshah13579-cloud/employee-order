@@ -432,10 +432,16 @@ export default function OrderFormPage() {
 
   // Immediate Business Type Change & Price Recalculation Handler
   const handleBusinessTypeChange = (newType: string) => {
+    // Only Admin or T.L. has capability to adjust business types
+    if (!isAdmin && !isTL) {
+      toast("Permission Denied: Only Admin can change customer business type.", "error");
+      return;
+    }
+
     setOrderBusinessType(newType);
 
-    // Update customer in state and DB
-    if (selectedCustomerId) {
+    // Only Admin/Super Admin is authorized to alter customer businessType in the database
+    if (isAdmin && selectedCustomerId) {
       setCustomers((prev) =>
         prev.map((c) => (c.id === selectedCustomerId ? { ...c, businessType: newType } : c))
       );
@@ -1186,36 +1192,42 @@ export default function OrderFormPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1.5">
                     <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider">
-                      Type of Business (Click to change & update prices immediately)
+                      Type of Business {!isAdmin && "(Locked by Admin - Contact Admin to Change)"}
                     </span>
                     <div className="flex items-center gap-2 flex-wrap">
+                      {/* Retailer: Available to all */}
                       <button
                         type="button"
-                        onClick={() => handleBusinessTypeChange("RETAILER")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                        onClick={() => (isAdmin || isTL) && handleBusinessTypeChange("RETAILER")}
+                        disabled={!isAdmin && !isTL}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                           effectiveBusinessType === "RETAILER"
                             ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/40"
                             : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                        }`}
+                        } ${!isAdmin && !isTL ? "cursor-default" : "cursor-pointer"}`}
                       >
                         {effectiveBusinessType === "RETAILER" && <CheckCircle2 size={13} className="text-white" />}
                         <span>Retailer</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleBusinessTypeChange("WHOLESALER")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                          effectiveBusinessType === "WHOLESALER"
-                            ? "bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-400/40"
-                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                        }`}
-                      >
-                        {effectiveBusinessType === "WHOLESALER" && <CheckCircle2 size={13} className="text-white" />}
-                        <span>Wholesale</span>
-                      </button>
+                      {/* Wholesale: ONLY shown to Team Leader (T.L.) or Admin */}
+                      {(isTL || isAdmin) && (
+                        <button
+                          type="button"
+                          onClick={() => handleBusinessTypeChange("WHOLESALER")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                            effectiveBusinessType === "WHOLESALER"
+                              ? "bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-400/40"
+                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                          }`}
+                        >
+                          {effectiveBusinessType === "WHOLESALER" && <CheckCircle2 size={13} className="text-white" />}
+                          <span>Wholesale</span>
+                        </button>
+                      )}
 
-                      {(selectedCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT" || canAdjustSpecialDiscount) && (
+                      {/* Retailer with Special Discount: ONLY shown to Team Leader (T.L.) or Admin */}
+                      {(isTL || isAdmin) && (
                         <button
                           type="button"
                           onClick={() => handleBusinessTypeChange("RETAILER WITH SPECIAL DISCOUNT")}
@@ -1226,11 +1238,12 @@ export default function OrderFormPage() {
                           }`}
                         >
                           {effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" && <CheckCircle2 size={13} className="text-white" />}
-                          <span>Retailer (Spl Disc{selectedCustomer.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""})</span>
+                          <span>Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""})</span>
                         </button>
                       )}
 
-                      {selectedCustomer.businessType === "WHOLESALER WITHOUT GST" && (
+                      {/* Wholesale Without GST: ONLY shown to Admin */}
+                      {isAdmin && (
                         <button
                           type="button"
                           onClick={() => handleBusinessTypeChange("WHOLESALER WITHOUT GST")}

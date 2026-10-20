@@ -98,7 +98,7 @@ function CustomerRegistrationContent() {
   const [transportName, setTransportName] = useState("");
   const [visitingCardUrl, setVisitingCardUrl] = useState("");
   const [businessType, setBusinessType] = useState<
-    "RETAILER" | "WHOLESALER" | "RETAILER WITH SPECIAL DISCOUNT"
+    "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT"
   >("RETAILER");
   const [specialDiscount, setSpecialDiscount] = useState<number | "">(50);
   const [creditDays, setCreditDays] = useState<number | "">(0);
@@ -266,7 +266,9 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please enter Firm Name / Shop Name", "error");
       return;
     }
-    if (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A") {
+    const isWholesaleNoGst = businessType === "WHOLESALER WITHOUT GST";
+
+    if (!isWholesaleNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")) {
       toast("Mandatory: Please enter valid GST No. or PAN No.", "error");
       return;
     }
@@ -275,7 +277,7 @@ function CustomerRegistrationContent() {
       return;
     }
     if (!businessType) {
-      toast("Mandatory: Please select Type of Business (Retailer or Wholesaler)", "error");
+      toast("Mandatory: Please select Type of Business", "error");
       return;
     }
     if (!address.trim()) {
@@ -307,9 +309,13 @@ function CustomerRegistrationContent() {
           })),
       ];
 
+      const finalGst = isWholesaleNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")
+        ? "URP"
+        : gstPanNo.trim().toUpperCase();
+
       const payload = {
         shopName: shopName.trim().toUpperCase(),
-        gstPanNo: gstPanNo.trim().toUpperCase(),
+        gstPanNo: finalGst,
         businessType: businessType,
         specialDiscount: businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (Number(specialDiscount) || 0) : 0,
         creditDays: Number(creditDays) || 0,
@@ -620,7 +626,8 @@ function CustomerRegistrationContent() {
                     </label>
                   </div>
 
-                  <div className={`grid grid-cols-1 ${canSetSpecialDiscount ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
+                  <div className={`grid grid-cols-1 ${isAdmin ? "sm:grid-cols-4" : isTL ? "sm:grid-cols-3" : "sm:grid-cols-1"} gap-3`}>
+                    {/* Retailer: Available to all */}
                     <button
                       type="button"
                       onClick={() => setBusinessType("RETAILER")}
@@ -636,20 +643,28 @@ function CustomerRegistrationContent() {
                       )}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setBusinessType("WHOLESALER")}
-                      className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
-                        businessType === "WHOLESALER"
-                          ? "border-purple-600 bg-purple-50/90 text-purple-950 shadow-xs ring-1 ring-purple-500"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="font-black text-sm text-purple-900">Wholesale</div>
-                      {businessType === "WHOLESALER" && (
-                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
-                      )}
-                    </button>
+                    {/* Wholesale: ONLY available to Team Leader (T.L.) or Admin */}
+                    {(isTL || isAdmin) && (
+                      <button
+                        type="button"
+                        onClick={() => setBusinessType("WHOLESALER")}
+                        className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                          businessType === "WHOLESALER"
+                            ? "border-purple-600 bg-purple-50/90 text-purple-950 shadow-xs ring-1 ring-purple-500"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-black text-sm text-purple-900">Wholesale</div>
+                          <div className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
+                            {isTL ? "Team Leader (T.L.)" : "Admin Authorized"}
+                          </div>
+                        </div>
+                        {businessType === "WHOLESALER" && (
+                          <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
+                        )}
+                      </button>
+                    )}
 
                     {/* Retailer with Special Discount: ONLY shown to Team Leader (T.L.) or Admin */}
                     {canSetSpecialDiscount && (
@@ -670,6 +685,29 @@ function CustomerRegistrationContent() {
                         </div>
                         {businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        )}
+                      </button>
+                    )}
+
+                    {/* Wholesale Without GST: ONLY available to Admin */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setBusinessType("WHOLESALER WITHOUT GST")}
+                        className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                          businessType === "WHOLESALER WITHOUT GST"
+                            ? "border-fuchsia-600 bg-fuchsia-50/90 text-fuchsia-950 shadow-xs ring-1 ring-fuchsia-500"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-black text-sm text-fuchsia-950">Wholesale (No GST)</div>
+                          <div className="text-[10px] font-bold text-fuchsia-700 uppercase tracking-wider">
+                            Admin Only • No GST Needed
+                          </div>
+                        </div>
+                        {businessType === "WHOLESALER WITHOUT GST" && (
+                          <CheckCircle2 className="w-5 h-5 text-fuchsia-600 shrink-0" />
                         )}
                       </button>
                     )}
@@ -786,7 +824,12 @@ function CustomerRegistrationContent() {
                       <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                         <CreditCard size={14} className="text-slate-500" />
                         <span>GST / PAN No.</span>
-                        <span className="text-red-500">*</span>
+                        {businessType !== "WHOLESALER WITHOUT GST" && (
+                          <span className="text-red-500">*</span>
+                        )}
+                        {businessType === "WHOLESALER WITHOUT GST" && (
+                          <span className="text-[10px] text-fuchsia-700 font-bold">(Optional)</span>
+                        )}
                       </label>
                       {autoFilledFields.gstPanNo && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
@@ -796,10 +839,10 @@ function CustomerRegistrationContent() {
                     </div>
                     <input
                       type="text"
-                      required
+                      required={businessType !== "WHOLESALER WITHOUT GST"}
                       value={gstPanNo}
                       onChange={(e) => setGstPanNo(e.target.value.toUpperCase())}
-                      placeholder="e.g. 24ABCDE1234F1Z5 or PAN"
+                      placeholder={businessType === "WHOLESALER WITHOUT GST" ? "Optional (No GST needed)" : "e.g. 24ABCDE1234F1Z5 or PAN"}
                       className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs placeholder:normal-case"
                     />
                   </div>
