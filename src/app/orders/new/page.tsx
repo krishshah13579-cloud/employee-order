@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FilePlus,
   Users,
@@ -81,9 +81,13 @@ interface ConfirmedOrder {
   whatsAppSent?: boolean;
 }
 
-export default function OrderFormPage() {
+function OrderFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  const customerIdParam = searchParams.get("customerId");
+  const businessTypeParam = searchParams.get("businessType");
 
   // Employee Name
   const [placedBy, setPlacedBy] = useState<string>("");
@@ -91,7 +95,35 @@ export default function OrderFormPage() {
   // Customers
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState<boolean>(true);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromUrl = urlParams.get("customerId");
+      if (fromUrl) {
+        const p = parseInt(fromUrl, 10);
+        if (!isNaN(p)) return p;
+      }
+      try {
+        const raw = localStorage.getItem("garmentpro_order_draft");
+        if (raw) {
+          const draft = JSON.parse(raw);
+          const cId = draft?.customerId || draft?.customer?.id;
+          if (cId) {
+            const p = parseInt(cId, 10);
+            if (!isNaN(p)) return p;
+          }
+        }
+      } catch {}
+      try {
+        const savedId = localStorage.getItem("garmentpro_selected_customer_id");
+        if (savedId) {
+          const p = parseInt(savedId, 10);
+          if (!isNaN(p)) return p;
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState<boolean>(false);
 
@@ -154,6 +186,17 @@ export default function OrderFormPage() {
   const isTL = isEmployeeTeamLeader(employee);
   const canAdjustSpecialDiscount = isAdmin || isTL;
 
+  // React to URL customerId query parameter changes (e.g. clicking Book on dashboard)
+  useEffect(() => {
+    const fromUrl = searchParams.get("customerId");
+    if (fromUrl) {
+      const p = parseInt(fromUrl, 10);
+      if (!isNaN(p) && p !== selectedCustomerId) {
+        setSelectedCustomerId(p);
+      }
+    }
+  }, [searchParams]);
+
   // Load employee name from session or localStorage
   useEffect(() => {
     if (employee?.name) {
@@ -186,9 +229,6 @@ export default function OrderFormPage() {
 
   useEffect(() => {
     fetchCustomers();
-    try {
-      localStorage.removeItem("garmentpro_selected_customer_id");
-    } catch {}
   }, []);
 
   // Load active draft from localStorage
@@ -198,7 +238,6 @@ export default function OrderFormPage() {
       if (raw) {
         const draft = JSON.parse(raw);
         if (draft) {
-          // Strictly do not pre-select any customer automatically on order/new
           if (Array.isArray(draft.items)) {
             setItems(draft.items);
           }
@@ -218,12 +257,28 @@ export default function OrderFormPage() {
           if (draft.businessType || draft.customer?.businessType) {
             setOrderBusinessType(draft.businessType || draft.customer?.businessType);
           }
+          // Restore customer from active draft if not explicitly provided via URL query param
+          const cidFromUrl = searchParams.get("customerId");
+          if (!cidFromUrl) {
+            const draftCustId = draft.customerId || draft.customer?.id;
+            if (draftCustId) {
+              const p = parseInt(draftCustId, 10);
+              if (!isNaN(p)) {
+                setSelectedCustomerId(p);
+              }
+            }
+          }
         }
       }
     } catch (err) {
       console.error("Error reading order draft:", err);
     }
   }, []);
+
+  // Helper for returnTo URL ensuring customerId is carried when navigating to products
+  const getReturnToUrl = () => {
+    return selectedCustomerId ? `/orders/new?customerId=${selectedCustomerId}` : "/orders/new";
+  };
 
   // Sync draft back to localStorage whenever it changes
   const saveDraft = (
@@ -297,9 +352,23 @@ export default function OrderFormPage() {
     return isGstPanRegistered(selectedCustomer.gstPanNo);
   }, [selectedCustomer, isWithoutGst]);
 
-  // Automatically open editable GST/PAN field if customer is NOT registered
+  // Automatically open editable GST/PAN field if customer is NOT registered & synchronize customer metadata
   useEffect(() => {
     if (selectedCustomer) {
+      const bType = businessTypeParam || selectedCustomer.businessType || "RETAILER";
+      if (!orderBusinessType) {
+        setOrderBusinessType(bType);
+      }
+      if (orderCreditDays === 0 && selectedCustomer.creditDays) {
+        setOrderCreditDays(selectedCustomer.creditDays);
+        if (selectedCustomer.creditDays === 45) {
+          setIsCreditLocked(true);
+        }
+      }
+      try {
+        localStorage.setItem("garmentpro_selected_customer_id", String(selectedCustomer.id));
+      } catch {}
+
       if (isWithoutGst) {
         setIsEditingGstPan(false);
         setCustomGstPan(selectedCustomer.gstPanNo || "");
@@ -310,11 +379,13 @@ export default function OrderFormPage() {
         setCustomGstPan(selectedCustomer.gstPanNo.toUpperCase());
         setIsEditingGstPan(false);
       }
+
+      saveDraft(items, selectedCustomer.id, orderNotes, placedBy, selectedCustomer.creditDays || orderCreditDays, bType);
     } else {
       setIsEditingGstPan(false);
       setCustomGstPan("");
     }
-  }, [selectedCustomer, isWithoutGst]);
+  }, [selectedCustomer, isWithoutGst, businessTypeParam]);
 
   // Handle Credit Days Change with permanent lock when set to 45 Days
   const handleCreditDaysChange = (days: number) => {
@@ -933,7 +1004,7 @@ export default function OrderFormPage() {
                   if (typeof window !== "undefined") {
                     saveDraft(items, selectedCustomerId, orderNotes, placedBy);
                   }
-                  router.push("/customers/new?returnTo=/orders/new");
+                  router.push(`/customers/new?returnTo=${encodeURIComponent(getReturnToUrl())}`);
                 }}
                 className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-xl border border-orange-200 transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:border-orange-300"
               >
@@ -1318,7 +1389,7 @@ export default function OrderFormPage() {
             {selectedCustomer && isCustomerGstRegistered && (
               <button
                 type="button"
-                onClick={() => router.push("/products?returnTo=/orders/new")}
+                onClick={() => router.push(`/products?returnTo=${encodeURIComponent(getReturnToUrl())}`)}
                 className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
                 <Plus size={16} />
@@ -1370,7 +1441,7 @@ export default function OrderFormPage() {
                         {selectedCustomer && isCustomerGstRegistered && (
                           <button
                             type="button"
-                            onClick={() => router.push("/products?returnTo=/orders/new")}
+                            onClick={() => router.push(`/products?returnTo=${encodeURIComponent(getReturnToUrl())}`)}
                             className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
                           >
                             <Plus size={14} />
@@ -1418,7 +1489,7 @@ export default function OrderFormPage() {
                             )}
                             <div>
                               <Link
-                                href={`/products/${item.productId}?returnTo=/orders/new`}
+                                href={`/products/${item.productId}?returnTo=${encodeURIComponent(getReturnToUrl())}`}
                                 className="font-black text-slate-900 hover:text-orange-600 transition"
                               >
                                 {item.productName}{prodData?.mrp ? ` (${prodData.mrp})` : ""}
@@ -1570,7 +1641,7 @@ export default function OrderFormPage() {
                         <td className="py-4 px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <Link
-                              href={`/products/${item.productId}?returnTo=/orders/new`}
+                              href={`/products/${item.productId}?returnTo=${encodeURIComponent(getReturnToUrl())}`}
                               className="p-1.5 text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition"
                               title="Edit colors and sets"
                             >
@@ -1853,5 +1924,19 @@ export default function OrderFormPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function OrderFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <OrderFormContent />
+    </Suspense>
   );
 }
