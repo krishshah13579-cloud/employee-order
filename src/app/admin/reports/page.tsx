@@ -35,6 +35,10 @@ const MONTH_NAMES = [
 interface ReportOrder {
   id: number;
   orderNumber: string;
+  taxInvoiceNumber?: string;
+  date?: string;
+  taxInvoiceDate?: string;
+  orderDate?: string;
   createdAt: string;
   status: string;
   placedBy: string;
@@ -435,8 +439,8 @@ export default function AdminReportsPage() {
                           <ExternalLink size={11} className="text-gray-400" />
                         </Link>
                       </td>
-                      <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap">
-                        {formatDate(ord.createdAt)}
+                      <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap font-medium">
+                        {formatDate(ord.date || ord.taxInvoiceDate || ord.orderDate || ord.createdAt)}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-gray-900">{ord.customer.shopName}</div>

@@ -342,18 +342,36 @@ export default function OrderFormPage() {
     saveDraft(items, selectedCustomerId, orderNotes, placedBy, days);
   };
 
-  // Filtered customer list for searchable dropdown
+  // Filtered customer list for searchable dropdown (Allocated customers prioritized)
   const filteredCustomers = useMemo(() => {
-    if (!customerSearchQuery.trim()) return customers;
-    const term = customerSearchQuery.toLowerCase().trim();
-    return customers.filter(
-      (c) =>
-        c.shopName.toLowerCase().includes(term) ||
-        c.gstPanNo.toLowerCase().includes(term) ||
-        c.phoneNumber.toLowerCase().includes(term) ||
-        (c.contactPerson && c.contactPerson.toLowerCase().includes(term))
-    );
-  }, [customers, customerSearchQuery]);
+    const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
+    const activeEmpId = employee?.id;
+
+    let list = customers;
+    if (customerSearchQuery.trim()) {
+      const term = customerSearchQuery.toLowerCase().trim();
+      list = list.filter(
+        (c) =>
+          c.shopName.toLowerCase().includes(term) ||
+          c.gstPanNo.toLowerCase().includes(term) ||
+          c.phoneNumber.toLowerCase().includes(term) ||
+          (c.contactPerson && c.contactPerson.toLowerCase().includes(term))
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      const aAllocated =
+        (activeEmpId && a.allocatedEmployeeId === activeEmpId) ||
+        (activeEmpName && a.allocatedEmployeeName && a.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
+      const bAllocated =
+        (activeEmpId && b.allocatedEmployeeId === activeEmpId) ||
+        (activeEmpName && b.allocatedEmployeeName && b.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
+
+      if (aAllocated && !bAllocated) return -1;
+      if (!aAllocated && bAllocated) return 1;
+      return a.shopName.localeCompare(b.shopName);
+    });
+  }, [customers, customerSearchQuery, employee, placedBy]);
 
   // Handle customer unselection / clear
   const handleUnselectCustomer = () => {
@@ -1000,35 +1018,47 @@ export default function OrderFormPage() {
                       No matching customer found. Please verify the firm name, GST/PAN, or phone.
                     </div>
                   ) : (
-                    filteredCustomers.map((cust) => (
-                      <div
-                        key={cust.id}
-                        onClick={() => handleSelectCustomer(cust)}
-                        className={`p-2.5 rounded-xl cursor-pointer hover:bg-orange-50 transition flex items-center justify-between ${
-                          selectedCustomerId === cust.id ? "bg-orange-50/70 font-bold" : ""
-                        }`}
-                      >
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 uppercase">
-                            {cust.shopName.toUpperCase()}
-                          </div>
-                          <div className="text-[11px] text-slate-500 font-mono uppercase flex items-center gap-1.5 flex-wrap">
-                            {!isGstPanRegistered(cust.gstPanNo) ? (
-                              <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1 py-0.2 rounded">
-                                ⚠️ NOT GST/PAN REGISTERED
-                              </span>
-                            ) : (
-                              <span>GST/PAN: {cust.gstPanNo.toUpperCase()}</span>
-                            )}
-                            <span>• Ph: {cust.phoneNumber}</span>
-                          </div>
-                        </div>
+                    filteredCustomers.map((cust) => {
+                      const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
+                      const isAllocatedToMe =
+                        (employee?.id && cust.allocatedEmployeeId === employee.id) ||
+                        (activeEmpName && cust.allocatedEmployeeName && cust.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
 
-                        {selectedCustomerId === cust.id && (
-                          <span className="text-xs font-bold text-orange-600">✓ Selected (Click to unselect)</span>
-                        )}
-                      </div>
-                    ))
+                      return (
+                        <div
+                          key={cust.id}
+                          onClick={() => handleSelectCustomer(cust)}
+                          className={`p-2.5 rounded-xl cursor-pointer hover:bg-orange-50 transition flex items-center justify-between ${
+                            selectedCustomerId === cust.id ? "bg-orange-50/70 font-bold" : ""
+                          }`}
+                        >
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5 flex-wrap">
+                              <span>{cust.shopName.toUpperCase()}</span>
+                              {isAllocatedToMe && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-full">
+                                  ⭐ Allocated to you
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-mono uppercase flex items-center gap-1.5 flex-wrap">
+                              {!isGstPanRegistered(cust.gstPanNo) ? (
+                                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1 py-0.2 rounded">
+                                  ⚠️ NOT GST/PAN REGISTERED
+                                </span>
+                              ) : (
+                                <span>GST/PAN: {cust.gstPanNo.toUpperCase()}</span>
+                              )}
+                              <span>• Ph: {cust.phoneNumber}</span>
+                            </div>
+                          </div>
+
+                          {selectedCustomerId === cust.id && (
+                            <span className="text-xs font-bold text-orange-600">✓ Selected (Click to unselect)</span>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>

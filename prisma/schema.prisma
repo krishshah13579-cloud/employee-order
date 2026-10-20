@@ -67,6 +67,8 @@ model Customer {
   visitingCardUrl String?  // Visiting Card (Photo/Upload)
   contactPerson   String?  // Primary Contact Person Name
   contactPersons  String?  // JSON Array of Multiple Contact Persons [{name, phone, designation}]
+  allocatedEmployeeId   Int?     // Assigned employee id
+  allocatedEmployeeName String?  // Assigned employee name
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   orders          Order[]

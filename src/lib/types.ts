@@ -101,6 +101,8 @@ export interface CustomerData {
   visitingCardUrl?: string | null;
   contactPerson?: string | null;
   contactPersons?: string | null;
+  allocatedEmployeeId?: number | null;
+  allocatedEmployeeName?: string | null;
   createdAt: string;
   updatedAt: string;
   orders?: any[];

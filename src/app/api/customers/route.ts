@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         contactPerson: true,
         contactPersons: true,
+        allocatedEmployeeId: true,
+        allocatedEmployeeName: true,
         createdAt: true,
         updatedAt: true,
         visitingCardUrl: fullCard,

@@ -19,6 +19,7 @@ import {
   Truck,
   IndianRupee,
   Sparkles,
+  Briefcase,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/types";
@@ -71,6 +72,25 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [empName, setEmpName] = useState<string>("");
+  const [myAllocatedCustomers, setMyAllocatedCustomers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!empName) return;
+    fetch("/api/customers")
+      .then((r) => r.json())
+      .then((all: any[]) => {
+        if (Array.isArray(all)) {
+          const clean = empName.trim().toLowerCase();
+          const allocated = all.filter(
+            (c) =>
+              (employee?.id && c.allocatedEmployeeId === employee.id) ||
+              (c.allocatedEmployeeName && c.allocatedEmployeeName.trim().toLowerCase() === clean)
+          );
+          setMyAllocatedCustomers(allocated);
+        }
+      })
+      .catch(() => {});
+  }, [empName, employee]);
 
   useEffect(() => {
     if (employee?.name) {
@@ -196,7 +216,7 @@ export default function HomePage() {
             3. CATEGORY
             ═══════════════════════════════════════════ */}
         <section aria-label="Key Dashboard Metrics">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* 1. TOTAL ORDERS (PRESENT DAY) */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
               <div className="flex items-center justify-between mb-4">
@@ -208,14 +228,14 @@ export default function HomePage() {
                 </span>
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Total Orders (Present Day)
+                Total Orders (Today)
               </h3>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
                   {loading ? "..." : stats?.todayOrders ?? 0}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
-                  orders booked today
+                  orders booked
                 </span>
               </div>
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
@@ -226,18 +246,50 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 2. CUSTOMERS */}
+            {/* 2. MY ALLOCATED CUSTOMERS */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-amber-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shadow-xs">
+                  <Briefcase size={22} />
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 uppercase tracking-wider">
+                  My Portfolio
+                </span>
+              </div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                My Allocated Customers
+              </h3>
+              <div className="mt-2 flex items-baseline gap-3">
+                <span className="text-3xl sm:text-4xl font-black text-amber-900 font-mono">
+                  {myAllocatedCustomers.length}
+                </span>
+                <span className="text-xs font-semibold text-amber-700">
+                  assigned shops
+                </span>
+              </div>
+              <div className="mt-4 pt-4 border-t border-amber-100 flex items-center justify-between text-xs text-amber-900">
+                <span>Priority Access:</span>
+                <Link
+                  href="/orders/new"
+                  className="font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 underline"
+                >
+                  Book Order <ArrowRight size={12} />
+                </Link>
+              </div>
+            </div>
+
+            {/* 3. CUSTOMERS */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-xs">
                   <Users size={22} />
                 </div>
                 <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase tracking-wider">
-                  Wholesale Network
+                  Network
                 </span>
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Customers
+                Total Customers
               </h3>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
@@ -249,11 +301,11 @@ export default function HomePage() {
               </div>
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
                 <span>Mandatory for Orders:</span>
-                <span className="font-bold text-blue-600">Shop Name + GST/PAN</span>
+                <span className="font-bold text-blue-600">Shop + GST/PAN</span>
               </div>
             </div>
 
-            {/* 3. PRODUCT CATALOG */}
+            {/* 4. PRODUCT CATALOG */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200/90 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
@@ -286,6 +338,63 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ═══════════════════════════════════════════
+            MY ALLOCATED CUSTOMER PORTFOLIO (QUICK SELECTOR)
+            ═══════════════════════════════════════════ */}
+        {myAllocatedCustomers.length > 0 && (
+          <section className="bg-amber-50/40 rounded-3xl border border-amber-200 p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-2xs">
+                  <Briefcase size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                    ⭐ My Allocated Customers ({myAllocatedCustomers.length})
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Accounts assigned to you by admin. Click any customer to immediately start a new order.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/orders/new"
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 hover:underline cursor-pointer"
+              >
+                <span>Go to Order Form</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
+              {myAllocatedCustomers.map((cust) => (
+                <div
+                  key={cust.id}
+                  onClick={() => router.push(`/orders/new?customerId=${cust.id}`)}
+                  className="bg-white rounded-2xl p-4 border border-amber-200/70 hover:border-amber-400 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div>
+                    <div className="font-bold text-xs text-slate-900 uppercase group-hover:text-amber-800 transition">
+                      {cust.shopName}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                      <span>{cust.phoneNumber}</span>
+                      <span>•</span>
+                      <span>{cust.city || "—"}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition flex items-center gap-1">
+                      <span>Book</span>
+                      <ArrowRight size={11} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ═══════════════════════════════════════════
             RECENT ORDERS (10 CUSTOMER ORDERS SHOWN)

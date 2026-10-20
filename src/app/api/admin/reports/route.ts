@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-security";
+import { PAST_INVOICES_1_TO_39 } from "@/lib/pastInvoicesData";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// Lookup map for historical bills 1 to 39 to ensure their original invoice dates (July, Aug, Sept) are always exact
+const pastInvoiceDateMap = new Map<string, string>();
+for (const p of PAST_INVOICES_1_TO_39) {
+  pastInvoiceDateMap.set(String(p.invoiceNumber).trim(), p.date);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,34 +27,13 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const currentYear = yearParam ? parseInt(yearParam, 10) : now.getFullYear();
 
-    // Build Prisma query condition
+    // Query non-cancelled orders
     const where: any = {
-      // Exclude Cancelled orders by default unless explicitly asked for Cancelled
       status: statusParam && statusParam !== "all" ? statusParam : { not: "Cancelled" },
     };
 
-    if (monthParam && monthParam !== "all") {
-      const monthIndex = parseInt(monthParam, 10) - 1; // 0-indexed
-      if (!isNaN(monthIndex) && monthIndex >= 0 && monthIndex <= 11) {
-        const startOfMonth = new Date(currentYear, monthIndex, 1, 0, 0, 0, 0);
-        const endOfMonth = new Date(currentYear, monthIndex + 1, 0, 23, 59, 59, 999);
-        where.createdAt = {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        };
-      }
-    } else if (yearParam) {
-      const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0, 0);
-      const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-      where.createdAt = {
-        gte: startOfYear,
-        lte: endOfYear,
-      };
-    }
-
-    const orders = await prisma.order.findMany({
+    const allOrders = await prisma.order.findMany({
       where,
-      orderBy: { createdAt: "desc" },
       include: {
         customer: true,
         items: {
@@ -69,6 +55,55 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Resolve accurate invoice date for each order
+    interface ProcessedOrder {
+      order: typeof allOrders[0];
+      effectiveDate: Date;
+    }
+
+    const resolvedOrders: ProcessedOrder[] = allOrders.map((o) => {
+      // 1. Check if order corresponds to historical invoice 1-39
+      const invNum = (o.taxInvoiceNumber || "").trim();
+      const histDateStr = invNum ? pastInvoiceDateMap.get(invNum) : undefined;
+
+      let effectiveDate: Date;
+      if (histDateStr) {
+        effectiveDate = new Date(histDateStr);
+      } else if (o.taxInvoiceDate) {
+        effectiveDate = new Date(o.taxInvoiceDate);
+      } else if (o.orderDate) {
+        effectiveDate = new Date(o.orderDate);
+      } else {
+        effectiveDate = new Date(o.createdAt);
+      }
+
+      return {
+        order: o,
+        effectiveDate,
+      };
+    });
+
+    // Filter by year and month using effective invoice date
+    const filteredByDate = resolvedOrders.filter(({ effectiveDate }) => {
+      const orderYear = effectiveDate.getFullYear();
+      if (yearParam && orderYear !== currentYear) {
+        return false;
+      }
+
+      if (monthParam && monthParam !== "all") {
+        const targetMonth = parseInt(monthParam, 10); // 1-12
+        const orderMonth = effectiveDate.getMonth() + 1; // 1-12
+        if (orderMonth !== targetMonth) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Sort by effective invoice date descending
+    filteredByDate.sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime());
+
     // Calculate aggregated metrics
     let totalRevenue = 0;
     let totalSets = 0;
@@ -78,9 +113,9 @@ export async function GET(request: NextRequest) {
     let retailerRevenue = 0;
     let wholesalerRevenue = 0;
 
-    const formattedOrders = orders.map((o) => {
+    const formattedOrders = filteredByDate.map(({ order: o, effectiveDate }) => {
       const bType = o.businessType || o.customer?.businessType || "RETAILER";
-      const isWholesaler = bType === "WHOLESALER";
+      const isWholesaler = bType === "WHOLESALER" || bType === "WHOLESALER WITHOUT GST";
       const orderRevenue = o.grandTotal || 0;
 
       totalRevenue += orderRevenue;
@@ -108,7 +143,11 @@ export async function GET(request: NextRequest) {
       return {
         id: o.id,
         orderNumber: o.orderNumber,
-        createdAt: o.createdAt,
+        taxInvoiceNumber: o.taxInvoiceNumber,
+        date: effectiveDate.toISOString(),
+        createdAt: effectiveDate.toISOString(),
+        taxInvoiceDate: o.taxInvoiceDate ? o.taxInvoiceDate.toISOString() : effectiveDate.toISOString(),
+        orderDate: o.orderDate ? o.orderDate.toISOString() : effectiveDate.toISOString(),
         status: o.status,
         placedBy: o.placedBy,
         businessType: bType,
@@ -145,7 +184,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       summary: {
-        totalOrders: orders.length,
+        totalOrders: filteredByDate.length,
         totalRevenue,
         totalSets,
         totalPcs,

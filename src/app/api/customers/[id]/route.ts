@@ -100,6 +100,13 @@ export async function PUT(
       updateData.contactPersons = typeof body.contactPersons === "string" ? body.contactPersons : JSON.stringify(body.contactPersons);
     }
 
+    if (body.allocatedEmployeeId !== undefined) {
+      updateData.allocatedEmployeeId = body.allocatedEmployeeId ? parseInt(body.allocatedEmployeeId, 10) : null;
+    }
+    if (body.allocatedEmployeeName !== undefined) {
+      updateData.allocatedEmployeeName = body.allocatedEmployeeName ? String(body.allocatedEmployeeName).trim() : null;
+    }
+
     // Check Super Admin permission for modifying creditDays
     if (body.creditDays !== undefined) {
       const admin = await getAdminSession(request);

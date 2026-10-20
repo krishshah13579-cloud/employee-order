@@ -31,20 +31,29 @@ export async function POST(request: NextRequest) {
     const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // Fetch processed orders for the month (exclude Cancelled)
-    const orders = await prisma.order.findMany({
+    const allOrders = await prisma.order.findMany({
       where: {
-        createdAt: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
         status: { not: "Cancelled" },
       },
       include: {
         customer: true,
         items: true,
       },
-      orderBy: { createdAt: "desc" },
+    });
+
+    const pastDateMap = new Map<string, string>();
+    try {
+      const { PAST_INVOICES_1_TO_39 } = require("@/lib/pastInvoicesData");
+      for (const p of PAST_INVOICES_1_TO_39) {
+        pastDateMap.set(String(p.invoiceNumber).trim(), p.date);
+      }
+    } catch {}
+
+    const orders = allOrders.filter((o) => {
+      const invNum = (o.taxInvoiceNumber || "").trim();
+      const histStr = invNum ? pastDateMap.get(invNum) : undefined;
+      const d = histStr ? new Date(histStr) : (o.taxInvoiceDate || o.orderDate || o.createdAt);
+      return d.getFullYear() === year && d.getMonth() + 1 === month;
     });
 
     let totalRevenue = 0;

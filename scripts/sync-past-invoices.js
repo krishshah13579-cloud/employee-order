@@ -215,10 +215,14 @@ async function syncPastInvoices() {
       updatedOrderItems++;
     }
 
-    // Update Order with taxInvoiceItems and status
+    // Update Order with exact invoice date, taxInvoiceItems, and status
+    const actualInvoiceDate = new Date(inv.date);
     await prisma.order.update({
       where: { id: order.id },
       data: {
+        orderDate: actualInvoiceDate,
+        taxInvoiceDate: actualInvoiceDate,
+        createdAt: actualInvoiceDate,
         taxInvoiceItems: JSON.stringify(itemsForTaxInvoice),
         taxInvoiceNumber: invNoStr,
         status: "Delivered",
@@ -241,6 +245,8 @@ async function syncPastInvoices() {
       await prisma.salesInvoice.update({
         where: { id: salesInv.id },
         data: {
+          invoiceDate: actualInvoiceDate,
+          createdAt: actualInvoiceDate,
           items: JSON.stringify(itemsForTaxInvoice),
           totalSets: inv.totalSets,
           totalPcs: inv.totalPcs,
