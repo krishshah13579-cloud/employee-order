@@ -345,11 +345,6 @@ export default function HomePage() {
         </section>
 
         {/* ═══════════════════════════════════════════
-            MY TEAM SUPERVISION SECTION (TEAM LEADER KRISH SHAH ONLY)
-            ═══════════════════════════════════════════ */}
-        {isSpecialTLKrishShah && <MyTeamSection />}
-
-        {/* ═══════════════════════════════════════════
             RECENT ORDERS (10 CUSTOMER ORDERS SHOWN)
             WHEN THE CUSTOMER ORDER DETAIL IS CLICKED THE ORDER FORM OPENS
             ═══════════════════════════════════════════ */}
@@ -572,6 +567,12 @@ export default function HomePage() {
             </div>
           </section>
         )}
+
+        {/* ═══════════════════════════════════════════
+            MY TEAM SUPERVISION SECTION (TEAM LEADER KRISH SHAH ONLY)
+            MOVED BELOW MY ALLOCATED CUSTOMERS SECTION
+            ═══════════════════════════════════════════ */}
+        {isSpecialTLKrishShah && <MyTeamSection />}
       </div>
     </div>
   );
