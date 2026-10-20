@@ -29,6 +29,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 
 interface SalesInvoiceItem {
   productId?: number;
@@ -489,10 +490,21 @@ export default function AdminSalesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to dispatch invoice via WhatsApp");
 
-      toast(
-        `✅ Tax Invoice PDF generated & sent directly to ${data.customerName || inv.customerName} (${data.customerPhone || phone}) via WhatsApp!`,
-        "success"
-      );
+      if (data.automated) {
+        toast(
+          `✅ Tax Invoice PDF generated & dispatched directly to ${data.customerName || inv.customerName} (${data.customerPhone || phone}) via WhatsApp!`,
+          "success"
+        );
+      } else {
+        await shareOrOpenWhatsAppWithPdf({
+          whatsappUrl: data.whatsappUrl,
+          nativeUrl: data.nativeUrl,
+          pdfUrl: data.pdfUrl,
+          filename: data.fileName,
+          text: data.message,
+          onToast: toast,
+        });
+      }
     } catch (err: any) {
       toast(err.message || "Failed to send WhatsApp invoice", "error");
     } finally {

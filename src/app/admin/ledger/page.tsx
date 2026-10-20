@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate, numberToIndianWords } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 
 interface CustomerOption {
   id: number;
@@ -182,7 +183,11 @@ function LedgerContent() {
   }, [customers, selectedCustomerId, ledgerData]);
 
   const handlePrint = () => {
-    window.print();
+    if (selectedCustomerId) {
+      window.open(`/api/admin/ledger/${selectedCustomerId}/pdf?format=${activeFormat}`, "_blank");
+    } else {
+      window.print();
+    }
   };
 
   const handleShareWhatsApp = async () => {
@@ -197,12 +202,23 @@ function LedgerContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to dispatch ledger via WhatsApp");
 
-      toast(
-        `✅ ${
-          activeFormat === "format1" ? "Pending Bills" : "Statement of Account"
-        } PDF generated and sent directly to ${ledgerData.customer.shopName} (${data.customerPhone})!`,
-        "success"
-      );
+      if (data.automated) {
+        toast(
+          `✅ ${
+            activeFormat === "format1" ? "Pending Bills" : "Statement of Account"
+          } PDF generated and dispatched automatically via WhatsApp to ${ledgerData.customer.shopName} (${data.customerPhone})!`,
+          "success"
+        );
+      } else {
+        await shareOrOpenWhatsAppWithPdf({
+          whatsappUrl: data.whatsappUrl,
+          nativeUrl: data.nativeUrl,
+          pdfUrl: data.pdfUrl,
+          filename: data.fileName,
+          text: data.message,
+          onToast: toast,
+        });
+      }
     } catch (err: any) {
       toast(err.message || "Could not send WhatsApp message", "error");
     } finally {

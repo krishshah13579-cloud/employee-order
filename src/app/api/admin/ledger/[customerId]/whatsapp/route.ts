@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
 import { generateCustomerLedgerPdfBuffer } from "@/lib/pdf-generator";
-import { dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
+import { dispatchAutomatedWhatsApp, createWhatsAppDirectLink, createWhatsAppNativeLink } from "@/lib/whatsapp";
 import { formatDate, formatCurrency, numberToIndianWords } from "@/lib/utils";
 
 export async function POST(
@@ -82,22 +82,20 @@ export async function POST(
       filename: fileName,
     });
 
-    if (!autoResult.success) {
-      return NextResponse.json(
-        {
-          error:
-            autoResult.error ||
-            "WhatsApp Gateway is offline or not connected. Please verify gateway status in WhatsApp Gateway tab.",
-        },
-        { status: 503 }
-      );
-    }
+    const directLink = createWhatsAppDirectLink(customerPhone, messageText);
+    const nativeLink = createWhatsAppNativeLink(customerPhone, messageText);
+    const origin = request.nextUrl.origin || "https://employee.iqtrousers.in";
+    const pdfUrl = `${origin}/api/admin/ledger/${cid}/pdf?format=${formatType}`;
 
     return NextResponse.json({
       success: true,
-      automated: true,
+      automated: autoResult.success,
       method: autoResult.method,
       fileName,
+      pdfUrl,
+      whatsappUrl: directLink,
+      nativeUrl: nativeLink,
+      message: messageText,
       customerPhone,
       customerName: customer.shopName,
     });

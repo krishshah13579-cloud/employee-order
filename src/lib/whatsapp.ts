@@ -613,6 +613,6 @@ export async function dispatchAutomatedWhatsApp(
   return {
     success: false,
     method: "DIRECT_LINK_FALLBACK",
-    error: "No WhatsApp Cloud API credentials configured or API call failed. Using 1-Click WhatsApp Direct Link.",
+    error: "WhatsApp gateway is currently offline or unreachable. Using WhatsApp Direct Link.",
   };
 }
