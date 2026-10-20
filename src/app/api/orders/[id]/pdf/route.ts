@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
+import {
+  formatColorAlphabetLines,
+  formatProductNameWithMrp,
+  expandOrderItemsForInvoice,
+} from "@/lib/utils";
 import { getInvoiceTemplateSettings } from "@/lib/invoice-template";
 import fs from "fs";
 import path from "path";
@@ -329,17 +333,37 @@ export async function GET(
     const tableTopY = y;
     let currentY = y;
 
-    displayItems.forEach((item: any, index: number) => {
+    const isWithoutGst =
+      (order as any).gstRate === 0 ||
+      (order as any).businessType === "WHOLESALER WITHOUT GST" ||
+      (order as any).businessType === "WHOLESALE WITHOUT GST" ||
+      order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
+      order.customer?.businessType === "WHOLESALE WITHOUT GST";
+
+    const expandedRows = expandOrderItemsForInvoice(displayItems);
+
+    resolvedTotalSets = expandedRows.reduce((s, r) => s + (Number(r.totalSets) || 0), 0);
+    resolvedTotalPcs = expandedRows.reduce((s, r) => s + (Number(r.totalPcs) || 0), 0);
+    resolvedSubtotal = expandedRows.reduce((s, r) => s + (Number(r.itemSubtotal) || 0), 0);
+    resolvedGst = isWithoutGst ? 0 : Math.round(resolvedSubtotal * 0.05 * 100) / 100;
+    resolvedGrandTotal = Math.round(resolvedSubtotal + resolvedGst);
+
+    expandedRows.forEach((row: any, index: number) => {
+      const origItem = row.originalItem || row;
       // Resolve product information for color wholesale alphabet mapping
       const prod =
-        (item as any).product ||
-        productByItem.get(item.productId) ||
-        productByItem.get(String(item.productName || "").toLowerCase().trim());
-      const colorMapping = prod?.colorMapping || (item as any).colorMapping;
-      const colorsAvailable = prod?.colorsAvailable || (item as any).colorsAvailable;
+        row.product ||
+        origItem.product ||
+        productByItem.get(origItem.productId) ||
+        productByItem.get(String(row.productName || origItem.productName || "").toLowerCase().trim());
+      const colorMapping = prod?.colorMapping || origItem.colorMapping;
+      const colorsAvailable = prod?.colorsAvailable || origItem.colorsAvailable;
 
-      // Color lines formatted as A: 2 Sets, B: 2 Sets etc.
-      const colorLines = formatColorAlphabetLines(item.colorSets, colorMapping, colorsAvailable);
+      // Color lines formatted as A: 2 Sets or 34 - 2 etc.
+      const colorLines =
+        Array.isArray(row.colorWiseLines) && row.colorWiseLines.length > 0
+          ? row.colorWiseLines
+          : formatColorAlphabetLines(origItem.colorSets, colorMapping, colorsAvailable);
       const colorLinesCount = Math.max(1, colorLines.length);
 
       const lineSpacing = 9;
@@ -352,27 +376,31 @@ export async function GET(
       drawText(String(index + 1), colX[0] + 8, rowTextTopY, { size: 7.5 });
 
       // 2. Product Design No. & Ratio
-      const resolvedMrp = prod?.mrp || (item as any).mrp;
-      const resolvedFallbackPrice = prod?.retailerPrice || prod?.price || item.unitPrice;
+      const resolvedMrp = row.mrp || prod?.mrp || origItem.mrp;
+      const resolvedFallbackPrice = prod?.retailerPrice || prod?.price || row.unitPrice || origItem.unitPrice;
       const formattedProdName = formatProductNameWithMrp(
-        item.productName,
+        row.productName || origItem.productName,
         resolvedMrp,
         resolvedFallbackPrice
       );
       drawText(formattedProdName.slice(0, 26), colX[1] + 4, rowTextTopY, { font: fontBold, size: 7.5 });
 
-      const ratio = String(item.sizeRatio || prod?.sizeRatio || "30 to 38");
-      drawText(`Ratio: ${ratio}`, colX[1] + 4, rowTextTopY - 9, { size: 7, color: rgb(0.2, 0.2, 0.2) });
+      // Only show ratio below product name if not a mix row and showRatioBelowName is true
+      if (row.showRatioBelowName && !row.isMixRow) {
+        const ratio = String(row.sizeRatio || origItem.sizeRatio || prod?.sizeRatio || "30 to 38");
+        drawText(`Ratio: ${ratio}`, colX[1] + 4, rowTextTopY - 9, { size: 7, color: rgb(0.2, 0.2, 0.2) });
+      }
 
       // 3. HSN/SAC
-      const hsn = String(item.hsnCode || prod?.hsnCode || tpl.defaultHsn || "6203");
+      const hsn = String(row.hsnCode || origItem.hsnCode || prod?.hsnCode || tpl.defaultHsn || "6203");
       drawText(hsn, colX[2] + 8, rowTextTopY, { size: 7.5 });
 
       // 4. Size
-      drawText(ratio, colX[3] + 6, rowTextTopY, { size: 7.5 });
+      const sizeVal = row.isMixRow ? "Mix Sizes" : String(row.sizeRatio || origItem.sizeRatio || prod?.sizeRatio || "30 to 38");
+      drawText(sizeVal, colX[3] + 6, rowTextTopY, { size: 7.5 });
 
       // 5. Color lines
-      colorLines.forEach((cLine, cIdx) => {
+      colorLines.forEach((cLine: string, cIdx: number) => {
         drawText(cLine, colX[4] + 4, rowTextTopY - cIdx * lineSpacing, {
           font: fontBold,
           size: 7,
@@ -381,19 +409,22 @@ export async function GET(
       });
 
       // 6. Set
-      const setsVal = Number(item.totalSets || 0).toFixed(2);
+      const setsVal =
+        row.isMixRow || row.totalSets === null || row.totalSets === undefined || row.totalSets === 0
+          ? "—"
+          : Number(row.totalSets).toFixed(2);
       drawText(setsVal, colX[5] + 8, rowTextTopY, { font: fontBold, size: 7.5 });
 
       // 7. Qty (PCS)
-      const pcsVal = `${Number(item.totalPcs || 0).toFixed(2)} PCS`;
+      const pcsVal = `${Number(row.totalPcs || 0).toFixed(2)} PCS`;
       drawText(pcsVal, colX[6] + 4, rowTextTopY, { font: fontBold, size: 7.5 });
 
       // 8. Rate
-      const rateVal = Number(item.unitPrice || 0).toFixed(2);
+      const rateVal = Number(row.unitPrice || 0).toFixed(2);
       drawText(rateVal, colX[7] + 8, rowTextTopY, { size: 7.5 });
 
       // 9. Amount
-      const amtVal = Number(item.itemSubtotal || 0).toFixed(2);
+      const amtVal = Number(row.itemSubtotal || 0).toFixed(2);
       const amtW = fontBold.widthOfTextAtSize(amtVal, 7.5);
       drawText(amtVal, colX[9] - amtW - 6, rowTextTopY, { font: fontBold, size: 7.5 });
 
@@ -468,17 +499,25 @@ export async function GET(
     const taxAmtW = fontRegular.widthOfTextAtSize(taxAmtStr, 7.5);
     drawText(taxAmtStr, width - margin - taxAmtW - 8, sY, { size: 7.5 });
 
-    sY -= 11;
-    drawText("Central Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
-    const cgstStr = Number(halfGst).toFixed(2);
-    const cgstW = fontRegular.widthOfTextAtSize(cgstStr, 7.5);
-    drawText(cgstStr, width - margin - cgstW - 8, sY, { size: 7.5 });
+    if (isWithoutGst) {
+      sY -= 11;
+      drawText("GST (0% - Without GST)", summarySplitX + 8, sY, { size: 7.5 });
+      const zeroGstStr = "0.00";
+      const zeroGstW = fontRegular.widthOfTextAtSize(zeroGstStr, 7.5);
+      drawText(zeroGstStr, width - margin - zeroGstW - 8, sY, { size: 7.5 });
+    } else {
+      sY -= 11;
+      drawText("Central Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
+      const cgstStr = Number(halfGst).toFixed(2);
+      const cgstW = fontRegular.widthOfTextAtSize(cgstStr, 7.5);
+      drawText(cgstStr, width - margin - cgstW - 8, sY, { size: 7.5 });
 
-    sY -= 11;
-    drawText("State/UT Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
-    const sgstStr = Number(halfGst).toFixed(2);
-    const sgstW = fontRegular.widthOfTextAtSize(sgstStr, 7.5);
-    drawText(sgstStr, width - margin - sgstW - 8, sY, { size: 7.5 });
+      sY -= 11;
+      drawText("State/UT Tax 2.50%", summarySplitX + 8, sY, { size: 7.5 });
+      const sgstStr = Number(halfGst).toFixed(2);
+      const sgstW = fontRegular.widthOfTextAtSize(sgstStr, 7.5);
+      drawText(sgstStr, width - margin - sgstW - 8, sY, { size: 7.5 });
+    }
 
     sY -= 14;
     // Grand Total Bar

@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { formatCurrency, formatColorAlphabetLines, formatProductNameWithMrp } from "@/lib/utils";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  formatCurrency,
+  formatColorAlphabetLines,
+  formatProductNameWithMrp,
+  expandOrderItemsForInvoice,
+  type ExpandedInvoiceRow,
+} from "@/lib/utils";
 import {
   DEFAULT_INVOICE_TEMPLATE,
   type InvoiceTemplateSettings,
@@ -32,6 +38,11 @@ export interface TaxInvoiceItem {
   unitPrice?: number;
   itemSubtotal?: number;
   hsnCode?: string;
+  notes?: string | null;
+  mixSizes?: string | null;
+  mixPcs?: number | null;
+  colorMixPcs?: any;
+  isMixRow?: boolean;
 }
 
 export interface TaxInvoiceOrder {
@@ -200,9 +211,24 @@ export default function TaxInvoiceA4({
   }, [order.orderNumber, order.templateOverrides]);
 
   // Recalculate Totals
-  const totalPcs = items.reduce((acc, it) => acc + (Number(it.totalPcs) || 0), 0);
-  const totalSets = items.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0);
-  const subtotal = items.reduce((acc, it) => acc + (Number(it.itemSubtotal) || 0), 0);
+  const displayRows = useMemo(() => expandOrderItemsForInvoice(items), [items]);
+  const totalPcs = useMemo(() => {
+    return isEditing
+      ? items.reduce((acc, it) => acc + (Number(it.totalPcs) || (Number(it.totalSets) || 0) * (it.pcsPerSet || 5)), 0)
+      : displayRows.reduce((acc, it) => acc + (Number(it.totalPcs) || 0), 0);
+  }, [isEditing, items, displayRows]);
+
+  const totalSets = useMemo(() => {
+    return isEditing
+      ? items.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0)
+      : displayRows.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0);
+  }, [isEditing, items, displayRows]);
+
+  const subtotal = useMemo(() => {
+    return isEditing
+      ? items.reduce((acc, it) => acc + (Number(it.itemSubtotal) || (Number(it.totalPcs) || 0) * (Number(it.unitPrice) || 0)), 0)
+      : displayRows.reduce((acc, it) => acc + (Number(it.itemSubtotal) || 0), 0);
+  }, [isEditing, items, displayRows]);
   const isWithoutGst =
     order.gstRate === 0 ||
     order.businessType === "WHOLESALER WITHOUT GST" ||
@@ -966,216 +992,306 @@ export default function TaxInvoiceA4({
           </thead>
 
           <tbody>
-            {items.map((it, idx) => {
-              const colorLines = formatColorAlphabetLines(
-                it.colorSets,
-                it.colorMapping,
-                it.colorsAvailable
-              );
+            {isEditing
+              ? items.map((it, idx) => {
+                  const colorLines = formatColorAlphabetLines(
+                    it.colorSets,
+                    it.colorMapping,
+                    it.colorsAvailable
+                  );
 
-              const totalPcsVal = Number(it.totalPcs) || (Number(it.totalSets) || 0) * (it.pcsPerSet || 5);
-              const unitPriceVal = Number(it.unitPrice) || 0;
-              const itemAmountVal = Number(it.itemSubtotal) || totalPcsVal * unitPriceVal;
+                  const totalPcsVal = Number(it.totalPcs) || (Number(it.totalSets) || 0) * (it.pcsPerSet || 5);
+                  const unitPriceVal = Number(it.unitPrice) || 0;
+                  const itemAmountVal = Number(it.itemSubtotal) || totalPcsVal * unitPriceVal;
 
-              return (
-                <tr key={idx} style={{ verticalAlign: "top" }}>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 2px",
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {idx + 1}
-                  </td>
-                  <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={it.productName}
-                        onChange={(e) => handleItemChange(idx, "productName", e.target.value)}
-                        className="w-full font-bold text-xs px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
-                      />
-                    ) : (
-                      <div style={{ fontWeight: "bold", color: "#000" }}>
-                        {formatProductNameWithMrp(
-                          it.productName,
-                          it.mrp || (it as any).product?.mrp,
-                          it.unitPrice
-                        )}
-                      </div>
-                    )}
-                    {it.sizeRatio && !isEditing && (
-                      <div
+                  return (
+                    <tr key={idx} style={{ verticalAlign: "top" }}>
+                      <td
                         style={{
-                          fontSize: "9px",
-                          color: "#444",
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
                           fontFamily: "monospace",
                         }}
                       >
-                        Ratio: {it.sizeRatio}
-                      </div>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 2px",
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                      fontSize: "10px",
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={it.hsnCode || "6203"}
-                        onChange={(e) => handleItemChange(idx, "hsnCode", e.target.value)}
-                        className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
-                      />
-                    ) : (
-                      it.hsnCode || template.defaultHsn || "6203"
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 2px",
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={it.sizeRatio || "30 to 38"}
-                        onChange={(e) => handleItemChange(idx, "sizeRatio", e.target.value)}
-                        className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
-                      />
-                    ) : (
-                      it.sizeRatio || "30 to 38"
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 4px",
-                      fontSize: "10px",
-                      fontWeight: "600",
-                      lineHeight: "1.3",
-                    }}
-                  >
-                    {colorLines.length > 0 ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        {colorLines.map((line, lIdx) => (
-                          <div key={lIdx} style={{ whiteSpace: "nowrap" }}>
-                            {line}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ color: "#666" }}>Standard Mix</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 2px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={it.totalSets || 0}
-                        onChange={(e) => handleItemChange(idx, "totalSets", parseFloat(e.target.value) || 0)}
-                        className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
-                      />
-                    ) : (
-                      it.totalSets ? Number(it.totalSets).toFixed(2) : "1.00"
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 4px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        value={it.totalPcs || 0}
-                        onChange={(e) => handleItemChange(idx, "totalPcs", parseInt(e.target.value) || 0)}
-                        className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
-                      />
-                    ) : (
-                      `${totalPcsVal.toFixed(2)} PCS`
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 4px",
-                      textAlign: "right",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        value={it.unitPrice || 0}
-                        onChange={(e) => handleItemChange(idx, "unitPrice", parseFloat(e.target.value) || 0)}
-                        className="w-full text-right font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none font-bold"
-                      />
-                    ) : (
-                      unitPriceVal.toFixed(2)
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      borderRight: "1px solid #000000",
-                      padding: "4px 2px",
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    5.00
-                  </td>
-                  <td
-                    style={{
-                      padding: "4px 6px",
-                      textAlign: "right",
-                      fontWeight: "bold",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {itemAmountVal.toFixed(2)}
-                  </td>
-                  {isEditing && (
-                    <td className="print:hidden text-center p-1">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(idx)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        title="Remove Item"
+                        {idx + 1}
+                      </td>
+                      <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
+                        <input
+                          type="text"
+                          value={it.productName}
+                          onChange={(e) => handleItemChange(idx, "productName", e.target.value)}
+                          className="w-full font-bold text-xs px-1 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                          fontSize: "10px",
+                        }}
                       >
-                        <Trash2 size={12} />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
+                        <input
+                          type="text"
+                          value={it.hsnCode || "6203"}
+                          onChange={(e) => handleItemChange(idx, "hsnCode", e.target.value)}
+                          className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={it.sizeRatio || "30 to 38"}
+                          onChange={(e) => handleItemChange(idx, "sizeRatio", e.target.value)}
+                          className="w-full text-center font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          lineHeight: "1.3",
+                        }}
+                      >
+                        {colorLines.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            {colorLines.map((line, lIdx) => (
+                              <div key={lIdx} style={{ whiteSpace: "nowrap" }}>
+                                {line}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#666" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={it.totalSets || 0}
+                          onChange={(e) => handleItemChange(idx, "totalSets", parseFloat(e.target.value) || 0)}
+                          className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          min="0"
+                          value={it.totalPcs || 0}
+                          onChange={(e) => handleItemChange(idx, "totalPcs", parseInt(e.target.value) || 0)}
+                          className="w-full text-center font-mono text-[10px] font-bold px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          min="0"
+                          value={it.unitPrice || 0}
+                          onChange={(e) => handleItemChange(idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                          className="w-full text-right font-mono text-[10px] px-0.5 border border-orange-300 bg-amber-50/50 rounded outline-none font-bold"
+                        />
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {isWithoutGst ? "0.00" : "5.00"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {itemAmountVal.toFixed(2)}
+                      </td>
+                      <td className="print:hidden text-center p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                          title="Remove Item"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              : displayRows.map((row, idx) => {
+                  return (
+                    <tr key={idx} style={{ verticalAlign: "top" }}>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {idx + 1}
+                      </td>
+                      <td style={{ borderRight: "1px solid #000000", padding: "4px 6px" }}>
+                        <div style={{ fontWeight: "bold", color: "#000" }}>
+                          {formatProductNameWithMrp(
+                            row.productName,
+                            row.mrp || (row as any).product?.mrp,
+                            row.unitPrice
+                          )}
+                        </div>
+                        {row.showRatioBelowName && !row.isMixRow && row.sizeRatio && (
+                          <div
+                            style={{
+                              fontSize: "9px",
+                              color: "#444",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            Ratio: {row.sizeRatio}
+                          </div>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                          fontSize: "10px",
+                        }}
+                      >
+                        {row.hsnCode || template.defaultHsn || "6203"}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {row.isMixRow ? "Mix Sizes" : (row.sizeRatio || "30 to 38")}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          lineHeight: "1.3",
+                        }}
+                      >
+                        {row.colorWiseLines.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            {row.colorWiseLines.map((line, lIdx) => (
+                              <div key={lIdx} style={{ whiteSpace: "nowrap" }}>
+                                {line}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#666" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {row.isMixRow || row.totalSets === null || row.totalSets === 0
+                          ? "—"
+                          : Number(row.totalSets).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {`${Number(row.totalPcs || 0).toFixed(2)} PCS`}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 4px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {Number(row.unitPrice || 0).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          borderRight: "1px solid #000000",
+                          padding: "4px 2px",
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {isWithoutGst ? "0.00" : "5.00"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {Number(row.itemSubtotal || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
 
             {/* Add Item Row in Edit Mode */}
             {isEditing && (

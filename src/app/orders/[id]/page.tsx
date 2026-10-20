@@ -303,15 +303,28 @@ export default function OrderEditPage() {
               Order Form
             </h1>
 
-            <button
-              type="button"
-              onClick={() => setIsPreviewModalOpen(true)}
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer"
-              title="Preview Order Form"
-            >
-              <Eye size={15} />
-              <span>Preview Order Form</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
+                disabled={sendingWhatsApp}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-900/20 cursor-pointer disabled:opacity-50"
+                title="Resend WhatsApp with PDF attached directly to customer"
+              >
+                <MessageCircle size={15} />
+                <span>{sendingWhatsApp ? "Sending..." : "Resend WhatsApp (PDF)"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer"
+                title="Preview Order Form"
+              >
+                <Eye size={15} />
+                <span>Preview Order Form</span>
+              </button>
+            </div>
           </div>
 
           {/* Locked Order Notice */}
@@ -792,6 +805,10 @@ export default function OrderEditPage() {
             totalPcs: it.totalPcs,
             unitPrice: it.unitPrice,
             itemSubtotal: it.itemSubtotal,
+            notes: it.notes,
+            mixSizes: (it as any).mixSizes,
+            mixPcs: (it as any).mixPcs,
+            colorMixPcs: (it as any).colorMixPcs,
           })),
         }}
       />
@@ -815,14 +832,13 @@ export default function OrderEditPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setIsPreviewModalOpen(false);
-                  setTimeout(() => window.print(), 100);
-                }}
-                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}
+                disabled={sendingWhatsApp}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm disabled:opacity-50"
+                title="Resend WhatsApp with PDF attached directly to customer"
               >
-                <Printer size={14} />
-                <span>Print / Save PDF</span>
+                <MessageCircle size={14} />
+                <span>{sendingWhatsApp ? "Sending..." : "Resend WhatsApp (PDF)"}</span>
               </button>
               <button
                 type="button"
@@ -878,22 +894,13 @@ export default function OrderEditPage() {
                     totalPcs: it.totalPcs,
                     unitPrice: it.unitPrice,
                     itemSubtotal: it.itemSubtotal,
+                    notes: it.notes,
+                    mixSizes: (it as any).mixSizes,
+                    mixPcs: (it as any).mixPcs,
+                    colorMixPcs: (it as any).colorMixPcs,
                   })),
                 }}
-                allowInlineEdit={true}
-                onSaveOverrides={async (overrides) => {
-                  const res = await fetch(`/api/orders/${orderId}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ templateOverrides: overrides }),
-                  });
-                  if (!res.ok) {
-                    const d = await res.json();
-                    throw new Error(d.error || "Failed to save template edits");
-                  }
-                  toast("Invoice customization saved successfully!", "success");
-                  fetchOrder();
-                }}
+                allowInlineEdit={false}
               />
             </div>
           </div>
