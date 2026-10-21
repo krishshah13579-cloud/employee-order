@@ -20,6 +20,8 @@ import {
   IndianRupee,
   Sparkles,
   Briefcase,
+  MapPin,
+  Camera,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/types";
@@ -343,6 +345,42 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════
+            VISITING CUSTOMER FIELD ACTION BANNER
+            ═══════════════════════════════════════════ */}
+        <section className="bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 text-white rounded-3xl p-6 sm:p-7 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-5 border border-amber-500/20">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-400 text-amber-950 flex items-center justify-center font-bold shadow-md shrink-0">
+              <Camera size={28} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Market Field Tool
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  Instant Visiting Card Capture
+                </span>
+              </div>
+              <h3 className="text-xl font-black tracking-tight mt-1">
+                Visiting Customer &amp; City Registration
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5 max-w-xl">
+                Directly upload prospective customer visiting cards from mobile camera and enter the city in CAPITAL ONLY to log store visits for the Admin Panel.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/visiting-customers"
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition shrink-0"
+          >
+            <MapPin size={16} />
+            <span>Upload Visiting Card &amp; City</span>
+            <ArrowRight size={14} />
+          </Link>
         </section>
 
         {/* ═══════════════════════════════════════════

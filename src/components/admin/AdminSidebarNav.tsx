@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   FileCheck2,
   X,
+  MapPin,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -53,6 +54,12 @@ const navItems = [
     name: "Customers",
     href: "/admin/customers",
     icon: Store,
+    exact: false,
+  },
+  {
+    name: "Visited Customers",
+    href: "/admin/visited-customers",
+    icon: MapPin,
     exact: false,
   },
   {

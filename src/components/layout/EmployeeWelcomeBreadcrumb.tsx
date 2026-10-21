@@ -102,6 +102,8 @@ export default function EmployeeWelcomeBreadcrumb() {
     currentPageTitle = "Order Details & Dispatch";
   } else if (pathname === "/customers/new") {
     currentPageTitle = "New Customer";
+  } else if (pathname === "/visiting-customers" || pathname.startsWith("/visiting-customers")) {
+    currentPageTitle = "Visiting Customer";
   } else if (pathname === "/products") {
     currentPageTitle = "Product Catalog";
   }

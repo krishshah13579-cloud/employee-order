@@ -290,3 +290,28 @@ export const STATUS_COLORS: Record<string, string> = {
   Delivered: "bg-green-100 text-green-800 border-green-300",
   Cancelled: "bg-red-100 text-red-700 border-red-300",
 };
+
+export interface VisitedCustomerData {
+  id: number;
+  visitingCardUrl: string;
+  city: string; // Strictly UPPERCASE (e.g., "SURAT")
+  shopName?: string | null;
+  phone?: string | null;
+  contactPerson?: string | null;
+  notes?: string | null;
+  employeeId?: number | null;
+  employeeName?: string | null;
+  status: string; // "Visited" | "Follow Up" | "Converted"
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVisitedCustomerPayload {
+  visitingCardUrl: string;
+  city: string;
+  shopName?: string;
+  phone?: string;
+  contactPerson?: string;
+  notes?: string;
+  status?: string;
+}

@@ -43,6 +43,7 @@ export default function Navbar() {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/orders/new", label: "Order Form", icon: FilePlus },
     { href: "/orders", label: "Order Page", icon: Package },
+    { href: "/visiting-customers", label: "Visiting Customer", icon: MapPin },
   ];
 
   return (
@@ -80,6 +81,8 @@ export default function Navbar() {
                   : link.href === "/orders"
                   ? pathname === "/orders" ||
                     (pathname.startsWith("/orders/") && pathname !== "/orders/new")
+                  : link.href === "/visiting-customers"
+                  ? pathname.startsWith("/visiting-customers")
                   : pathname.startsWith(link.href);
 
               const Icon = link.icon;

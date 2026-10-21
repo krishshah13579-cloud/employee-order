@@ -290,3 +290,23 @@ model StockReservation {
   @@index([expiresAt])
 }
 
+// 12. Visited Customer (Field Visiting Cards with Mandatory UPPERCASE City)
+model VisitedCustomer {
+  id              Int      @id @default(autoincrement())
+  visitingCardUrl String   // Visiting Card (Photo / Upload / Data URL)
+  city            String   // City name in CAPITAL ONLY (e.g. "SURAT", "AHMEDABAD")
+  shopName        String?  // Optional Shop Name / Firm Name
+  phone           String?  // Optional Contact Number
+  contactPerson   String?  // Optional Contact Person Name
+  notes           String?  // Optional Visit / Discussion Notes
+  employeeId      Int?     // Employee ID who visited
+  employeeName    String?  // Employee Name who visited
+  status          String   @default("Visited") // Visited, Follow Up, Converted
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([city])
+  @@index([employeeId])
+  @@index([createdAt])
+}
+

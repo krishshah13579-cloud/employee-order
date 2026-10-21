@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import CustomerForm from "@/components/admin/CustomerForm";
@@ -52,5 +52,16 @@ export default function EditCustomerPage() {
     );
   }
 
-  return <CustomerForm initialData={customer} isEdit customerId={id} />;
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+          <p className="text-sm text-zinc-500">Loading customer information...</p>
+        </div>
+      }
+    >
+      <CustomerForm initialData={customer} isEdit customerId={id} />
+    </Suspense>
+  );
 }

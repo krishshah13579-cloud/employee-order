@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -54,14 +54,16 @@ export default function CustomerForm({
       .catch(() => {});
   }, []);
 
+  const searchParams = useSearchParams();
+
   const [formData, setFormData] = useState({
-    shopName: initialData?.shopName || "",
+    shopName: initialData?.shopName || searchParams?.get("shopName") || "",
     gstPanNo: initialData?.gstPanNo || "",
     address: initialData?.address || "",
-    city: initialData?.city || "",
+    city: initialData?.city || searchParams?.get("city") || "",
     state: initialData?.state || "",
-    phoneNumber: initialData?.phoneNumber || "",
-    visitingCardUrl: initialData?.visitingCardUrl || "",
+    phoneNumber: initialData?.phoneNumber || searchParams?.get("phone") || "",
+    visitingCardUrl: initialData?.visitingCardUrl || searchParams?.get("visitingCardUrl") || "",
     contactPerson: initialData?.contactPerson || "",
     businessType: initialData?.businessType || "RETAILER",
     specialDiscount: initialData?.specialDiscount !== undefined && initialData?.specialDiscount !== null ? initialData.specialDiscount : 50,
