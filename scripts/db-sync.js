@@ -1,5 +1,9 @@
 const { execSync } = require("child_process");
 
+if (process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith("postgres://") || process.env.DATABASE_URL.startsWith("postgresql://")) && !process.env.DATABASE_URL.includes("schema=")) {
+  process.env.DATABASE_URL += process.env.DATABASE_URL.includes("?") ? "&schema=wholesale" : "?schema=wholesale";
+}
+
 const dbUrl = process.env.DATABASE_URL || "";
 
 if (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://") || dbUrl.startsWith("prisma+postgres://")) {
