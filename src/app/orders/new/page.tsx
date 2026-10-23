@@ -532,9 +532,12 @@ function OrderFormContent() {
     // If selected customer is Retailer or Retailer with Special Discount -> Base Price is Retailer Price (MRP / 2)
     // If selected customer is Retailer with Special Discount -> Base Price is (MRP / 2) - specialDiscount
     // If selected customer is Wholesale -> use Wholesaler Price (MRP / 2 - 100)
-    const isWholesaler = custBusinessType === "WHOLESALER" || custBusinessType === "WHOLESALER WITHOUT GST";
-    const isSpecialDiscount = custBusinessType === "RETAILER WITH SPECIAL DISCOUNT";
-    const specialDiscountAmt = isSpecialDiscount ? (Number(c.specialDiscount) || 0) : 0;
+    const isWholesaler =
+      custBusinessType === "WHOLESALER" ||
+      custBusinessType === "WHOLESALER WITHOUT GST" ||
+      custBusinessType.toUpperCase().includes("WHOLESAL");
+    const specialDiscountAmt = Number(c.specialDiscount) || 0;
+    const isSpecialDiscount = specialDiscountAmt > 0 || custBusinessType === "RETAILER WITH SPECIAL DISCOUNT";
     const updatedItems = items.map((it) => {
       const prod = productsMap[it.productId];
       const retPrice = it.retailerPrice ?? prod?.retailerPrice ?? prod?.price ?? it.unitPrice;
@@ -542,11 +545,9 @@ function OrderFormContent() {
 
       let applicableUnitPrice = it.unitPrice;
       if (isWholesaler) {
-        applicableUnitPrice = whoPrice;
-      } else if (isSpecialDiscount) {
-        applicableUnitPrice = Math.max(0, retPrice - specialDiscountAmt);
+        applicableUnitPrice = isSpecialDiscount ? Math.max(0, whoPrice - specialDiscountAmt) : whoPrice;
       } else {
-        applicableUnitPrice = retPrice;
+        applicableUnitPrice = isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice;
       }
       return {
         ...it,
@@ -586,9 +587,12 @@ function OrderFormContent() {
       }).catch((err) => console.error("Error updating customer businessType:", err));
     }
 
-    const isWholesaler = newType === "WHOLESALER" || newType === "WHOLESALER WITHOUT GST";
-    const isSpecialDiscount = newType === "RETAILER WITH SPECIAL DISCOUNT";
-    const specialDiscountAmt = isSpecialDiscount ? (Number(selectedCustomer?.specialDiscount) || 0) : 0;
+    const isWholesaler =
+      newType === "WHOLESALER" ||
+      newType === "WHOLESALER WITHOUT GST" ||
+      newType.toUpperCase().includes("WHOLESAL");
+    const specialDiscountAmt = Number(selectedCustomer?.specialDiscount) || 0;
+    const isSpecialDiscount = specialDiscountAmt > 0 || newType === "RETAILER WITH SPECIAL DISCOUNT";
 
     const updatedItems = items.map((it) => {
       const prod = productsMap[it.productId];
@@ -597,11 +601,9 @@ function OrderFormContent() {
 
       let applicableUnitPrice = it.unitPrice;
       if (isWholesaler) {
-        applicableUnitPrice = whoPrice;
-      } else if (isSpecialDiscount) {
-        applicableUnitPrice = Math.max(0, retPrice - specialDiscountAmt);
+        applicableUnitPrice = isSpecialDiscount ? Math.max(0, whoPrice - specialDiscountAmt) : whoPrice;
       } else {
-        applicableUnitPrice = retPrice;
+        applicableUnitPrice = isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice;
       }
 
       return {
@@ -1361,23 +1363,29 @@ function OrderFormContent() {
                       {effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-fuchsia-600" />
-                          <span>Wholesale (Without GST) (Locked)</span>
+                          <span>
+                            Wholesale (Without GST){selectedCustomer?.specialDiscount ? ` (Spl Disc: -₹${selectedCustomer.specialDiscount})` : ""} (Locked)
+                          </span>
                         </span>
                       ) : effectiveBusinessType === "RETAILER WITHOUT GST" || effectiveBusinessType === "RETAILER (WITHOUT GST)" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-teal-600" />
-                          <span>Retailer (Without GST) (Locked)</span>
+                          <span>
+                            Retailer (Without GST){selectedCustomer?.specialDiscount ? ` (Spl Disc: -₹${selectedCustomer.specialDiscount})` : ""} (Locked)
+                          </span>
                         </span>
                       ) : effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-purple-500" />
-                          <span>Wholesale (Locked)</span>
+                          <span>
+                            Wholesale{selectedCustomer?.specialDiscount ? ` (Spl Disc: -₹${selectedCustomer.specialDiscount})` : ""} (Locked)
+                          </span>
                         </span>
-                      ) : effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
+                      ) : effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" || (selectedCustomer?.specialDiscount && selectedCustomer.specialDiscount > 0) ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-emerald-600" />
                           <span>
-                            Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""}) (Locked)
+                            Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: -₹${selectedCustomer.specialDiscount}` : ""}) (Locked)
                           </span>
                         </span>
                       ) : (
@@ -1658,9 +1666,9 @@ function OrderFormContent() {
                           ) : (
                             <div>
                               <span className="font-mono">{formatCurrency(item.unitPrice)}</span>
-                              {selectedCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+                              {((selectedCustomer?.specialDiscount && selectedCustomer.specialDiscount > 0) || selectedCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT") && (
                                 <span className="text-[10px] text-teal-600 block font-semibold">
-                                  MRP/2 (-₹{selectedCustomer.specialDiscount || 0})
+                                  {(effectiveBusinessType || "").toUpperCase().includes("WHOLESAL") ? "Wholesale" : "MRP/2"} (-₹{selectedCustomer?.specialDiscount || 0})
                                 </span>
                               )}
                             </div>

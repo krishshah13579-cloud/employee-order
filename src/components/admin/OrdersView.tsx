@@ -327,7 +327,7 @@ export default function OrdersView({
             ? "Showing all Booked Client Order Forms (Ratios & Sets)"
             : activeTab === "INVOICES"
             ? "Showing official Final Tax Invoices with GST"
-            : "Direct non-GST bills for Wholesale Without GST clients"}
+            : "Direct non-GST bills for Wholesale & Retailer Without GST clients"}
         </div>
       </div>
 

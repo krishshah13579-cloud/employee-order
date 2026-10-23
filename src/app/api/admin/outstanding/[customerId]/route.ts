@@ -27,6 +27,14 @@ export async function GET(
             invoiceDate: "asc",
           },
         },
+        orders: {
+          where: {
+            status: { in: ["Confirmed", "In Production", "Ready", "Dispatched", "Delivered"] },
+          },
+          orderBy: {
+            orderDate: "asc",
+          },
+        },
         payments: {
           orderBy: {
             paymentDate: "asc",
@@ -45,7 +53,24 @@ export async function GET(
     }
 
     // 1. Process customer bills datewise from Sales Invoices (Credit sales)
-    const bills = customer.salesInvoices
+    const invoiceOrderIds = new Set(customer.salesInvoices.map((si) => si.orderId).filter(Boolean));
+    const invoiceDocNumbers = new Set(
+      customer.salesInvoices.flatMap((si) => [si.invoiceNumber, si.orderNumber]).filter(Boolean)
+    );
+
+    const bills: {
+      id: number | string;
+      orderId?: number | null;
+      orderNumber?: string | null;
+      taxInvoiceNumber?: string | null;
+      displayDocNo: string;
+      invoiceDate: Date | string;
+      totalSets: number;
+      totalPcs: number;
+      totalAmount: number;
+      paymentType?: string | null;
+      status: string;
+    }[] = customer.salesInvoices
       .filter((si) => si.paymentType !== "Cash")
       .map((si) => ({
         id: si.id,
@@ -60,6 +85,33 @@ export async function GET(
         paymentType: si.paymentType,
         status: "Confirmed",
       }));
+
+    // Merge all bills: Tax Invoices & Bills Without GST from orders not yet in salesInvoices
+    customer.orders?.forEach((ord) => {
+      const isAlreadyInvoiced =
+        (ord.id && invoiceOrderIds.has(ord.id)) ||
+        (ord.orderNumber && invoiceDocNumbers.has(ord.orderNumber)) ||
+        (ord.taxInvoiceNumber && invoiceDocNumbers.has(ord.taxInvoiceNumber));
+
+      if (!isAlreadyInvoiced) {
+        bills.push({
+          id: `ORD-${ord.id}`,
+          orderId: ord.id,
+          orderNumber: ord.orderNumber,
+          taxInvoiceNumber: ord.taxInvoiceNumber,
+          displayDocNo: ord.taxInvoiceNumber || ord.orderNumber || `ORD-${ord.id}`,
+          invoiceDate: ord.taxInvoiceDate || ord.orderDate || new Date(),
+          totalSets: ord.totalSets || 0,
+          totalPcs: ord.totalPcs || 0,
+          totalAmount: ord.grandTotal,
+          paymentType: "Credit",
+          status: ord.status,
+        });
+      }
+    });
+
+    // Sort all bills chronologically by date
+    bills.sort((a, b) => new Date(a.invoiceDate).getTime() - new Date(b.invoiceDate).getTime());
 
     // 2. Total credits = Payments + Sales Returns
     const totalBilled = bills.reduce((sum, b) => sum + b.totalAmount, 0);

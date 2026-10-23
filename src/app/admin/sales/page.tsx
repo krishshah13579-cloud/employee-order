@@ -276,13 +276,15 @@ export default function AdminSalesPage() {
           item.color = colors[0] || "Standard";
           item.sizeRatio = prod.sizesRatio || "30 to 38";
           item.pcsPerSet = prod.pcsPerSet || 5;
-          const isWholesaler = businessType === "WHOLESALER" || businessType === "WHOLESALER WITHOUT GST";
-          const isSpecialDiscount = businessType === "RETAILER WITH SPECIAL DISCOUNT";
+          const isWholesaler = (businessType || "").toUpperCase().includes("WHOLESAL");
           const customerObj = availableCustomers.find((c) => c.id === selectedCustomerId);
-          const splDisc = isSpecialDiscount ? (Number(customerObj?.specialDiscount) || 0) : 0;
+          const splDisc = Number(customerObj?.specialDiscount) || 0;
+          const isSpecialDiscount = splDisc > 0 || businessType === "RETAILER WITH SPECIAL DISCOUNT";
           const ret = prod.retailerPrice || prod.price;
           const who = prod.wholesalerPrice || Math.max(0, ret - 100);
-          item.unitPrice = isWholesaler ? who : isSpecialDiscount ? Math.max(0, ret - splDisc) : ret;
+          item.unitPrice = isWholesaler
+            ? (isSpecialDiscount ? Math.max(0, who - splDisc) : who)
+            : (isSpecialDiscount ? Math.max(0, ret - splDisc) : ret);
           item.totalPcs = item.totalSets * item.pcsPerSet;
           item.itemSubtotal = item.totalPcs * item.unitPrice;
         }
@@ -385,33 +387,25 @@ export default function AdminSalesPage() {
       setCreditDays(c.creditDays || 0);
 
       // Recalculate prices if wholesaler or retailer with special discount
-      if (c.businessType === "WHOLESALER" || c.businessType === "WHOLESALER WITHOUT GST") {
-        setFormItems((prev) =>
-          prev.map((it) => {
-            const prod = availableProducts.find((p) => p.id === it.productId);
-            const price = prod?.wholesalerPrice || it.unitPrice;
-            return {
-              ...it,
-              unitPrice: price,
-              itemSubtotal: it.totalPcs * price,
-            };
-          })
-        );
-      } else if (c.businessType === "RETAILER WITH SPECIAL DISCOUNT") {
-        const splDisc = Number(c.specialDiscount) || 0;
-        setFormItems((prev) =>
-          prev.map((it) => {
-            const prod = availableProducts.find((p) => p.id === it.productId);
-            const ret = prod?.retailerPrice || prod?.price || it.unitPrice;
-            const price = Math.max(0, ret - splDisc);
-            return {
-              ...it,
-              unitPrice: price,
-              itemSubtotal: it.totalPcs * price,
-            };
-          })
-        );
-      }
+      const isWholesaler = (c.businessType || "").toUpperCase().includes("WHOLESAL");
+      const splDisc = Number(c.specialDiscount) || 0;
+      const isSpecialDiscount = splDisc > 0 || c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+
+      setFormItems((prev) =>
+        prev.map((it) => {
+          const prod = availableProducts.find((p) => p.id === it.productId);
+          const ret = prod?.retailerPrice || prod?.price || it.unitPrice;
+          const who = prod?.wholesalerPrice || Math.max(0, ret - 100);
+          const price = isWholesaler
+            ? (isSpecialDiscount ? Math.max(0, who - splDisc) : who)
+            : (isSpecialDiscount ? Math.max(0, ret - splDisc) : ret);
+          return {
+            ...it,
+            unitPrice: price,
+            itemSubtotal: it.totalPcs * price,
+          };
+        })
+      );
     }
   };
 

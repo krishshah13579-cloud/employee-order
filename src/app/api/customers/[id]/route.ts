@@ -87,9 +87,6 @@ export async function PUT(
       }
       const bType = String(body.businessType).trim().toUpperCase();
       updateData.businessType = bType;
-      if (bType !== "RETAILER WITH SPECIAL DISCOUNT") {
-        updateData.specialDiscount = 0;
-      }
     }
 
     if (body.specialDiscount !== undefined) {

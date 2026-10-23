@@ -166,7 +166,9 @@ export async function POST(request: NextRequest) {
       rawBusinessType === "WHOLESALER WITHOUT GST" ||
       rawBusinessType === "WHOLESALE WITHOUT GST" ||
       rawBusinessType === "RETAILER WITHOUT GST" ||
-      rawBusinessType === "RETAILER (WITHOUT GST)";
+      rawBusinessType === "RETAILER (WITHOUT GST)" ||
+      rawBusinessType.includes("WITHOUT GST") ||
+      rawBusinessType.includes("NO GST");
 
     // GST/PAN is strictly mandatory EXCEPT for Without GST customers (Wholesaler or Retailer)
     if (isNoGst) {
@@ -182,53 +184,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const isWholesaleNoGst =
-      rawBusinessType === "WHOLESALER WITHOUT GST" || rawBusinessType === "WHOLESALE WITHOUT GST";
+    const requestedSpecialDiscount = Math.max(0, parseFloat(body.specialDiscount) || 0);
 
-    if (isWholesaleNoGst) {
-      const admin = await getAdminSession(request);
-      if (!admin) {
-        return NextResponse.json(
-          { error: "Permission Denied: Only Admin can create customers under 'Wholesaler Without GST'." },
-          { status: 403 }
-        );
-      }
-    }
-
-    if (rawBusinessType === "RETAILER WITHOUT GST") {
+    // Permission checks: Without GST and Special Discount can ONLY be created by Team Leader (T.L.) or Admin
+    if (isNoGst) {
       const allowed = await canUserAssignSpecialDiscount(request);
       if (!allowed) {
         return NextResponse.json(
-          { error: "Permission Denied: Only Team Leader (T.L.) or Admin can create customers under 'Retailer (Without GST)'." },
+          { error: "Permission Denied: Only Team Leader (T.L.) or Admin can create customers Without GST." },
           { status: 403 }
         );
       }
     }
 
-    if (rawBusinessType === "WHOLESALER") {
+    if (requestedSpecialDiscount > 0 || rawBusinessType === "RETAILER WITH SPECIAL DISCOUNT") {
       const allowed = await canUserAssignSpecialDiscount(request);
       if (!allowed) {
         return NextResponse.json(
-          { error: "Permission Denied: Regular employees can only create Retailer accounts. Team Leaders (T.L.) or Admins required for Wholesale." },
+          { error: "Permission Denied: Only Team Leaders (T.L.) and Admins can assign Special Discount." },
           { status: 403 }
         );
       }
     }
 
-    if (rawBusinessType === "RETAILER WITH SPECIAL DISCOUNT") {
-      const allowed = await canUserAssignSpecialDiscount(request);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: "Permission Denied: Only Team Leaders (T.L.) and Admins can register customers under 'Retailer with Special Discount'." },
-          { status: 403 }
-        );
-      }
-    }
     const businessType = rawBusinessType;
     const creditDays = parseInt(body.creditDays, 10) || 0;
-    const specialDiscount = businessType === "RETAILER WITH SPECIAL DISCOUNT"
-      ? Math.max(0, parseFloat(body.specialDiscount) || 0)
-      : 0;
+    const specialDiscount = requestedSpecialDiscount;
 
     const customer = await prisma.customer.create({
       data: {

@@ -119,12 +119,14 @@ export default function NewOrderPage() {
       prod.colorMapping
     );
 
-    const isWholesaler = activeCustomer?.businessType === "WHOLESALER" || activeCustomer?.businessType === "WHOLESALER WITHOUT GST";
-    const isSpecialDiscount = activeCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
-    const splDisc = isSpecialDiscount ? (Number(activeCustomer?.specialDiscount) || 0) : 0;
+    const isWholesaler = (activeCustomer?.businessType || "").toUpperCase().includes("WHOLESAL");
+    const splDisc = Number(activeCustomer?.specialDiscount) || 0;
+    const isSpecialDiscount = splDisc > 0 || activeCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
     const baseRetail = prod.retailerPrice || prod.price;
     const baseWhole = prod.wholesalerPrice || Math.max(0, baseRetail - 100);
-    const initialPrice = isWholesaler ? baseWhole : isSpecialDiscount ? Math.max(0, baseRetail - splDisc) : baseRetail;
+    const initialPrice = isWholesaler
+      ? (isSpecialDiscount ? Math.max(0, baseWhole - splDisc) : baseWhole)
+      : (isSpecialDiscount ? Math.max(0, baseRetail - splDisc) : baseRetail);
 
     setOrderItems((prev) => [
       ...prev,
@@ -211,7 +213,9 @@ export default function NewOrderPage() {
   const orderTotalSets = orderItems.reduce((acc, it) => acc + getItemTotalSets(it), 0);
   const orderTotalPcs = orderItems.reduce((acc, it) => acc + getItemTotalPcs(it), 0);
   const orderSubtotal = orderItems.reduce((acc, it) => acc + getItemSubtotal(it), 0);
-  const isWithoutGst = activeCustomer?.businessType === "WHOLESALER WITHOUT GST";
+  const isWithoutGst =
+    (activeCustomer?.businessType || "").toUpperCase().includes("WITHOUT GST") ||
+    (activeCustomer?.businessType || "").toUpperCase().includes("NO GST");
   const orderGst = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05);
   const orderGrandTotal = Math.round(orderSubtotal + orderGst);
 

@@ -133,7 +133,7 @@ export default function CustomersPage() {
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
       if (activeCreditTab === "specialDiscount") {
-        return c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
+        return (c.specialDiscount && c.specialDiscount > 0) || c.businessType === "RETAILER WITH SPECIAL DISCOUNT";
       }
       if (activeCreditTab === "wholesaleNoGst") {
         return (
@@ -233,7 +233,7 @@ export default function CustomersPage() {
                 : "bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200"
             }`}
           >
-            Special Discount ({customers.filter((c) => c.businessType === "RETAILER WITH SPECIAL DISCOUNT").length})
+            Special Discount ({customers.filter((c) => (c.specialDiscount && c.specialDiscount > 0) || c.businessType === "RETAILER WITH SPECIAL DISCOUNT").length})
           </button>
           <button
             onClick={() => setActiveCreditTab("wholesaleNoGst")}
@@ -341,25 +341,40 @@ export default function CustomersPage() {
 
                       {/* Business Type */}
                       <td className="py-4 px-6">
-                        {isWholesaler ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            WHOLESALE
-                          </span>
-                        ) : c.businessType === "WHOLESALER WITHOUT GST" ? (
+                        {c.businessType === "WHOLESALER WITHOUT GST" || c.businessType === "WHOLESALE WITHOUT GST" ? (
                           <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300"
                             title="Wholesale Without GST"
                           >
-                            WHOLESALE (NO GST)
+                            <span>WHOLESALE (NO GST)</span>
+                            {c.specialDiscount ? (
+                              <span className="bg-fuchsia-200/80 text-fuchsia-900 px-1 rounded font-mono">
+                                -₹{c.specialDiscount}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : isWholesaler ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            <span>WHOLESALE</span>
+                            {c.specialDiscount ? (
+                              <span className="bg-purple-200/80 text-purple-900 px-1 rounded font-mono">
+                                -₹{c.specialDiscount}
+                              </span>
+                            ) : null}
                           </span>
                         ) : c.businessType === "RETAILER WITHOUT GST" || c.businessType === "RETAILER (WITHOUT GST)" ? (
                           <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
                             title="Retailer Without GST"
                           >
-                            RETAILER (NO GST)
+                            <span>RETAILER (NO GST)</span>
+                            {c.specialDiscount ? (
+                              <span className="bg-teal-200/80 text-teal-900 px-1 rounded font-mono">
+                                -₹{c.specialDiscount}
+                              </span>
+                            ) : null}
                           </span>
-                        ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
+                        ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" || (c.specialDiscount && c.specialDiscount > 0) ? (
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
                             title={`Retailer with Special Discount: ₹${c.specialDiscount || 0} off MRP/2`}

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Clock,
   Tag,
+  CheckCircle2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { CustomerData } from "@/lib/types";
@@ -55,6 +56,21 @@ export default function CustomerForm({
   }, []);
 
   const searchParams = useSearchParams();
+
+  const initialBase: "RETAILER" | "WHOLESALER" =
+    initialData?.businessType?.toUpperCase().includes("WHOLESAL") ? "WHOLESALER" : "RETAILER";
+  const initialNoGst = Boolean(
+    initialData?.businessType?.toUpperCase().includes("WITHOUT GST") ||
+    initialData?.businessType?.toUpperCase().includes("NO GST")
+  );
+  const initialHasSplDisc = Boolean(
+    (initialData?.specialDiscount !== undefined && initialData?.specialDiscount !== null && initialData.specialDiscount > 0) ||
+    initialData?.businessType === "RETAILER WITH SPECIAL DISCOUNT"
+  );
+
+  const [baseBusinessType, setBaseBusinessType] = useState<"RETAILER" | "WHOLESALER">(initialBase);
+  const [isWithoutGst, setIsWithoutGst] = useState(initialNoGst);
+  const [hasSpecialDiscount, setHasSpecialDiscount] = useState(initialHasSplDisc);
 
   const [formData, setFormData] = useState({
     shopName: initialData?.shopName || searchParams?.get("shopName") || "",
@@ -95,10 +111,28 @@ export default function CustomerForm({
       const method = isEdit ? "PUT" : "POST";
       const endpoint = isEdit ? `/api/customers/${customerId}` : "/api/customers";
 
+      const finalBusinessType =
+        baseBusinessType === "WHOLESALER"
+          ? (isWithoutGst ? "WHOLESALER WITHOUT GST" : "WHOLESALER")
+          : (isWithoutGst ? "RETAILER WITHOUT GST" : "RETAILER");
+
+      const finalGst =
+        isWithoutGst && (!formData.gstPanNo.trim() || formData.gstPanNo.trim().toUpperCase() === "N/A")
+          ? "URP"
+          : formData.gstPanNo.trim().toUpperCase();
+
+      const submitData = {
+        ...formData,
+        shopName: formData.shopName.trim().toUpperCase(),
+        gstPanNo: finalGst,
+        businessType: finalBusinessType,
+        specialDiscount: hasSpecialDiscount ? (Number(formData.specialDiscount) || 0) : 0,
+      };
+
       const res = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       if (res.ok) {
@@ -186,15 +220,20 @@ export default function CustomerForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              GST No. / PAN No. *
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span>GST No. / PAN No. {isWithoutGst ? "(Optional - Without GST)" : "*"}</span>
+              {isWithoutGst && (
+                <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  No GST Needed
+                </span>
+              )}
             </label>
             <input
               type="text"
-              required
+              required={!isWithoutGst}
               value={formData.gstPanNo}
               onChange={(e) => setFormData({ ...formData, gstPanNo: e.target.value.toUpperCase() })}
-              placeholder="e.g. 24ABCDE1234F1Z5 or ABCDE1234F"
+              placeholder={isWithoutGst ? "Optional (URP / No GST)" : "e.g. 24ABCDE1234F1Z5 or ABCDE1234F"}
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
           </div>
@@ -227,25 +266,88 @@ export default function CustomerForm({
           </div>
 
           {/* Business Type & Credit Terms */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+          <div className="col-span-1 sm:col-span-2 space-y-3">
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Type of Business *
             </label>
-            <select
-              value={formData.businessType}
-              onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900 cursor-pointer"
-            >
-              <option value="RETAILER">Retailer</option>
-              <option value="RETAILER WITHOUT GST">Retailer (Without GST)</option>
-              <option value="WHOLESALER">Wholesale</option>
-              <option value="WHOLESALER WITHOUT GST">Wholesale (Without GST)</option>
-              <option value="RETAILER WITH SPECIAL DISCOUNT">Retailer with Special Discount</option>
-            </select>
+
+            {/* 2 Main Options: Retailer & Wholesaler */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setBaseBusinessType("RETAILER")}
+                className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                  baseBusinessType === "RETAILER"
+                    ? "border-blue-600 bg-blue-50/90 text-blue-950 shadow-xs ring-1 ring-blue-500"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div>
+                  <div className="font-bold text-sm text-blue-900">Retailer</div>
+                  <div className="text-[11px] text-blue-700 font-medium">Standard Retail Customer</div>
+                </div>
+                {baseBusinessType === "RETAILER" && (
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBaseBusinessType("WHOLESALER")}
+                className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                  baseBusinessType === "WHOLESALER"
+                    ? "border-purple-600 bg-purple-50/90 text-purple-950 shadow-xs ring-1 ring-purple-500"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div>
+                  <div className="font-bold text-sm text-purple-900">Wholesaler</div>
+                  <div className="text-[11px] text-purple-700 font-medium">Standard Wholesale Customer</div>
+                </div>
+                {baseBusinessType === "WHOLESALER" && (
+                  <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0" />
+                )}
+              </button>
+            </div>
+
+            {/* 2 Options Checkboxes: Without GST & Special Discount - SHOWN ONLY TO ADMIN / T.L. */}
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5">
+              <div className="text-[10px] font-black uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                <Lock size={12} className="text-gray-400" />
+                <span>Admin & T.L. Options ({baseBusinessType === "WHOLESALER" ? "Wholesaler" : "Retailer"})</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 cursor-pointer transition select-none">
+                  <input
+                    type="checkbox"
+                    checked={isWithoutGst}
+                    onChange={(e) => setIsWithoutGst(e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-gray-900 block">Without GST</span>
+                    <span className="text-[10px] text-gray-500 font-medium">GST/PAN optional • 0% GST on bills</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 cursor-pointer transition select-none">
+                  <input
+                    type="checkbox"
+                    checked={hasSpecialDiscount}
+                    onChange={(e) => setHasSpecialDiscount(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-gray-900 block">Special Discount</span>
+                    <span className="text-[10px] text-gray-500 font-medium">Apply custom ₹ discount per piece</span>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
 
-          {/* Special Discount Field for Retailer with Special Discount */}
-          {formData.businessType === "RETAILER WITH SPECIAL DISCOUNT" && (
+          {/* Special Discount Field for Retailer / Wholesaler with Special Discount */}
+          {hasSpecialDiscount && (
             <div className="col-span-1 sm:col-span-2 p-4 bg-emerald-50/80 border-2 border-emerald-300 rounded-xl space-y-2 animate-in fade-in duration-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <label className="text-xs font-black text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
@@ -253,7 +355,9 @@ export default function CustomerForm({
                   <span>What special discount would you like to give? *</span>
                 </label>
                 <span className="text-[11px] font-bold text-emerald-700">
-                  Formula: (MRP / 2) - Special Discount
+                  {baseBusinessType === "RETAILER"
+                    ? "Formula: (MRP / 2) - Special Discount"
+                    : "Formula: Wholesale Price - Special Discount"}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -277,7 +381,9 @@ export default function CustomerForm({
                   />
                 </div>
                 <span className="text-xs text-emerald-800 font-medium">
-                  Enter discount per PC (e.g. Special Discount 50 will deduct ₹50 per piece from MRP/2).
+                  {baseBusinessType === "RETAILER"
+                    ? "Enter discount per PC (e.g. Special Discount 50 will deduct ₹50 per piece from MRP/2)."
+                    : "Enter discount per PC (e.g. Special Discount 50 will deduct ₹50 per piece from Wholesale Price)."}
                 </span>
               </div>
             </div>

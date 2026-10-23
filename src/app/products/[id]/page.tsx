@@ -718,12 +718,17 @@ function ProductDetailContent() {
 
   const totalPcs = totalSetsPcs + totalMixPieces;
 
-  const isWholesaler = draftCustomer?.businessType === "WHOLESALER" || draftCustomer?.businessType === "WHOLESALER WITHOUT GST";
-  const isSpecialDiscount = draftCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
-  const specialDiscountAmt = isSpecialDiscount ? (Number(draftCustomer?.specialDiscount) || 0) : 0;
+  const isWholesaler =
+    draftCustomer?.businessType === "WHOLESALER" ||
+    draftCustomer?.businessType === "WHOLESALER WITHOUT GST" ||
+    (draftCustomer?.businessType || "").toUpperCase().includes("WHOLESAL");
+  const specialDiscountAmt = Number(draftCustomer?.specialDiscount) || 0;
+  const isSpecialDiscount = specialDiscountAmt > 0 || draftCustomer?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
   const retPrice = product?.retailerPrice ?? product?.price ?? 0;
   const whoPrice = product?.wholesalerPrice ?? Math.max(0, retPrice - 100);
-  const unitPrice = isWholesaler ? whoPrice : isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice;
+  const unitPrice = isWholesaler
+    ? (isSpecialDiscount ? Math.max(0, whoPrice - specialDiscountAmt) : whoPrice)
+    : (isSpecialDiscount ? Math.max(0, retPrice - specialDiscountAmt) : retPrice);
   const totalAmount = totalPcs * unitPrice;
 
   // Mix sizes available information

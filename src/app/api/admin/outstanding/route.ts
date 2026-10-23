@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.toLowerCase() || "";
 
-    // Fetch all customers with their sales invoices, payments, and sales returns
+    // Fetch all customers with their sales invoices, confirmed orders, payments, and sales returns
     const customers = await prisma.customer.findMany({
       include: {
         salesInvoices: {
@@ -30,6 +30,26 @@ export async function GET(request: NextRequest) {
           },
           orderBy: {
             invoiceDate: "asc",
+          },
+        },
+        orders: {
+          where: {
+            status: { in: ["Confirmed", "In Production", "Ready", "Dispatched", "Delivered"] },
+          },
+          select: {
+            id: true,
+            orderNumber: true,
+            taxInvoiceNumber: true,
+            orderDate: true,
+            taxInvoiceDate: true,
+            grandTotal: true,
+            totalSets: true,
+            totalPcs: true,
+            businessType: true,
+            status: true,
+          },
+          orderBy: {
+            orderDate: "asc",
           },
         },
         payments: {
@@ -67,8 +87,23 @@ export async function GET(request: NextRequest) {
     let totalOutstandingAll = 0;
 
     const customerSummaries = customers.map((c) => {
-      // 1. Calculate bills from Sales Tab invoices (Credit sales require settlement; Cash sales are pre-settled)
-      const bills = c.salesInvoices
+      // 1. Gather invoices from SalesInvoice table (Credit sales)
+      const invoiceOrderIds = new Set(c.salesInvoices.map((si) => si.orderId).filter(Boolean));
+      const invoiceDocNumbers = new Set(
+        c.salesInvoices.flatMap((si) => [si.invoiceNumber, si.orderNumber]).filter(Boolean)
+      );
+
+      const bills: {
+        id: number | string;
+        docNo: string;
+        orderNumber?: string | null;
+        date: Date | string;
+        amount: number;
+        totalSets: number;
+        totalPcs: number;
+        paymentType?: string | null;
+        status: string;
+      }[] = c.salesInvoices
         .filter((si) => si.paymentType !== "Cash")
         .map((si) => ({
           id: si.id,
@@ -81,6 +116,31 @@ export async function GET(request: NextRequest) {
           paymentType: si.paymentType,
           status: "Confirmed",
         }));
+
+      // Merge all bills: Tax Invoices & Bills Without GST from orders not yet in salesInvoices
+      c.orders?.forEach((ord) => {
+        const isAlreadyInvoiced =
+          (ord.id && invoiceOrderIds.has(ord.id)) ||
+          (ord.orderNumber && invoiceDocNumbers.has(ord.orderNumber)) ||
+          (ord.taxInvoiceNumber && invoiceDocNumbers.has(ord.taxInvoiceNumber));
+
+        if (!isAlreadyInvoiced) {
+          bills.push({
+            id: `ORD-${ord.id}`,
+            docNo: ord.taxInvoiceNumber || ord.orderNumber || `ORD-${ord.id}`,
+            orderNumber: ord.orderNumber,
+            date: ord.taxInvoiceDate || ord.orderDate || new Date(),
+            amount: ord.grandTotal,
+            totalSets: ord.totalSets || 0,
+            totalPcs: ord.totalPcs || 0,
+            paymentType: "Credit",
+            status: ord.status,
+          });
+        }
+      });
+
+      // Sort all bills chronologically by date
+      bills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       const totalBilled = bills.reduce((sum, b) => sum + b.amount, 0);
       const totalPaid = c.payments.reduce((sum, p) => sum + p.amount, 0);

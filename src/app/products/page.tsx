@@ -473,21 +473,26 @@ function ProductsContent() {
                                   : "bg-blue-100 text-blue-800"
                               }`}
                             >
-                              {draftInfo.businessType === "WHOLESALER" || draftInfo.businessType === "WHOLESALER WITHOUT GST"
-                                ? "Wholesale"
-                                : draftInfo.businessType === "RETAILER WITH SPECIAL DISCOUNT"
-                                ? `Spl Disc (-₹${draftInfo.specialDiscount || 0})`
-                                : "Retailer"}
+                              {(() => {
+                                const bt = (draftInfo.businessType || "").toUpperCase();
+                                const isWho = bt.includes("WHOLESAL");
+                                const spl = Number(draftInfo.specialDiscount) || 0;
+                                if (isWho) return spl > 0 ? `Wholesale (-₹${spl})` : "Wholesale";
+                                if (spl > 0 || bt === "RETAILER WITH SPECIAL DISCOUNT") return `Retailer (-₹${spl})`;
+                                return "Retailer";
+                              })()}
                             </span>
                           )}
                         </div>
                         {(() => {
-                          const isWholesaler = draftInfo?.businessType === "WHOLESALER" || draftInfo?.businessType === "WHOLESALER WITHOUT GST";
-                          const isSpecialDiscount = draftInfo?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
-                          const splDisc = isSpecialDiscount ? (draftInfo?.specialDiscount || 0) : 0;
+                          const isWholesaler = (draftInfo?.businessType || "").toUpperCase().includes("WHOLESAL");
+                          const splDisc = Number(draftInfo?.specialDiscount) || 0;
+                          const hasSplDisc = splDisc > 0 || draftInfo?.businessType === "RETAILER WITH SPECIAL DISCOUNT";
                           const ret = product.retailerPrice || product.price;
                           const who = product.wholesalerPrice || Math.max(0, ret - 100);
-                          const activePrice = isWholesaler ? who : isSpecialDiscount ? Math.max(0, ret - splDisc) : ret;
+                          const activePrice = isWholesaler
+                            ? (hasSplDisc ? Math.max(0, who - splDisc) : who)
+                            : (hasSplDisc ? Math.max(0, ret - splDisc) : ret);
 
                           return (
                             <div className="flex items-baseline gap-1.5 flex-wrap">

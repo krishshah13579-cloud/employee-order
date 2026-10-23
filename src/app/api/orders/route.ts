@@ -13,6 +13,7 @@ import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/w
 import { requireAdmin, getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
 import { releaseReservations } from "@/lib/reservations";
+import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 
 export async function GET(request: NextRequest) {
   try {
@@ -466,6 +467,15 @@ export async function POST(request: NextRequest) {
         whatsAppSent = dispatchRes.success;
       } catch (err) {
         console.error("Order WhatsApp automated dispatch exception:", err);
+      }
+    }
+
+    // Automatically sync confirmed wholesale order into Sales Invoices register
+    if (createdOrder?.id) {
+      try {
+        await createOrUpdateSalesInvoiceFromOrder(createdOrder.id);
+      } catch (siErr) {
+        console.error("Auto sales invoice sync error on order creation:", siErr);
       }
     }
 
