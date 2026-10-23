@@ -99,7 +99,22 @@ export async function PUT(
     }
 
     const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
-    if (!admin && !isTLKrishShah && employee) {
+    if (!admin && !isTLKrishShah) {
+      if (!employee) {
+        return NextResponse.json({ error: "Unauthorized. Please log in to edit this order." }, { status: 401 });
+      }
+
+      // Check if employee has Admin Approval to edit order forms
+      if (!employee.canEditOrders) {
+        return NextResponse.json(
+          {
+            error: "Permission Denied: Order form editing is locked for your account. Please ask Administrator to approve Order Form Editing access from the Admin Panel.",
+          },
+          { status: 403 }
+        );
+      }
+
+      // IDOR Defense: verify order belongs to or is allocated to this employee
       const empName = (employee.name || "").trim().toLowerCase();
       const placedBy = (existingOrder.placedBy || "").trim().toLowerCase();
       const custAllocatedEmpId = existingOrder.customer?.allocatedEmployeeId;
@@ -112,7 +127,7 @@ export async function PUT(
 
       if (!isMyOrder && !isMyAllocatedCustomer) {
         return NextResponse.json(
-          { error: "Forbidden: You do not have permission to edit this order." },
+          { error: "Forbidden: You do not have permission to edit this order. Customer/order belongs to another employee." },
           { status: 403 }
         );
       }
@@ -133,12 +148,33 @@ export async function PUT(
       templateOverrides,
     } = body;
 
+    // Check if status is reverting to Pending or already Pending
+    const willBePending = body.status === "Pending" || (body.status === undefined && existingOrder.status === "Pending");
+
+    if (existingOrder.status !== "Pending" && body.status === "Pending") {
+      if (!admin && !isTLKrishShah) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Admin can revert a confirmed order back to Pending status." },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (!admin && body.status && body.status !== "Pending" && existingOrder.status === "Pending") {
+      return NextResponse.json(
+        { error: "Permission Denied: Only Admin can confirm or advance orders beyond Pending status." },
+        { status: 403 }
+      );
+    }
+
     const isAlreadyConfirmed =
-      existingOrder.status === "Confirmed" ||
-      existingOrder.status === "In Production" ||
-      existingOrder.status === "Ready" ||
-      existingOrder.status === "Dispatched" ||
-      existingOrder.status === "Delivered";
+      !willBePending && (
+        existingOrder.status === "Confirmed" ||
+        existingOrder.status === "In Production" ||
+        existingOrder.status === "Ready" ||
+        existingOrder.status === "Dispatched" ||
+        existingOrder.status === "Delivered"
+      );
 
     // Only Tax Invoice modal adjustments (taxInvoiceNumber, taxInvoiceDate, taxInvoiceItems, templateOverrides) are permitted on confirmed orders
     const isTaxInvoiceOnlyUpdate =
@@ -149,7 +185,7 @@ export async function PUT(
     if (isAlreadyConfirmed && !isTaxInvoiceOnlyUpdate && (body.items !== undefined || body.orderNumber !== undefined || body.customerId !== undefined)) {
       return NextResponse.json(
         {
-          error: `Order #${existingOrder.orderNumber} is already ${existingOrder.status} and locked. Once an order is confirmed, editing the order form is strictly prohibited.`,
+          error: `Order #${existingOrder.orderNumber} is currently ${existingOrder.status} and locked. Once an order is confirmed, editing the order form is strictly prohibited unless changed back to Pending.`,
         },
         { status: 403 }
       );
@@ -372,6 +408,8 @@ export async function PUT(
               ? typeof taxInvoiceItems === "string"
                 ? taxInvoiceItems
                 : JSON.stringify(taxInvoiceItems)
+              : (willBePending && validatedItems.length > 0)
+              ? null
               : existingOrder.taxInvoiceItems,
           templateOverrides:
             templateOverrides !== undefined

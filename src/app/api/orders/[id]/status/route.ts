@@ -46,6 +46,13 @@ export async function PUT(
       );
     }
 
+    if (status === "Pending" && !admin) {
+      return NextResponse.json(
+        { error: "Permission Denied: Only Admin can change order status to Pending." },
+        { status: 403 }
+      );
+    }
+
     // Fetch existing order with items to handle stock adjustment
     const existingOrder = await prisma.order.findUnique({
       where: { id: orderId },
@@ -120,6 +127,7 @@ export async function PUT(
       where: { id: orderId },
       data: {
         status,
+        ...(status === "Pending" ? { taxInvoiceItems: null } : {}),
         ...(autoTaxInvoiceNumber ? { taxInvoiceNumber: autoTaxInvoiceNumber } : {}),
         ...(autoTaxInvoiceDate ? { taxInvoiceDate: autoTaxInvoiceDate } : {}),
       },

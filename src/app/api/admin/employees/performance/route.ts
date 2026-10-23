@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         proofUrl: true,
         designation: true,
         isTeamLeader: true,
+        canEditOrders: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,

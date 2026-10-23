@@ -32,6 +32,8 @@ import {
   AlertCircle,
   Clock,
   Sparkles,
+  Edit3,
+  Lock,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -58,6 +60,7 @@ interface EmployeePerformanceProfile {
   proofUrl?: string | null;
   designation: string;
   isTeamLeader: boolean;
+  canEditOrders?: boolean;
   isActive: boolean;
   createdAt?: string;
   stats: {
@@ -210,6 +213,38 @@ export default function EmployeesPage() {
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update employee role", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // Handle Order Form Editing permission toggle (Admin Approval)
+  const handleToggleOrderEdit = async (id: number, name: string, allowEdit: boolean) => {
+    try {
+      setTogglingId(id);
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          canEditOrders: allowEdit,
+        }),
+      });
+
+      if (res.ok) {
+        toast(
+          allowEdit
+            ? `✅ Order Form Editing access APPROVED for "${name}"!`
+            : `🔒 Order Form Editing access REVOKED for "${name}".`,
+          "success"
+        );
+        fetchEmployees();
+        fetchPerformanceData();
+      } else {
+        const err = await res.json();
+        toast(err.error || "Failed to update order editing permissions", "error");
       }
     } catch (err: any) {
       toast("Error: " + err.message, "error");
@@ -767,6 +802,31 @@ export default function EmployeesPage() {
                             </>
                           )}
                         </button>
+
+                        {/* Order Form Edit Permission (Admin Approval) */}
+                        {selectedProfile.canEditOrders ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, false)}
+                            disabled={togglingId === selectedProfile.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-red-50 text-blue-800 hover:text-red-700 border border-blue-300 hover:border-red-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            title="Revoke Admin approval to edit pending orders"
+                          >
+                            <Edit3 size={13} className="text-blue-600" />
+                            <span>Revoke Edit Access</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, true)}
+                            disabled={togglingId === selectedProfile.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-300 hover:border-blue-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            title="Grant Admin approval to edit pending order forms"
+                          >
+                            <Edit3 size={13} className="text-gray-500" />
+                            <span>Approve Edit Access</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1013,6 +1073,7 @@ export default function EmployeesPage() {
                     <th className="py-3.5 px-6">Employee Name</th>
                     <th className="py-3.5 px-6">Designation</th>
                     <th className="py-3.5 px-6">T.L. Status (24*7 Access)</th>
+                    <th className="py-3.5 px-6">Order Edit Access</th>
                     <th className="py-3.5 px-6">Email Address</th>
                     <th className="py-3.5 px-6">Mobile Number</th>
                     <th className="py-3.5 px-6">Residential Address</th>
@@ -1024,13 +1085,13 @@ export default function EmployeesPage() {
                 <tbody className="divide-y divide-gray-100">
                   {loadingDirectory && employees.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-gray-400">
+                      <td colSpan={10} className="py-12 text-center text-gray-400">
                         Loading employees...
                       </td>
                     </tr>
                   ) : employees.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-gray-400">
+                      <td colSpan={10} className="py-12 text-center text-gray-400">
                         No employees registered yet. Click "Add New Employee" to create a staff record.
                       </td>
                     </tr>
@@ -1106,6 +1167,42 @@ export default function EmployeesPage() {
                               >
                                 <Crown size={12} className="text-orange-600" />
                                 <span>Make T.L.</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          {emp.canEditOrders ? (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-300 rounded-full text-xs font-bold shadow-2xs">
+                                <CheckCircle size={12} className="text-blue-600 shrink-0" />
+                                <span>Approved</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleOrderEdit(emp.id, emp.name, false)}
+                                disabled={togglingId === emp.id}
+                                className="text-[11px] font-semibold text-gray-500 hover:text-red-600 hover:underline cursor-pointer disabled:opacity-50"
+                                title="Revoke Order Form Edit Access"
+                              >
+                                Revoke
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                <Lock size={10} className="text-gray-400 shrink-0" />
+                                <span>Locked</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleOrderEdit(emp.id, emp.name, true)}
+                                disabled={togglingId === emp.id}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                                title="Approve employee to edit pending order forms"
+                              >
+                                <Edit3 size={12} className="text-blue-600" />
+                                <span>Approve</span>
                               </button>
                             </div>
                           )}

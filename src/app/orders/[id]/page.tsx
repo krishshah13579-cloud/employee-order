@@ -18,6 +18,7 @@ import {
   Clock,
   Eye,
   Lock,
+  Edit3,
   X,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
@@ -358,6 +359,28 @@ export default function OrderEditPage() {
             </h1>
 
             <div className="flex items-center gap-2">
+              {/* Edit Order Form Button (Visible if Pending AND approved by Admin) */}
+              {status === "Pending" && (
+                isAdmin || Boolean(employee?.canEditOrders) || employee?.name?.trim().toLowerCase() === "krish shah" ? (
+                  <Link
+                    href={`/orders/${orderId}/edit`}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-blue-900/20 cursor-pointer"
+                    title="Edit items, products, size ratios, sets and prices on order form"
+                  >
+                    <Edit3 size={15} />
+                    <span>Edit Order Form</span>
+                  </Link>
+                ) : (
+                  <div
+                    className="px-3.5 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 select-none cursor-not-allowed"
+                    title="Order form editing requires Administrator approval"
+                  >
+                    <Lock size={14} className="text-slate-400" />
+                    <span>Editing Locked (Admin Approval Required)</span>
+                  </div>
+                )
+              )}
+
               <button
                 type="button"
                 onClick={() => handleSendWhatsApp("ORDER_CONFIRMATION")}

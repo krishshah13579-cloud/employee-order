@@ -93,6 +93,8 @@ export default function OrderInvoicePage() {
           initialFormat = "ORDER_FORM";
         } else if (formatParam === "tax-invoice" || formatParam === "tax_invoice" || formatParam === "invoices") {
           initialFormat = "TAX_INVOICE";
+        } else if (data.status === "Pending") {
+          initialFormat = "ORDER_FORM";
         } else if (
           data.taxInvoiceNumber ||
           data.status === "Ready" ||
@@ -105,6 +107,8 @@ export default function OrderInvoicePage() {
         if (urlParams.get("editInvoice") === "true") {
           setIsTaxInvoiceModalOpen(true);
         }
+      } else if (data.status === "Pending") {
+        initialFormat = "ORDER_FORM";
       } else if (
         data.taxInvoiceNumber ||
         data.status === "Ready" ||

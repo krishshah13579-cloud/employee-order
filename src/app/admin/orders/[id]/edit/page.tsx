@@ -361,8 +361,8 @@ export default function EditOrderPage() {
     if (e) e.preventDefault();
     if (!order) return;
 
-    if (order.status && order.status !== "Pending") {
-      toast(`Order #${order.orderNumber} is ${order.status} and locked. Editing is not permitted.`, "error");
+    if (editStatus !== "Pending") {
+      toast(`Order status is "${editStatus}" and locked. Please change status to "Pending" to edit the order form.`, "error");
       return;
     }
 
@@ -475,7 +475,7 @@ export default function EditOrderPage() {
     );
   }
 
-  const isLocked = Boolean(order?.status && order.status !== "Pending");
+  const isLocked = Boolean(editStatus !== "Pending");
 
   return (
     <div className="max-w-5xl mx-auto pb-24 space-y-6">
@@ -517,13 +517,18 @@ export default function EditOrderPage() {
           </Link>
 
           {isLocked ? (
-            <div
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl border border-slate-200 select-none cursor-not-allowed"
-              title="Order is confirmed and locked from editing"
+            <button
+              type="button"
+              onClick={() => {
+                setEditStatus("Pending");
+                toast("Status set to Pending. You can now edit order items & products.", "info");
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              title="Click to change status to Pending and unlock editing"
             >
               <Lock size={14} />
-              <span>Order Locked ({order.status})</span>
-            </div>
+              <span>Unlock Order ({editStatus})</span>
+            </button>
           ) : (
             <button
               type="button"
@@ -556,22 +561,26 @@ export default function EditOrderPage() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-amber-950 flex items-center gap-2">
-                <span>Order Form Locked ({order.status})</span>
+                <span>Order Form Locked ({editStatus})</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold uppercase tracking-wider">
                   Read Only
                 </span>
               </h3>
               <p className="text-xs text-amber-800 mt-0.5">
-                Once an order is confirmed, editing products, ratios, and items in the order form is strictly prohibited to maintain ledger, inventory, and audit accuracy.
+                Orders with status &quot;{editStatus}&quot; are locked. To unlock and edit customer products, size ratios, sets, and prices, change the Order Status to <strong>Pending</strong>.
               </p>
             </div>
           </div>
-          <Link
-            href={`/admin/orders/${order.id}?format=order-form`}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition shrink-0 text-center"
+          <button
+            type="button"
+            onClick={() => {
+              setEditStatus("Pending");
+              toast("Order status set to Pending — editor unlocked!", "success");
+            }}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition shrink-0 text-center cursor-pointer"
           >
-            ← View Order Form
-          </Link>
+            🔓 Unlock (Set Status to Pending)
+          </button>
         </div>
       )}
 

@@ -16,6 +16,7 @@ import {
   Loader2,
   Trash2,
   Crown,
+  Edit3,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { EmployeeData } from "@/lib/types";
@@ -49,6 +50,7 @@ export default function EmployeeForm({
     proofUrl: initialData?.proofUrl || "",
     designation: initialData?.designation || "Sales Representative",
     isTeamLeader: initialData?.isTeamLeader ?? isEmployeeTeamLeader(initialData),
+    canEditOrders: initialData?.canEditOrders ?? false,
     isActive: initialData?.isActive ?? true,
   });
 
@@ -277,6 +279,41 @@ export default function EmployeeForm({
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+              </label>
+            </div>
+
+            {/* Order Form Editing Permission (Admin Approval) */}
+            <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-xl border border-blue-200">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-800 shrink-0">
+                  <Edit3 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <span>Order Form Editing Access</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold uppercase">
+                      Admin Approval
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    Grant this employee explicit permission to edit Pending order forms. If disabled, orders cannot be edited by this employee.
+                  </p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.canEditOrders)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      canEditOrders: e.target.checked,
+                    }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
           </div>

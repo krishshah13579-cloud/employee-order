@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest) {
         address: true,
         designation: true,
         isTeamLeader: true,
+        canEditOrders: true,
         mobileNumber: true,
         isActive: true,
       },

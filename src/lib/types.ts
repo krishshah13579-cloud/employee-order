@@ -81,6 +81,7 @@ export interface EmployeeData {
   proofUrl?: string | null;
   designation: string;
   isTeamLeader?: boolean;
+  canEditOrders?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

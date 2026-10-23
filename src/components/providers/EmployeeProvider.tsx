@@ -9,6 +9,7 @@ export interface EmployeeSession {
   name: string;
   designation: string;
   isTeamLeader?: boolean;
+  canEditOrders?: boolean;
   mobileNumber?: string;
   email?: string;
   address?: string;

@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
         address: employee.address,
         designation: employee.designation,
         isTeamLeader: isTL,
+        canEditOrders: employee.canEditOrders,
         mobileNumber: employee.mobileNumber,
       },
       message: `Welcome, ${employee.name}!${isTL ? " (T.L. 24*7 Access Active)" : ""}`,
