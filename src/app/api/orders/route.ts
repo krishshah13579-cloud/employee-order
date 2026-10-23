@@ -310,9 +310,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // GST calculation: 0% if WHOLESALER WITHOUT GST, else 5%
+    // GST calculation: 0% if Without GST (Wholesale or Retailer), else 5%
     const effectiveBusinessType = (body.businessType || (customer as any).businessType || "RETAILER").trim().toUpperCase();
-    const isWithoutGst = effectiveBusinessType === "WHOLESALER WITHOUT GST" || body.gstRate === 0;
+    const isWithoutGst =
+      effectiveBusinessType === "WHOLESALER WITHOUT GST" ||
+      effectiveBusinessType === "WHOLESALE WITHOUT GST" ||
+      effectiveBusinessType === "RETAILER WITHOUT GST" ||
+      effectiveBusinessType === "RETAILER (WITHOUT GST)" ||
+      effectiveBusinessType.includes("WITHOUT GST") ||
+      effectiveBusinessType.includes("NO GST") ||
+      body.gstRate === 0;
     const gstRate = isWithoutGst ? 0 : 5.0;
     const gstAmount = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05 * 100) / 100;
     const grandTotal = Math.round(orderSubtotal + gstAmount);

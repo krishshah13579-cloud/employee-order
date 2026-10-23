@@ -237,6 +237,7 @@ export default function CustomerForm({
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900 cursor-pointer"
             >
               <option value="RETAILER">Retailer</option>
+              <option value="RETAILER WITHOUT GST">Retailer (Without GST)</option>
               <option value="WHOLESALER">Wholesale</option>
               <option value="WHOLESALER WITHOUT GST">Wholesale (Without GST)</option>
               <option value="RETAILER WITH SPECIAL DISCOUNT">Retailer with Special Discount</option>

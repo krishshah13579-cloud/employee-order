@@ -139,6 +139,9 @@ export default function CustomersPage() {
         return (
           c.businessType === "WHOLESALER WITHOUT GST" ||
           c.businessType === "WHOLESALE WITHOUT GST" ||
+          c.businessType === "RETAILER WITHOUT GST" ||
+          c.businessType === "RETAILER (WITHOUT GST)" ||
+          (c.businessType || "").toUpperCase().includes("WITHOUT GST") ||
           ((c.businessType === "WHOLESALER" || c.businessType === "WHOLESALE") &&
             (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A" || c.gstPanNo === "NOT APPLICABLE"))
         );
@@ -240,7 +243,7 @@ export default function CustomersPage() {
                 : "bg-fuchsia-50 text-fuchsia-800 hover:bg-fuchsia-100 border border-fuchsia-200"
             }`}
           >
-            Wholesale (No GST) ({customers.filter((c) => c.businessType === "WHOLESALER WITHOUT GST" || c.businessType === "WHOLESALE WITHOUT GST" || ((c.businessType === "WHOLESALER" || c.businessType === "WHOLESALE") && (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A"))).length})
+            Without GST ({customers.filter((c) => (c.businessType || "").toUpperCase().includes("WITHOUT GST") || (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A")).length})
           </button>
         </div>
 
@@ -348,6 +351,13 @@ export default function CustomersPage() {
                             title="Wholesale Without GST"
                           >
                             WHOLESALE (NO GST)
+                          </span>
+                        ) : c.businessType === "RETAILER WITHOUT GST" || c.businessType === "RETAILER (WITHOUT GST)" ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
+                            title="Retailer Without GST"
+                          >
+                            RETAILER (NO GST)
                           </span>
                         ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
                           <span

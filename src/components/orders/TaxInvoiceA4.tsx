@@ -233,8 +233,14 @@ export default function TaxInvoiceA4({
     order.gstRate === 0 ||
     order.businessType === "WHOLESALER WITHOUT GST" ||
     order.businessType === "WHOLESALE WITHOUT GST" ||
+    order.businessType === "RETAILER WITHOUT GST" ||
+    order.businessType === "RETAILER (WITHOUT GST)" ||
+    String(order.businessType || "").toUpperCase().includes("WITHOUT GST") ||
     order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
-    order.customer?.businessType === "WHOLESALE WITHOUT GST";
+    order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+    order.customer?.businessType === "RETAILER WITHOUT GST" ||
+    order.customer?.businessType === "RETAILER (WITHOUT GST)" ||
+    String(order.customer?.businessType || "").toUpperCase().includes("WITHOUT GST");
   const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const cgst = Math.round((gstAmount / 2) * 100) / 100;
   const sgst = Math.round((gstAmount / 2) * 100) / 100;

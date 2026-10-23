@@ -748,11 +748,11 @@ function ProductDetailContent() {
       return;
     }
 
-    const isWholesaleNoGstCust =
-      draftCustomer?.businessType === "WHOLESALER WITHOUT GST" ||
-      draftCustomer?.businessType === "WHOLESALE WITHOUT GST";
+    const isNoGstCust =
+      draftCustomer?.businessType?.toUpperCase().includes("WITHOUT GST") ||
+      draftCustomer?.businessType?.toUpperCase().includes("NO GST");
 
-    if (draftCustomer && !isWholesaleNoGstCust && !isGstPanRegistered(draftCustomer.gstPanNo)) {
+    if (draftCustomer && !isNoGstCust && !isGstPanRegistered(draftCustomer.gstPanNo)) {
       toast(
         "Customer is NOT GST/PAN registered! Please enter and save GST/PAN details in the order form before adding products.",
         "error"

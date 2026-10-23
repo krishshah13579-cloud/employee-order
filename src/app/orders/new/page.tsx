@@ -1358,14 +1358,24 @@ function OrderFormContent() {
                       Type of Business
                     </span>
                     <div className="flex items-center gap-2">
-                      {effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" || effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
+                      {effectiveBusinessType === "WHOLESALER WITHOUT GST" || effectiveBusinessType === "WHOLESALE WITHOUT GST" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-fuchsia-600" />
+                          <span>Wholesale (Without GST) (Locked)</span>
+                        </span>
+                      ) : effectiveBusinessType === "RETAILER WITHOUT GST" || effectiveBusinessType === "RETAILER (WITHOUT GST)" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-teal-600" />
+                          <span>Retailer (Without GST) (Locked)</span>
+                        </span>
+                      ) : effectiveBusinessType === "WHOLESALER" || effectiveBusinessType === "WHOLESALE" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
                           <Lock size={12} className="text-purple-500" />
                           <span>Wholesale (Locked)</span>
                         </span>
                       ) : effectiveBusinessType === "RETAILER WITH SPECIAL DISCOUNT" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
-                          <Lock size={12} className="text-teal-600" />
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black uppercase tracking-wide shadow-2xs">
+                          <Lock size={12} className="text-emerald-600" />
                           <span>
                             Retailer (Spl Disc{selectedCustomer?.specialDiscount ? `: ₹${selectedCustomer.specialDiscount}` : ""}) (Locked)
                           </span>

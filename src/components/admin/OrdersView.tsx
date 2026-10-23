@@ -79,11 +79,10 @@ export default function OrdersView({
           data.customers.forEach((c: any) => {
             map[c.customerId] = c.totalOutstanding || 0;
           });
-          const noGstCusts = data.customers.filter(
-            (c: any) =>
-              c.businessType === "WHOLESALER WITHOUT GST" ||
-              c.businessType === "WHOLESALE WITHOUT GST"
-          );
+          const noGstCusts = data.customers.filter((c: any) => {
+            const bt = (c.businessType || "").toUpperCase();
+            return bt.includes("WITHOUT GST") || bt.includes("NO GST");
+          });
           setWholesaleNoGstCustomers(noGstCusts);
         }
         setOutstandingMap(map);
@@ -190,13 +189,10 @@ export default function OrdersView({
       o.status === "Dispatched" ||
       o.status === "Delivered"
   );
-  const billsOrders = orders.filter(
-    (o) =>
-      o.customer?.businessType === "WHOLESALER WITHOUT GST" ||
-      o.customer?.businessType === "WHOLESALE WITHOUT GST" ||
-      (o as any).businessType === "WHOLESALER WITHOUT GST" ||
-      (o as any).businessType === "WHOLESALE WITHOUT GST"
-  );
+  const billsOrders = orders.filter((o) => {
+    const bt = (o.customer?.businessType || (o as any).businessType || "").toUpperCase();
+    return bt.includes("WITHOUT GST") || bt.includes("NO GST");
+  });
 
   const displayedOrders =
     activeTab === "ORDERS"
@@ -344,10 +340,10 @@ export default function OrdersView({
             <div>
               <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                 <FileCheck2 className="text-emerald-600 w-4 h-4" />
-                Wholesale (Without GST) Clients &amp; Outstanding Balances
+                Without GST (Wholesale &amp; Retailer) Clients &amp; Outstanding Balances
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                All registered clients under Wholesale (Without GST). Bills generated here do NOT add 5% GST and require NO GST/PAN.
+                All registered clients under Without GST (Wholesale &amp; Retailer). Bills generated here do NOT add 5% GST and require NO GST/PAN.
               </p>
             </div>
             <Link
@@ -361,7 +357,7 @@ export default function OrdersView({
 
           {wholesaleNoGstCustomers.length === 0 ? (
             <div className="p-4 bg-emerald-50/50 rounded-xl text-center text-xs text-emerald-800">
-              No clients currently categorized as Wholesale (Without GST). When creating or editing a customer, set their business type to Wholesale (Without GST).
+              No clients currently categorized under Without GST (Wholesale or Retailer). When creating or editing a customer, set their business type to Wholesale (Without GST) or Retailer (Without GST).
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

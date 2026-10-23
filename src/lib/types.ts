@@ -41,7 +41,7 @@ export interface CreateCustomerPayload {
   firmName?: string;
   name?: string;
   gstPanNo?: string;
-  businessType?: "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
+  businessType?: "RETAILER" | "RETAILER WITHOUT GST" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT" | string;
   creditDays?: number;
   specialDiscount?: number;
   address?: string;

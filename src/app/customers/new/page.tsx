@@ -105,7 +105,7 @@ function CustomerRegistrationContent() {
   const [transportName, setTransportName] = useState("");
   const [visitingCardUrl, setVisitingCardUrl] = useState("");
   const [businessType, setBusinessType] = useState<
-    "RETAILER" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT"
+    "RETAILER" | "RETAILER WITHOUT GST" | "WHOLESALER" | "WHOLESALER WITHOUT GST" | "RETAILER WITH SPECIAL DISCOUNT"
   >("RETAILER");
   const [specialDiscount, setSpecialDiscount] = useState<number | "">(50);
   const [creditDays, setCreditDays] = useState<number | "">(0);
@@ -273,9 +273,10 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please enter Firm Name / Shop Name", "error");
       return;
     }
-    const isWholesaleNoGst = businessType === "WHOLESALER WITHOUT GST";
+    const isNoGst =
+      businessType === "WHOLESALER WITHOUT GST" || businessType === "RETAILER WITHOUT GST";
 
-    if (!isWholesaleNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")) {
+    if (!isNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")) {
       toast("Mandatory: Please enter valid GST No. or PAN No.", "error");
       return;
     }
@@ -316,7 +317,7 @@ function CustomerRegistrationContent() {
           })),
       ];
 
-      const finalGst = isWholesaleNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")
+      const finalGst = isNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")
         ? "URP"
         : gstPanNo.trim().toUpperCase();
 
@@ -633,7 +634,7 @@ function CustomerRegistrationContent() {
                     </label>
                   </div>
 
-                  <div className={`grid grid-cols-1 ${isAdmin ? "sm:grid-cols-4" : isTL ? "sm:grid-cols-3" : "sm:grid-cols-1"} gap-3`}>
+                  <div className={`grid grid-cols-1 ${isAdmin || isTL ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-1"} gap-3`}>
                     {/* Retailer: Available to all */}
                     <button
                       type="button"
@@ -649,6 +650,29 @@ function CustomerRegistrationContent() {
                         <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
                       )}
                     </button>
+
+                    {/* Retailer (Without GST): ONLY available to Team Leader (T.L.) or Admin */}
+                    {(isTL || isAdmin) && (
+                      <button
+                        type="button"
+                        onClick={() => setBusinessType("RETAILER WITHOUT GST")}
+                        className={`p-3.5 rounded-xl border-2 text-left flex items-center justify-between transition-all cursor-pointer ${
+                          businessType === "RETAILER WITHOUT GST"
+                            ? "border-teal-600 bg-teal-50/90 text-teal-950 shadow-xs ring-1 ring-teal-500"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-black text-sm text-teal-950">Retailer (No GST)</div>
+                          <div className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">
+                            {isTL ? "Team Leader (T.L.)" : "Admin Authorized"} • No GST
+                          </div>
+                        </div>
+                        {businessType === "RETAILER WITHOUT GST" && (
+                          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
+                        )}
+                      </button>
+                    )}
 
                     {/* Wholesale: ONLY available to Team Leader (T.L.) or Admin */}
                     {(isTL || isAdmin) && (
@@ -831,11 +855,11 @@ function CustomerRegistrationContent() {
                       <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                         <CreditCard size={14} className="text-slate-500" />
                         <span>GST / PAN No.</span>
-                        {businessType !== "WHOLESALER WITHOUT GST" && (
+                        {businessType !== "WHOLESALER WITHOUT GST" && businessType !== "RETAILER WITHOUT GST" && (
                           <span className="text-red-500">*</span>
                         )}
-                        {businessType === "WHOLESALER WITHOUT GST" && (
-                          <span className="text-[10px] text-fuchsia-700 font-bold">(Optional)</span>
+                        {(businessType === "WHOLESALER WITHOUT GST" || businessType === "RETAILER WITHOUT GST") && (
+                          <span className="text-[10px] text-teal-700 font-bold">(Optional — No GST Needed)</span>
                         )}
                       </label>
                       {autoFilledFields.gstPanNo && (
@@ -846,10 +870,14 @@ function CustomerRegistrationContent() {
                     </div>
                     <input
                       type="text"
-                      required={businessType !== "WHOLESALER WITHOUT GST"}
+                      required={businessType !== "WHOLESALER WITHOUT GST" && businessType !== "RETAILER WITHOUT GST"}
                       value={gstPanNo}
                       onChange={(e) => setGstPanNo(e.target.value.toUpperCase())}
-                      placeholder={businessType === "WHOLESALER WITHOUT GST" ? "Optional (No GST needed)" : "e.g. 24ABCDE1234F1Z5 or PAN"}
+                      placeholder={
+                        businessType === "WHOLESALER WITHOUT GST" || businessType === "RETAILER WITHOUT GST"
+                          ? "Optional (No GST needed)"
+                          : "e.g. 24ABCDE1234F1Z5 or PAN"
+                      }
                       className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition uppercase shadow-xs placeholder:normal-case"
                     />
                   </div>

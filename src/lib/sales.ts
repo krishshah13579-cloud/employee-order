@@ -101,8 +101,12 @@ export async function createOrUpdateSalesInvoiceFromOrder(orderId: number) {
       totalPcs = order.totalPcs || 0;
     }
 
-    const gstRate = order.gstRate ?? 5.0;
-    const gstAmount = Math.round(subtotal * (gstRate / 100) * 100) / 100;
+    const isWithoutGst =
+      order.gstRate === 0 ||
+      (order.businessType || order.customer?.businessType || "").toUpperCase().includes("WITHOUT GST") ||
+      (order.businessType || order.customer?.businessType || "").toUpperCase().includes("NO GST");
+    const gstRate = isWithoutGst ? 0 : (order.gstRate ?? 5.0);
+    const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * (gstRate / 100) * 100) / 100;
     const grandTotal = Math.round(subtotal + gstAmount);
 
     // Determine invoice number

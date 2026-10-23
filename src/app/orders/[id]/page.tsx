@@ -279,7 +279,13 @@ export default function OrderEditPage() {
   const totalSets = activeItems.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = activeItems.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const subtotal = activeItems.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const isWithoutGst = businessType === "WHOLESALER WITHOUT GST" || businessType === "WHOLESALE WITHOUT GST";
+  const isWithoutGst =
+    businessType === "WHOLESALER WITHOUT GST" ||
+    businessType === "WHOLESALE WITHOUT GST" ||
+    businessType === "RETAILER WITHOUT GST" ||
+    businessType === "RETAILER (WITHOUT GST)" ||
+    businessType.toUpperCase().includes("WITHOUT GST") ||
+    businessType.toUpperCase().includes("NO GST");
   const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
   const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);

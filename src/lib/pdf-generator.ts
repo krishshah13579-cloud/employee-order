@@ -77,8 +77,14 @@ export async function generateOrderPdfBuffer(
     order.gstRate === 0 ||
     order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
     order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+    order.customer?.businessType === "RETAILER WITHOUT GST" ||
+    order.customer?.businessType === "RETAILER (WITHOUT GST)" ||
+    String(order.customer?.businessType || "").toUpperCase().includes("WITHOUT GST") ||
     (order as any).businessType === "WHOLESALER WITHOUT GST" ||
-    (order as any).businessType === "WHOLESALE WITHOUT GST";
+    (order as any).businessType === "WHOLESALE WITHOUT GST" ||
+    (order as any).businessType === "RETAILER WITHOUT GST" ||
+    (order as any).businessType === "RETAILER (WITHOUT GST)" ||
+    String((order as any).businessType || "").toUpperCase().includes("WITHOUT GST");
 
   if (isTaxInvoice && order.taxInvoiceItems) {
     try {

@@ -368,8 +368,14 @@ export async function GET(
       (order as any).gstRate === 0 ||
       (order as any).businessType === "WHOLESALER WITHOUT GST" ||
       (order as any).businessType === "WHOLESALE WITHOUT GST" ||
+      (order as any).businessType === "RETAILER WITHOUT GST" ||
+      (order as any).businessType === "RETAILER (WITHOUT GST)" ||
+      String((order as any).businessType || "").toUpperCase().includes("WITHOUT GST") ||
       order.customer?.businessType === "WHOLESALER WITHOUT GST" ||
-      order.customer?.businessType === "WHOLESALE WITHOUT GST";
+      order.customer?.businessType === "WHOLESALE WITHOUT GST" ||
+      order.customer?.businessType === "RETAILER WITHOUT GST" ||
+      order.customer?.businessType === "RETAILER (WITHOUT GST)" ||
+      String(order.customer?.businessType || "").toUpperCase().includes("WITHOUT GST");
 
     const expandedRows = expandOrderItemsForInvoice(displayItems);
 

@@ -144,20 +144,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rawBusinessType = (body.businessType || "").trim().toUpperCase();
-    const validTypes = ["RETAILER", "WHOLESALER", "WHOLESALER WITHOUT GST", "WHOLESALE WITHOUT GST", "RETAILER WITH SPECIAL DISCOUNT"];
+    let rawBusinessType = (body.businessType || "").trim().toUpperCase();
+    if (rawBusinessType === "RETAILER (WITHOUT GST)") rawBusinessType = "RETAILER WITHOUT GST";
+    const validTypes = [
+      "RETAILER",
+      "RETAILER WITHOUT GST",
+      "RETAILER (WITHOUT GST)",
+      "WHOLESALER",
+      "WHOLESALER WITHOUT GST",
+      "WHOLESALE WITHOUT GST",
+      "RETAILER WITH SPECIAL DISCOUNT",
+    ];
     if (!rawBusinessType || !validTypes.includes(rawBusinessType)) {
       return NextResponse.json(
-        { error: "Business Type is mandatory. Please select Retailer, Wholesaler, Wholesaler Without GST, or Retailer with Special Discount." },
+        { error: "Business Type is mandatory. Please select Retailer, Retailer (Without GST), Wholesaler, Wholesaler Without GST, or Retailer with Special Discount." },
         { status: 400 }
       );
     }
 
-    const isWholesaleNoGst =
-      rawBusinessType === "WHOLESALER WITHOUT GST" || rawBusinessType === "WHOLESALE WITHOUT GST";
+    const isNoGst =
+      rawBusinessType === "WHOLESALER WITHOUT GST" ||
+      rawBusinessType === "WHOLESALE WITHOUT GST" ||
+      rawBusinessType === "RETAILER WITHOUT GST" ||
+      rawBusinessType === "RETAILER (WITHOUT GST)";
 
-    // GST/PAN is strictly mandatory EXCEPT for Wholesale Without GST customers
-    if (isWholesaleNoGst) {
+    // GST/PAN is strictly mandatory EXCEPT for Without GST customers (Wholesaler or Retailer)
+    if (isNoGst) {
       if (!gstPanNo || gstPanNo === "N/A") {
         gstPanNo = "URP"; // Unregistered Person / Non-GST
       }
@@ -170,11 +182,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const isWholesaleNoGst =
+      rawBusinessType === "WHOLESALER WITHOUT GST" || rawBusinessType === "WHOLESALE WITHOUT GST";
+
     if (isWholesaleNoGst) {
       const admin = await getAdminSession(request);
       if (!admin) {
         return NextResponse.json(
           { error: "Permission Denied: Only Admin can create customers under 'Wholesaler Without GST'." },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (rawBusinessType === "RETAILER WITHOUT GST") {
+      const allowed = await canUserAssignSpecialDiscount(request);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "Permission Denied: Only Team Leader (T.L.) or Admin can create customers under 'Retailer (Without GST)'." },
           { status: 403 }
         );
       }

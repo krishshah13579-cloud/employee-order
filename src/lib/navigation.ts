@@ -26,6 +26,7 @@ export const APP_ROUTES = {
 // Allowed Business Types Whitelist
 export const VALID_BUSINESS_TYPES = [
   "RETAILER",
+  "RETAILER WITHOUT GST",
   "RETAILER WITH SPECIAL DISCOUNT",
   "WHOLESALER",
   "WHOLESALER WITHOUT GST",
@@ -94,6 +95,9 @@ export function sanitizeBusinessType(val: string | null | undefined): ValidBusin
   if (VALID_BUSINESS_TYPES.includes(upper as ValidBusinessType)) {
     return upper as ValidBusinessType;
   }
+  if (upper.includes("RETAILER") && (upper.includes("WITHOUT GST") || upper.includes("NO GST"))) {
+    return "RETAILER WITHOUT GST";
+  }
   if (upper.includes("WITHOUT GST") || upper.includes("NO GST")) {
     return "WHOLESALER WITHOUT GST";
   }
@@ -102,6 +106,9 @@ export function sanitizeBusinessType(val: string | null | undefined): ValidBusin
   }
   if (upper.includes("WHOLESALE")) {
     return "WHOLESALER";
+  }
+  if (upper.includes("RETAIL")) {
+    return "RETAILER";
   }
   return null;
 }
