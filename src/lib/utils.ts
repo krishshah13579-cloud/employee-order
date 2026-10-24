@@ -434,6 +434,89 @@ export function extractMixSizeLines(item: any): string[] {
   return [];
 }
 
+/**
+ * Extracts all unique particular garment sizes from an order item or product
+ * e.g. ["32"], ["30", "32"], ["34", "36"].
+ * Returns empty array if only generic loose count is recorded.
+ */
+export function extractMixParticularSizes(item: any): string[] {
+  if (!item) return [];
+  const sizes: string[] = [];
+
+  const addSize = (s: string) => {
+    const clean = String(s).trim();
+    if (!clean) return;
+    if (!sizes.includes(clean)) sizes.push(clean);
+  };
+
+  // 1. Structured colorMixPcs (object or JSON string)
+  let cmp = item.colorMixPcs;
+  if (typeof cmp === "string") {
+    try {
+      cmp = JSON.parse(cmp);
+    } catch {
+      cmp = null;
+    }
+  }
+
+  if (cmp && typeof cmp === "object") {
+    for (const [_, sizeMap] of Object.entries(cmp)) {
+      if (!sizeMap || typeof sizeMap !== "object") continue;
+      for (const [sz, cnt] of Object.entries(sizeMap)) {
+        if ((parseInt(String(cnt), 10) || 0) > 0) {
+          addSize(sz);
+        }
+      }
+    }
+    if (sizes.length > 0) return sizes;
+  }
+
+  // 2. Parse from item.mixSizes or item.notes
+  let rawMix = item.mixSizes || "";
+  if (!rawMix && item.notes) {
+    const match = String(item.notes).match(/\[Mix Sizes:\s*([^\]]+)\]/i);
+    if (match && match[1]) {
+      rawMix = match[1].trim();
+    }
+  }
+
+  if (rawMix && rawMix !== "None" && rawMix !== "—") {
+    const chunks = rawMix.split(/;|\n/).map((c: string) => c.trim()).filter(Boolean);
+    chunks.forEach((chunk: string) => {
+      let sizesPart = chunk;
+      if (chunk.includes(":")) {
+        sizesPart = chunk.substring(chunk.indexOf(":") + 1).trim();
+      }
+
+      // Check patterns like "32(1)", "32-1", "Size 32", "32 (1 pc)"
+      const regex = /(\d+|S|M|L|XL|XXL|2XL|3XL)\s*(?:\(|\-|\:|\s)?\s*(\d+)?/gi;
+      let m;
+      let foundInPart = false;
+      while ((m = regex.exec(sizesPart)) !== null) {
+        const candidate = m[1].trim();
+        const num = parseInt(candidate, 10);
+        if ((!isNaN(num) && num >= 24 && num <= 54) || /^(S|M|L|XL|XXL|2XL|3XL)$/i.test(candidate)) {
+          foundInPart = true;
+          addSize(candidate.toUpperCase());
+        }
+      }
+
+      if (!foundInPart) {
+        // Try comma-separated tokens
+        sizesPart.split(",").forEach((sp) => {
+          const clean = sp.trim().replace(/\s*pcs?$/i, "").replace(/[()]/g, "");
+          const num = parseInt(clean, 10);
+          if ((!isNaN(num) && num >= 24 && num <= 54) || /^(S|M|L|XL|XXL|2XL|3XL)$/i.test(clean)) {
+            addSize(clean.toUpperCase());
+          }
+        });
+      }
+    });
+  }
+
+  return sizes;
+}
+
 export interface ExpandedInvoiceRow {
   originalItem: any;
   productName: string;
@@ -441,6 +524,7 @@ export interface ExpandedInvoiceRow {
   product?: any;
   hsnCode?: string;
   sizeRatio?: string;
+  particularSize?: string;
   showRatioBelowName: boolean;
   colorWiseLines: string[];
   totalSets: number | null;
@@ -482,6 +566,15 @@ export function expandOrderItemsForInvoice(items: any[]): ExpandedInvoiceRow[] {
     const hasSets = rawSets > 0 || colorSetsLines.length > 0;
     const hasMix = mixLines.length > 0 || mixPcsCount > 0;
 
+    // Resolve particular mix size(s) instead of hardcoding "Mix Sizes"
+    const particularSizes = extractMixParticularSizes(it);
+    const particularSizeStr = particularSizes.length > 0 ? particularSizes.join(", ") : "";
+    const effectiveMixSizeRatio =
+      particularSizeStr ||
+      (it.sizeRatio && it.sizeRatio !== "Mix Sizes"
+        ? it.sizeRatio
+        : (it.product?.sizesRatio || "30 to 38"));
+
     // Case 1: Both Sets AND Mix pieces for the same product -> 2 separate rows!
     if (hasSets && hasMix) {
       const setsCount = rawSets > 0 ? rawSets : Math.max(1, colorSetsLines.length);
@@ -512,7 +605,8 @@ export function expandOrderItemsForInvoice(items: any[]): ExpandedInvoiceRow[] {
         mrp: it.mrp || it.product?.mrp,
         product: it.product,
         hsnCode: it.hsnCode,
-        sizeRatio: "Mix Sizes",
+        sizeRatio: effectiveMixSizeRatio,
+        particularSize: particularSizeStr || effectiveMixSizeRatio,
         showRatioBelowName: false, // Don't mention Ratio below product name for mix sizes!
         colorWiseLines: mixLines.length > 0 ? mixLines : (effectiveMixPcs ? [`${effectiveMixPcs} Pcs`] : ["Mix Pcs"]),
         totalSets: null, // Shows as —
@@ -531,7 +625,8 @@ export function expandOrderItemsForInvoice(items: any[]): ExpandedInvoiceRow[] {
         mrp: it.mrp || it.product?.mrp,
         product: it.product,
         hsnCode: it.hsnCode,
-        sizeRatio: "Mix Sizes",
+        sizeRatio: effectiveMixSizeRatio,
+        particularSize: particularSizeStr || effectiveMixSizeRatio,
         showRatioBelowName: false, // Don't mention Ratio below product name for mix sizes!
         colorWiseLines: mixLines.length > 0 ? mixLines : (effectiveMixPcs ? [`${effectiveMixPcs} Pcs`] : ["Mix Pcs"]),
         totalSets: null, // Shows as —

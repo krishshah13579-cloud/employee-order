@@ -1127,23 +1127,56 @@ export interface FormattedMixEntry {
  * [ { letter: "A", colorName: "Dark Blue", sizes: [ { size: "34", count: 2 }, { size: "36", count: 1 } ] } ]
  */
 export function parseMixSizesForDisplay(
-  item: { colorMixPcs?: Record<string, Record<string, number>> | null; mixSizes?: string | null; mixPcs?: number },
+  item: {
+    colorMixPcs?: Record<string, Record<string, number>> | string | null;
+    mixSizes?: string | null;
+    mixPcs?: number | null;
+    notes?: string | null;
+    totalPcs?: number | null;
+    totalSets?: number | null;
+    pcsPerSet?: number | null;
+  },
   prodData?: { colorMapping?: string | null; colorsAvailable?: string | null } | null
 ): FormattedMixEntry[] {
-  // If no mix pieces are selected for this item, never mention mix sizes
-  if (item.mixPcs !== undefined && item.mixPcs !== null && item.mixPcs <= 0) {
-    return [];
+  if (!item) return [];
+
+  // Parse colorMixPcs if stored as JSON string
+  let cmp: Record<string, Record<string, number>> | null = null;
+  if (typeof item.colorMixPcs === "string") {
+    try {
+      cmp = JSON.parse(item.colorMixPcs);
+    } catch {
+      cmp = null;
+    }
+  } else if (item.colorMixPcs && typeof item.colorMixPcs === "object") {
+    cmp = item.colorMixPcs;
   }
-  if (!item.colorMixPcs && (!item.mixSizes || item.mixSizes === "None" || item.mixSizes.trim() === "")) {
+
+  // Extract raw mix from mixSizes or notes [Mix Sizes: ...]
+  let rawMix = item.mixSizes || "";
+  if (!rawMix && item.notes) {
+    const match = String(item.notes).match(/\[Mix Sizes:\s*([^\]]+)\]/i);
+    if (match && match[1]) {
+      rawMix = match[1].trim();
+    }
+  }
+
+  const sets = Number(item.totalSets) || 0;
+  const perSet = Number(item.pcsPerSet) || 5;
+  const looseDiff = Math.max(0, (Number(item.totalPcs) || 0) - sets * perSet);
+  const hasMixPcsCount = (item.mixPcs !== undefined && item.mixPcs !== null && Number(item.mixPcs) > 0) || looseDiff > 0;
+
+  // If no mix pieces or sizes are associated with this item, return empty
+  if (!cmp && (!rawMix || rawMix === "None" || rawMix === "—") && !hasMixPcsCount) {
     return [];
   }
 
   const result: FormattedMixEntry[] = [];
 
-  // 1. Try colorMixPcs object first
-  if (item.colorMixPcs && typeof item.colorMixPcs === "object") {
+  // 1. Try colorMixPcs structured object first
+  if (cmp && typeof cmp === "object") {
     let colIdx = 0;
-    for (const [colName, sizeMap] of Object.entries(item.colorMixPcs)) {
+    for (const [colName, sizeMap] of Object.entries(cmp)) {
       if (typeof sizeMap !== "object" || !sizeMap) continue;
       const validSizes = Object.entries(sizeMap)
         .map(([sz, cnt]) => ({ size: String(sz).trim(), count: parseInt(String(cnt), 10) || 0 }))
@@ -1169,25 +1202,45 @@ export function parseMixSizesForDisplay(
 
   if (result.length > 0) return result;
 
-  // 2. Fallback: Parse from item.mixSizes string e.g. "Jet Black: 34(2), 36(1); Navy: 32(1)" or "A: 34(2), 36(1)"
-  if (item.mixSizes && item.mixSizes !== "None" && typeof item.mixSizes === "string") {
-    const colorChunks = item.mixSizes.split(/;|\n/);
+  // 2. Fallback: Parse from rawMix string
+  // Supports "White: 32(1)", "White: 32 - 1", "White: 32", "White - 1", "32(1)", "32 - 1", "32"
+  if (rawMix && rawMix !== "None" && typeof rawMix === "string") {
+    const colorChunks = rawMix.split(/;|\n/).map((c) => c.trim()).filter(Boolean);
     let colIdx = 0;
+
     for (const chunk of colorChunks) {
-      const colonIdx = chunk.indexOf(":");
-      if (colonIdx !== -1) {
+      if (chunk.includes(":")) {
+        const colonIdx = chunk.indexOf(":");
         const colName = chunk.substring(0, colonIdx).trim();
         const sizesPart = chunk.substring(colonIdx + 1).trim();
-        // Match "34(2)" or "34-2" or "34 (2 pcs)"
-        const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
-        let match;
+
         const validSizes: { size: string; count: number }[] = [];
+        // Match "34(2)" or "34-2" or "34 (2 pcs)" or "34:2"
+        const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-|\:)\s*(\d+)/g;
+        let match;
         while ((match = sizeRegex.exec(sizesPart)) !== null) {
           validSizes.push({
             size: match[1],
             count: parseInt(match[2], 10) || 1,
           });
         }
+
+        // If no hyphen/paren pair found, parse standalone tokens (e.g. "32", "30, 32", "1")
+        if (validSizes.length === 0) {
+          sizesPart.split(",").forEach((sp) => {
+            const clean = sp.trim().replace(/\s*pcs?$/i, "").replace(/[()]/g, "");
+            if (!clean) return;
+            const num = parseInt(clean, 10);
+            if (!isNaN(num) && num >= 24 && num <= 54) {
+              validSizes.push({ size: clean, count: 1 });
+            } else if (!isNaN(num)) {
+              validSizes.push({ size: "Mix", count: num });
+            } else {
+              validSizes.push({ size: clean, count: 1 });
+            }
+          });
+        }
+
         if (validSizes.length > 0) {
           const letter = getColorShadeLetter(prodData, colName, colIdx);
           result.push({
@@ -1197,28 +1250,78 @@ export function parseMixSizesForDisplay(
           });
         }
       } else {
-        // Flat sizes e.g. "34 (2 pcs), 36 (1 pc)" or "34 (2)"
-        const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
-        let match;
+        // Flat chunk without colon e.g. "White - 1", "34-2", "34(2)", "34"
         const validSizes: { size: string; count: number }[] = [];
-        while ((match = sizeRegex.exec(chunk)) !== null) {
-          validSizes.push({
-            size: match[1],
-            count: parseInt(match[2], 10) || 1,
-          });
-        }
-        if (validSizes.length > 0) {
-          result.push({
-            letter: "Mix",
-            colorName: "",
-            sizes: validSizes,
-          });
+        const dm = chunk.match(/^([a-zA-Z0-9\s]+)\s*[\-:]\s*(\d+)/);
+        if (dm) {
+          const namePart = dm[1].trim();
+          const countPart = parseInt(dm[2], 10) || 1;
+          const isSize = /^(S|M|L|XL|XXL|2XL|3XL|\d+)$/i.test(namePart);
+          const num = parseInt(namePart, 10);
+          if (isSize && (!isNaN(num) ? num >= 24 : true)) {
+            validSizes.push({ size: namePart, count: countPart });
+            result.push({ letter: "Mix", colorName: "", sizes: validSizes });
+          } else {
+            // It is a color shade with count e.g. "White - 1"
+            result.push({
+              letter: getColorShadeLetter(prodData, namePart, colIdx),
+              colorName: namePart,
+              sizes: [{ size: "Mix", count: countPart }],
+            });
+          }
+        } else {
+          const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
+          let match;
+          while ((match = sizeRegex.exec(chunk)) !== null) {
+            validSizes.push({
+              size: match[1],
+              count: parseInt(match[2], 10) || 1,
+            });
+          }
+          if (validSizes.length > 0) {
+            result.push({ letter: "Mix", colorName: "", sizes: validSizes });
+          } else {
+            const num = parseInt(chunk, 10);
+            if (!isNaN(num) && num >= 24 && num <= 54) {
+              result.push({ letter: "Mix", colorName: "", sizes: [{ size: String(num), count: 1 }] });
+            }
+          }
         }
       }
       colIdx++;
     }
   }
 
+  // 3. Fallback: If result is still empty but item has loose pieces
+  if (result.length === 0 && (hasMixPcsCount || looseDiff > 0)) {
+    const diff = looseDiff > 0 ? looseDiff : (Number(item.mixPcs) || 1);
+    result.push({
+      letter: "Mix",
+      colorName: "",
+      sizes: [{ size: "Mix", count: diff }],
+    });
+  }
+
   return result;
+}
+
+/**
+ * Extracts a list of particular mix size labels from an item, e.g. ["32"] or ["30", "32"].
+ * Returns empty array if only generic loose count is known.
+ */
+export function getParticularMixSizes(
+  item: any,
+  prodData?: { colorMapping?: string | null; colorsAvailable?: string | null } | null
+): string[] {
+  const formatted = parseMixSizesForDisplay(item, prodData);
+  const sizes: string[] = [];
+  for (const entry of formatted) {
+    for (const s of entry.sizes) {
+      if (s.size && s.size !== "Mix" && !sizes.includes(s.size)) {
+        sizes.push(s.size);
+      }
+    }
+  }
+  return sizes;
 }
 

@@ -43,6 +43,7 @@ export interface TaxInvoiceItem {
   mixPcs?: number | null;
   colorMixPcs?: any;
   isMixRow?: boolean;
+  particularSize?: string;
 }
 
 export interface TaxInvoiceOrder {
@@ -1218,7 +1219,11 @@ export default function TaxInvoiceA4({
                           fontFamily: "monospace",
                         }}
                       >
-                        {row.isMixRow ? "Mix Sizes" : (row.sizeRatio || "30 to 38")}
+                        {row.isMixRow
+                          ? (row.sizeRatio && row.sizeRatio !== "Mix Sizes"
+                              ? row.sizeRatio
+                              : (row.particularSize || row.originalItem?.sizeRatio || "30 to 38"))
+                          : (row.sizeRatio || "30 to 38")}
                       </td>
                       <td
                         style={{

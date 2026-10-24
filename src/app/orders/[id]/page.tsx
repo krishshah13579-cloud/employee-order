@@ -213,6 +213,23 @@ export default function OrderEditPage() {
           colorSets = [];
         }
 
+        const mixMatch = it.notes?.match(/\[Mix Sizes:\s*([^\]]+)\]/i)?.[1];
+        const rawMix = it.mixSizes || mixMatch || null;
+        let parsedColorMixPcs = it.colorMixPcs || null;
+        if (typeof parsedColorMixPcs === "string") {
+          try {
+            parsedColorMixPcs = JSON.parse(parsedColorMixPcs);
+          } catch {
+            parsedColorMixPcs = null;
+          }
+        }
+
+        const setsCount = Number(it.totalSets) || 0;
+        const pcsPerSet = it.pcsPerSet || it.product?.pcsPerSet || 5;
+        const totalPcs = Number(it.totalPcs) || 0;
+        const looseDiff = Math.max(0, totalPcs - setsCount * pcsPerSet);
+        const effectiveMixPcs = Number(it.mixPcs) > 0 ? Number(it.mixPcs) : looseDiff;
+
         return {
           id: it.id,
           productId: it.productId,
@@ -225,15 +242,15 @@ export default function OrderEditPage() {
           colorsAvailable: it.product?.colorsAvailable || it.colorsAvailable || null,
           sizeRatio: it.sizeRatio || it.product?.sizesRatio || "30 to 38",
           sizesList: it.sizesList || it.product?.sizesList,
-          pcsPerSet: it.pcsPerSet || it.product?.pcsPerSet || 5,
-          totalSets: it.totalSets || 0,
-          totalPcs: it.totalPcs || 0,
+          pcsPerSet,
+          totalSets: setsCount,
+          totalPcs,
           unitPrice: it.unitPrice || 0,
           itemSubtotal: it.itemSubtotal || 0,
           notes: it.notes || "",
-          mixSizes: it.mixSizes || null,
-          mixPcs: it.mixPcs || 0,
-          colorMixPcs: it.colorMixPcs || null,
+          mixSizes: rawMix,
+          mixPcs: effectiveMixPcs,
+          colorMixPcs: parsedColorMixPcs,
         };
       });
 
@@ -686,7 +703,18 @@ export default function OrderEditPage() {
                         {(() => {
                           const mixMatch = item.notes?.match(/\[Mix Sizes:\s*([^\]]+)\]/i)?.[1];
                           const rawMix = (item as any).mixSizes || mixMatch || null;
-                          if (!rawMix || rawMix === "None" || rawMix === "—") {
+                          const pcsPerSet = item.pcsPerSet || item.product?.pcsPerSet || 5;
+                          const setsPcs = (Number(item.totalSets) || 0) * pcsPerSet;
+                          const totalPcs = Number(item.totalPcs) || 0;
+                          const looseDiff = Math.max(0, totalPcs - setsPcs);
+
+                          const hasMix =
+                            Boolean(rawMix && rawMix !== "None" && rawMix !== "—") ||
+                            Boolean((item as any).colorMixPcs) ||
+                            looseDiff > 0 ||
+                            Boolean((item as any).mixPcs && Number((item as any).mixPcs) > 0);
+
+                          if (!hasMix) {
                             return (
                               <div className="text-center">
                                 <span className="text-[11px] text-slate-400 font-medium italic">—</span>
@@ -695,39 +723,66 @@ export default function OrderEditPage() {
                           }
 
                           const formattedMix = parseMixSizesForDisplay(
-                            { mixSizes: rawMix, colorMixPcs: (item as any).colorMixPcs },
+                            {
+                              mixSizes: rawMix,
+                              colorMixPcs: (item as any).colorMixPcs,
+                              mixPcs: (item as any).mixPcs || looseDiff,
+                              notes: item.notes,
+                              totalPcs,
+                              totalSets: item.totalSets,
+                              pcsPerSet,
+                            },
                             item.product
                           );
 
                           if (formattedMix.length === 0) {
                             return (
-                              <div className="text-center">
-                                <span className="text-[11px] text-slate-400 font-medium italic">—</span>
+                              <div className="flex flex-col gap-1 min-w-[100px]">
+                                <div className="bg-amber-50/90 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs">
+                                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-600 text-white font-black text-[10px]">
+                                      MIX
+                                    </span>
+                                    <span>{looseDiff > 0 ? `${looseDiff} Loose Pcs` : (rawMix || "Mix Sizes")}</span>
+                                  </div>
+                                </div>
                               </div>
                             );
                           }
 
                           return (
-                            <div className="flex flex-col gap-1.5 min-w-[100px]">
+                            <div className="flex flex-col gap-1.5 min-w-[110px]">
                               {formattedMix.map((entry, eIdx) => (
                                 <div
                                   key={eIdx}
-                                  className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
+                                  className="bg-amber-50/90 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
                                 >
-                                  <div className="font-black text-slate-900 flex items-center gap-1">
-                                    <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
-                                      {entry.letter}
-                                    </span>
-                                    <span className="text-slate-400">-</span>
-                                    <span className="text-amber-900 font-bold">
-                                      {entry.sizes[0].size}-{entry.sizes[0].count}
-                                    </span>
+                                  <div className="font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
+                                    {entry.letter && entry.letter !== "Mix" && (
+                                      <span className="px-1.5 py-0.5 rounded bg-orange-600 text-white font-black text-[10px]">
+                                        {entry.letter}
+                                      </span>
+                                    )}
+                                    {entry.colorName && (
+                                      <span className="text-slate-800 font-bold text-[11px]">
+                                        {entry.colorName}:
+                                      </span>
+                                    )}
+                                    {entry.sizes.map((sz, sIdx) => {
+                                      const isMixLabel = sz.size === "Mix";
+                                      return (
+                                        <span
+                                          key={sIdx}
+                                          className="inline-flex items-center gap-1 bg-amber-100/90 border border-amber-400/80 px-2 py-0.5 rounded text-[11px] text-amber-900 font-bold"
+                                        >
+                                          <span>{isMixLabel ? "Mix" : `Size ${sz.size}`}</span>
+                                          <span className="text-orange-700 font-black">
+                                            ({sz.count} {sz.count === 1 ? "pc" : "pcs"})
+                                          </span>
+                                        </span>
+                                      );
+                                    })}
                                   </div>
-                                  {entry.sizes.slice(1).map((sz, sIdx) => (
-                                    <div key={sIdx} className="text-amber-900 font-bold pl-7 pt-0.5 text-xs">
-                                      {sz.size}-{sz.count}
-                                    </div>
-                                  ))}
                                 </div>
                               ))}
                             </div>

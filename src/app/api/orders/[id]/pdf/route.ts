@@ -432,8 +432,10 @@ export async function GET(
       const hsn = String(row.hsnCode || origItem.hsnCode || prod?.hsnCode || tpl.defaultHsn || "6203");
       drawText(hsn, colX[2] + 8, rowTextTopY, { size: 7.5 });
 
-      // 4. Size
-      const sizeVal = row.isMixRow ? "Mix Sizes" : String(row.sizeRatio || origItem.sizeRatio || prod?.sizeRatio || "30 to 38");
+      // 4. Size (shows particular mix size for mix rows, e.g. "32" or "30, 32")
+      const sizeVal = (row.sizeRatio && row.sizeRatio !== "Mix Sizes")
+        ? String(row.sizeRatio)
+        : (row.particularSize || String(origItem.sizeRatio || prod?.sizeRatio || "30 to 38"));
       drawText(sizeVal, colX[3] + 6, rowTextTopY, { size: 7.5 });
 
       // 5. Color lines

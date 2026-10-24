@@ -1826,32 +1826,38 @@ function OrderFormContent() {
                             }
 
                             return (
-                              <div className="flex flex-col gap-2 min-w-[110px]">
+                              <div className="flex flex-col gap-1.5 min-w-[110px]">
                                 {formattedMix.map((entry, eIdx) => (
                                   <div
                                     key={eIdx}
-                                    className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
+                                    className="bg-amber-50/90 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
                                   >
-                                    {/* First line: A - 34-2 */}
-                                    <div className="font-black text-slate-900 flex items-center gap-1">
-                                      <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
-                                        {entry.letter}
-                                      </span>
-                                      <span className="text-slate-400">-</span>
-                                      <span className="text-amber-900 font-bold">
-                                        {entry.sizes[0].size}-{entry.sizes[0].count}
-                                      </span>
+                                    <div className="font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
+                                      {entry.letter && entry.letter !== "Mix" && (
+                                        <span className="px-1.5 py-0.5 rounded bg-orange-600 text-white font-black text-[10px]">
+                                          {entry.letter}
+                                        </span>
+                                      )}
+                                      {entry.colorName && (
+                                        <span className="text-slate-800 font-bold text-[11px]">
+                                          {entry.colorName}:
+                                        </span>
+                                      )}
+                                      {entry.sizes.map((sz, sIdx) => {
+                                        const isMixLabel = sz.size === "Mix";
+                                        return (
+                                          <span
+                                            key={sIdx}
+                                            className="inline-flex items-center gap-1 bg-amber-100/90 border border-amber-400/80 px-2 py-0.5 rounded text-[11px] text-amber-900 font-bold"
+                                          >
+                                            <span>{isMixLabel ? "Mix" : `Size ${sz.size}`}</span>
+                                            <span className="text-orange-700 font-black">
+                                              ({sz.count} {sz.count === 1 ? "pc" : "pcs"})
+                                            </span>
+                                          </span>
+                                        );
+                                      })}
                                     </div>
-
-                                    {/* Below it: 36-1 */}
-                                    {entry.sizes.slice(1).map((sz, sIdx) => (
-                                      <div
-                                        key={sIdx}
-                                        className="text-amber-900 font-bold pl-7 pt-0.5 text-xs"
-                                      >
-                                        {sz.size}-{sz.count}
-                                      </div>
-                                    ))}
                                   </div>
                                 ))}
                               </div>
