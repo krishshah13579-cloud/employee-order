@@ -182,10 +182,10 @@ export async function PUT(
       body.taxInvoiceItems !== undefined &&
       !body.items;
 
-    if (isAlreadyConfirmed && !isTaxInvoiceOnlyUpdate && (body.items !== undefined || body.orderNumber !== undefined || body.customerId !== undefined)) {
+    if (!admin && !isTLKrishShah && isAlreadyConfirmed && !isTaxInvoiceOnlyUpdate && (body.items !== undefined || body.orderNumber !== undefined || body.customerId !== undefined)) {
       return NextResponse.json(
         {
-          error: `Order #${existingOrder.orderNumber} is currently ${existingOrder.status} and locked. Once an order is confirmed, editing the order form is strictly prohibited unless changed back to Pending.`,
+          error: `Order #${existingOrder.orderNumber} is currently ${existingOrder.status} and locked. Only Pending orders can be edited by staff.`,
         },
         { status: 403 }
       );
@@ -408,7 +408,7 @@ export async function PUT(
               ? typeof taxInvoiceItems === "string"
                 ? taxInvoiceItems
                 : JSON.stringify(taxInvoiceItems)
-              : (willBePending && validatedItems.length > 0)
+              : validatedItems.length > 0
               ? null
               : existingOrder.taxInvoiceItems,
           templateOverrides:

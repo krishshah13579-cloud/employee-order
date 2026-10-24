@@ -361,11 +361,6 @@ export default function EditOrderPage() {
     if (e) e.preventDefault();
     if (!order) return;
 
-    if (editStatus !== "Pending") {
-      toast(`Order status is "${editStatus}" and locked. Please change status to "Pending" to edit the order form.`, "error");
-      return;
-    }
-
     if (totalSets === 0) {
       toast("Please allocate at least 1 set across the products", "error");
       return;
@@ -475,8 +470,6 @@ export default function EditOrderPage() {
     );
   }
 
-  const isLocked = Boolean(editStatus !== "Pending");
-
   return (
     <div className="max-w-5xl mx-auto pb-24 space-y-6">
       {/* Top Header Navigation */}
@@ -496,8 +489,8 @@ export default function EditOrderPage() {
                   ? `Order #${order.orderNumber} (Invoice #${order.taxInvoiceNumber})`
                   : `Edit Order #${order.orderNumber}`}
               </span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isLocked ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
-                {isLocked ? "Locked (Read Only)" : "Product & Ratio Editor"}
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                Product &amp; Ratio Editor
               </span>
             </h1>
             <p className="text-xs text-slate-500">
@@ -513,76 +506,29 @@ export default function EditOrderPage() {
             href={`/admin/orders/${order.id}`}
             className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition"
           >
-            {isLocked ? "Back to Order" : "Cancel"}
+            Cancel
           </Link>
 
-          {isLocked ? (
-            <button
-              type="button"
-              onClick={() => {
-                setEditStatus("Pending");
-                toast("Status set to Pending. You can now edit order items & products.", "info");
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-              title="Click to change status to Pending and unlock editing"
-            >
-              <Lock size={14} />
-              <span>Unlock Order ({editStatus})</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => handleSave()}
-              className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-            >
-              {saving ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Saving Changes...</span>
-                </>
-              ) : (
-                <>
-                  <Save size={14} />
-                  <span>Save Order Changes</span>
-                </>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Lock Warning Banner */}
-      {isLocked && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Lock size={20} />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-amber-950 flex items-center gap-2">
-                <span>Order Form Locked ({editStatus})</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold uppercase tracking-wider">
-                  Read Only
-                </span>
-              </h3>
-              <p className="text-xs text-amber-800 mt-0.5">
-                Orders with status &quot;{editStatus}&quot; are locked. To unlock and edit customer products, size ratios, sets, and prices, change the Order Status to <strong>Pending</strong>.
-              </p>
-            </div>
-          </div>
           <button
             type="button"
-            onClick={() => {
-              setEditStatus("Pending");
-              toast("Order status set to Pending — editor unlocked!", "success");
-            }}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition shrink-0 text-center cursor-pointer"
+            disabled={saving}
+            onClick={() => handleSave()}
+            className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
           >
-            🔓 Unlock (Set Status to Pending)
+            {saving ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Saving Changes...</span>
+              </>
+            ) : (
+              <>
+                <Save size={14} />
+                <span>Save Order Changes</span>
+              </>
+            )}
           </button>
         </div>
-      )}
+      </div>
 
       {/* Guide Banner */}
       <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-950 flex items-start gap-2.5 shadow-2xs">
@@ -607,7 +553,7 @@ export default function EditOrderPage() {
           </div>
 
           {/* Add Product Dropdown */}
-          {availableProducts.length > 0 && !isLocked && (
+          {availableProducts.length > 0 && (
             <div className="flex items-center gap-2">
               <select
                 value={selectedProductToAdd}
@@ -672,7 +618,7 @@ export default function EditOrderPage() {
                     </span>
                   </div>
 
-                  {orderItems.length > 1 && !isLocked && (
+                  {orderItems.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(itIdx)}

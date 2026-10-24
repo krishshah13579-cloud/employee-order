@@ -715,22 +715,13 @@ export default function OrdersView({
                             </button>
 
                             {/* Edit Order */}
-                            {o.status === "Pending" ? (
-                              <Link
-                                href={`/admin/orders/${o.id}/edit`}
-                                className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
-                                title="Edit Order Form items & quantities"
-                              >
-                                <Edit size={15} />
-                              </Link>
-                            ) : (
-                              <span
-                                className="p-1.5 inline-flex text-gray-300 cursor-not-allowed"
-                                title="Order is confirmed and locked from editing"
-                              >
-                                <Lock size={15} />
-                              </span>
-                            )}
+                            <Link
+                              href={`/admin/orders/${o.id}/edit`}
+                              className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit Order Form items & quantities"
+                            >
+                              <Edit size={15} />
+                            </Link>
 
                             {/* View Dedicated Page */}
                             <Link
