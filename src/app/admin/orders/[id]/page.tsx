@@ -1136,26 +1136,26 @@ export default function OrderInvoicePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4 overflow-y-auto print:hidden">
           <div className="bg-slate-100 rounded-2xl w-full max-w-4xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-slate-900 text-white shrink-0">
-              <div className="flex items-center gap-2">
-                <Edit3 size={18} className="text-orange-500" />
-                <div>
-                  <span className="font-bold text-sm block">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 bg-slate-900 text-white shrink-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Edit3 size={18} className="text-orange-500 shrink-0" />
+                <div className="min-w-0">
+                  <span className="font-bold text-xs sm:text-sm block truncate">
                     {isTaxInvoiceActive ? "Tax Invoice (Format 2)" : "Order Form (Format 1)"} — Live Editor &amp; Preview
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-slate-400 font-mono hidden sm:block">
                     Click 'Edit Live' to modify headers, addresses, items, rates, or terms directly on screen.
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                 <button
                   type="button"
                   onClick={() => {
                     setIsPreviewModalOpen(false);
                     setTimeout(() => window.print(), 100);
                   }}
-                  className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                  className="px-2.5 sm:px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 transition cursor-pointer shadow-sm"
                 >
                   <Printer size={14} />
                   <span>Print A4</span>
@@ -1171,9 +1171,45 @@ export default function OrderInvoicePage() {
               </div>
             </div>
 
-            {/* Modal Body: A4 Paper Preview */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-300/80 flex justify-center">
-              <div className="bg-white shadow-xl p-3 sm:p-5 w-full max-w-[780px] rounded-sm">
+            {/* Modal Body: A4 Paper Preview (mobile-responsive with CSS scale) */}
+            <div className="flex-1 overflow-y-auto p-2 sm:p-6 bg-slate-300/80 flex justify-center">
+              <div
+                className="bg-white shadow-xl rounded-sm w-full"
+                style={{ maxWidth: "780px" }}
+              >
+                <div
+                  className="invoice-scale-wrapper"
+                  style={{
+                    transformOrigin: "top left",
+                  }}
+                  ref={(el) => {
+                    if (!el) return;
+                    const parent = el.parentElement;
+                    if (!parent) return;
+                    const resizeObserver = new ResizeObserver(() => {
+                      const parentWidth = parent.clientWidth;
+                      if (parentWidth < 760) {
+                        const scale = parentWidth / 780;
+                        el.style.transform = `scale(${scale})`;
+                        el.style.width = "780px";
+                        el.style.height = "auto";
+                        const contentHeight = el.scrollHeight * scale;
+                        parent.style.height = `${contentHeight}px`;
+                        parent.style.overflow = "hidden";
+                        parent.style.padding = "0";
+                      } else {
+                        el.style.transform = "none";
+                        el.style.width = "100%";
+                        parent.style.height = "auto";
+                        parent.style.overflow = "visible";
+                        parent.style.padding = "";
+                      }
+                    });
+                    resizeObserver.observe(parent);
+                    (el as any).__resizeObserver = resizeObserver;
+                    return () => resizeObserver.disconnect();
+                  }}
+                >
                 <TaxInvoiceA4
                   formatType={formatType}
                   allowInlineEdit={true}
@@ -1230,6 +1266,7 @@ export default function OrderInvoicePage() {
                     loadOrder();
                   }}
                 />
+              </div>
               </div>
             </div>
           </div>
