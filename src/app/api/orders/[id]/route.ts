@@ -311,7 +311,8 @@ export async function PUT(
           itemTotalPcs += pcsCalc.totalPcs;
         }
 
-        const itemMixPcs = parseInt(String(it.mixPcs), 10) || 0;
+        const isMixRemoved = it.removeMixSizes === true || !it.mixSizes || it.mixSizes === "None";
+        const itemMixPcs = !isMixRemoved ? (parseInt(String(it.mixPcs), 10) || 0) : 0;
         itemTotalPcs += itemMixPcs;
 
         if (itemTotalPcs === 0) {
@@ -325,6 +326,18 @@ export async function PUT(
         orderTotalPcs += itemTotalPcs;
         orderTotalSets += itemTotalSets;
 
+        let itemNotes = it.notes || null;
+        if (isMixRemoved) {
+          if (itemNotes) {
+            itemNotes = itemNotes
+              .replace(/\[Mix Sizes:\s*[^\]]+\]/gi, "")
+              .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+              .trim() || null;
+          }
+        } else if (it.mixSizes && !itemNotes?.includes("[Mix Sizes:")) {
+          itemNotes = [itemNotes, `[Mix Sizes: ${it.mixSizes}]`].filter(Boolean).join(" | ");
+        }
+
         validatedItems.push({
           orderId,
           productId: targetPid,
@@ -337,7 +350,7 @@ export async function PUT(
           totalPcs: itemTotalPcs,
           unitPrice,
           itemSubtotal,
-          notes: it.notes || null,
+          notes: itemNotes,
         });
       }
     }

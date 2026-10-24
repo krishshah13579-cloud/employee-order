@@ -51,6 +51,9 @@ interface EditableOrderItem {
   unitPrice: number;
   itemSubtotal: number;
   notes?: string;
+  mixSizes?: string | null;
+  mixPcs?: number;
+  colorMixPcs?: any;
 }
 
 export default function OrderEditPage() {
@@ -227,6 +230,9 @@ export default function OrderEditPage() {
           unitPrice: it.unitPrice || 0,
           itemSubtotal: it.itemSubtotal || 0,
           notes: it.notes || "",
+          mixSizes: it.mixSizes || null,
+          mixPcs: it.mixPcs || 0,
+          colorMixPcs: it.colorMixPcs || null,
         };
       });
 
@@ -658,51 +664,21 @@ export default function OrderEditPage() {
                       <td className="py-4 px-4 text-left">
                         {(() => {
                           const mixMatch = item.notes?.match(/\[Mix Sizes:\s*([^\]]+)\]/i)?.[1];
+                          const rawMix = (item as any).mixSizes || mixMatch || null;
+                          if (!rawMix || rawMix === "None" || rawMix === "—") {
+                            return (
+                              <div className="text-center">
+                                <span className="text-[11px] text-slate-400 font-medium italic">—</span>
+                              </div>
+                            );
+                          }
+
                           const formattedMix = parseMixSizesForDisplay(
-                            { mixSizes: mixMatch || item.product?.mixSizes, mixPcs: item.product?.mixPcs },
+                            { mixSizes: rawMix, colorMixPcs: (item as any).colorMixPcs },
                             item.product
                           );
 
                           if (formattedMix.length === 0) {
-                            const mixInfo = getProductMixSizesInfo(
-                              item.product?.setsColorwise,
-                              item.product?.mixPcs || 0
-                            );
-                            if (mixInfo.totalMixPcs <= 0) {
-                              return (
-                                <div className="text-center">
-                                  <span className="text-[11px] text-slate-400 font-medium italic">—</span>
-                                </div>
-                              );
-                            }
-                            const fallback = parseMixSizesForDisplay({ mixSizes: mixInfo.sizesSummary, mixPcs: mixInfo.totalMixPcs }, item.product);
-                            if (fallback.length > 0) {
-                              return (
-                                <div className="flex flex-col gap-1.5 min-w-[100px]">
-                                  {fallback.map((entry, eIdx) => (
-                                    <div
-                                      key={eIdx}
-                                      className="bg-amber-50/80 border border-amber-300 rounded-lg p-2 font-mono text-xs shadow-2xs"
-                                    >
-                                      <div className="font-black text-slate-900 flex items-center gap-1">
-                                        <span className="px-1.5 py-0.2 rounded bg-orange-600 text-white font-black text-[10px]">
-                                          {entry.letter}
-                                        </span>
-                                        <span className="text-slate-400">-</span>
-                                        <span className="text-amber-900 font-bold">
-                                          {entry.sizes[0].size}-{entry.sizes[0].count}
-                                        </span>
-                                      </div>
-                                      {entry.sizes.slice(1).map((sz, sIdx) => (
-                                        <div key={sIdx} className="text-amber-900 font-bold pl-7 pt-0.5 text-xs">
-                                          {sz.size}-{sz.count}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            }
                             return (
                               <div className="text-center">
                                 <span className="text-[11px] text-slate-400 font-medium italic">—</span>

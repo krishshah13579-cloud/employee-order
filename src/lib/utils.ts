@@ -431,11 +431,6 @@ export function extractMixSizeLines(item: any): string[] {
     if (lines.length > 0) return lines;
   }
 
-  // 3. Fallback to product mixSizes
-  if (item.product?.mixSizes && item.product.mixSizes !== "None" && item.product.mixSizes !== rawMix) {
-    return extractMixSizeLines({ ...item, mixSizes: item.product.mixSizes, notes: null });
-  }
-
   return [];
 }
 

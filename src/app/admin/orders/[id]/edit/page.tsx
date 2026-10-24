@@ -32,6 +32,7 @@ import {
   sortSizeRatioKeys,
   cleanColorName,
   parseDetailedColorRatioSets,
+  parseMixSizesForDisplay,
 } from "@/lib/stock";
 import { useToast } from "@/components/ui/Toast";
 import { sendAutomatedWhatsAppDirect } from "@/lib/whatsapp-client";
@@ -56,6 +57,10 @@ interface EditOrderItem {
   colorSets: EditColorSet[];
   product?: ProductData | null;
   availableRatios: string[];
+  mixSizes?: string | null;
+  mixPcs?: number;
+  colorMixPcs?: any;
+  notes?: string;
 }
 
 export default function EditOrderPage() {
@@ -178,6 +183,19 @@ export default function EditOrderPage() {
           const currentRatio = it.sizeRatio || ratios[0] || "28 to 36";
           const pcsPerSet = it.pcsPerSet || getPcsFromRatio(currentRatio, 5);
 
+          const mixMatch = it.notes?.match(/\[Mix Sizes:\s*([^\]]+)\]/i)?.[1];
+          const itemMix = it.mixSizes || mixMatch || null;
+          let itemMixPcs = Number(it.mixPcs) || 0;
+          if (itemMix && itemMixPcs === 0) {
+            const formatted = parseMixSizesForDisplay({ mixSizes: itemMix, colorMixPcs: it.colorMixPcs }, matchedProd);
+            const sumPcs = formatted.reduce((acc, f) => acc + f.sizes.reduce((sAcc, s) => sAcc + s.count, 0), 0);
+            if (sumPcs > 0) {
+              itemMixPcs = sumPcs;
+            } else if (Number(it.totalPcs) > (Number(it.totalSets) * pcsPerSet)) {
+              itemMixPcs = Number(it.totalPcs) - (Number(it.totalSets) * pcsPerSet);
+            }
+          }
+
           return {
             id: it.id,
             productId: it.productId,
@@ -193,6 +211,10 @@ export default function EditOrderPage() {
             colorSets: colorSetsArray,
             product: matchedProd,
             availableRatios: ratios,
+            mixSizes: itemMix,
+            mixPcs: itemMixPcs,
+            colorMixPcs: it.colorMixPcs || null,
+            notes: it.notes || "",
           };
         });
 
@@ -214,6 +236,46 @@ export default function EditOrderPage() {
   const subtotal = orderItems.reduce((s, it) => s + (Number(it.itemSubtotal) || 0), 0);
   const gstAmount = Math.round(subtotal * 0.05 * 100) / 100;
   const grandTotal = Math.round(subtotal + gstAmount);
+
+  // Handle Mix Sizes Removal
+  const handleRemoveMixSizes = (itemIndex: number) => {
+    setOrderItems((prev) => {
+      const copy = [...prev];
+      const item = { ...copy[itemIndex] };
+      item.mixSizes = null;
+      item.mixPcs = 0;
+      item.colorMixPcs = null;
+      if (item.notes) {
+        item.notes = item.notes
+          .replace(/\[Mix Sizes:\s*[^\]]+\]/gi, "")
+          .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+          .trim();
+      }
+
+      // Recalculate pieces for this item from colorSets
+      let calculatedPcs = 0;
+      for (const cs of item.colorSets) {
+        const requested = Number(cs.sets) || 0;
+        const pcsCalc = calculateOrderedColorSetsPieces(
+          item.product?.setsColorwise || null,
+          cs.color,
+          requested,
+          item.pcsPerSet
+        );
+        calculatedPcs += pcsCalc.totalPcs;
+      }
+      if (calculatedPcs === 0) {
+        calculatedPcs = item.totalSets * item.pcsPerSet;
+      }
+
+      item.totalPcs = calculatedPcs;
+      item.itemSubtotal = calculatedPcs * item.unitPrice;
+
+      copy[itemIndex] = item;
+      return copy;
+    });
+    toast("Mix sizes removed from this product", "info");
+  };
 
   // Handle color set value edit
   const handleEditColorSet = (itemIndex: number, colorIndex: number, newSets: number) => {
@@ -369,19 +431,36 @@ export default function EditOrderPage() {
     try {
       setSaving(true);
 
-      const sanitizedItems = orderItems.map((it) => ({
-        id: it.id,
-        productId: Number(it.productId) || 0,
-        productName: it.productName || "Garment",
-        sizeRatio: it.sizeRatio || "28 to 36",
-        sizesList: it.sizesList || "Standard",
-        pcsPerSet: Number(it.pcsPerSet) || 5,
-        totalSets: Number(it.totalSets) || 0,
-        totalPcs: Number(it.totalPcs) || 0,
-        unitPrice: Number(it.unitPrice) || 0,
-        itemSubtotal: Number(it.itemSubtotal) || 0,
-        colorSets: Array.isArray(it.colorSets) ? it.colorSets : [],
-      }));
+      const sanitizedItems = orderItems.map((it) => {
+        let cleanNotes = it.notes || "";
+        if (!it.mixSizes || it.mixSizes === "None") {
+          cleanNotes = cleanNotes
+            .replace(/\[Mix Sizes:\s*[^\]]+\]/gi, "")
+            .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+            .trim();
+        } else if (!cleanNotes.includes("[Mix Sizes:")) {
+          cleanNotes = [cleanNotes, `[Mix Sizes: ${it.mixSizes}]`].filter(Boolean).join(" | ");
+        }
+
+        return {
+          id: it.id,
+          productId: Number(it.productId) || 0,
+          productName: it.productName || "Garment",
+          sizeRatio: it.sizeRatio || "28 to 36",
+          sizesList: it.sizesList || "Standard",
+          pcsPerSet: Number(it.pcsPerSet) || 5,
+          totalSets: Number(it.totalSets) || 0,
+          totalPcs: Number(it.totalPcs) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          itemSubtotal: Number(it.itemSubtotal) || 0,
+          colorSets: Array.isArray(it.colorSets) ? it.colorSets : [],
+          mixSizes: it.mixSizes || null,
+          mixPcs: Number(it.mixPcs) || 0,
+          colorMixPcs: it.colorMixPcs || null,
+          removeMixSizes: !it.mixSizes || it.mixSizes === "None" || Number(it.mixPcs) === 0,
+          notes: cleanNotes || null,
+        };
+      });
 
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PUT",
@@ -752,6 +831,35 @@ export default function EditOrderPage() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Mix Sizes Section with Remove Button */}
+              {(item.mixSizes || (item.mixPcs && item.mixPcs > 0)) && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-amber-600 text-white font-black text-[11px] uppercase tracking-wider">
+                        Mix Sizes
+                      </span>
+                      <span className="text-xs font-bold text-amber-900">
+                        +{item.mixPcs || 0} Pcs Included
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-slate-800 bg-white/80 border border-amber-200 px-2.5 py-1 rounded-lg">
+                      {item.mixSizes}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMixSizes(itIdx)}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer shrink-0"
+                    title="Remove mix sizes from this product"
+                  >
+                    <Trash2 size={13} />
+                    <span>Remove Mix Sizes</span>
+                  </button>
                 </div>
               )}
 
