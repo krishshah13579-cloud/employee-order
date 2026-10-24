@@ -547,8 +547,9 @@ export default function ProductsPage() {
         let parsedRows: SizeGuideRow[] | null = null;
         try {
           const parsed = JSON.parse(previewGuide.guide);
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].brandSize) {
-            parsedRows = parsed;
+          const rowsList = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.rows) ? parsed.rows : []);
+          if (rowsList.length > 0 && rowsList[0].brandSize) {
+            parsedRows = rowsList;
           }
         } catch {}
 

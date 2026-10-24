@@ -469,15 +469,29 @@ function ProductDetailContent() {
   }, [colorMixPcs]);
 
   // Size guide synced with product database and filtered to ONLY available sizes for this product
-  const sizeGuideData = useMemo(() => {
+  // Size guide synced with product database and filtered to ONLY available sizes for this product
+  const { sizeGuideData, guideTemplateName } = useMemo(() => {
     let rows = DEFAULT_SIZE_GUIDE;
+    let templateName = "Trouser";
     if (product?.sizeGuide) {
       try {
         const parsed = Array.isArray(product.sizeGuide)
           ? product.sizeGuide
           : JSON.parse(product.sizeGuide);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          rows = parsed.map((r: any) => ({
+        const rowsList = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.rows) ? parsed.rows : []);
+        if (parsed?.template === "Formal" || parsed?.template === "Trouser") {
+          templateName = parsed.template;
+        } else if (rowsList.length > 0 && (rowsList[0].template === "Formal" || rowsList[0].template === "Trouser")) {
+          templateName = rowsList[0].template;
+        } else {
+          const has28 = rowsList.some((r: any) => String(r.brandSize).trim() === "28");
+          const has30 = rowsList.some((r: any) => String(r.brandSize).trim() === "30");
+          if (!has28 && has30) {
+            templateName = "Formal";
+          }
+        }
+        if (rowsList.length > 0) {
+          rows = rowsList.map((r: any) => ({
             brandSize: String(r.brandSize || ""),
             waist: r.waist
               ? String(r.waist).includes('"') || String(r.waist).includes("cm")
@@ -501,10 +515,12 @@ function ProductDetailContent() {
           (sz) => sz.toLowerCase() === r.brandSize.toLowerCase()
         )
       );
-      if (filtered.length > 0) return filtered;
+      if (filtered.length > 0) {
+        return { sizeGuideData: filtered, guideTemplateName: templateName };
+      }
     }
 
-    return rows;
+    return { sizeGuideData: rows, guideTemplateName: templateName };
   }, [product, productAvailableSizes]);
 
   // Synchronize activeColor with availableColors
@@ -1230,7 +1246,7 @@ function ProductDetailContent() {
                 >
                   <span className="flex items-center gap-1.5">
                     <HelpCircle size={14} className="text-orange-500" />
-                    <span>Trouser Size Guide & Measurements</span>
+                    <span>{guideTemplateName} Size Guide & Measurements</span>
                   </span>
                   {sizeGuideOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>

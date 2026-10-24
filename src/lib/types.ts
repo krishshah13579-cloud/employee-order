@@ -117,6 +117,7 @@ export interface SizeGuideRow {
   brandSize: string;
   waist: string;
   length: string;
+  template?: string;
 }
 
 export interface ProductData {

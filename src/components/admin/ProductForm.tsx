@@ -89,18 +89,31 @@ const PRESET_COLORS = [
   { name: "Rust", hex: "#c2410c" },
 ];
 
-// Default Standard Size Guide (Fixed brand sizes 28–44, editable waist & length)
-const DEFAULT_ADMIN_SIZE_GUIDE: SizeGuideRow[] = [
-  { brandSize: "28", waist: "28", length: "41" },
-  { brandSize: "30", waist: "30", length: "41" },
-  { brandSize: "32", waist: "32", length: "41" },
-  { brandSize: "34", waist: "34", length: "41" },
-  { brandSize: "36", waist: "36", length: "41" },
-  { brandSize: "38", waist: "38", length: "41" },
-  { brandSize: "40", waist: "40", length: "41" },
-  { brandSize: "42", waist: "42", length: "41" },
-  { brandSize: "44", waist: "44", length: "41" },
+// Standard Size Guides: Trouser vs Formal
+const TROUSERS_SIZE_GUIDE: SizeGuideRow[] = [
+  { brandSize: "28", waist: "28", length: "41", template: "Trouser" },
+  { brandSize: "30", waist: "30", length: "41", template: "Trouser" },
+  { brandSize: "32", waist: "32", length: "41", template: "Trouser" },
+  { brandSize: "34", waist: "34", length: "41", template: "Trouser" },
+  { brandSize: "36", waist: "36", length: "41", template: "Trouser" },
+  { brandSize: "38", waist: "38", length: "41", template: "Trouser" },
+  { brandSize: "40", waist: "40", length: "41", template: "Trouser" },
+  { brandSize: "42", waist: "42", length: "41", template: "Trouser" },
+  { brandSize: "44", waist: "44", length: "41", template: "Trouser" },
 ];
+
+const FORMAL_SIZE_GUIDE: SizeGuideRow[] = [
+  { brandSize: "30", waist: "28", length: "41", template: "Formal" },
+  { brandSize: "32", waist: "30", length: "41", template: "Formal" },
+  { brandSize: "34", waist: "32", length: "41", template: "Formal" },
+  { brandSize: "36", waist: "34", length: "41", template: "Formal" },
+  { brandSize: "38", waist: "36", length: "41", template: "Formal" },
+  { brandSize: "40", waist: "38", length: "41", template: "Formal" },
+  { brandSize: "42", waist: "40", length: "41", template: "Formal" },
+  { brandSize: "44", waist: "42", length: "41", template: "Formal" },
+];
+
+const DEFAULT_ADMIN_SIZE_GUIDE = TROUSERS_SIZE_GUIDE;
 
 interface ProductFormProps {
   initialData?: ProductData;
@@ -289,16 +302,55 @@ export default function ProductForm({
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [externalUrlInput, setExternalUrlInput] = useState("");
 
+  // Detect initial guide template: "Formal" | "Trouser" | ""
+  // For new product addition, ALWAYS keep select option ("")
+  const detectInitialTemplate = (): "Formal" | "Trouser" | "" => {
+    if (!isEdit && !initialData?.id) {
+      return "";
+    }
+    if (initialData?.sizeGuide) {
+      try {
+        const parsed = Array.isArray(initialData.sizeGuide)
+          ? initialData.sizeGuide
+          : JSON.parse(initialData.sizeGuide);
+        const rows = Array.isArray(parsed) ? parsed : (parsed?.rows || []);
+        if (parsed?.template === "Formal" || parsed?.template === "Trouser") {
+          return parsed.template;
+        }
+        if (rows.length > 0 && (rows[0].template === "Formal" || rows[0].template === "Trouser")) {
+          return rows[0].template;
+        }
+        const has28 = rows.some((r: any) => String(r.brandSize).trim() === "28");
+        const has30 = rows.some((r: any) => String(r.brandSize).trim() === "30");
+        if (!has28 && has30) {
+          return "Formal";
+        }
+        return "Trouser";
+      } catch {}
+    }
+    return isEdit ? "Trouser" : "";
+  };
+
+  const [guideTemplate, setGuideTemplate] = useState<"Formal" | "Trouser" | "">(detectInitialTemplate);
+  const [templateError, setTemplateError] = useState<boolean>(false);
+
   // Parse initial size guide rows
   const parseInitialSizeGuide = (): SizeGuideRow[] => {
+    const tmpl = detectInitialTemplate();
+    if (!tmpl) {
+      return [];
+    }
+    const templateBase = tmpl === "Formal" ? FORMAL_SIZE_GUIDE : TROUSERS_SIZE_GUIDE;
+
     let existingMap: Record<string, { waist: string; length: string }> = {};
     if (initialData?.sizeGuide) {
       try {
         const parsed = Array.isArray(initialData.sizeGuide)
           ? initialData.sizeGuide
           : JSON.parse(initialData.sizeGuide);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((r: any) => {
+        const rows = Array.isArray(parsed) ? parsed : (parsed?.rows || []);
+        if (Array.isArray(rows)) {
+          rows.forEach((r: any) => {
             if (r && r.brandSize) {
               existingMap[String(r.brandSize).trim()] = {
                 waist: String(r.waist ?? ""),
@@ -310,7 +362,7 @@ export default function ProductForm({
       } catch {}
     }
 
-    return DEFAULT_ADMIN_SIZE_GUIDE.map((def) => {
+    return templateBase.map((def) => {
       const match = existingMap[def.brandSize];
       if (
         match &&
@@ -323,14 +375,51 @@ export default function ProductForm({
           brandSize: def.brandSize,
           waist: match.waist,
           length: match.length,
+          template: tmpl,
         };
       }
-      return { ...def };
+      return { ...def, template: tmpl };
     });
   };
 
   const [sizeGuideRows, setSizeGuideRows] = useState<SizeGuideRow[]>(parseInitialSizeGuide);
   const [sizeGuideUnit, setSizeGuideUnit] = useState<"IN" | "CM">("IN");
+
+  const handleTemplateChange = (val: string) => {
+    const tmpl = val as "Formal" | "Trouser" | "";
+    setGuideTemplate(tmpl);
+    setTemplateError(false);
+
+    if (tmpl === "Formal") {
+      const currentMap: Record<string, { waist: string; length: string }> = {};
+      sizeGuideRows.forEach((r) => {
+        currentMap[r.brandSize] = { waist: r.waist, length: r.length };
+      });
+      const nextRows = FORMAL_SIZE_GUIDE.map((def) => ({
+        brandSize: def.brandSize,
+        waist: currentMap[def.brandSize]?.waist || def.waist,
+        length: currentMap[def.brandSize]?.length || def.length,
+        template: "Formal",
+      }));
+      setSizeGuideRows(nextRows);
+      toast("Loaded Formal Guide (Sizes 30 to 44)", "success");
+    } else if (tmpl === "Trouser") {
+      const currentMap: Record<string, { waist: string; length: string }> = {};
+      sizeGuideRows.forEach((r) => {
+        currentMap[r.brandSize] = { waist: r.waist, length: r.length };
+      });
+      const nextRows = TROUSERS_SIZE_GUIDE.map((def) => ({
+        brandSize: def.brandSize,
+        waist: currentMap[def.brandSize]?.waist || def.waist,
+        length: currentMap[def.brandSize]?.length || def.length,
+        template: "Trouser",
+      }));
+      setSizeGuideRows(nextRows);
+      toast("Loaded Trouser Guide (Sizes 28 to 44)", "success");
+    } else {
+      setSizeGuideRows([]);
+    }
+  };
 
   const getConvertedEquivalent = (val: string, currentUnit: "IN" | "CM") => {
     const num = parseFloat(val);
@@ -378,9 +467,17 @@ export default function ProductForm({
   };
 
   const handleResetSizeGuide = () => {
-    setSizeGuideRows([...DEFAULT_ADMIN_SIZE_GUIDE]);
-    setSizeGuideUnit("IN");
-    toast("Size guide reset to standard 28–44 dimensions", "success");
+    if (guideTemplate === "Formal") {
+      setSizeGuideRows(FORMAL_SIZE_GUIDE.map((r) => ({ ...r, template: "Formal" })));
+      setSizeGuideUnit("IN");
+      toast("Reset to standard Formal Guide dimensions", "success");
+    } else if (guideTemplate === "Trouser") {
+      setSizeGuideRows(TROUSERS_SIZE_GUIDE.map((r) => ({ ...r, template: "Trouser" })));
+      setSizeGuideUnit("IN");
+      toast("Reset to standard Trouser Guide dimensions", "success");
+    } else {
+      toast("Please select a guide template first (Formal or Trouser)", "error");
+    }
   };
 
   // Dynamic Categories list from API (strictly active categories from database)
@@ -1177,24 +1274,38 @@ export default function ProductForm({
       return;
     }
 
+    // Size Guide Template is MANDATORY (Formal or Trouser)
+    if (!guideTemplate) {
+      setTemplateError(true);
+      setIsSizeGuideOpen(true);
+      setError("Size Guide Template is mandatory. Please select Formal or Trouser.");
+      toast("Size Guide Template is mandatory. Please select Formal or Trouser.", "error");
+      setTimeout(() => {
+        const el = document.getElementById("guideTemplateSelect");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }, 50);
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Normalize size guide rows to Inches so frontend can toggle seamlessly
       const normalizedSizeGuide = sizeGuideRows.map((row) => {
-        if (sizeGuideUnit === "CM") {
-          const toInches = (val: string) => {
-            const num = parseFloat(val);
-            if (isNaN(num)) return val;
-            const inch = (num / 2.54).toFixed(1);
-            return inch.endsWith(".0") ? inch.slice(0, -2) : inch;
-          };
-          return {
-            brandSize: row.brandSize,
-            waist: toInches(row.waist),
-            length: toInches(row.length),
-          };
-        }
-        return row;
+        const toInches = (val: string) => {
+          const num = parseFloat(val);
+          if (isNaN(num)) return val;
+          const inch = (num / 2.54).toFixed(1);
+          return inch.endsWith(".0") ? inch.slice(0, -2) : inch;
+        };
+        return {
+          brandSize: row.brandSize,
+          waist: sizeGuideUnit === "CM" ? toInches(row.waist) : row.waist,
+          length: sizeGuideUnit === "CM" ? toInches(row.length) : row.length,
+          template: guideTemplate,
+        };
       });
 
       // Generate clean setsColorwise from colorRatioStockMap and colorLooseStockMap for selectedColors
@@ -1433,9 +1544,15 @@ export default function ProductForm({
                   <h3 className="text-sm font-bold text-gray-900 tracking-tight">
                     Product Size Guide
                   </h3>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
-                    Fixed Sizes 28–44
-                  </span>
+                  {guideTemplate ? (
+                    <span className="text-[10px] font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full uppercase">
+                      {guideTemplate} Guide
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase">
+                      Template Required *
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Brand sizes are fixed (28 to 44). You can customize Waist and Length in both IN and CM.
@@ -1493,51 +1610,93 @@ export default function ProductForm({
 
           {isSizeGuideOpen && (
             <div className="p-5 space-y-4 animate-fadeIn">
-              {/* Preset Selector: Formal vs Trousers */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Select Guide Template:
-                  </span>
-                  <div className="inline-flex rounded-lg bg-white p-0.5 border border-slate-300">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSizeGuideRows(DEFAULT_ADMIN_SIZE_GUIDE);
-                        toast("Loaded Standard Trousers Size Guide", "success");
-                      }}
-                      className="px-3 py-1 rounded-md text-xs font-bold bg-slate-900 text-white shadow-xs cursor-pointer"
+              {/* Guide Template Selector Dropdown: Formal and Trouser (Mandatory) */}
+              <div
+                className={`p-3.5 rounded-xl border transition-all ${
+                  templateError
+                    ? "bg-red-50/70 border-red-300 ring-2 ring-red-400"
+                    : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                    <label
+                      htmlFor="guideTemplateSelect"
+                      className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1 shrink-0"
                     >
-                      Trousers Guide
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const formalRows = [
-                          { brandSize: "30", waist: "28", length: "41" },
-                          { brandSize: "32", waist: "30", length: "41" },
-                          { brandSize: "34", waist: "32", length: "41" },
-                          { brandSize: "36", waist: "34", length: "41" },
-                          { brandSize: "38", waist: "36", length: "41" },
-                          { brandSize: "40", waist: "38", length: "41" },
-                          { brandSize: "42", waist: "40", length: "41" },
-                          { brandSize: "44", waist: "42", length: "41" },
-                        ];
-                        setSizeGuideRows(formalRows);
-                        toast("Loaded Executive Formal Size Guide", "success");
-                      }}
-                      className="px-3 py-1 rounded-md text-xs font-bold bg-orange-600 text-white shadow-xs hover:bg-orange-700 cursor-pointer"
-                    >
-                      Formal Guide
-                    </button>
+                      <span>Select Guide Template:</span>
+                      <span className="text-red-500 font-black text-sm">*</span>
+                    </label>
+
+                    <div className="relative inline-block">
+                      <select
+                        id="guideTemplateSelect"
+                        value={guideTemplate}
+                        onChange={(e) => handleTemplateChange(e.target.value)}
+                        required
+                        className={`w-48 pl-3 pr-8 py-2 bg-white border rounded-lg text-xs font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer appearance-none ${
+                          templateError
+                            ? "border-red-400 focus:ring-red-400 text-red-900"
+                            : "border-slate-300 focus:ring-slate-900 focus:border-slate-900"
+                        }`}
+                      >
+                        <option value="" disabled className="text-slate-400">
+                          -- Select Guide Template --
+                        </option>
+                        <option value="Trouser">Trouser</option>
+                        <option value="Formal">Formal</option>
+                      </select>
+                      <ChevronDown
+                        size={14}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                      />
+                    </div>
+
+                    {guideTemplate && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-900 text-white shadow-2xs">
+                        <Check size={12} className="text-emerald-400" />
+                        {guideTemplate} Guide Selected
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] text-slate-500">
+                    {guideTemplate === "Formal" ? (
+                      <span className="text-slate-700 font-medium">
+                        👔 <strong>Formal Guide:</strong> Executive tailored drape (Sizes 30 to 44 with tapered waist).
+                      </span>
+                    ) : guideTemplate === "Trouser" ? (
+                      <span className="text-slate-700 font-medium">
+                        👖 <strong>Trouser Guide:</strong> Standard comfortable stretch fit (Sizes 28 to 44).
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 font-semibold flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        Mandatory: Select Formal or Trouser to load measurements.
+                      </span>
+                    )}
                   </div>
                 </div>
-                <span className="text-[11px] text-slate-500">
-                  Switch between everyday Trousers or executive Formal drape.
-                </span>
+
+                {templateError && (
+                  <div className="mt-2.5 p-2 bg-red-100/80 border border-red-300 rounded-lg flex items-center gap-2 text-xs font-bold text-red-700">
+                    <AlertCircle size={14} className="shrink-0 text-red-600" />
+                    <span>Please select a guide template (Formal or Trouser). This option is mandatory.</span>
+                  </div>
+                )}
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
+              {!guideTemplate || sizeGuideRows.length === 0 ? (
+                <div className="py-10 px-4 text-center bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                  <Ruler className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700">No Guide Template Selected</p>
+                  <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
+                    Please select <strong className="text-slate-800">Formal</strong> or <strong className="text-slate-800">Trouser</strong> from the dropdown above to load and customize the measurement chart.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-700 border-b border-gray-200">
                     <tr>
@@ -1610,19 +1769,25 @@ export default function ProductForm({
                 </table>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-xs text-gray-500">
-                  Default preset: 28 28 41, 30 30 41, 32 32 41, 34 34 41, 36 36 41, 38 38 41, 40 40 41, 42 42 41, 44 44 41
-                </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-xs text-gray-500">
+                      {guideTemplate === "Formal"
+                        ? "Formal preset: 30(28), 32(30), 34(32), 36(34), 38(36), 40(38), 42(40), 44(42) | Length: 41"
+                        : guideTemplate === "Trouser"
+                        ? "Trouser preset: 28(28), 30(30), 32(32), 34(34), 36(36), 38(38), 40(40), 42(42), 44(44) | Length: 41"
+                        : "Select a guide template above to view preset dimensions."}
+                    </p>
 
-                <button
-                  type="button"
-                  onClick={handleResetSizeGuide}
-                  className="text-xs text-gray-500 hover:text-gray-900 underline cursor-pointer"
-                >
-                  Reset to Standard Sizing
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      onClick={handleResetSizeGuide}
+                      className="text-xs text-gray-500 hover:text-gray-900 underline cursor-pointer"
+                    >
+                      Reset to Standard Sizing
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
