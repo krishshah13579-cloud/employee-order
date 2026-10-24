@@ -42,6 +42,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [previewGuide, setPreviewGuide] = useState<{ name: string; guide: string } | null>(null);
+  const [previewGuideTab, setPreviewGuideTab] = useState<"TROUSERS" | "FORMAL">("TROUSERS");
   const [previewUnit, setPreviewUnit] = useState<"IN" | "CM">("IN");
   const [categoriesList, setCategoriesList] = useState<string[]>([...PRODUCT_CATEGORIES]);
 
@@ -518,8 +519,31 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Size Guide Preview Modal (Quick view) */}
+      {/* Size Guide Preview Modal (2 Tabs: Formal and Trousers) */}
       {previewGuide && (() => {
+        const TROUSER_ROWS = [
+          { brandSize: "28", waist: "30", length: "41" },
+          { brandSize: "30", waist: "32", length: "41" },
+          { brandSize: "32", waist: "34", length: "41" },
+          { brandSize: "34", waist: "36", length: "41" },
+          { brandSize: "36", waist: "38", length: "41" },
+          { brandSize: "38", waist: "40", length: "41" },
+          { brandSize: "40", waist: "42", length: "41" },
+          { brandSize: "42", waist: "44", length: "41" },
+          { brandSize: "44", waist: "46", length: "41" },
+        ];
+
+        const FORMAL_ROWS = [
+          { brandSize: "30", waist: "28", length: "41" },
+          { brandSize: "32", waist: "30", length: "41" },
+          { brandSize: "34", waist: "32", length: "41" },
+          { brandSize: "36", waist: "34", length: "41" },
+          { brandSize: "38", waist: "36", length: "41" },
+          { brandSize: "40", waist: "38", length: "41" },
+          { brandSize: "42", waist: "40", length: "41" },
+          { brandSize: "44", waist: "42", length: "41" },
+        ];
+
         let parsedRows: SizeGuideRow[] | null = null;
         try {
           const parsed = JSON.parse(previewGuide.guide);
@@ -527,6 +551,8 @@ export default function ProductsPage() {
             parsedRows = parsed;
           }
         } catch {}
+
+        const activeRows = previewGuideTab === "FORMAL" ? FORMAL_ROWS : (parsedRows || TROUSER_ROWS);
 
         const formatVal = (val: string) => {
           const num = parseFloat(val);
@@ -546,71 +572,97 @@ export default function ProductsPage() {
             size="md"
           >
             <div className="space-y-4">
+              {/* 2 Tabs: Trousers & Formal */}
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
-                  <Ruler size={15} className="text-zinc-900" /> Size Chart & Dimensions
+                <div className="inline-flex rounded-xl bg-gray-100 p-1 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewGuideTab("TROUSERS")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      previewGuideTab === "TROUSERS"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Trousers Guide
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewGuideTab("FORMAL")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      previewGuideTab === "FORMAL"
+                        ? "bg-orange-600 text-white shadow-xs"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Formal Guide
+                  </button>
                 </div>
 
-                {parsedRows && (
-                  <div className="inline-flex rounded-lg bg-gray-100 p-0.5 border border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewUnit("IN")}
-                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                        previewUnit === "IN"
-                          ? "bg-white text-gray-900 shadow-2xs"
-                          : "text-gray-500 hover:text-gray-900"
-                      }`}
-                    >
-                      IN
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewUnit("CM")}
-                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                        previewUnit === "CM"
-                          ? "bg-white text-gray-900 shadow-2xs"
-                          : "text-gray-500 hover:text-gray-900"
-                      }`}
-                    >
-                      CM
-                    </button>
-                  </div>
+                <div className="inline-flex rounded-lg bg-gray-100 p-0.5 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewUnit("IN")}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      previewUnit === "IN"
+                        ? "bg-white text-gray-900 shadow-2xs"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    IN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewUnit("CM")}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      previewUnit === "CM"
+                        ? "bg-white text-gray-900 shadow-2xs"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    CM
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600">
+                {previewGuideTab === "FORMAL" ? (
+                  <span>
+                    👔 <strong>Formal Size Guide:</strong> Engineered for executive tailored formal drape with tapered waistband.
+                  </span>
+                ) : (
+                  <span>
+                    👖 <strong>Trouser Size Guide:</strong> Standard comfortable stretch fit for everyday &amp; casual trousers.
+                  </span>
                 )}
               </div>
 
-              {parsedRows ? (
-                <div className="overflow-x-auto rounded-xl border border-gray-200">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 text-[11px] font-bold uppercase text-gray-700 border-b border-gray-200">
-                      <tr>
-                        <th className="px-3.5 py-2.5">Brand Size</th>
-                        <th className="px-3.5 py-2.5">Waist ({previewUnit})</th>
-                        <th className="px-3.5 py-2.5">Length ({previewUnit})</th>
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 text-[11px] font-bold uppercase text-gray-700 border-b border-gray-200">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Brand Size</th>
+                      <th className="px-3.5 py-2.5">Waist ({previewUnit})</th>
+                      <th className="px-3.5 py-2.5">Length ({previewUnit})</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white font-medium">
+                    {activeRows.map((row) => (
+                      <tr key={row.brandSize} className="hover:bg-gray-50">
+                        <td className="px-3.5 py-2 font-bold text-gray-900">
+                          Size {row.brandSize}
+                        </td>
+                        <td className="px-3.5 py-2 text-gray-700 font-mono">
+                          {formatVal(row.waist)}
+                        </td>
+                        <td className="px-3.5 py-2 text-gray-700 font-mono">
+                          {formatVal(row.length)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white font-medium">
-                      {parsedRows.map((row) => (
-                        <tr key={row.brandSize} className="hover:bg-gray-50">
-                          <td className="px-3.5 py-2 font-bold text-gray-900">
-                            Size {row.brandSize}
-                          </td>
-                          <td className="px-3.5 py-2 text-gray-700 font-mono">
-                            {formatVal(row.waist)}
-                          </td>
-                          <td className="px-3.5 py-2 text-gray-700 font-mono">
-                            {formatVal(row.length)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-800 whitespace-pre-line leading-relaxed font-sans bg-gray-50 p-3 rounded-xl border border-gray-200">
-                  {previewGuide.guide}
-                </p>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </Modal>
         );

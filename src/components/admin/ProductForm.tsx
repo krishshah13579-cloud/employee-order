@@ -1493,6 +1493,50 @@ export default function ProductForm({
 
           {isSizeGuideOpen && (
             <div className="p-5 space-y-4 animate-fadeIn">
+              {/* Preset Selector: Formal vs Trousers */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Select Guide Template:
+                  </span>
+                  <div className="inline-flex rounded-lg bg-white p-0.5 border border-slate-300">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSizeGuideRows(DEFAULT_ADMIN_SIZE_GUIDE);
+                        toast("Loaded Standard Trousers Size Guide", "success");
+                      }}
+                      className="px-3 py-1 rounded-md text-xs font-bold bg-slate-900 text-white shadow-xs cursor-pointer"
+                    >
+                      Trousers Guide
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const formalRows = [
+                          { brandSize: "30", waist: "28", length: "41" },
+                          { brandSize: "32", waist: "30", length: "41" },
+                          { brandSize: "34", waist: "32", length: "41" },
+                          { brandSize: "36", waist: "34", length: "41" },
+                          { brandSize: "38", waist: "36", length: "41" },
+                          { brandSize: "40", waist: "38", length: "41" },
+                          { brandSize: "42", waist: "40", length: "41" },
+                          { brandSize: "44", waist: "42", length: "41" },
+                        ];
+                        setSizeGuideRows(formalRows);
+                        toast("Loaded Executive Formal Size Guide", "success");
+                      }}
+                      className="px-3 py-1 rounded-md text-xs font-bold bg-orange-600 text-white shadow-xs hover:bg-orange-700 cursor-pointer"
+                    >
+                      Formal Guide
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  Switch between everyday Trousers or executive Formal drape.
+                </span>
+              </div>
+
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-700 border-b border-gray-200">

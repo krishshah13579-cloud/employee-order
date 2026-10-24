@@ -495,77 +495,41 @@ export default function AdminOutstandingPage() {
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary KPI Cards (Focused on Outstanding) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Total Outstanding */}
-        <div className="bg-white rounded-2xl p-5 border border-rose-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-3xl p-5 border border-rose-200/80 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500 block">
               Total Outstanding
             </span>
-            <span className="text-2xl font-black text-rose-700 font-mono mt-1 block">
+            <span className="text-3xl font-black text-rose-700 font-mono mt-1 block">
               {formatCurrency(summaryStats.totalOutstandingAll)}
             </span>
             <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
-              Across {summaryStats.customersWithOutstandingCount} pending customers
+              Across {summaryStats.customersWithOutstandingCount} pending customer accounts
             </span>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <IndianRupee size={24} />
-          </div>
-        </div>
-
-        {/* Total Collected */}
-        <div className="bg-white rounded-2xl p-5 border border-emerald-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 block">
-              Payments Collected
-            </span>
-            <span className="text-2xl font-black text-emerald-700 font-mono mt-1 block">
-              {formatCurrency(summaryStats.totalCollectedAll)}
-            </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
-              Credited via FIFO starting oldest bill
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <IndianRupee size={28} />
           </div>
         </div>
 
         {/* Total Sales Returns */}
-        <div className="bg-white rounded-2xl p-5 border border-purple-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-3xl p-5 border border-purple-200/80 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 block">
-              Sales Returns
+              Sales Returns Credited
             </span>
-            <span className="text-2xl font-black text-purple-700 font-mono mt-1 block">
+            <span className="text-3xl font-black text-purple-700 font-mono mt-1 block">
               {formatCurrency(summaryStats.totalReturnsAll)}
             </span>
             <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
-              Credited to customer balances
+              Credited directly to customer balances via FIFO
             </span>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-            <RotateCcw size={24} />
-          </div>
-        </div>
-
-        {/* Total Wholesale Billed */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-              Total Wholesale Billed
-            </span>
-            <span className="text-2xl font-black text-slate-900 font-mono mt-1 block">
-              {formatCurrency(summaryStats.totalBilledAll)}
-            </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
-              From {summaryStats.totalCustomersCount} registered retailers
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-            <CreditCard size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <RotateCcw size={28} />
           </div>
         </div>
       </div>
@@ -635,20 +599,16 @@ export default function AdminOutstandingPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">Firm Name</th>
-                <th className="py-3 px-4">City</th>
-                <th className="py-3 px-4">Phone</th>
-                <th className="py-3 px-4 text-right">Total Billed</th>
-                <th className="py-3 px-4 text-right">Paid / Credited</th>
-                <th className="py-3 px-4 text-right">Outstanding Amount</th>
-                <th className="py-3 px-4 text-center">Bills</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-6">Firm Name</th>
+                <th className="py-3.5 px-6">City</th>
+                <th className="py-3.5 px-6 text-right">Outstanding Amount</th>
+                <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={4} className="py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-7 h-7 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs font-semibold">Loading outstanding balances &amp; FIFO ledger...</span>
@@ -657,7 +617,7 @@ export default function AdminOutstandingPage() {
                 </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={4} className="py-12 text-center text-slate-500">
                     No customers found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
@@ -671,7 +631,7 @@ export default function AdminOutstandingPage() {
                       onClick={() => handleOpenLedger(c.id)}
                     >
                       {/* Firm Name */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-4 px-6">
                         <div className="font-black text-slate-900 text-sm uppercase">
                           {c.firmName}
                         </div>
@@ -681,29 +641,14 @@ export default function AdminOutstandingPage() {
                       </td>
 
                       {/* City */}
-                      <td className="py-3.5 px-4 font-semibold text-slate-800 uppercase">
+                      <td className="py-4 px-6 font-semibold text-slate-800 uppercase">
                         {c.city}
                       </td>
 
-                      {/* Phone */}
-                      <td className="py-3.5 px-4 font-medium text-slate-700">
-                        {c.phoneNumber || "—"}
-                      </td>
-
-                      {/* Total Billed */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-800">
-                        {formatCurrency(c.totalBilled)}
-                      </td>
-
-                      {/* Paid & Credited */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-700">
-                        {formatCurrency(c.totalCredits)}
-                      </td>
-
                       {/* Outstanding Amount */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <span
-                          className={`font-mono font-black text-sm px-2.5 py-1 rounded-lg ${
+                          className={`font-mono font-black text-sm px-3 py-1.5 rounded-xl ${
                             hasOutstanding
                               ? "bg-rose-50 text-rose-700 border border-rose-200/80"
                               : "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
@@ -713,19 +658,9 @@ export default function AdminOutstandingPage() {
                         </span>
                       </td>
 
-                      {/* Bills Count */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                          {c.billsCount} bills
-                          {c.unpaidBillsCount > 0 && (
-                            <span className="text-rose-600 font-black">({c.unpaidBillsCount} unpaid)</span>
-                          )}
-                        </span>
-                      </td>
-
                       {/* Actions */}
                       <td
-                        className="py-3.5 px-4 text-right"
+                        className="py-4 px-6 text-right"
                         onClick={(e) => e.stopPropagation()} // prevent double-trigger
                       >
                         <div className="flex items-center justify-end gap-1.5">
@@ -733,22 +668,22 @@ export default function AdminOutstandingPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenLedger(c.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition cursor-pointer shadow-2xs"
                             title="View all bills datewise with FIFO breakdown"
                           >
                             <Eye size={13} />
-                            <span className="hidden sm:inline">View Bills</span>
+                            <span>View Ledger</span>
                           </button>
 
                           {/* Record Payment */}
                           <button
                             type="button"
                             onClick={() => handleOpenPaymentModal({ id: c.id, name: c.firmName })}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
                             title="Record payment received from customer"
                           >
                             <Plus size={13} />
-                            <span className="hidden sm:inline">Payment</span>
+                            <span>Payment</span>
                           </button>
 
                           {/* WhatsApp Reminder */}
@@ -757,7 +692,7 @@ export default function AdminOutstandingPage() {
                               type="button"
                               disabled={sendingWhatsAppFor === c.id}
                               onClick={() => handleSendWhatsAppReminder(c.id)}
-                              className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition cursor-pointer shadow-2xs"
+                              className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition cursor-pointer shadow-2xs"
                               title="Send weekly payment reminder on WhatsApp"
                             >
                               <MessageCircle size={14} className={sendingWhatsAppFor === c.id ? "animate-spin" : ""} />

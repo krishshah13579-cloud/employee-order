@@ -74,6 +74,7 @@ export async function PUT(
         designation: body.designation,
         isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
         canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
+        canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,

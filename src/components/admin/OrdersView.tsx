@@ -21,6 +21,7 @@ import {
   FileCheck2,
   Lock,
   ExternalLink,
+  CheckCircle2,
 } from "lucide-react";
 import {
   ORDER_STATUSES,
@@ -43,6 +44,7 @@ export default function OrdersView({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [activeTab, setActiveTab] = useState<"ORDERS" | "INVOICES" | "BILLS">(initialTab);
+  const [orderFormSubTab, setOrderFormSubTab] = useState<"PENDING" | "APPROVED">("PENDING");
 
   // Outstanding data map (customerId -> totalOutstanding)
   const [outstandingMap, setOutstandingMap] = useState<Record<number, number>>({});
@@ -181,10 +183,18 @@ export default function OrdersView({
     }
   }, [initialTab]);
 
-  const orderForms = orders;
+  const pendingOrders = orders.filter((o) => o.status === "Pending" && !o.taxInvoiceNumber);
+  const approvedOrders = orders.filter(
+    (o) => o.status === "Approved" || o.status === "Confirmed" || Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim())
+  );
+  const orderForms = orderFormSubTab === "PENDING" ? pendingOrders : approvedOrders;
+
   const finalInvoices = orders.filter(
     (o) =>
       Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim()) ||
+      o.status === "Approved" ||
+      o.status === "Confirmed" ||
+      o.status === "Processing" ||
       o.status === "Ready" ||
       o.status === "Dispatched" ||
       o.status === "Delivered"
@@ -233,17 +243,13 @@ export default function OrdersView({
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
-          {isSuperAdmin && (
+          {isSuperAdmin && activeTab !== "BILLS" && (
             <Link
-              href={
-                activeTab === "BILLS"
-                  ? "/orders/new?businessType=WHOLESALER%20WITHOUT%20GST"
-                  : "/admin/orders/new"
-              }
+              href="/admin/orders/new"
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Plus size={16} />
-              <span>{activeTab === "BILLS" ? "Generate New Bill" : "Book New Order"}</span>
+              <span>Book New Order</span>
             </Link>
           )}
         </div>
@@ -331,86 +337,34 @@ export default function OrdersView({
         </div>
       </div>
 
-      {/* ═════════════════════════════════════════════════════════════
-          WHOLESALER (WITHOUT GST) CUSTOMERS OVERVIEW WITH OUTSTANDING
-          ═════════════════════════════════════════════════════════════ */}
-      {activeTab === "BILLS" && (
-        <div className="bg-white rounded-2xl border border-emerald-200/80 p-5 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <FileCheck2 className="text-emerald-600 w-4 h-4" />
-                Without GST (Wholesale &amp; Retailer) Clients &amp; Outstanding Balances
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                All registered clients under Without GST (Wholesale &amp; Retailer). Bills generated here do NOT add 5% GST and require NO GST/PAN.
-              </p>
-            </div>
-            <Link
-              href="/orders/new?businessType=WHOLESALER%20WITHOUT%20GST"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors self-start sm:self-auto cursor-pointer"
-            >
-              <Plus size={14} />
-              <span>+ Generate Bill</span>
-            </Link>
-          </div>
-
-          {wholesaleNoGstCustomers.length === 0 ? (
-            <div className="p-4 bg-emerald-50/50 rounded-xl text-center text-xs text-emerald-800">
-              No clients currently categorized under Without GST (Wholesale or Retailer). When creating or editing a customer, set their business type to Wholesale (Without GST) or Retailer (Without GST).
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {wholesaleNoGstCustomers.map((cust) => {
-                const outBal = cust.totalOutstanding || outstandingMap[cust.customerId] || 0;
-                return (
-                  <div
-                    key={cust.customerId}
-                    className="p-3.5 bg-slate-50/80 hover:bg-emerald-50/40 rounded-xl border border-slate-200/80 transition-all flex flex-col justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-bold text-slate-900 text-xs truncate">
-                          {cust.customerName || "Customer #" + cust.customerId}
-                        </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                          Without GST
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {cust.customerCity ? `${cust.customerCity} • ` : ""}
-                        {cust.customerPhone || "No Phone"}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">
-                          Outstanding Amount:
-                        </span>
-                        <span
-                          className={`text-xs font-mono font-bold ${
-                            outBal > 0 ? "text-red-600" : "text-emerald-700"
-                          }`}
-                        >
-                          {formatCurrency(outBal)}
-                        </span>
-                      </div>
-
-                      <Link
-                        href={`/orders/new?customerId=${cust.customerId}&businessType=WHOLESALER%20WITHOUT%20GST`}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                        title="Generate bill for this customer"
-                      >
-                        <Plus size={12} />
-                        <span>Generate Bill</span>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Sub-Tabs for Order Forms (Pending vs Approved) */}
+      {activeTab === "ORDERS" && (
+        <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-2xs">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider px-2">Order Form Status:</span>
+          <button
+            type="button"
+            onClick={() => setOrderFormSubTab("PENDING")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+              orderFormSubTab === "PENDING"
+                ? "bg-amber-500 text-white shadow-xs font-black"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <Clock size={13} />
+            <span>Pending Orders ({pendingOrders.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrderFormSubTab("APPROVED")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+              orderFormSubTab === "APPROVED"
+                ? "bg-emerald-600 text-white shadow-xs font-black"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <CheckCircle2 size={13} />
+            <span>Approved Orders ({approvedOrders.length})</span>
+          </button>
         </div>
       )}
 
@@ -458,8 +412,8 @@ export default function OrdersView({
                   {activeTab === "INVOICES" ? "Invoice #" : activeTab === "BILLS" ? "Bill #" : "Order Form #"}
                 </th>
                 <th className="py-3.5 px-6">Date</th>
-                <th className="py-3.5 px-6">Customer &amp; City</th>
-                <th className="py-3.5 px-6">Outstanding</th>
+                <th className="py-3.5 px-6">{activeTab === "BILLS" ? "Customer & Type" : "Customer & City"}</th>
+                {activeTab !== "BILLS" && <th className="py-3.5 px-6">Outstanding</th>}
                 <th className="py-3.5 px-6">Sets / Pcs</th>
                 <th className="py-3.5 px-6">
                   {activeTab === "BILLS" ? "Bill Amount (0% GST)" : "Total Amount & Status"}
@@ -546,30 +500,57 @@ export default function OrdersView({
                         )}
                       </td>
 
-                      {/* 3. Customer Name & City */}
+                      {/* 3. Customer Name & Type / City */}
                       <td className="py-4 px-6">
                         <div className="font-bold text-gray-900">
                           {o.customer?.shopName || "Customer #" + o.customerId}
                         </div>
-                        {o.customer?.city && (
+                        {activeTab === "BILLS" ? (
+                          <div className="mt-1">
+                            {(() => {
+                              const bt = (o.customer?.businessType || (o as any).businessType || "").toUpperCase();
+                              if (bt.includes("SPECIAL DISCOUNT")) {
+                                return (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                    RETAILER (SPL DISCOUNT NO GST)
+                                  </span>
+                                );
+                              }
+                              if (bt.includes("WHOLESAL")) {
+                                return (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200">
+                                    WHOLESALER WITHOUT GST
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  RETAILER WITHOUT GST
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        ) : o.customer?.city ? (
                           <div className="text-[10px] text-gray-400 mt-0.5 font-medium">
                             {o.customer.city}
                           </div>
-                        )}
+                        ) : null}
                       </td>
 
-                      {/* 4. Customer Outstanding Balance */}
-                      <td className="py-4 px-6">
-                        <span
-                          className={`font-mono font-bold px-2 py-1 rounded-lg text-xs ${
-                            custOutstanding > 0
-                              ? "bg-red-50 text-red-700 border border-red-200"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}
-                        >
-                          {formatCurrency(custOutstanding)}
-                        </span>
-                      </td>
+                      {/* 4. Customer Outstanding Balance (Hidden on Bills tab) */}
+                      {activeTab !== "BILLS" && (
+                        <td className="py-4 px-6">
+                          <span
+                            className={`font-mono font-bold px-2 py-1 rounded-lg text-xs ${
+                              custOutstanding > 0
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {formatCurrency(custOutstanding)}
+                          </span>
+                        </td>
+                      )}
 
                       {/* 5. Sets & Pieces */}
                       <td className="py-4 px-6">
@@ -689,6 +670,38 @@ export default function OrdersView({
                              WhatsApp, Edit (if Pending), View Order, Status Update, Delete
                              ───────────────────────────────────────────────────────────── */
                           <>
+                            {/* Approve Order Button -> Generates Final Tax Invoice */}
+                            {o.status === "Pending" && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm(`Approve order #${o.orderNumber} and generate Final Tax Invoice?`)) return;
+                                  try {
+                                    const res = await fetch(`/api/orders/${o.id}/status`, {
+                                      method: "PUT",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ status: "Approved" }),
+                                    });
+                                    if (res.ok) {
+                                      toast(`✅ Order #${o.orderNumber} approved & Final Tax Invoice generated!`, "success");
+                                      fetchOrders();
+                                      fetchOutstanding();
+                                    } else {
+                                      const err = await res.json();
+                                      toast(err.error || "Failed to approve order", "error");
+                                    }
+                                  } catch (err: any) {
+                                    toast("Error: " + err.message, "error");
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Approve order and create Final Tax Invoice"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Approve</span>
+                              </button>
+                            )}
+
                             {/* WhatsApp Button */}
                             <button
                               type="button"
@@ -809,11 +822,23 @@ export default function OrdersView({
                 onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
                 className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900 cursor-pointer"
               >
-                {ORDER_STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
+                {activeTab === "INVOICES"
+                  ? ["Processing", "Ready", "Dispatched", "Delivered", "Cancelled by Customer"].map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))
+                  : activeTab === "ORDERS"
+                  ? ["Pending", "Approved"].map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))
+                  : ORDER_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
               </select>
             </div>
 

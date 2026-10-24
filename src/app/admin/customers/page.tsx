@@ -179,100 +179,16 @@ export default function CustomersPage() {
         )}
       </div>
 
-      {/* Credit Days Tab Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-500 mr-2 flex items-center gap-1">
-            <Clock size={14} /> Credit Tabs:
-          </span>
-          <button
-            onClick={() => setActiveCreditTab("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "all"
-                ? "bg-zinc-950 text-white shadow-xs"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            All Shops ({customers.length})
-          </button>
-          <button
-            onClick={() => setActiveCreditTab("credit")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "credit"
-                ? "bg-orange-600 text-white shadow-xs"
-                : "bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200"
-            }`}
-          >
-            Active Credit ({customers.filter((c) => (c.creditDays || 0) > 0).length})
-          </button>
-          <button
-            onClick={() => setActiveCreditTab("45days")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "45days"
-                ? "bg-purple-700 text-white shadow-xs"
-                : "bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200"
-            }`}
-          >
-            45 Days Locked ({customers.filter((c) => (c.creditDays || 0) === 45).length})
-          </button>
-          <button
-            onClick={() => setActiveCreditTab("advance")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "advance"
-                ? "bg-emerald-700 text-white shadow-xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
-            }`}
-          >
-            Advance Payment ({customers.filter((c) => (c.creditDays || 0) === 0).length})
-          </button>
-          <button
-            onClick={() => setActiveCreditTab("specialDiscount")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "specialDiscount"
-                ? "bg-teal-700 text-white shadow-xs"
-                : "bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200"
-            }`}
-          >
-            Special Discount ({customers.filter((c) => (c.specialDiscount && c.specialDiscount > 0) || c.businessType === "RETAILER WITH SPECIAL DISCOUNT").length})
-          </button>
-          <button
-            onClick={() => setActiveCreditTab("wholesaleNoGst")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-              activeCreditTab === "wholesaleNoGst"
-                ? "bg-fuchsia-700 text-white shadow-xs"
-                : "bg-fuchsia-50 text-fuchsia-800 hover:bg-fuchsia-100 border border-fuchsia-200"
-            }`}
-          >
-            Without GST ({customers.filter((c) => (c.businessType || "").toUpperCase().includes("WITHOUT GST") || (!c.gstPanNo || c.gstPanNo === "URP" || c.gstPanNo === "N/A")).length})
-          </button>
-        </div>
-
-        {/* Super admin permission indicator */}
-        <div className="flex items-center gap-2">
-          {isSuperAdmin ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-[11px] font-bold">
-              <ShieldCheck size={13} className="text-emerald-600" />
-              Super Admin: Credit Days Editing Authorized
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-600 border border-gray-200 rounded-xl text-[11px] font-medium" title="Only Super Admin can modify Credit Days">
-              <Lock size={12} className="text-gray-400" />
-              Credit Days: Super Admin Managed
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Toolbar & Filters */}
+      {/* Toolbar & Filters (Search in Capitals Only) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3.5 top-3 text-gray-400" />
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by shop name, GSTIN, PAN, or phone..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-zinc-900 focus:outline-none shadow-2xs"
+            onChange={(e) => setSearch(e.target.value.toUpperCase())}
+            placeholder="SEARCH IN CAPITALS BY SHOP NAME..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-xs uppercase font-semibold focus:ring-2 focus:ring-zinc-900 focus:outline-none shadow-2xs"
           />
         </div>
 
@@ -285,33 +201,30 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Customers Table Card */}
+      {/* Customers Table Card (Clean 5 Columns: Shop Name, Type, Credit Days, City, Action) */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-                <th className="py-3.5 px-6">Shop & Contact Person</th>
+                <th className="py-3.5 px-6">Shop Name</th>
                 <th className="py-3.5 px-6">Type</th>
-                <th className="py-3.5 px-6">Credit Days Tab</th>
-                <th className="py-3.5 px-6">GSTIN / PAN</th>
-                <th className="py-3.5 px-6">Phone Number</th>
-                <th className="py-3.5 px-6">Store Address</th>
-                <th className="py-3.5 px-6">Visiting Card</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
+                <th className="py-3.5 px-6">Credit Days</th>
+                <th className="py-3.5 px-6">City</th>
+                <th className="py-3.5 px-6 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={5} className="py-12 text-center text-gray-400">
                     Loading customer shops...
                   </td>
                 </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
-                    No customer shops found matching the selected tab.
+                  <td colSpan={5} className="py-12 text-center text-gray-400">
+                    No customer shops found matching &quot;{search}&quot;.
                   </td>
                 </tr>
               ) : (
@@ -321,170 +234,82 @@ export default function CustomersPage() {
 
                   return (
                     <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                      {/* 1. Shop Name */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center font-bold text-sm shrink-0">
                             {c.shopName.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-bold text-gray-900">{c.shopName}</div>
+                            <div className="font-bold text-gray-900 uppercase text-sm">{c.shopName}</div>
                             {c.contactPerson ? (
                               <div className="text-[11px] text-gray-500 mt-0.5">
                                 Contact: {c.contactPerson}
                               </div>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 italic">No contact specified</span>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </td>
 
-                      {/* Business Type */}
+                      {/* 2. Business Type */}
                       <td className="py-4 px-6">
                         {c.businessType === "WHOLESALER WITHOUT GST" || c.businessType === "WHOLESALE WITHOUT GST" ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-300"
-                            title="Wholesale Without GST"
-                          >
-                            <span>WHOLESALE (NO GST)</span>
-                            {c.specialDiscount ? (
-                              <span className="bg-fuchsia-200/80 text-fuchsia-900 px-1 rounded font-mono">
-                                -₹{c.specialDiscount}
-                              </span>
-                            ) : null}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200">
+                            WHOLESALE (NO GST)
                           </span>
                         ) : isWholesaler ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            <span>WHOLESALE</span>
-                            {c.specialDiscount ? (
-                              <span className="bg-purple-200/80 text-purple-900 px-1 rounded font-mono">
-                                -₹{c.specialDiscount}
-                              </span>
-                            ) : null}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            WHOLESALE
                           </span>
                         ) : c.businessType === "RETAILER WITHOUT GST" || c.businessType === "RETAILER (WITHOUT GST)" ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
-                            title="Retailer Without GST"
-                          >
-                            <span>RETAILER (NO GST)</span>
-                            {c.specialDiscount ? (
-                              <span className="bg-teal-200/80 text-teal-900 px-1 rounded font-mono">
-                                -₹{c.specialDiscount}
-                              </span>
-                            ) : null}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                            RETAILER (NO GST)
                           </span>
                         ) : c.businessType === "RETAILER WITH SPECIAL DISCOUNT" || (c.specialDiscount && c.specialDiscount > 0) ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300"
-                            title={`Retailer with Special Discount: ₹${c.specialDiscount || 0} off MRP/2`}
-                          >
-                            <span>RETAILER (SPL DISC)</span>
-                            {c.specialDiscount ? (
-                              <span className="bg-teal-200/80 text-teal-900 px-1 rounded font-mono">
-                                -₹{c.specialDiscount}
-                              </span>
-                            ) : null}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                            RETAILER (SPL DISCOUNT)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                             RETAILER
                           </span>
                         )}
                       </td>
 
-                      {/* Credit Days Tab Column */}
+                      {/* 3. Credit Days */}
                       <td className="py-4 px-6">
-                        {isSuperAdmin ? (
-                          <button
-                            onClick={() => {
-                              setEditingCreditCustomer(c);
-                              setNewCreditDays(c.creditDays || 0);
-                            }}
-                            className={`group inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold transition cursor-pointer border ${
-                              days === 45
-                                ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-300"
-                                : days > 0
-                                ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300"
-                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200"
-                            }`}
-                            title="Click to edit Credit Days (Super Admin)"
-                          >
-                            <Clock size={12} className="text-gray-500 group-hover:scale-110 transition-transform" />
-                            <span>{days > 0 ? `${days} Days` : "Advance (0d)"}</span>
-                            <Edit2 size={11} className="opacity-0 group-hover:opacity-100 text-gray-500 ml-1 transition-opacity" />
-                          </button>
-                        ) : (
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border ${
-                              days === 45
-                                ? "bg-purple-50 text-purple-800 border-purple-200"
-                                : days > 0
-                                ? "bg-amber-50 text-amber-800 border-amber-200"
-                                : "bg-gray-50 text-gray-700 border-gray-200"
-                            }`}
-                            title="Credit Days locked for non-super admins"
-                          >
-                            <Lock size={11} className="text-gray-400" />
-                            <span>{days > 0 ? `${days} Days` : "Advance (0d)"}</span>
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-lg font-mono text-[11px] font-bold text-gray-800">
-                          <CreditCard size={12} className="text-gray-400" />
-                          {c.gstPanNo}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border ${
+                            days === 45
+                              ? "bg-purple-50 text-purple-800 border-purple-200"
+                              : days > 0
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          }`}
+                        >
+                          <Clock size={12} className={days > 0 ? "text-amber-600" : "text-emerald-600"} />
+                          <span>{days > 0 ? `${days} Days` : "Advance (0d)"}</span>
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-mono font-medium text-gray-800">
-                        <a
-                          href={`tel:${c.phoneNumber}`}
-                          className="inline-flex items-center gap-1.5 hover:text-orange-600 transition-colors"
-                        >
-                          <Phone size={13} className="text-gray-400" />
-                          {c.phoneNumber}
-                        </a>
+
+                      {/* 4. City */}
+                      <td className="py-4 px-6 font-semibold text-gray-800 uppercase">
+                        {c.city || "—"}
                       </td>
-                      <td className="py-4 px-6 max-w-xs text-gray-600">
-                        <div className="flex items-start gap-1.5">
-                          <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
-                          <span className="line-clamp-2">{c.address}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        {c.visitingCardUrl ? (
-                          <button
-                            onClick={() => setPreviewCardUrl(c.visitingCardUrl!)}
-                            className="group relative inline-flex items-center gap-2 p-1 bg-gray-50 hover:bg-orange-50 border border-gray-200 hover:border-orange-300 rounded-xl transition-all cursor-pointer"
-                            title="Click to view full card"
-                          >
-                            <img
-                              src={c.visitingCardUrl}
-                              alt="Visiting Card"
-                              className="w-12 h-8 rounded-lg object-cover"
-                            />
-                            <span className="text-[11px] font-semibold text-gray-700 group-hover:text-orange-700 pr-1.5 flex items-center gap-1">
-                              <Eye size={12} /> View Card
-                            </span>
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic flex items-center gap-1">
-                            <ImageIcon size={13} /> No Card
-                          </span>
-                        )}
-                      </td>
+
+                      {/* 5. Actions (Edit / View Details) */}
                       <td className="py-4 px-6 text-right space-x-2">
                         <Link
                           href={`/admin/customers/${c.id}/edit`}
-                          className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Edit Customer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-2xs"
+                          title="Edit and view customer details"
                         >
-                          <Edit2 size={15} />
+                          <Eye size={13} />
+                          <span>Edit / View</span>
                         </Link>
                         <button
                           onClick={() => handleDelete(c.id, c.shopName)}
-                          className="p-1.5 inline-flex text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 inline-flex text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
                           title="Delete Customer"
                         >
                           <Trash2 size={15} />

@@ -256,12 +256,15 @@ export interface DashboardStats {
 
 export const ORDER_STATUSES = [
   "Pending",
+  "Approved",
   "Confirmed",
+  "Processing",
   "In Production",
   "Ready",
   "Dispatched",
   "Delivered",
   "Cancelled",
+  "Cancelled by Customer",
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];

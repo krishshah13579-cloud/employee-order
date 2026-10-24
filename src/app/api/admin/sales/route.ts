@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-security";
+import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 
 // GET /api/admin/sales: List all sales invoices
 export async function GET(request: NextRequest) {
@@ -55,6 +56,16 @@ export async function GET(request: NextRequest) {
         phone.includes(search) ||
         gst.includes(search)
       );
+    });
+
+    // Sort strictly by numeric invoice number sequence (e.g. 41, 40, 39...)
+    filtered.sort((a, b) => {
+      const numA = parseInt(a.invoiceNumber, 10);
+      const numB = parseInt(b.invoiceNumber, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numB - numA;
+      }
+      return b.id - a.id;
     });
 
     let totalRevenue = 0;
@@ -166,30 +177,14 @@ export async function POST(request: NextRequest) {
     const gstAmount = Math.round(effectiveSubtotal * (effectiveGstRate / 100) * 100) / 100;
     const grandTotal = Math.round(effectiveSubtotal + gstAmount);
 
-    // Generate unique serial invoice number: CS-YYMMDD-XXX for cash, INV-YYMMDD-XXX for credit
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const datePrefix = `${yy}${mm}${dd}`;
-
-    const countToday = await prisma.salesInvoice.count({
-      where: {
-        createdAt: {
-          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-        },
-      },
-    });
-
-    const seq = String(countToday + 1).padStart(3, "0");
-    const prefix = paymentType === "Cash" ? "CS" : "INV";
-    const invoiceNumber = `${prefix}-${datePrefix}-${seq}`;
-
     const isCash = paymentType === "Cash";
     const parsedCustomerId = customerId ? parseInt(customerId, 10) : null;
 
-    // Use transaction to create invoice and record cash payment if customer is linked
+    // Use transaction to create invoice with strict sequential number (just number: 41, 42, etc.)
     const result = await prisma.$transaction(async (tx) => {
+      // Strict Invoice# Policy: pure number in sequence (41, 42, ...)
+      const invoiceNumber = await getNextTaxInvoiceNumber(tx);
+
       const invoice = await tx.salesInvoice.create({
         data: {
           invoiceNumber,

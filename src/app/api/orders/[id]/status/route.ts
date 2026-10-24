@@ -64,7 +64,10 @@ export async function PUT(
     }
 
     // 1. If cancelling order, restore stock sets back to inventory
-    if (status === "Cancelled" && existingOrder.status !== "Cancelled") {
+    const isCancelling = (status === "Cancelled" || status === "Cancelled by Customer") &&
+      existingOrder.status !== "Cancelled" && existingOrder.status !== "Cancelled by Customer";
+
+    if (isCancelling) {
       for (const item of existingOrder.items) {
         if (item.productId && item.colorSets) {
           try {
@@ -90,7 +93,10 @@ export async function PUT(
     }
 
     // 2. If un-cancelling order, re-deduct stock
-    if (existingOrder.status === "Cancelled" && status !== "Cancelled") {
+    const isUncancelling = (existingOrder.status === "Cancelled" || existingOrder.status === "Cancelled by Customer") &&
+      status !== "Cancelled" && status !== "Cancelled by Customer";
+
+    if (isUncancelling) {
       for (const item of existingOrder.items) {
         if (item.productId && item.colorSets) {
           try {
@@ -118,7 +124,7 @@ export async function PUT(
     let autoTaxInvoiceNumber = existingOrder.taxInvoiceNumber;
     let autoTaxInvoiceDate = existingOrder.taxInvoiceDate;
 
-    if (status === "Confirmed" && (!autoTaxInvoiceNumber || !autoTaxInvoiceNumber.trim())) {
+    if ((status === "Approved" || status === "Confirmed") && (!autoTaxInvoiceNumber || !autoTaxInvoiceNumber.trim())) {
       autoTaxInvoiceNumber = await getNextTaxInvoiceNumber();
       autoTaxInvoiceDate = new Date();
     }

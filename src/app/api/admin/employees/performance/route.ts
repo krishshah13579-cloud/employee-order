@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         designation: true,
         isTeamLeader: true,
         canEditOrders: true,
+        canUpdateStock: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -158,6 +159,8 @@ export async function GET(request: NextRequest) {
         proofUrl: emp.proofUrl,
         designation: emp.designation,
         isTeamLeader: emp.isTeamLeader,
+        canEditOrders: Boolean(emp.canEditOrders),
+        canUpdateStock: Boolean(emp.canUpdateStock),
         isActive: emp.isActive,
         createdAt: emp.createdAt,
         stats: {

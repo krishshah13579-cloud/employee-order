@@ -80,22 +80,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
-    // Generate Return Invoice Number: RET-YYMMDD-XXX
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const datePrefix = `RET-${yy}${mm}${dd}-`;
-
-    const countToday = await prisma.salesReturn.count({
-      where: {
-        returnNumber: {
-          startsWith: datePrefix,
-        },
-      },
+    // Generate Return Invoice Number: R-01, R-02... Re-using deleted sequences via gap-finding
+    const existingReturns = await prisma.salesReturn.findMany({
+      select: { returnNumber: true },
     });
-
-    const returnNumber = `${datePrefix}${String(countToday + 1).padStart(3, "0")}`;
+    const usedSeqs = new Set<number>();
+    for (const ret of existingReturns) {
+      const match = (ret.returnNumber || "").match(/^R-(\d+)$/i);
+      if (match) {
+        usedSeqs.add(parseInt(match[1], 10));
+      }
+    }
+    let seq = 1;
+    while (usedSeqs.has(seq)) {
+      seq++;
+    }
+    const returnNumber = `R-${String(seq).padStart(2, "0")}`;
 
     const itemsJson = typeof items === "string" ? items : JSON.stringify(items || []);
 
@@ -115,6 +115,32 @@ export async function POST(request: NextRequest) {
         notes: notes?.trim() || null,
       },
     });
+
+    // Add returned items back to product stock (mixPcs)
+    try {
+      const parsedItems = Array.isArray(items)
+        ? items
+        : typeof items === "string"
+        ? JSON.parse(items || "[]")
+        : [];
+
+      for (const item of parsedItems) {
+        const pcs =
+          Number(item.totalPcs || item.pcs || item.quantity) ||
+          (Number(item.totalSets || item.sets || 0) * (Number(item.pcsPerSet) || 5));
+        const pId = item.productId ? parseInt(item.productId, 10) : null;
+        if (pId && pcs > 0) {
+          await prisma.product.update({
+            where: { id: pId },
+            data: {
+              mixPcs: { increment: pcs },
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error adding returned items back to stock:", err);
+    }
 
     return NextResponse.json(salesReturn, { status: 201 });
   } catch (error: any) {
@@ -137,6 +163,39 @@ export async function DELETE(request: NextRequest) {
 
     if (isNaN(rid)) {
       return NextResponse.json({ error: "Invalid return ID" }, { status: 400 });
+    }
+
+    const existingReturn = await prisma.salesReturn.findUnique({
+      where: { id: rid },
+    });
+
+    if (existingReturn && existingReturn.items) {
+      try {
+        const parsedItems = JSON.parse(existingReturn.items);
+        if (Array.isArray(parsedItems)) {
+          for (const item of parsedItems) {
+            const pcs =
+              Number(item.totalPcs || item.pcs || item.quantity) ||
+              (Number(item.totalSets || item.sets || 0) * (Number(item.pcsPerSet) || 5));
+            const pId = item.productId ? parseInt(item.productId, 10) : null;
+            if (pId && pcs > 0) {
+              const prod = await prisma.product.findUnique({
+                where: { id: pId },
+                select: { mixPcs: true },
+              });
+              if (prod) {
+                const newMix = Math.max(0, (prod.mixPcs || 0) - pcs);
+                await prisma.product.update({
+                  where: { id: pId },
+                  data: { mixPcs: newMix },
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error deducting returned pcs on return deletion:", err);
+      }
     }
 
     await prisma.salesReturn.delete({

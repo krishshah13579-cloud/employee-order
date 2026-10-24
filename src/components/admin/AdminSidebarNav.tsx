@@ -25,6 +25,7 @@ import {
   FileCheck2,
   X,
   MapPin,
+  TrendingUp,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -81,18 +82,6 @@ const navItems = [
     exact: false,
   },
   {
-    name: "Final Invoices",
-    href: "/admin/invoices",
-    icon: Receipt,
-    exact: false,
-  },
-  {
-    name: "Bill (Without GST)",
-    href: "/admin/bills",
-    icon: FileCheck2,
-    exact: false,
-  },
-  {
     name: "Sales Register",
     href: "/admin/sales",
     icon: BadgePercent,
@@ -120,6 +109,12 @@ const navItems = [
     name: "Stock",
     href: "/admin/stock",
     icon: Boxes,
+    exact: false,
+  },
+  {
+    name: "Profit",
+    href: "/admin/profit",
+    icon: TrendingUp,
     exact: false,
   },
   {

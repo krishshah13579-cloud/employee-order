@@ -37,7 +37,10 @@ import {
   Boxes,
   Pencil,
   ChevronDown,
+  ChevronUp,
   MoreVertical,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -129,6 +132,8 @@ export default function EmployeesPage() {
   const [empSearch, setEmpSearch] = useState("");
   const [customerFilterSearch, setCustomerFilterSearch] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [isAllocatedOpen, setIsAllocatedOpen] = useState(false);
+  const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
 
   // Allocation Modal State
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
@@ -229,6 +234,17 @@ export default function EmployeesPage() {
 
   // Handle Order Form Editing permission toggle (Admin Approval)
   const handleToggleOrderEdit = async (id: number, name: string, allowEdit: boolean) => {
+    // Optimistically update perfData so UI reflects immediately
+    setPerfData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        employees: prev.employees.map((e) =>
+          e.id === id ? { ...e, canEditOrders: allowEdit } : e
+        ),
+      };
+    });
+
     try {
       setTogglingId(id);
       const res = await fetch(`/api/employees/${id}`, {
@@ -251,9 +267,11 @@ export default function EmployeesPage() {
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update order editing permissions", "error");
+        fetchPerformanceData();
       }
     } catch (err: any) {
       toast("Error: " + err.message, "error");
+      fetchPerformanceData();
     } finally {
       setTogglingId(null);
     }
@@ -261,6 +279,17 @@ export default function EmployeesPage() {
 
   // Handle Inventory Stock Update permission toggle
   const handleToggleStockUpdate = async (id: number, name: string, allowStock: boolean) => {
+    // Optimistically update perfData so UI reflects immediately
+    setPerfData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        employees: prev.employees.map((e) =>
+          e.id === id ? { ...e, canUpdateStock: allowStock } : e
+        ),
+      };
+    });
+
     try {
       setTogglingId(id);
       const res = await fetch(`/api/employees/${id}`, {
@@ -283,9 +312,11 @@ export default function EmployeesPage() {
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update stock update permissions", "error");
+        fetchPerformanceData();
       }
     } catch (err: any) {
       toast("Error: " + err.message, "error");
+      fetchPerformanceData();
     } finally {
       setTogglingId(null);
     }
@@ -798,132 +829,61 @@ export default function EmployeesPage() {
                         </div>
                       </div>
 
-                      {/* Fast Access Action Controls - Clean, subtle & in dropdown */}
+                      {/* Fast Access Action Controls - Explicit Ticked/Un-Ticked Checkboxes & Edit Button */}
                       <div className="flex flex-wrap items-center gap-2.5">
                         {/* 1. Approve Edit Access Checkbox */}
-                        <label
+                        <button
+                          type="button"
+                          disabled={togglingId === selectedProfile.id}
+                          onClick={() =>
+                            handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, !selectedProfile.canEditOrders)
+                          }
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
                             selectedProfile.canEditOrders
-                              ? "bg-blue-50/80 border-blue-300 text-blue-900 hover:bg-blue-100"
+                              ? "bg-blue-50 border-blue-400 text-blue-900 shadow-xs"
                               : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                           } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
-                          title={selectedProfile.canEditOrders ? "Uncheck to revoke edit order permission" : "Check to approve edit order permission"}
+                          title={selectedProfile.canEditOrders ? "Click to un-tick and revoke edit access" : "Click to tick and approve edit access"}
                         >
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selectedProfile.canEditOrders)}
-                            disabled={togglingId === selectedProfile.id}
-                            onChange={(e) =>
-                              handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, e.target.checked)
-                            }
-                            className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                          />
-                          <Edit3 size={13} className={selectedProfile.canEditOrders ? "text-blue-600" : "text-gray-400"} />
+                          {selectedProfile.canEditOrders ? (
+                            <CheckSquare size={16} className="text-blue-600 fill-blue-100 shrink-0" />
+                          ) : (
+                            <Square size={16} className="text-gray-400 shrink-0" />
+                          )}
                           <span>Approve Edit Access</span>
-                        </label>
+                        </button>
 
                         {/* 2. Stock Update Access Checkbox */}
-                        <label
+                        <button
+                          type="button"
+                          disabled={togglingId === selectedProfile.id}
+                          onClick={() =>
+                            handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, !selectedProfile.canUpdateStock)
+                          }
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
                             selectedProfile.canUpdateStock
-                              ? "bg-emerald-50/80 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                              ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs"
                               : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                           } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
-                          title={selectedProfile.canUpdateStock ? "Uncheck to revoke stock update access right away" : "Check to allow stock update access"}
+                          title={selectedProfile.canUpdateStock ? "Click to un-tick and revoke stock update access" : "Click to tick and grant stock update access"}
                         >
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selectedProfile.canUpdateStock)}
-                            disabled={togglingId === selectedProfile.id}
-                            onChange={(e) =>
-                              handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, e.target.checked)
-                            }
-                            className="w-4 h-4 text-emerald-600 bg-white border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
-                          />
-                          <Boxes size={13} className={selectedProfile.canUpdateStock ? "text-emerald-600" : "text-gray-400"} />
+                          {selectedProfile.canUpdateStock ? (
+                            <CheckSquare size={16} className="text-emerald-600 fill-emerald-100 shrink-0" />
+                          ) : (
+                            <Square size={16} className="text-gray-400 shrink-0" />
+                          )}
                           <span>Stock Update Access</span>
-                        </label>
+                        </button>
 
                         {/* 3. Edit Employee Button */}
                         <Link
                           href={`/admin/employees/${selectedProfile.id}/edit`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
                           title="Edit employee details and permissions"
                         >
                           <Pencil size={12} />
                           <span>Edit</span>
                         </Link>
-
-                        {/* 4. Clean Actions Dropdown (Reset PIN, Toggle T.L., Toggle Active) */}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
-                          >
-                            <MoreVertical size={13} className="text-gray-500" />
-                            <span>Actions</span>
-                            <ChevronDown size={12} className={`text-gray-400 transition-transform ${profileMenuOpen ? "rotate-180" : ""}`} />
-                          </button>
-
-                          {profileMenuOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setProfileMenuOpen(false)}
-                              />
-                              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setProfileMenuOpen(false);
-                                    setPinModalEmp({ id: selectedProfile.id, name: selectedProfile.name });
-                                    setNewPin("1234");
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                                >
-                                  <KeyRound size={13} className="text-gray-500 shrink-0" />
-                                  <span>Reset Login PIN</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setProfileMenuOpen(false);
-                                    handleToggleTL(selectedProfile.id, selectedProfile.name, !selectedProfile.isTeamLeader);
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                                >
-                                  <Crown size={13} className={selectedProfile.isTeamLeader ? "text-amber-600 shrink-0" : "text-gray-400 shrink-0"} />
-                                  <span>{selectedProfile.isTeamLeader ? "Remove Team Leader (T.L.)" : "Make Team Leader (24*7)"}</span>
-                                </button>
-
-                                <div className="border-t border-gray-100 my-1" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setProfileMenuOpen(false);
-                                    handleToggleActive(selectedProfile.id, selectedProfile.name, selectedProfile.isActive);
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                                >
-                                  {selectedProfile.isActive ? (
-                                    <>
-                                      <XCircle size={13} className="text-red-500 shrink-0" />
-                                      <span className="text-red-600">Deactivate Account</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle size={13} className="text-emerald-500 shrink-0" />
-                                      <span className="text-emerald-600">Activate Account</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
                       </div>
                     </div>
 
@@ -987,136 +947,183 @@ export default function EmployeesPage() {
                     </div>
                   </div>
 
-                  {/* Customer Allocation Manager */}
+                  {/* Customer Allocation Manager - Dropdown / Collapsible Form */}
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
-                    <div className="p-4 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Briefcase size={16} className="text-orange-600" />
-                          <h3 className="font-bold text-sm text-gray-900">
-                            Allocated Customers ({selectedProfile.allocatedCustomers.length})
-                          </h3>
+                    <div
+                      className="p-4 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50 cursor-pointer select-none hover:bg-gray-100/60 transition"
+                      onClick={() => setIsAllocatedOpen(!isAllocatedOpen)}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
+                          <Briefcase size={16} />
                         </div>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          These customers will appear prominently on <strong>{selectedProfile.name}</strong>'s wholesale dashboard and order form.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomerIdsToAllocate([]);
-                          setModalCustomerFilter("");
-                          setModalFilterType("unallocated");
-                          setIsAllocateModalOpen(true);
-                        }}
-                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer self-start sm:self-auto"
-                      >
-                        <Plus size={14} />
-                        <span>+ Allocate Customers</span>
-                      </button>
-                    </div>
-
-                    {/* Allocated Customers Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                            <th className="py-3 px-4">Firm / Shop Name</th>
-                            <th className="py-3 px-4">Phone Number</th>
-                            <th className="py-3 px-4">City</th>
-                            <th className="py-3 px-4">Business Type</th>
-                            <th className="py-3 px-4 text-right">Outstanding (Due)</th>
-                            <th className="py-3 px-4 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {selectedProfile.allocatedCustomers.length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="py-10 text-center text-gray-400">
-                                <div className="space-y-1">
-                                  <Briefcase size={24} className="mx-auto text-gray-300 mb-1" />
-                                  <p className="font-medium text-xs text-gray-500">
-                                    No customers allocated to {selectedProfile.name} yet.
-                                  </p>
-                                  <p className="text-[11px] text-gray-400">
-                                    Click <strong>"+ Allocate Customers"</strong> to assign customer accounts.
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            selectedProfile.allocatedCustomers.map((cust) => (
-                              <tr key={cust.id} className="hover:bg-gray-50/60 transition">
-                                <td className="py-3 px-4 font-bold text-gray-900 uppercase">
-                                  {cust.shopName}
-                                </td>
-                                <td className="py-3 px-4 font-mono text-gray-700">
-                                  {cust.phoneNumber}
-                                </td>
-                                <td className="py-3 px-4 text-gray-600">{cust.city}</td>
-                                <td className="py-3 px-4">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
-                                    {cust.businessType}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-right font-mono font-bold">
-                                  {cust.outstanding > 0 ? (
-                                    <span className="text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-xs">
-                                      {formatCurrency(cust.outstanding)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
-                                      ✓ Cleared
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleUnallocateCustomer(cust.id, cust.shopName, selectedProfile.name)
-                                    }
-                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-800 hover:underline cursor-pointer"
-                                    title="Unallocate customer from this employee"
-                                  >
-                                    <UserMinus size={12} />
-                                    <span>Unallocate</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Recent Orders Placed by Employee */}
-                  {selectedProfile.recentOrders && selectedProfile.recentOrders.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
-                      <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Layers size={16} className="text-orange-600" />
-                          <h3 className="font-bold text-sm text-gray-900">
-                            Recent Orders Booked by {selectedProfile.name}
-                          </h3>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-sm text-gray-900">
+                              Allocated Customers ({selectedProfile.allocatedCustomers.length})
+                            </h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 uppercase">
+                              Dropdown Form
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            Click to {isAllocatedOpen ? "collapse" : "expand"} allocated retail/wholesale accounts ({selectedProfile.allocatedCustomers.length} assigned).
+                          </p>
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto">
+                      <div className="flex items-center gap-2 self-start sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomerIdsToAllocate([]);
+                            setModalCustomerFilter("");
+                            setModalFilterType("unallocated");
+                            setIsAllocateModalOpen(true);
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                        >
+                          <Plus size={14} />
+                          <span>+ Allocate</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsAllocatedOpen(!isAllocatedOpen)}
+                          className="p-1.5 rounded-xl border border-gray-200 hover:bg-white text-gray-600 transition"
+                          title={isAllocatedOpen ? "Collapse section" : "Expand section"}
+                        >
+                          {isAllocatedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Allocated Customers Table (Collapsible) */}
+                    {isAllocatedOpen && (
+                      <div className="overflow-x-auto animate-in fade-in duration-200">
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                              <th className="py-3 px-4">Order #</th>
-                              <th className="py-3 px-4">Customer</th>
-                              <th className="py-3 px-4">Volume</th>
-                              <th className="py-3 px-4 text-right">Grand Total</th>
-                              <th className="py-3 px-4">Status</th>
-                              <th className="py-3 px-4 text-right">Date</th>
+                              <th className="py-3 px-4">Firm / Shop Name</th>
+                              <th className="py-3 px-4">Phone Number</th>
+                              <th className="py-3 px-4">City</th>
+                              <th className="py-3 px-4">Business Type</th>
+                              <th className="py-3 px-4 text-right">Outstanding (Due)</th>
+                              <th className="py-3 px-4 text-right">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
+                            {selectedProfile.allocatedCustomers.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="py-10 text-center text-gray-400">
+                                  <div className="space-y-1">
+                                    <Briefcase size={24} className="mx-auto text-gray-300 mb-1" />
+                                    <p className="font-medium text-xs text-gray-500">
+                                      No customers allocated to {selectedProfile.name} yet.
+                                    </p>
+                                    <p className="text-[11px] text-gray-400">
+                                      Click <strong>"+ Allocate"</strong> to assign customer accounts.
+                                    </p>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              selectedProfile.allocatedCustomers.map((cust) => (
+                                <tr key={cust.id} className="hover:bg-gray-50/60 transition">
+                                  <td className="py-3 px-4 font-bold text-gray-900 uppercase">
+                                    {cust.shopName}
+                                  </td>
+                                  <td className="py-3 px-4 font-mono text-gray-700">
+                                    {cust.phoneNumber}
+                                  </td>
+                                  <td className="py-3 px-4 text-gray-600">{cust.city}</td>
+                                  <td className="py-3 px-4">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
+                                      {cust.businessType}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-bold">
+                                    {cust.outstanding > 0 ? (
+                                      <span className="text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-xs">
+                                        {formatCurrency(cust.outstanding)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
+                                        ✓ Cleared
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleUnallocateCustomer(cust.id, cust.shopName, selectedProfile.name)
+                                      }
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-800 hover:underline cursor-pointer"
+                                      title="Unallocate customer from this employee"
+                                    >
+                                      <UserMinus size={12} />
+                                      <span>Unallocate</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recent Orders Placed by Employee - Dropdown / Collapsible Form */}
+                  {selectedProfile.recentOrders && selectedProfile.recentOrders.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+                      <div
+                        className="p-4 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between cursor-pointer select-none hover:bg-gray-100/60 transition"
+                        onClick={() => setIsRecentOrdersOpen(!isRecentOrdersOpen)}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                            <Layers size={16} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-sm text-gray-900">
+                                Recent Orders Booked ({selectedProfile.recentOrders.length})
+                              </h3>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
+                                Dropdown Form
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              Click to {isRecentOrdersOpen ? "collapse" : "view"} recent wholesale bookings.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsRecentOrdersOpen(!isRecentOrdersOpen)}
+                          className="p-1.5 rounded-xl border border-gray-200 hover:bg-white text-gray-600 transition"
+                          title={isRecentOrdersOpen ? "Collapse section" : "Expand section"}
+                        >
+                          {isRecentOrdersOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+
+                      {isRecentOrdersOpen && (
+                        <div className="overflow-x-auto animate-in fade-in duration-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                                <th className="py-3 px-4">Order #</th>
+                                <th className="py-3 px-4">Customer</th>
+                                <th className="py-3 px-4">Volume</th>
+                                <th className="py-3 px-4 text-right">Grand Total</th>
+                                <th className="py-3 px-4">Status</th>
+                                <th className="py-3 px-4 text-right">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
                             {selectedProfile.recentOrders.map((ord: any) => (
                               <tr key={ord.id} className="hover:bg-gray-50/60 transition">
                                 <td className="py-3 px-4 font-mono font-bold text-gray-900">
@@ -1149,6 +1156,7 @@ export default function EmployeesPage() {
                           </tbody>
                         </table>
                       </div>
+                      )}
                     </div>
                   )}
                 </>

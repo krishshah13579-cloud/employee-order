@@ -220,18 +220,29 @@ export default function AdminSalesPage() {
     loadAuxData();
   }, []);
 
-  // Filtered invoices client-side if searching rapidly
+  // Filtered invoices client-side if searching rapidly (Strict Numeric Sequence)
   const filteredInvoices = useMemo(() => {
-    if (!search.trim()) return invoices;
-    const s = search.toLowerCase();
-    return invoices.filter(
-      (inv) =>
-        inv.invoiceNumber.toLowerCase().includes(s) ||
-        (inv.orderNumber && inv.orderNumber.toLowerCase().includes(s)) ||
-        inv.customerName.toLowerCase().includes(s) ||
-        (inv.customerPhone && inv.customerPhone.includes(s)) ||
-        (inv.customerGstPan && inv.customerGstPan.toLowerCase().includes(s))
-    );
+    let list = invoices;
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      list = invoices.filter(
+        (inv) =>
+          inv.invoiceNumber.toLowerCase().includes(s) ||
+          (inv.orderNumber && inv.orderNumber.toLowerCase().includes(s)) ||
+          inv.customerName.toLowerCase().includes(s) ||
+          (inv.customerPhone && inv.customerPhone.includes(s)) ||
+          (inv.customerGstPan && inv.customerGstPan.toLowerCase().includes(s))
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      const numA = parseInt(a.invoiceNumber, 10);
+      const numB = parseInt(b.invoiceNumber, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numB - numA;
+      }
+      return b.id - a.id;
+    });
   }, [invoices, search]);
 
   // Add Item to Form
