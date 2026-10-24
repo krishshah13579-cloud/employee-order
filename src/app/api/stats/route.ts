@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // For non-admin, non-KrishShah employees, scope all summary stats to their own data
-    const isRestrictedEmployee = Boolean(isEmployee && !isAdmin && !isTLKrishShah);
+    // For all employees on the employee side, strictly scope customer & order summary stats to their own allocated portfolio
+    const isRestrictedEmployee = Boolean(isEmployee && isEmployee.id > 0);
     const empOrderScope: any = isRestrictedEmployee
       ? { placedBy: { equals: isEmployee!.name, mode: "insensitive" } }
       : {};

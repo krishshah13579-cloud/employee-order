@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
     const where: any = {};
 
     // 1. Portfolio / IDOR Isolation
-    // If not Admin and not Team Leader Krish Shah, regular employee can only see their own visited customers
-    if (!admin && !isTLKrishShah && employee) {
+    // On employee side, all employees strictly see only their own visited customer records
+    if (!admin && employee && employee.id > 0) {
       where.OR = [
         { employeeId: employee.id },
         { employeeName: { equals: employee.name, mode: "insensitive" } },

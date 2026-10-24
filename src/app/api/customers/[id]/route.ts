@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, requireAdmin, verifyToken } from "@/lib/auth-security";
+import { getAdminSession, getEmployeeSession, requireAdmin, verifyToken } from "@/lib/auth-security";
 import { cookies } from "next/headers";
 import { isEmployeeTeamLeader } from "@/lib/time";
 
@@ -50,6 +50,26 @@ export async function GET(
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    const referer = request.headers.get("referer") || "";
+    const isAdminRoute = referer.includes("/admin");
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+
+    // Strict customer isolation on employee side:
+    // If accessing as an employee, verify this customer is strictly allocated to this employee!
+    if ((!isAdminRoute || (employee && employee.id > 0)) && employee && employee.id > 0) {
+      const isAllocated =
+        (customer.allocatedEmployeeId && customer.allocatedEmployeeId === employee.id) ||
+        (customer.allocatedEmployeeName && customer.allocatedEmployeeName.trim().toLowerCase() === employee.name.trim().toLowerCase());
+
+      if (!isAllocated) {
+        return NextResponse.json(
+          { error: "Forbidden: Customer is not allocated to your portfolio." },
+          { status: 403 }
+        );
+      }
     }
 
     return NextResponse.json(customer);

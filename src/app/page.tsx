@@ -293,23 +293,23 @@ export default function HomePage() {
                   <Users size={22} />
                 </div>
                 <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase tracking-wider">
-                  Network
+                  Portfolio
                 </span>
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Total Customers
+                Allocated Customers
               </h3>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
-                  {loading ? "..." : stats?.totalCustomers ?? 0}
+                  {myAllocatedCustomers.length}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
-                  registered shops
+                  assigned shops
                 </span>
               </div>
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                <span>Mandatory for Orders:</span>
-                <span className="font-bold text-blue-600">Shop + GST/PAN</span>
+                <span>Direct Booking:</span>
+                <span className="font-bold text-blue-600">Allocated Only</span>
               </div>
             </div>
 

@@ -495,13 +495,14 @@ function OrderFormContent() {
     if (!selectedCustomerId || customers.length === 0) return null;
     const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
     const activeEmpId = employee?.id;
-    const isKrishShah = isTL && activeEmpName.includes("krish");
+    const isSuperAdminStore = employee?.id === 0;
 
     const found = customers.find((c) => c.id === selectedCustomerId) || null;
     if (!found) return null;
 
-    // Security check: non-admin, non-KrishShah employees are isolated strictly to their allocated customers
-    if (!isAdmin && !isKrishShah) {
+    // Strict customer isolation on employee side:
+    // Every employee is strictly locked to only their allocated customers!
+    if (!isSuperAdminStore) {
       const matchesId = activeEmpId && found.allocatedEmployeeId === activeEmpId;
       const matchesName =
         activeEmpName &&
@@ -513,7 +514,28 @@ function OrderFormContent() {
     }
 
     return found;
-  }, [customers, selectedCustomerId, employee, placedBy, isAdmin, isTL]);
+  }, [customers, selectedCustomerId, employee, placedBy]);
+
+  // If a previously selected customer is not allocated to the current employee, automatically reset it
+  useEffect(() => {
+    if (selectedCustomerId && customers.length > 0 && employee && employee.id > 0) {
+      const activeEmpName = (employee.name || placedBy || "").trim().toLowerCase();
+      const activeEmpId = employee.id;
+      const found = customers.find((c) => c.id === selectedCustomerId);
+      if (found) {
+        const matchesId = activeEmpId && found.allocatedEmployeeId === activeEmpId;
+        const matchesName =
+          activeEmpName &&
+          found.allocatedEmployeeName &&
+          found.allocatedEmployeeName.trim().toLowerCase() === activeEmpName;
+        if (!matchesId && !matchesName) {
+          setSelectedCustomerId(null);
+        }
+      } else {
+        setSelectedCustomerId(null);
+      }
+    }
+  }, [selectedCustomerId, customers, employee, placedBy]);
 
   // Effective Business Type across Order Form & Dynamic Pricing
   const effectiveBusinessType = orderBusinessType || selectedCustomer?.businessType || "RETAILER";
@@ -587,25 +609,24 @@ function OrderFormContent() {
     saveDraft(items, selectedCustomerId, orderNotes, placedBy, days);
   };
 
-  // Filtered customer list for searchable dropdown (Allocated customers prioritized)
+  // Filtered customer list for searchable dropdown (Only allocated customers shown on employee side)
   const filteredCustomers = useMemo(() => {
     const activeEmpName = (employee?.name || placedBy || "").trim().toLowerCase();
     const activeEmpId = employee?.id;
-    const isKrishShah = isTL && activeEmpName.includes("krish");
+    const isSuperAdminStore = employee?.id === 0;
 
     let list = customers;
 
-    // Strict customer isolation for non-admin, non-KrishShah employees:
-    // "IF THERE IS ANY NEW EMPLOYEE AND NO CUSTOMERS ARE ALLOCATED DO NOT SHOW ANY CUSTOMERS PRESENT IN THE CUSTOMERS TAB."
-    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
-    if (!isAdmin && !isKrishShah) {
+    // Strict customer isolation on employee side:
+    // "ON EMPLOYEE SIDE: DONT SHOW ANY CUSTOMER THAT ARE NOT ALLOCATED TO EMPLOYEE."
+    if (!isSuperAdminStore) {
       list = list.filter((c) => {
         const matchesId = activeEmpId && c.allocatedEmployeeId === activeEmpId;
         const matchesName =
           activeEmpName &&
           c.allocatedEmployeeName &&
           c.allocatedEmployeeName.trim().toLowerCase() === activeEmpName;
-        return matchesId || matchesName;
+        return Boolean(matchesId || matchesName);
       });
     }
 
@@ -620,19 +641,8 @@ function OrderFormContent() {
       );
     }
 
-    return [...list].sort((a, b) => {
-      const aAllocated =
-        (activeEmpId && a.allocatedEmployeeId === activeEmpId) ||
-        (activeEmpName && a.allocatedEmployeeName && a.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
-      const bAllocated =
-        (activeEmpId && b.allocatedEmployeeId === activeEmpId) ||
-        (activeEmpName && b.allocatedEmployeeName && b.allocatedEmployeeName.trim().toLowerCase() === activeEmpName);
-
-      if (aAllocated && !bAllocated) return -1;
-      if (!aAllocated && bAllocated) return 1;
-      return a.shopName.localeCompare(b.shopName);
-    });
-  }, [customers, customerSearchQuery, employee, placedBy, isAdmin, isTL]);
+    return [...list].sort((a, b) => a.shopName.localeCompare(b.shopName));
+  }, [customers, customerSearchQuery, employee, placedBy]);
 
   // Handle customer unselection / clear
   const handleUnselectCustomer = () => {

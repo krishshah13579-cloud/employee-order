@@ -132,6 +132,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+
+    // Strict allocation verification for employees on employee side
+    if (!admin && employee && employee.id > 0) {
+      const isAllocated =
+        (customer.allocatedEmployeeId && customer.allocatedEmployeeId === employee.id) ||
+        (customer.allocatedEmployeeName && customer.allocatedEmployeeName.trim().toLowerCase() === employee.name.trim().toLowerCase());
+
+      if (!isAllocated) {
+        return NextResponse.json(
+          { error: `Forbidden: Customer "${customer.shopName}" is not allocated to your portfolio.` },
+          { status: 403 }
+        );
+      }
+    }
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "At least one product item is required" }, { status: 400 });
     }

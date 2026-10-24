@@ -51,12 +51,14 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    const referer = request.headers.get("referer") || "";
+    const isAdminRoute = referer.includes("/admin");
+
     // Role-based Customer Isolation:
-    // "IF THERE IS ANY NEW EMPLOYEE AND NO CUSTOMERS ARE ALLOCATED DO NOT SHOW ANY CUSTOMERS PRESENT IN THE CUSTOMERS TAB."
-    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
-    // "JUST TEAM LEADER CAN HAVE A LOOK I.E. KRISH SHAH NO OTHER T.L. CAN CHECK ANY OTHER EMPLOYEES DATA."
-    if (!admin && !isTLKrishShah) {
-      if (employee) {
+    // "ON EMPLOYEE SIDE: DONT SHOW ANY CUSTOMER THAT ARE NOT ALLOCATED TO EMPLOYEE."
+    // Every employee (including Team Leaders) on the employee side can strictly and only view customers allocated to them!
+    if (!isAdminRoute || (employee && employee.id > 0)) {
+      if (employee && employee.id > 0) {
         where.AND = [
           ...(where.AND || []),
           {
@@ -66,8 +68,12 @@ export async function GET(request: NextRequest) {
             ],
           },
         ];
+      } else if (employee && employee.id === 0) {
+        // Super Admin browsing store: allowed to see all
+      } else if (admin && !isAdminRoute) {
+        // Admin previewing store directly
       } else {
-        // Unknown or missing employee session
+        // Unauthenticated visitor on employee side: return zero customers
         return NextResponse.json([]);
       }
     } else if (allocatedToQuery && allocatedToQuery.trim() !== "") {
@@ -211,6 +217,10 @@ export async function POST(request: NextRequest) {
     const creditDays = parseInt(body.creditDays, 10) || 0;
     const specialDiscount = requestedSpecialDiscount;
 
+    const employeeSession = await getEmployeeSession(request);
+    const allocatedEmpId = body.allocatedEmployeeId !== undefined ? body.allocatedEmployeeId : (employeeSession && employeeSession.id > 0 ? employeeSession.id : null);
+    const allocatedEmpName = body.allocatedEmployeeName !== undefined ? body.allocatedEmployeeName : (employeeSession && employeeSession.id > 0 ? employeeSession.name : null);
+
     const customer = await prisma.customer.create({
       data: {
         shopName: finalShopName,
@@ -225,6 +235,8 @@ export async function POST(request: NextRequest) {
         visitingCardUrl: visitingCardUrl,
         contactPerson: finalContact || null,
         contactPersons: contactPersons,
+        allocatedEmployeeId: allocatedEmpId,
+        allocatedEmployeeName: allocatedEmpName,
       },
     });
 
