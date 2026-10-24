@@ -739,9 +739,9 @@ export default function OrderInvoicePage() {
             Garment Items ({activeDisplayItems.length} {activeDisplayItems.length === 1 ? "Product" : "Products"})
           </span>
           <Link
-            href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}`)}`}
+            href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.id}&returnTo=/admin/orders/${order.id}`)}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs cursor-pointer print:hidden"
-            title="Browse catalogue to add another product or mix sizes to this order"
+            title="Browse catalogue to add another product or mix sizes to this order as Super Admin"
           >
             <Plus size={14} />
             <span>+ Add Product / Mix Size</span>

@@ -105,28 +105,9 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Check if user has an active Admin session
-      const adminRes = await fetch("/api/auth/check", { cache: "no-store" });
-      if (adminRes.ok) {
-        const adminData = await adminRes.json();
-        if (adminData.authenticated && adminData.user) {
-          const adminEmployee: EmployeeSession = {
-            id: 0,
-            name: adminData.user.username || "Super Admin",
-            designation: "Administrator",
-            isTeamLeader: true,
-            canEditOrders: true,
-            canUpdateStock: true,
-          };
-          setEmployee(adminEmployee);
-          localStorage.setItem("garmentpro_employee", JSON.stringify(adminEmployee));
-          localStorage.setItem("garmentpro_employee_name", adminEmployee.name);
-          return adminEmployee;
-        }
-      }
-
       setEmployee(null);
       localStorage.removeItem("garmentpro_employee");
+      localStorage.removeItem("garmentpro_employee_name");
       return null;
     } catch {
       return null;
@@ -156,7 +137,9 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
         if (cached && isMounted) {
           try {
             const parsed = JSON.parse(cached);
-            setEmployee(parsed);
+            if (pathname !== "/login" || parsed?.id !== 0) {
+              setEmployee(parsed);
+            }
           } catch {}
         }
 

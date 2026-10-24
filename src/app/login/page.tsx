@@ -36,9 +36,9 @@ export default function EmployeeLoginPage() {
     }
   }, []);
 
-  // If already authenticated as employee, redirect to dashboard
+  // If already authenticated as employee (and not Super Admin), redirect to dashboard
   useEffect(() => {
-    if (!sessionLoading && employee) {
+    if (!sessionLoading && employee && employee.id !== 0) {
       router.replace("/");
     }
   }, [employee, sessionLoading, router]);
@@ -126,6 +126,14 @@ export default function EmployeeLoginPage() {
             <p className="text-xs text-slate-400 mt-1">
               Enter your registered employee name and PIN to access the wholesale order dashboard.
             </p>
+            {employee?.id === 0 && (
+              <div className="mt-3 p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between text-xs text-blue-300">
+                <span>Logged in as Super Admin in Admin Panel.</span>
+                <Link href="/" className="font-bold underline text-blue-400 hover:text-white">
+                  Continue as Admin →
+                </Link>
+              </div>
+            )}
           </div>
 
           {isNightLogoutNotice && (

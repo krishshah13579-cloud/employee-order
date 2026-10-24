@@ -290,12 +290,12 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
           </div>
         </div>
 
-        {/* View Storefront Link */}
+        {/* View Storefront Link (Delegates Super Admin Access through Admin Panel) */}
         <Link
-          href="/"
+          href="/api/admin/open-store?target=/"
           target="_blank"
           className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-700 hover:text-black hover:bg-zinc-100 transition-colors border border-gray-200 cursor-pointer shadow-2xs"
-          title="Open Employee Order Collection in new tab"
+          title="Open Employee Order Collection in new tab as Super Admin"
         >
           <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
           <span>Employee Order Page</span>

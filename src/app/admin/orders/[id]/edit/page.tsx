@@ -662,9 +662,9 @@ export default function EditOrderPage() {
             )}
 
             <Link
-              href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
+              href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.id}&returnTo=/admin/orders/${order.id}/edit`)}`}
               className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition shadow-xs"
-              title="Browse store to select products, colors, and mix sizes"
+              title="Browse store to select products, colors, and mix sizes as Super Admin"
             >
               <Sparkles size={14} className="text-orange-200" />
               <span>Browse Store &amp; Mix</span>

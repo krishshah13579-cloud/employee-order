@@ -9,43 +9,49 @@ export async function GET(_req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("garmentpro_emp_session");
 
+    // Do NOT automatically log in as Super Admin without a valid session!
+    // Super Admin login is only granted when access was explicitly initiated through Admin Panel (/api/admin/open-store)
     if (!sessionCookie?.value) {
-      // Check if user is logged in via Admin Panel (iq_admin_session)
-      const adminCookie = cookieStore.get("iq_admin_session");
-      if (adminCookie?.value) {
-        const decodedAdmin = verifyToken<{ username: string; id?: number }>(adminCookie.value);
-        if (decodedAdmin?.username) {
-          const adminAccount = await prisma.adminAccount.findUnique({
-            where: { username: decodedAdmin.username },
-            select: { id: true, username: true },
-          });
-          if (adminAccount) {
-            return NextResponse.json({
-              authenticated: true,
-              isAdmin: true,
-              employee: {
-                id: 0,
-                name: adminAccount.username || "Super Admin",
-                email: "admin@iqtrousers.com",
-                designation: "Super Administrator",
-                isTeamLeader: true,
-                canEditOrders: true,
-                canUpdateStock: true,
-                mobileNumber: "",
-                isActive: true,
-              },
-            });
-          }
-        }
-      }
       return NextResponse.json({ authenticated: false });
     }
 
-    const session = verifyToken<{ id: number; name: string }>(sessionCookie.value);
+    const session = verifyToken<{ id: number; name: string; isAdmin?: boolean }>(sessionCookie.value);
 
-    if (!session?.id) {
+    if (session?.id === undefined || session === null) {
       cookieStore.delete("garmentpro_emp_session");
       return NextResponse.json({ authenticated: false });
+    }
+
+    // If session is for Super Admin (delegated access from Admin Panel)
+    if (session.id === 0 || session.isAdmin) {
+      // Confirm that the underlying Admin session is still valid
+      const adminCookie = cookieStore.get("iq_admin_session");
+      if (!adminCookie?.value) {
+        cookieStore.delete("garmentpro_emp_session");
+        return NextResponse.json({ authenticated: false });
+      }
+
+      const decodedAdmin = verifyToken<{ username: string; id?: number }>(adminCookie.value);
+      if (!decodedAdmin?.username) {
+        cookieStore.delete("garmentpro_emp_session");
+        return NextResponse.json({ authenticated: false });
+      }
+
+      return NextResponse.json({
+        authenticated: true,
+        isAdmin: true,
+        employee: {
+          id: 0,
+          name: session.name || decodedAdmin.username || "Super Admin",
+          email: "admin@iqtrousers.com",
+          designation: "Super Administrator",
+          isTeamLeader: true,
+          canEditOrders: true,
+          canUpdateStock: true,
+          mobileNumber: "",
+          isActive: true,
+        },
+      });
     }
 
     // Verify against DB
