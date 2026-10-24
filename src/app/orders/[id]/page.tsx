@@ -30,7 +30,7 @@ import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp
 import { getColorHex } from "@/lib/colors";
 import { STATUS_COLORS, type OrderStatus, type ColorSetEntry } from "@/lib/types";
 import TaxInvoiceA4 from "@/components/orders/TaxInvoiceA4";
-import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
+import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay, sanitizeMixSize } from "@/lib/stock";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { sanitizePositiveInt } from "@/lib/navigation";
 
@@ -769,13 +769,14 @@ export default function OrderEditPage() {
                                       </span>
                                     )}
                                     {entry.sizes.map((sz, sIdx) => {
-                                      const isMixLabel = sz.size === "Mix";
+                                      const cleanSz = sanitizeMixSize(sz.size, entry.colorName, item.product);
+                                      const isMixLabel = !cleanSz || cleanSz === "Mix";
                                       return (
                                         <span
                                           key={sIdx}
                                           className="inline-flex items-center gap-1 bg-amber-100/90 border border-amber-400/80 px-2 py-0.5 rounded text-[11px] text-amber-900 font-bold"
                                         >
-                                          <span>{isMixLabel ? "Mix" : `Size ${sz.size}`}</span>
+                                          <span>{isMixLabel ? "Mix" : `Size ${cleanSz}`}</span>
                                           <span className="text-orange-700 font-black">
                                             ({sz.count} {sz.count === 1 ? "pc" : "pcs"})
                                           </span>

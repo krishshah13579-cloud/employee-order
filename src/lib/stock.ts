@@ -1123,6 +1123,71 @@ export interface FormattedMixEntry {
 }
 
 /**
+ * Checks if a string token is a genuine garment size (e.g. 26 to 54, S to 5XL),
+ * and NOT a color name or arbitrary text.
+ */
+export function isValidGarmentSize(token?: string | null, colorName?: string | null): boolean {
+  if (!token) return false;
+  const clean = String(token).trim();
+  if (!clean) return false;
+  if (clean.toLowerCase() === "mix") return false;
+  if (colorName && clean.toLowerCase() === String(colorName).trim().toLowerCase()) return false;
+  if (clean.includes(":")) return false;
+
+  const num = parseInt(clean, 10);
+  if (!isNaN(num) && num >= 24 && num <= 54) return true;
+  if (/^(S|M|L|XL|XXL|2XL|3XL|4XL|5XL)$/i.test(clean)) return true;
+  return false;
+}
+
+/**
+ * Sanitizes a mix size candidate. If the candidate is invalid (e.g. "White:1", "White:", or a color name),
+ * it extracts the genuine garment size or resolves it from the product's configured stock/ratio.
+ */
+export function sanitizeMixSize(rawSize?: string | null, colorName?: string | null, product?: any): string {
+  let s = String(rawSize || "").trim();
+
+  // If size string contains a colon (e.g. "White:34", "White:1", "White:")
+  if (s.includes(":")) {
+    const parts = s.split(":").map((p) => p.trim()).filter(Boolean);
+    const validPart = parts.find((p) => isValidGarmentSize(p, colorName));
+    if (validPart) return validPart;
+    s = parts[parts.length - 1] || "";
+  }
+
+  if (isValidGarmentSize(s, colorName)) {
+    return s.toUpperCase();
+  }
+
+  // If s is invalid (e.g. it is "White", "1", "Mix", or contains colons),
+  // attempt resolution from product setsColorwise loosePcs or sizesList
+  if (product) {
+    if (product.setsColorwise) {
+      try {
+        const sc = typeof product.setsColorwise === "string" ? JSON.parse(product.setsColorwise) : product.setsColorwise;
+        const colorData = (colorName && sc[colorName]) || Object.values(sc).find((c: any) => c && c.loosePcs);
+        if (colorData && colorData.loosePcs) {
+          const validLoose = Object.keys(colorData.loosePcs).filter((k) => isValidGarmentSize(k, colorName));
+          if (validLoose.length > 0) {
+            return validLoose[0];
+          }
+        }
+      } catch {}
+    }
+
+    if (product.sizesList) {
+      const list = String(product.sizesList).split(",").map((p) => p.trim()).filter(Boolean);
+      const validInList = list.filter((p) => isValidGarmentSize(p, colorName));
+      if (validInList.length > 0) {
+        return validInList[0];
+      }
+    }
+  }
+
+  return "Mix";
+}
+
+/**
  * Parses mix single sizes from an order item or product into structured format:
  * [ { letter: "A", colorName: "Dark Blue", sizes: [ { size: "34", count: 2 }, { size: "36", count: 1 } ] } ]
  */
@@ -1179,7 +1244,10 @@ export function parseMixSizesForDisplay(
     for (const [colName, sizeMap] of Object.entries(cmp)) {
       if (typeof sizeMap !== "object" || !sizeMap) continue;
       const validSizes = Object.entries(sizeMap)
-        .map(([sz, cnt]) => ({ size: String(sz).trim(), count: parseInt(String(cnt), 10) || 0 }))
+        .map(([sz, cnt]) => {
+          const cleanSize = sanitizeMixSize(sz, colName, prodData);
+          return { size: cleanSize, count: parseInt(String(cnt), 10) || 0 };
+        })
         .filter((s) => s.count > 0)
         .sort((a, b) => {
           const nA = parseInt(a.size, 10);
@@ -1219,8 +1287,9 @@ export function parseMixSizesForDisplay(
         const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-|\:)\s*(\d+)/g;
         let match;
         while ((match = sizeRegex.exec(sizesPart)) !== null) {
+          const cleanSize = sanitizeMixSize(match[1], colName, prodData);
           validSizes.push({
-            size: match[1],
+            size: cleanSize,
             count: parseInt(match[2], 10) || 1,
           });
         }
@@ -1231,13 +1300,12 @@ export function parseMixSizesForDisplay(
             const clean = sp.trim().replace(/\s*pcs?$/i, "").replace(/[()]/g, "");
             if (!clean) return;
             const num = parseInt(clean, 10);
-            if (!isNaN(num) && num >= 24 && num <= 54) {
-              validSizes.push({ size: clean, count: 1 });
-            } else if (!isNaN(num)) {
-              validSizes.push({ size: "Mix", count: num });
-            } else {
-              validSizes.push({ size: clean, count: 1 });
-            }
+            const isPureCount = !isNaN(num) && num > 0 && num < 20;
+            const cleanSize = sanitizeMixSize(clean, colName, prodData);
+            validSizes.push({
+              size: cleanSize,
+              count: isPureCount ? num : 1,
+            });
           });
         }
 
@@ -1256,25 +1324,26 @@ export function parseMixSizesForDisplay(
         if (dm) {
           const namePart = dm[1].trim();
           const countPart = parseInt(dm[2], 10) || 1;
-          const isSize = /^(S|M|L|XL|XXL|2XL|3XL|\d+)$/i.test(namePart);
-          const num = parseInt(namePart, 10);
-          if (isSize && (!isNaN(num) ? num >= 24 : true)) {
-            validSizes.push({ size: namePart, count: countPart });
+          const isSize = isValidGarmentSize(namePart);
+          if (isSize) {
+            validSizes.push({ size: namePart.toUpperCase(), count: countPart });
             result.push({ letter: "Mix", colorName: "", sizes: validSizes });
           } else {
             // It is a color shade with count e.g. "White - 1"
+            const resolvedSize = sanitizeMixSize(null, namePart, prodData);
             result.push({
               letter: getColorShadeLetter(prodData, namePart, colIdx),
               colorName: namePart,
-              sizes: [{ size: "Mix", count: countPart }],
+              sizes: [{ size: resolvedSize, count: countPart }],
             });
           }
         } else {
           const sizeRegex = /(\d+|[a-zA-Z]+)\s*(?:\(|\-)\s*(\d+)/g;
           let match;
           while ((match = sizeRegex.exec(chunk)) !== null) {
+            const cleanSize = sanitizeMixSize(match[1], null, prodData);
             validSizes.push({
-              size: match[1],
+              size: cleanSize,
               count: parseInt(match[2], 10) || 1,
             });
           }
@@ -1295,10 +1364,11 @@ export function parseMixSizesForDisplay(
   // 3. Fallback: If result is still empty but item has loose pieces
   if (result.length === 0 && (hasMixPcsCount || looseDiff > 0)) {
     const diff = looseDiff > 0 ? looseDiff : (Number(item.mixPcs) || 1);
+    const resolvedSize = sanitizeMixSize(null, null, prodData);
     result.push({
       letter: "Mix",
       colorName: "",
-      sizes: [{ size: "Mix", count: diff }],
+      sizes: [{ size: resolvedSize, count: diff }],
     });
   }
 

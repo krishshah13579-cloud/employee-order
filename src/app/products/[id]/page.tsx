@@ -1427,9 +1427,16 @@ function ProductDetailContent() {
                       ? availableRatios
                       : [product.sizesRatio || "28 to 36"];
 
-                    // ONLY sizes that have available mix single pieces in stock for this color (or already selected)
+                    // ONLY valid garment sizes that have available mix single pieces in stock for this color (or already selected)
                     const colorAvailableMixSizes = Object.keys(colorStockDetail.loosePcs)
-                      .filter((sz) => (colorStockDetail.loosePcs[sz] || 0) > 0 || (colorMixMap[sz] || 0) > 0)
+                      .filter((sz) => {
+                        const cleanSz = String(sz || "").trim();
+                        if (!cleanSz || cleanSz.includes(":") || cleanSz.toLowerCase() === color.toLowerCase()) return false;
+                        const n = parseInt(cleanSz, 10);
+                        const isValid = (!isNaN(n) && n >= 24 && n <= 54) || /^(S|M|L|XL|XXL|2XL|3XL|4XL|5XL)$/i.test(cleanSz);
+                        if (!isValid) return false;
+                        return (colorStockDetail.loosePcs[sz] || 0) > 0 || (colorMixMap[sz] || 0) > 0;
+                      })
                       .sort((a, b) => {
                         const nA = parseInt(a, 10);
                         const nB = parseInt(b, 10);

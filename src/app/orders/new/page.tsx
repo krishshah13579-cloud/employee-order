@@ -43,7 +43,7 @@ import { getColorHex } from "@/lib/colors";
 import type { CustomerData, ColorSetEntry } from "@/lib/types";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
-import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay } from "@/lib/stock";
+import { getProductMixSizesInfo, getColorShadeLetter, parseMixSizesForDisplay, sanitizeMixSize } from "@/lib/stock";
 import { getClientSessionId } from "@/lib/session";
 import {
   PARAM_CUSTOMER_ID,
@@ -1844,13 +1844,14 @@ function OrderFormContent() {
                                         </span>
                                       )}
                                       {entry.sizes.map((sz, sIdx) => {
-                                        const isMixLabel = sz.size === "Mix";
+                                        const cleanSz = sanitizeMixSize(sz.size, entry.colorName, prodData);
+                                        const isMixLabel = !cleanSz || cleanSz === "Mix";
                                         return (
                                           <span
                                             key={sIdx}
                                             className="inline-flex items-center gap-1 bg-amber-100/90 border border-amber-400/80 px-2 py-0.5 rounded text-[11px] text-amber-900 font-bold"
                                           >
-                                            <span>{isMixLabel ? "Mix" : `Size ${sz.size}`}</span>
+                                            <span>{isMixLabel ? "Mix" : `Size ${cleanSz}`}</span>
                                             <span className="text-orange-700 font-black">
                                               ({sz.count} {sz.count === 1 ? "pc" : "pcs"})
                                             </span>
