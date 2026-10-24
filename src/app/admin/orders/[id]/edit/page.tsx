@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Scissors,
   Lock,
+  Edit,
 } from "lucide-react";
 import { formatCurrency, formatProductNameWithMrp } from "@/lib/utils";
 import {
@@ -655,6 +656,15 @@ export default function EditOrderPage() {
                 <Plus size={14} />
                 <span>Add Product</span>
               </button>
+
+              <Link
+                href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
+                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 transition"
+                title="Browse store to select products, colors, and mix sizes"
+              >
+                <Plus size={14} />
+                <span>Browse Store &amp; Mix</span>
+              </Link>
             </div>
           )}
         </div>
@@ -696,6 +706,15 @@ export default function EditOrderPage() {
                       {formatCurrency(item.itemSubtotal)}
                     </span>
                   </div>
+
+                  <Link
+                    href={`/products/${item.productId}?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
+                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer flex items-center gap-1 font-bold text-xs"
+                    title="Edit sets and mix sizes on product page"
+                  >
+                    <Edit size={14} />
+                    <span className="hidden sm:inline">Product Page</span>
+                  </Link>
 
                   {orderItems.length > 1 && (
                     <button

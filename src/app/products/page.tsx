@@ -44,6 +44,15 @@ function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
+  const orderId = searchParams.get("orderId");
+
+  const getProductDetailUrl = (pId: number) => {
+    const q = new URLSearchParams();
+    if (orderId) q.set("orderId", orderId);
+    if (returnTo) q.set("returnTo", returnTo);
+    const qStr = q.toString();
+    return `/products/${pId}${qStr ? `?${qStr}` : ""}`;
+  };
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_STORE_CATEGORIES);
@@ -210,6 +219,25 @@ function ProductsContent() {
           </div>
         </div>
       </div>
+
+      {/* Adding to Order Notification Banner */}
+      {orderId && (
+        <div className="bg-amber-600 text-white px-4 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-sm sticky top-0 z-40">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-amber-200" />
+            <span>
+              Adding Product / Mix Size to Order #{orderId}. Select any garment product below to configure sets &amp; mix pieces.
+            </span>
+          </div>
+          <Link
+            href={returnTo || `/admin/orders/${orderId}`}
+            className="px-3 py-1 bg-black/25 hover:bg-black/40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+          >
+            <ArrowLeft size={13} />
+            <span>Return to Order #{orderId}</span>
+          </Link>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* Unregistered Customer GST/PAN warning (skipped for Without GST customers) */}
@@ -382,7 +410,7 @@ function ProductsContent() {
                 >
                   {/* Product Image Box */}
                   <Link
-                    href={`/products/${product.id}?returnTo=${encodeURIComponent(returnTo)}`}
+                    href={getProductDetailUrl(product.id)}
                     className="relative w-full h-64 bg-slate-100 overflow-hidden block"
                   >
                     <img
@@ -408,7 +436,7 @@ function ProductsContent() {
                     <div>
                       {/* Product Name */}
                       <Link
-                        href={`/products/${product.id}?returnTo=${encodeURIComponent(returnTo)}`}
+                        href={getProductDetailUrl(product.id)}
                         className="font-black text-slate-900 text-base hover:text-orange-600 transition-colors line-clamp-1"
                       >
                         {product.name}
@@ -510,7 +538,7 @@ function ProductsContent() {
                       </div>
 
                       <Link
-                        href={`/products/${product.id}?returnTo=${encodeURIComponent(returnTo)}`}
+                        href={getProductDetailUrl(product.id)}
                         className="px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5"
                       >
                         <span>Select Colors</span>

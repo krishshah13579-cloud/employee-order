@@ -105,16 +105,36 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
             setEmployee(data.employee);
             localStorage.setItem("garmentpro_employee", JSON.stringify(data.employee));
             localStorage.setItem("garmentpro_employee_name", data.employee.name);
+            return;
           } else if (data.nightLogout && isMounted) {
             setEmployee(null);
             localStorage.removeItem("garmentpro_employee");
             localStorage.removeItem("garmentpro_employee_name");
             logout("night_logout");
-          } else if (isMounted) {
-            setEmployee(null);
-            localStorage.removeItem("garmentpro_employee");
+            return;
           }
-        } else if (isMounted) {
+        }
+
+        // Check if user has an active Admin session to allow seamless access using same admin login
+        const adminRes = await fetch("/api/auth/check", { cache: "no-store" });
+        if (adminRes.ok) {
+          const adminData = await adminRes.json();
+          if (adminData.authenticated && adminData.user && isMounted) {
+            const adminEmployee: EmployeeSession = {
+              id: 0,
+              name: adminData.user.username || "Super Admin",
+              designation: "Administrator",
+              isTeamLeader: true,
+              canEditOrders: true,
+            };
+            setEmployee(adminEmployee);
+            localStorage.setItem("garmentpro_employee", JSON.stringify(adminEmployee));
+            localStorage.setItem("garmentpro_employee_name", adminEmployee.name);
+            return;
+          }
+        }
+
+        if (isMounted) {
           setEmployee(null);
           localStorage.removeItem("garmentpro_employee");
         }

@@ -491,8 +491,9 @@ export default function OrdersView({
               ) : (
                 displayedOrders.map((o) => {
                   const isFinalInvoiceGenerated =
-                    Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim()) ||
-                    activeTab === "INVOICES";
+                    (Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim()) ||
+                    activeTab === "INVOICES") &&
+                    o.status !== "Pending";
                   const isBillTab = activeTab === "BILLS";
                   const custOutstanding =
                     outstandingMap[o.customerId] !== undefined ? outstandingMap[o.customerId] : 0;
@@ -608,6 +609,17 @@ export default function OrdersView({
                             ───────────────────────────────────────────────────────────── */}
                         {isFinalInvoiceGenerated || isBillTab ? (
                           <>
+                            {/* Edit Button (if order status is converted back to Pending) */}
+                            {o.status === "Pending" && (
+                              <Link
+                                href={`/admin/orders/${o.id}`}
+                                className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit Order Form"
+                              >
+                                <Edit size={15} />
+                              </Link>
+                            )}
+
                             {/* 1. WhatsApp Button */}
                             <button
                               type="button"
@@ -716,7 +728,7 @@ export default function OrdersView({
 
                             {/* Edit Order */}
                             <Link
-                              href={`/admin/orders/${o.id}/edit`}
+                              href={`/admin/orders/${o.id}`}
                               className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                               title="Edit Order Form items & quantities"
                             >

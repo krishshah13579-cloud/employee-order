@@ -20,6 +20,7 @@ import {
   Lock,
   Edit3,
   X,
+  Plus,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
@@ -584,6 +585,17 @@ export default function OrderEditPage() {
                 </span>
               </h2>
             </div>
+
+            {status === "Pending" && (
+              <Link
+                href={`/products?orderId=${orderId}&returnTo=${encodeURIComponent(`/orders/${orderId}`)}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs cursor-pointer print:hidden"
+                title="Browse store to add another product or mix sizes to this order"
+              >
+                <Plus size={14} />
+                <span>+ Add Product / Mix Size</span>
+              </Link>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -619,8 +631,17 @@ export default function OrderEditPage() {
                             item.product?.retailerPrice || item.product?.price || item.unitPrice
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-500">
-                          Ratio: {item.sizeRatio} ({item.pcsPerSet || 5} pcs/set)
+                        <div className="text-[10px] text-slate-500 flex items-center justify-between gap-2 mt-0.5">
+                          <span>Ratio: {item.sizeRatio} ({item.pcsPerSet || 5} pcs/set)</span>
+                          {status === "Pending" && (
+                            <Link
+                              href={`/products/${item.productId || item.product?.id || 1}?orderId=${orderId}&returnTo=${encodeURIComponent(`/orders/${orderId}`)}`}
+                              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline print:hidden cursor-pointer"
+                              title="Edit this product or add mix sizes on product page"
+                            >
+                              Edit Product (Mix/Sets) →
+                            </Link>
+                          )}
                         </div>
                       </td>
 

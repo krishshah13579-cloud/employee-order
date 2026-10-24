@@ -733,6 +733,21 @@ export default function OrderInvoicePage() {
           </div>
         </div>
 
+        {/* Itemized Table Header with Add Product / Mix Size */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+            Garment Items ({activeDisplayItems.length} {activeDisplayItems.length === 1 ? "Product" : "Products"})
+          </span>
+          <Link
+            href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}`)}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs cursor-pointer print:hidden"
+            title="Browse catalogue to add another product or mix sizes to this order"
+          >
+            <Plus size={14} />
+            <span>+ Add Product / Mix Size</span>
+          </Link>
+        </div>
+
         {/* Itemized Table */}
         <div className="overflow-x-auto border border-gray-200 rounded-xl">
           <table className="w-full text-left border-collapse text-xs">
@@ -744,7 +759,8 @@ export default function OrderInvoicePage() {
                 <th className="p-3 border-r border-gray-200 text-center">Sets</th>
                 <th className="p-3 border-r border-gray-200 text-center">PCS</th>
                 <th className="p-3 border-r border-gray-200 text-right">Rate / Pc</th>
-                <th className="p-3 text-right">Amount (₹)</th>
+                <th className="p-3 border-r border-gray-200 text-right">Amount (₹)</th>
+                <th className="p-3 text-center print:hidden">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -806,8 +822,18 @@ export default function OrderInvoicePage() {
                     <td className="p-3 border-r border-gray-200 text-right font-mono">
                       {formatCurrency(it.unitPrice)}
                     </td>
-                    <td className="p-3 text-right font-bold font-mono">
+                    <td className="p-3 border-r border-gray-200 text-right font-bold font-mono">
                       {formatCurrency(it.itemSubtotal)}
+                    </td>
+                    <td className="p-3 text-center print:hidden">
+                      <Link
+                        href={`/products/${it.productId || it.product?.id || 1}?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}`)}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition shadow-2xs border border-blue-200 cursor-pointer"
+                        title="Edit this product or configure mix sizes on product page"
+                      >
+                        <Edit size={12} />
+                        <span>Edit Product</span>
+                      </Link>
                     </td>
                   </tr>
                 );

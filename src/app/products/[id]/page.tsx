@@ -71,8 +71,10 @@ function ProductDetailContent() {
 
   const productId = params?.id as string;
   const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
+  const orderIdParam = searchParams.get("orderId");
 
   const [product, setProduct] = useState<ProductData | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +99,32 @@ function ProductDetailContent() {
   >({});
 
   const sessionId = useMemo(() => getClientSessionId(), []);
+
+  // Fetch active order details if editing from an existing order
+  useEffect(() => {
+    if (!orderIdParam) return;
+    fetch(`/api/orders/${orderIdParam}`, { cache: "no-store" })
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error("Failed to load order");
+      })
+      .then((data) => {
+        setEditingOrder(data);
+        if (data.customer) {
+          setDraftCustomer(data.customer);
+        } else if (data.customerId) {
+          setDraftCustomer({
+            id: data.customerId,
+            shopName: data.customerName,
+            phoneNumber: data.customerPhone,
+            address: data.customerAddress,
+            gstPanNo: data.customerGstPan,
+            businessType: data.businessType || "RETAILER",
+          });
+        }
+      })
+      .catch((err) => console.error("Error loading order for editing:", err));
+  }, [orderIdParam]);
 
   // Fetch real-time active reservations and available stock
   const fetchLiveStock = useCallback(async () => {
@@ -210,6 +238,51 @@ function ProductDetailContent() {
       loadProduct();
     }
   }, [productId]);
+
+  // Pre-populate product sets & mix sizes from the order if editing an existing order
+  useEffect(() => {
+    if (!editingOrder || !product) return;
+    const existingItem = (editingOrder.items || []).find(
+      (it: any) => String(it.productId) === String(product.id) || it.productName === product.name
+    );
+    if (existingItem) {
+      let cSets: any[] = [];
+      try {
+        cSets = typeof existingItem.colorSets === "string" ? JSON.parse(existingItem.colorSets) : existingItem.colorSets;
+      } catch {}
+
+      if (Array.isArray(cSets) && cSets.length > 0) {
+        setColorSetsSelection((prev) => {
+          const next = { ...prev };
+          cSets.forEach((cs) => {
+            if (cs?.color) next[cs.color] = Number(cs.sets) || 0;
+          });
+          return next;
+        });
+        const firstWithSets = cSets.find((cs) => Number(cs.sets) > 0);
+        if (firstWithSets?.color) {
+          setActiveColor(firstWithSets.color);
+        }
+      }
+
+      if (existingItem.sizeRatio) {
+        setSelectedRatio(existingItem.sizeRatio);
+      }
+
+      if (existingItem.colorMixPcs && typeof existingItem.colorMixPcs === "object") {
+        setColorMixPcs(existingItem.colorMixPcs);
+      }
+
+      if (existingItem.notes) {
+        setItemNotes(
+          existingItem.notes
+            .replace(/\[Mix Sizes:\s*[^\]]+\]/gi, "")
+            .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+            .trim()
+        );
+      }
+    }
+  }, [editingOrder, product]);
 
   // Custom colors added by the employee/customer directly
   const [customColors, setCustomColors] = useState<string[]>([]);
@@ -644,6 +717,8 @@ function ProductDetailContent() {
   const [draftCustomer, setDraftCustomer] = useState<{
     id?: number;
     shopName?: string;
+    phoneNumber?: string;
+    address?: string;
     gstPanNo?: string;
     businessType?: string;
     specialDiscount?: number;
@@ -737,7 +812,7 @@ function ProductDetailContent() {
   }, [product]);
 
   // Add To Order Form Action
-  const handleAddToOrderForm = () => {
+  const handleAddToOrderForm = async () => {
     if (!product) return;
 
     const storedCustomerId =
@@ -807,6 +882,51 @@ function ProductDetailContent() {
       itemSubtotal: totalAmount,
       notes: itemNotes.trim() || undefined,
     };
+
+    // If editing from an existing order (e.g. from /admin/orders/[id])
+    if (orderIdParam && editingOrder) {
+      try {
+        const existingItems = Array.isArray(editingOrder.items) ? [...editingOrder.items] : [];
+        const existingIndex = existingItems.findIndex(
+          (it: any) => String(it.productId) === String(product.id) || it.productName === product.name
+        );
+
+        if (existingIndex >= 0) {
+          existingItems[existingIndex] = {
+            ...existingItems[existingIndex],
+            ...draftItem,
+            id: existingItems[existingIndex].id,
+          };
+        } else {
+          existingItems.push(draftItem);
+        }
+
+        const res = await fetch(`/api/orders/${orderIdParam}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: existingItems,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update order");
+        }
+
+        toast(
+          `✅ Saved ${product.name} (${totalSets} sets, ${totalPcs} pcs${totalMixPieces > 0 ? ` incl ${totalMixPieces} mix` : ""}) to Order #${editingOrder.orderNumber || orderIdParam}!`,
+          "success"
+        );
+        const redirectTarget = returnTo || `/admin/orders/${orderIdParam}`;
+        router.push(redirectTarget);
+        return;
+      } catch (err: any) {
+        console.error("Error saving directly to order:", err);
+        toast("Failed to update order: " + err.message, "error");
+        return;
+      }
+    }
 
     try {
       const existingDraftStr = localStorage.getItem("garmentpro_order_draft");
@@ -890,6 +1010,25 @@ function ProductDetailContent() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
       <UserHeader showBack />
+
+      {/* Editing Order Notification Banner */}
+      {editingOrder && (
+        <div className="bg-amber-600 text-white px-4 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-sm sticky top-0 z-40">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-amber-200" />
+            <span>
+              Editing Product / Mix Sizes for Order #{editingOrder.orderNumber || orderIdParam} ({editingOrder.customer?.shopName || editingOrder.customerName || "Customer"})
+            </span>
+          </div>
+          <Link
+            href={returnTo || `/admin/orders/${orderIdParam}`}
+            className="px-3 py-1 bg-black/25 hover:bg-black/40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+          >
+            <ArrowLeft size={13} />
+            <span>Return to Order</span>
+          </Link>
+        </div>
+      )}
 
       {/* Breadcrumb & Navigation */}
       <div className="bg-slate-900 text-white border-b border-slate-800">
@@ -1697,7 +1836,9 @@ function ProductDetailContent() {
                 >
                   <FilePlus size={20} />
                   <span>
-                    Add To Order Form ({totalSets} Sets{totalMixPieces > 0 ? ` · ${totalMixPieces} Mix` : ""} · {totalPcs} Pcs)
+                    {editingOrder
+                      ? `Save & Update Order #${editingOrder.orderNumber || orderIdParam} (${totalSets} Sets${totalMixPieces > 0 ? ` · ${totalMixPieces} Mix` : ""} · ${totalPcs} Pcs)`
+                      : `Add To Order Form (${totalSets} Sets${totalMixPieces > 0 ? ` · ${totalMixPieces} Mix` : ""} · ${totalPcs} Pcs)`}
                   </span>
                 </button>
               </div>
