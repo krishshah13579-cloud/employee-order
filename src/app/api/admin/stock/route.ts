@@ -224,6 +224,9 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateData: any = {};
+    if (body.imageUrl !== undefined) {
+      updateData.imageUrl = body.imageUrl ? String(body.imageUrl).trim() : null;
+    }
     if (mixPcs !== undefined) {
       updateData.mixPcs = Math.max(0, parseInt(String(mixPcs), 10) || 0);
     }

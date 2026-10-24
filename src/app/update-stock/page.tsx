@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,8 @@ import {
   AlertCircle,
   ArrowRight,
   ShieldAlert,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { useToast } from "@/components/ui/Toast";
@@ -31,9 +33,8 @@ import {
   getPcsFromRatio,
   getSizesFromRatio,
   sortSizeRatioKeys,
-  calculateOrderedColorSetsPieces,
 } from "@/lib/stock";
-import { STANDARD_SIZE_RATIOS, type ProductData } from "@/lib/types";
+import { STANDARD_SIZE_RATIOS } from "@/lib/types";
 
 interface StockProduct {
   id: number;
@@ -61,7 +62,7 @@ interface StockProduct {
 
 export default function UpdateStockPage() {
   const router = useRouter();
-  const { employee, loading: sessionLoading } = useEmployee();
+  const { employee, loading: sessionLoading, refreshSession } = useEmployee();
   const { toast } = useToast();
 
   const [products, setProducts] = useState<StockProduct[]>([]);
@@ -74,19 +75,25 @@ export default function UpdateStockPage() {
   const [modalRatio, setModalRatio] = useState<string>("30 to 38");
   const [modalColorSets, setModalColorSets] = useState<Record<string, number>>({});
   const [modalCostPrice, setModalCostPrice] = useState<string>("");
+  const [modalImageUrl, setModalImageUrl] = useState<string>("");
+  const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
 
+  // Strict authorization check: Only allowed if explicitly granted or super admin
   const isAuthorized = Boolean(
-    employee?.canUpdateStock ||
-    employee?.isTeamLeader ||
-    employee?.designation === "Administrator" ||
-    employee?.id === 0
+    employee?.canUpdateStock === true ||
+    (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
-  const fetchStockProducts = async () => {
+  const fetchStockProducts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/admin/stock", { cache: "no-store" });
+      if (res.status === 401 || res.status === 403) {
+        toast("Access Revoked: You do not have permission to update stock.", "error");
+        router.replace("/");
+        return;
+      }
       if (!res.ok) {
         throw new Error(`Failed to load stock data (${res.status})`);
       }
@@ -97,18 +104,48 @@ export default function UpdateStockPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, toast]);
 
+  // Periodic real-time check against DB: Revoke right away if admin removed access
   useEffect(() => {
+    let active = true;
+
+    const verifyFreshAccess = async () => {
+      try {
+        const res = await fetch("/api/employee/auth/check", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          const hasAccess = Boolean(
+            data.authenticated &&
+            (data.isAdmin || data.employee?.canUpdateStock === true)
+          );
+          if (!hasAccess && active) {
+            toast("Access Revoked: Stock update permission removed by administrator.", "error");
+            router.replace("/");
+            return false;
+          }
+        }
+      } catch {}
+      return true;
+    };
+
     if (!sessionLoading) {
-      if (employee && !isAuthorized) {
+      if (!isAuthorized) {
         toast("Access Denied: You do not have permission to update stock.", "error");
         router.replace("/");
         return;
       }
       fetchStockProducts();
     }
-  }, [sessionLoading, employee, isAuthorized]);
+
+    // Verify continuously every 10 seconds to revoke right away
+    const interval = setInterval(verifyFreshAccess, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [sessionLoading, isAuthorized, fetchStockProducts, router, toast]);
 
   const categories = useMemo(() => {
     const set = new Set<string>(["All"]);
@@ -141,6 +178,7 @@ export default function UpdateStockPage() {
     setEditingProduct(p);
     setModalRatio(p.sizesRatio || "30 to 38");
     setModalCostPrice(p.costPrice !== null && p.costPrice !== undefined ? String(p.costPrice) : "");
+    setModalImageUrl(p.imageUrl || "");
 
     // Pre-populate color sets from detailedRatioSets or setsColorwise
     const colorCounts: Record<string, number> = {};
@@ -163,6 +201,35 @@ export default function UpdateStockPage() {
     });
 
     setModalColorSets(colorCounts);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingPhoto(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to upload photo");
+      }
+
+      const data = await res.json();
+      setModalImageUrl(data.url);
+      toast("Product photo uploaded! Click Save Stock Changes to apply.", "success");
+    } catch (err: any) {
+      toast("Photo upload failed: " + err.message, "error");
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleColorCountChange = (color: string, val: number) => {
@@ -230,6 +297,7 @@ export default function UpdateStockPage() {
           sizesRatio: modalRatio,
           costPrice: modalCostPrice ? parseFloat(modalCostPrice) || null : null,
           setsColorwise: JSON.stringify(nextStockMap),
+          imageUrl: modalImageUrl || null,
         }),
       });
 
@@ -238,7 +306,7 @@ export default function UpdateStockPage() {
         throw new Error(err.error || "Failed to update stock");
       }
 
-      toast(`✅ Successfully updated stock for ${editingProduct.name} (${modalTotalSets} Sets · ${modalTotalPcs} Pcs)!`, "success");
+      toast(`✅ Successfully updated stock & photo for ${editingProduct.name} (${modalTotalSets} Sets · ${modalTotalPcs} Pcs)!`, "success");
       setEditingProduct(null);
       fetchStockProducts();
     } catch (err: any) {
@@ -300,7 +368,7 @@ export default function UpdateStockPage() {
                 <span>Stock Management</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-                Update live sets, size ratios, and inventory piece counts across all catalog styles.
+                Update live sets, size ratios, garment photos, and inventory piece counts across all styles.
               </p>
             </div>
 
@@ -323,7 +391,7 @@ export default function UpdateStockPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* ═══════════════════════════════════════════
-            CATEGORY TABS & SEARCH BAR (MATCHING 2ND PHOTO)
+            CATEGORY TABS & SEARCH BAR
             ═══════════════════════════════════════════ */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -368,7 +436,7 @@ export default function UpdateStockPage() {
         </div>
 
         {/* ═══════════════════════════════════════════
-            PRODUCT CARDS GRID (MATCHING 2ND PHOTO)
+            PRODUCT CARDS GRID (100% UNIFORM BOX SIZES AS SHOWN IN PICTURE)
             ═══════════════════════════════════════════ */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -386,29 +454,37 @@ export default function UpdateStockPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
             {filteredProducts.map((p) => {
               const inStock = p.totalSets > 0 || p.mixPcs > 0;
               const displayMrp = p.mrp || Math.round((p.retailerPrice || p.price) * 2);
+              const coverImg = getProductCoverImage(p.imageUrl);
 
               return (
                 <div
                   key={p.id}
-                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col group"
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col h-full group"
                 >
-                  {/* Photo Container with Category Badge */}
-                  <div className="relative aspect-4/3 bg-slate-100 overflow-hidden">
+                  {/* Photo Container with Uniform Fixed Height */}
+                  <div className="relative w-full h-72 bg-slate-100 overflow-hidden block shrink-0">
                     <img
-                      src={getProductCoverImage(p.imageUrl)}
+                      src={coverImg}
                       alt={p.name}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'><rect width='400' height='400' fill='%23f1f5f9'/><path d='M160 120 L240 120 L225 280 L205 280 L200 190 L195 280 L175 280 Z' fill='%23cbd5e1' stroke='%2394a3b8' stroke-width='2'/><text x='50%25' y='78%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2364748b'>Garment Photo</text></svg>";
+                      }}
                     />
+
+                    {/* Category Badge */}
                     <div className="absolute top-2.5 left-2.5">
-                      <span className="px-2.5 py-1 rounded-md bg-zinc-900/90 text-white font-black text-[10px] tracking-wider uppercase backdrop-blur-xs">
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-900/90 text-white font-black text-[10px] tracking-wider uppercase backdrop-blur-xs shadow-xs">
                         {p.category || "Trouser"}
                       </span>
                     </div>
 
+                    {/* Stock Count Badge */}
                     <div className="absolute top-2.5 right-2.5">
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-xs ${
@@ -422,25 +498,25 @@ export default function UpdateStockPage() {
                     </div>
                   </div>
 
-                  {/* Card Content */}
-                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                  {/* Card Content with Uniform Dimensions */}
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3 min-h-[160px]">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-base font-black text-slate-900 tracking-tight">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-black text-slate-900 tracking-tight truncate flex-1" title={p.name}>
                           {p.name}
                         </h3>
-                        <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
                           {p.pcsPerSet || 5} Pcs / Set
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+                      <div className="flex items-center justify-between text-xs text-slate-500 mt-1.5">
                         <span>Sizes: <strong className="text-slate-800">{p.sizesRatio || "30 to 38"}</strong></span>
-                        <span className="font-mono text-slate-600 font-semibold">{p.totalPcs} total pcs</span>
+                        <span className="font-mono text-slate-700 font-bold">{p.totalPcs} total pcs</span>
                       </div>
 
                       {/* Color Swatch Dots */}
-                      <div className="flex items-center gap-1.5 mt-2.5">
+                      <div className="flex items-center gap-1.5 mt-2.5 min-h-[18px]">
                         {p.colors.slice(0, 7).map((col, cIdx) => {
                           const hex = getColorHex(col).hex;
                           return (
@@ -479,7 +555,7 @@ export default function UpdateStockPage() {
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(p)}
-                        className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer active:scale-95 shrink-0"
                       >
                         <Edit size={13} />
                         <span>Update Stock</span>
@@ -494,25 +570,23 @@ export default function UpdateStockPage() {
       </main>
 
       {/* ═══════════════════════════════════════════
-          PRETTY STOCK UPDATE MODAL (MANDATORY FIELDS)
+          STOCK & PHOTO UPDATE MODAL
           ═══════════════════════════════════════════ */}
       {editingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 sm:p-6 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Top Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 sm:p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img
-                  src={getProductCoverImage(editingProduct.imageUrl)}
-                  alt={editingProduct.name}
-                  className="w-12 h-12 rounded-xl object-cover border border-white/20 shrink-0"
-                />
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                  <Boxes size={22} />
+                </div>
                 <div>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-300 uppercase tracking-wider">
                     {editingProduct.category || "Trouser"}
                   </span>
                   <h3 className="text-lg font-black text-white mt-0.5">
-                    Update Stock — {editingProduct.name}
+                    Update Stock &amp; Photo — {editingProduct.name}
                   </h3>
                 </div>
               </div>
@@ -528,7 +602,62 @@ export default function UpdateStockPage() {
 
             {/* Modal Content */}
             <div className="p-5 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* 1. Size Ratio Pack Selector */}
+              {/* 1. Product Photo Update Section */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative w-24 h-28 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden shrink-0 shadow-2xs">
+                  <img
+                    src={getProductCoverImage(modalImageUrl)}
+                    alt={editingProduct.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23e2e8f0'><rect width='100' height='100'/></svg>";
+                    }}
+                  />
+                  {uploadingPhoto && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">
+                      Product Photo
+                    </span>
+                    <span className="text-[11px] text-slate-500 block">
+                      Update or replace this garment photo directly. Supports JPG, PNG, WEBP.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer shadow-2xs">
+                      <Camera size={14} className="text-orange-600" />
+                      <span>{uploadingPhoto ? "Uploading..." : "Upload New Photo"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingPhoto}
+                        onChange={handlePhotoUpload}
+                      />
+                    </label>
+
+                    {modalImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setModalImageUrl("")}
+                        className="px-2.5 py-1.5 text-red-600 hover:bg-red-50 text-xs font-semibold rounded-xl transition cursor-pointer"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Size Ratio Pack Selector */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-700 flex items-center gap-1.5">
@@ -567,7 +696,7 @@ export default function UpdateStockPage() {
                 </div>
               </div>
 
-              {/* 2. Color-Wise Sets Stepper Grid */}
+              {/* 3. Color-Wise Sets Stepper Grid */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -590,69 +719,75 @@ export default function UpdateStockPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => handleQuickAddAll(20)}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                    >
+                      +20 All
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleResetAll}
                       className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[11px] font-bold transition cursor-pointer"
                     >
-                      Reset
+                      Clear
                     </button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {editingProduct.colors.map((color) => {
-                    const clean = cleanColorName(color);
-                    const cHex = getColorHex(color);
-                    const count = modalColorSets[clean] || 0;
+                  {Object.entries(modalColorSets).map(([color, count]) => {
+                    const hex = getColorHex(color).hex;
+                    const pcsThisColor = count * modalPcsPerSet;
 
                     return (
                       <div
                         key={color}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition ${
-                          count > 0
-                            ? "bg-blue-50/40 border-blue-200 shadow-2xs"
-                            : "bg-white border-slate-200 hover:border-slate-300"
-                        }`}
+                        className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs hover:border-slate-300 transition"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <span
-                            className="w-5 h-5 rounded-full border border-black/15 shrink-0 shadow-2xs"
-                            style={{ backgroundColor: cHex.hex }}
+                            className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
+                            style={{ backgroundColor: hex }}
                           />
-                          <div>
-                            <div className="text-xs font-bold text-slate-900 truncate" title={color}>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-slate-900 block truncate">
                               {color}
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-mono">
-                              {count * modalPcsPerSet} pcs
-                            </div>
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono font-medium block">
+                              {pcsThisColor} Pcs ({modalRatio})
+                            </span>
                           </div>
                         </div>
 
-                        {/* Stepper with - / input / + */}
-                        <div className="flex items-center border border-slate-300 rounded-xl overflow-hidden bg-white shadow-2xs shrink-0">
+                        {/* Interactive Stepper */}
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"
-                            onClick={() => handleColorCountChange(clean, count - 1)}
-                            className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-black font-black text-xs transition cursor-pointer"
+                            onClick={() => handleColorCountChange(color, count - 1)}
+                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-sm transition cursor-pointer"
                           >
-                            <Minus size={12} />
+                            <Minus size={13} />
                           </button>
+
                           <input
                             type="number"
                             min="0"
-                            value={count === 0 ? "" : count}
-                            placeholder="0"
+                            value={count}
                             onChange={(e) =>
-                              handleColorCountChange(clean, parseInt(e.target.value, 10) || 0)
+                              handleColorCountChange(
+                                color,
+                                parseInt(e.target.value, 10) || 0
+                              )
                             }
-                            className="w-12 h-8 border-x border-slate-300 text-center text-xs font-mono font-bold text-slate-900 focus:outline-none focus:bg-blue-50/50"
+                            className="w-14 text-center py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none"
                           />
+
                           <button
                             type="button"
-                            onClick={() => handleColorCountChange(clean, count + 1)}
-                            className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-black font-black text-xs transition cursor-pointer"
+                            onClick={() => handleColorCountChange(color, count + 1)}
+                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-sm transition cursor-pointer"
                           >
-                            <Plus size={12} />
+                            <Plus size={13} />
                           </button>
                         </div>
                       </div>
@@ -661,7 +796,7 @@ export default function UpdateStockPage() {
                 </div>
               </div>
 
-              {/* 3. Cost Price Input (Optional) */}
+              {/* 4. Cost Price Input (Optional) */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">
@@ -687,7 +822,7 @@ export default function UpdateStockPage() {
                 </div>
               </div>
 
-              {/* 4. Live Stock Summary Pill */}
+              {/* 5. Live Stock Summary Pill */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">
@@ -728,12 +863,12 @@ export default function UpdateStockPage() {
                 {saving ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Saving Stock...</span>
+                    <span>Saving Changes...</span>
                   </>
                 ) : (
                   <>
                     <Save size={14} />
-                    <span>Save Stock Changes</span>
+                    <span>Save Stock &amp; Photo</span>
                   </>
                 )}
               </button>

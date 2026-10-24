@@ -21,6 +21,7 @@ interface EmployeeContextType {
   loading: boolean;
   login: (name: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   logout: (reason?: string) => Promise<void>;
+  refreshSession: () => Promise<EmployeeSession | null>;
 }
 
 const EmployeeContext = createContext<EmployeeContextType>({
@@ -28,6 +29,7 @@ const EmployeeContext = createContext<EmployeeContextType>({
   loading: true,
   login: async () => ({ success: false }),
   logout: async () => {},
+  refreshSession: async () => null,
 });
 
 export const useEmployee = () => useContext(EmployeeContext);
@@ -83,6 +85,66 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [employee, logout]);
 
+  // Function to re-verify session with database immediately (used when permissions change)
+  const refreshSession = useCallback(async (): Promise<EmployeeSession | null> => {
+    try {
+      const res = await fetch("/api/employee/auth/check", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated && data.employee) {
+          setEmployee(data.employee);
+          localStorage.setItem("garmentpro_employee", JSON.stringify(data.employee));
+          localStorage.setItem("garmentpro_employee_name", data.employee.name);
+          return data.employee;
+        } else if (data.nightLogout) {
+          setEmployee(null);
+          localStorage.removeItem("garmentpro_employee");
+          localStorage.removeItem("garmentpro_employee_name");
+          logout("night_logout");
+          return null;
+        }
+      }
+
+      // Check if user has an active Admin session
+      const adminRes = await fetch("/api/auth/check", { cache: "no-store" });
+      if (adminRes.ok) {
+        const adminData = await adminRes.json();
+        if (adminData.authenticated && adminData.user) {
+          const adminEmployee: EmployeeSession = {
+            id: 0,
+            name: adminData.user.username || "Super Admin",
+            designation: "Administrator",
+            isTeamLeader: true,
+            canEditOrders: true,
+            canUpdateStock: true,
+          };
+          setEmployee(adminEmployee);
+          localStorage.setItem("garmentpro_employee", JSON.stringify(adminEmployee));
+          localStorage.setItem("garmentpro_employee_name", adminEmployee.name);
+          return adminEmployee;
+        }
+      }
+
+      setEmployee(null);
+      localStorage.removeItem("garmentpro_employee");
+      return null;
+    } catch {
+      return null;
+    }
+  }, [logout]);
+
+  // Re-verify session whenever pathname changes or periodically every 15s to catch permission revocations right away
+  useEffect(() => {
+    refreshSession();
+  }, [pathname, refreshSession]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      refreshSession();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [refreshSession]);
+
   // Initialize from localStorage & verify via API
   useEffect(() => {
     let isMounted = true;
@@ -98,48 +160,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
           } catch {}
         }
 
-        // Backend cookie validation (backend enforces night logout for non-T.L. staff)
-        const res = await fetch("/api/employee/auth/check", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.authenticated && data.employee && isMounted) {
-            setEmployee(data.employee);
-            localStorage.setItem("garmentpro_employee", JSON.stringify(data.employee));
-            localStorage.setItem("garmentpro_employee_name", data.employee.name);
-            return;
-          } else if (data.nightLogout && isMounted) {
-            setEmployee(null);
-            localStorage.removeItem("garmentpro_employee");
-            localStorage.removeItem("garmentpro_employee_name");
-            logout("night_logout");
-            return;
-          }
-        }
-
-        // Check if user has an active Admin session to allow seamless access using same admin login
-        const adminRes = await fetch("/api/auth/check", { cache: "no-store" });
-        if (adminRes.ok) {
-          const adminData = await adminRes.json();
-          if (adminData.authenticated && adminData.user && isMounted) {
-            const adminEmployee: EmployeeSession = {
-              id: 0,
-              name: adminData.user.username || "Super Admin",
-              designation: "Administrator",
-              isTeamLeader: true,
-              canEditOrders: true,
-              canUpdateStock: true,
-            };
-            setEmployee(adminEmployee);
-            localStorage.setItem("garmentpro_employee", JSON.stringify(adminEmployee));
-            localStorage.setItem("garmentpro_employee_name", adminEmployee.name);
-            return;
-          }
-        }
-
-        if (isMounted) {
-          setEmployee(null);
-          localStorage.removeItem("garmentpro_employee");
-        }
+        await refreshSession();
       } catch (err) {
         console.error("Session verification error:", err);
       } finally {
@@ -154,7 +175,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [logout]);
+  }, [refreshSession]);
 
   // Login handler: Send to server to authenticate (T.L. can log in 24*7)
   const login = useCallback(
@@ -183,7 +204,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <EmployeeContext.Provider value={{ employee, loading, login, logout }}>
+    <EmployeeContext.Provider value={{ employee, loading, login, logout, refreshSession }}>
       {children}
     </EmployeeContext.Provider>
   );

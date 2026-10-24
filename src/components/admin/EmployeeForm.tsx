@@ -17,6 +17,8 @@ import {
   Trash2,
   Crown,
   Edit3,
+  Boxes,
+  Package,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { EmployeeData } from "@/lib/types";
@@ -51,6 +53,7 @@ export default function EmployeeForm({
     designation: initialData?.designation || "Sales Representative",
     isTeamLeader: initialData?.isTeamLeader ?? isEmployeeTeamLeader(initialData),
     canEditOrders: initialData?.canEditOrders ?? false,
+    canUpdateStock: initialData?.canUpdateStock ?? false,
     isActive: initialData?.isActive ?? true,
   });
 
@@ -314,6 +317,38 @@ export default function EmployeeForm({
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {/* Stock Update Page Permission */}
+            <div className="flex items-center justify-between p-4 bg-gray-50/60 rounded-xl border border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Stock Update Page Access
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Allow employee to update sets, ratios, and product photos on /update-stock.
+                  </p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.canUpdateStock)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      canUpdateStock: e.target.checked,
+                    }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
               </label>
             </div>
           </div>

@@ -862,30 +862,27 @@ export default function EmployeesPage() {
                           </button>
                         )}
 
-                        {/* Inventory Stock Update Permission */}
-                        {selectedProfile.canUpdateStock ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, false)}
+                        {/* Inventory Stock Update Permission (Checkbox Button) */}
+                        <label
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
+                            selectedProfile.canUpdateStock
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                              : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"
+                          } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
+                          title={selectedProfile.canUpdateStock ? "Uncheck to revoke stock update access right away" : "Check to allow stock update access"}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedProfile.canUpdateStock)}
                             disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-red-50 text-emerald-800 hover:text-red-700 border border-emerald-300 hover:border-red-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Revoke Stock Update Access"
-                          >
-                            <Boxes size={13} className="text-emerald-600" />
-                            <span>Revoke Stock Access</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, true)}
-                            disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 hover:border-emerald-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Grant Stock Update Access to this employee"
-                          >
-                            <Boxes size={13} className="text-gray-500" />
-                            <span>Allow Stock Update</span>
-                          </button>
-                        )}
+                            onChange={(e) =>
+                              handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, e.target.checked)
+                            }
+                            className="w-4 h-4 text-emerald-600 bg-white border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <Boxes size={13} className={selectedProfile.canUpdateStock ? "text-emerald-600" : "text-gray-400"} />
+                          <span>{selectedProfile.canUpdateStock ? "Stock Update Allowed" : "Stock Update Access"}</span>
+                        </label>
                       </div>
                     </div>
 
@@ -1268,40 +1265,25 @@ export default function EmployeesPage() {
                           )}
                         </td>
                         <td className="py-4 px-6">
-                          {emp.canUpdateStock ? (
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-full text-xs font-bold shadow-2xs">
-                                <CheckCircle size={12} className="text-emerald-600 shrink-0" />
-                                <span>Allowed</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleStockUpdate(emp.id, emp.name, false)}
-                                disabled={togglingId === emp.id}
-                                className="text-[11px] font-semibold text-gray-500 hover:text-red-600 hover:underline cursor-pointer disabled:opacity-50"
-                                title="Revoke Stock Update Access"
-                              >
-                                Revoke
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
-                                <Lock size={10} className="text-gray-400 shrink-0" />
-                                <span>Locked</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleStockUpdate(emp.id, emp.name, true)}
-                                disabled={togglingId === emp.id}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
-                                title="Grant Stock Update Access to this employee"
-                              >
-                                <Boxes size={12} className="text-emerald-600" />
-                                <span>Allow</span>
-                              </button>
-                            </div>
-                          )}
+                          <label
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none shadow-2xs ${
+                              emp.canUpdateStock
+                                ? "bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:border-gray-300"
+                            } ${togglingId === emp.id ? "opacity-50 pointer-events-none" : ""}`}
+                            title={emp.canUpdateStock ? "Uncheck to revoke stock update access right away" : "Check to grant stock update access"}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(emp.canUpdateStock)}
+                              disabled={togglingId === emp.id}
+                              onChange={(e) => handleToggleStockUpdate(emp.id, emp.name, e.target.checked)}
+                              className="w-4 h-4 text-emerald-600 bg-white border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                            />
+                            <span className="text-xs font-bold whitespace-nowrap">
+                              {emp.canUpdateStock ? "Access Allowed" : "Allow Access"}
+                            </span>
+                          </label>
                         </td>
                         <td className="py-4 px-6 text-gray-700">
                           {emp.email ? (

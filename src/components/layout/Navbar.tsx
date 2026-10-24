@@ -41,10 +41,8 @@ export default function Navbar() {
   }, []);
 
   const canUpdateStock = Boolean(
-    employee?.canUpdateStock ||
-    employee?.isTeamLeader ||
-    employee?.designation === "Administrator" ||
-    employee?.id === 0
+    employee?.canUpdateStock === true ||
+    (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
   const navLinks = [
