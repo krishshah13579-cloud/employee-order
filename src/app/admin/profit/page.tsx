@@ -66,7 +66,7 @@ export default function AdminProfitPage() {
   const fetchStockMetrics = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/stock", { cache: "no-store" });
+      const res = await fetch("/api/admin/stock?includeProfit=1", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load profit metrics");
       const data = await res.json();
       setMetrics(data.metrics || null);

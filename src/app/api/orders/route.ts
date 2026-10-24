@@ -17,9 +17,6 @@ import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 
 export async function GET(request: NextRequest) {
   try {
-    // Ensure all existing orders start sequentially from 1
-    await syncSequentialOrderNumbers().catch(() => {});
-
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");

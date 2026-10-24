@@ -116,12 +116,14 @@ export function sanitizeBusinessType(val: string | null | undefined): ValidBusin
 }
 
 /**
- * Safely constructs the Order Form return URL with encoded customer parameter.
+ * Safely constructs the Order Form return URL with encoded customer parameter and optional orderId for editing.
  */
-export function buildOrderFormReturnUrl(customerId?: number | null): string {
+export function buildOrderFormReturnUrl(customerId?: number | null, orderId?: number | null): string {
   const safeId = sanitizePositiveInt(customerId);
-  if (safeId) {
-    return `${APP_ROUTES.ORDERS_NEW}?${PARAM_CUSTOMER_ID}=${safeId}`;
-  }
-  return APP_ROUTES.ORDERS_NEW;
+  const safeOrderId = sanitizePositiveInt(orderId);
+  const params = new URLSearchParams();
+  if (safeId) params.set(PARAM_CUSTOMER_ID, String(safeId));
+  if (safeOrderId) params.set("orderId", String(safeOrderId));
+  const query = params.toString();
+  return query ? `${APP_ROUTES.ORDERS_NEW}?${query}` : APP_ROUTES.ORDERS_NEW;
 }

@@ -25,7 +25,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Stock update permission required." }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const includeProfit = searchParams.get("includeProfit") === "1";
+
     const rawProducts = await prisma.product.findMany({
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        colorsAvailable: true,
+        colorMapping: true,
+        sizesRatio: true,
+        sizesList: true,
+        pcsPerSet: true,
+        mrp: true,
+        retailerPrice: true,
+        wholesalerPrice: true,
+        price: true,
+        costPrice: true,
+        mixPcs: true,
+        setsColorwise: true,
+        imageUrl: true,
+        isActive: true,
+      },
       orderBy: { name: "asc" },
     });
 
@@ -92,138 +114,132 @@ export async function GET(request: NextRequest) {
     const grandTotalPcs = stockItems.reduce((acc, i) => acc + i.totalPcs, 0);
     const grandTotalValuation = stockItems.reduce((acc, i) => acc + i.totalValuation, 0);
 
-    // Calculate aggregated sold units & profit from all non-cancelled orders & bills (including Bill No 1 to 39)
-    const soldOrders = await prisma.order.findMany({
-      where: {
-        status: { not: "Cancelled" },
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                category: true,
-                costPrice: true,
-                retailerPrice: true,
-                price: true,
+    let grandTotalSoldUnits = 0;
+    let grandTotalSalesRevenue = 0;
+    let grandTotalCostOfSold = 0;
+    let grandTotalSoldProfit = 0;
+    let overallMarginPercent = 0;
+    let soldProfitBreakdown: any[] = [];
+    let billProfitBreakdown: any[] = [];
+
+    // Calculate aggregated sold units & profit from all non-cancelled orders only when requested (e.g. /admin/profit)
+    if (includeProfit) {
+      const soldOrders = await prisma.order.findMany({
+        where: {
+          status: { not: "Cancelled" },
+        },
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  category: true,
+                  costPrice: true,
+                  retailerPrice: true,
+                  price: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { id: "asc" },
-    });
-
-    let grandTotalSoldUnits = 0;
-    let grandTotalSalesRevenue = 0;
-    let grandTotalCostOfSold = 0;
-
-    const soldPerProductMap = new Map<
-      number,
-      {
-        productId: number;
-        productName: string;
-        category: string;
-        soldUnits: number;
-        avgSellingPrice: number;
-        costPrice: number;
-        sellingRevenue: number;
-        totalCost: number;
-        grossProfit: number;
-        marginPercent: number;
-      }
-    >();
-
-    const billProfitBreakdown: Array<{
-      billNo: string;
-      orderId: number;
-      customerName: string;
-      date: string;
-      totalPcs: number;
-      revenue: number;
-      cost: number;
-      profit: number;
-      marginPercent: number;
-    }> = [];
-
-    for (const order of soldOrders) {
-      let orderUnits = 0;
-      let orderRev = 0;
-      let orderCost = 0;
-
-      for (const item of order.items) {
-        const pcs = item.totalPcs || 0;
-        const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
-
-        // Accurate unit costing:
-        // If product costPrice is explicitly configured, use it; otherwise default to 70% of actual selling rate
-        let prodCost = 0;
-        if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
-          prodCost = item.product.costPrice;
-        } else {
-          prodCost = Math.round(item.unitPrice * 0.7);
-        }
-        const cost = Math.round(pcs * prodCost);
-        const profit = Math.round(subtotal - cost);
-
-        orderUnits += pcs;
-        orderRev += subtotal;
-        orderCost += cost;
-
-        grandTotalSoldUnits += pcs;
-        grandTotalSalesRevenue += subtotal;
-        grandTotalCostOfSold += cost;
-
-        const pId = item.productId;
-        if (!soldPerProductMap.has(pId)) {
-          soldPerProductMap.set(pId, {
-            productId: pId,
-            productName: item.productName || item.product?.name || "Garment",
-            category: item.product?.category || "Trouser",
-            soldUnits: 0,
-            avgSellingPrice: 0,
-            costPrice: prodCost,
-            sellingRevenue: 0,
-            totalCost: 0,
-            grossProfit: 0,
-            marginPercent: 0,
-          });
-        }
-        const entry = soldPerProductMap.get(pId)!;
-        entry.soldUnits += pcs;
-        entry.sellingRevenue += subtotal;
-        entry.totalCost += cost;
-        entry.grossProfit += profit;
-      }
-
-      const orderProfit = Math.round(orderRev - orderCost);
-      const orderMargin = orderRev > 0 ? Math.round((orderProfit / orderRev) * 1000) / 10 : 0;
-
-      billProfitBreakdown.push({
-        billNo: order.taxInvoiceNumber || String(order.id),
-        orderId: order.id,
-        customerName: order.customerName || "Customer",
-        date: (order.orderDate || order.createdAt).toISOString(),
-        totalPcs: orderUnits,
-        revenue: orderRev,
-        cost: orderCost,
-        profit: orderProfit,
-        marginPercent: orderMargin,
+        orderBy: { id: "asc" },
       });
+
+      const soldPerProductMap = new Map<
+        number,
+        {
+          productId: number;
+          productName: string;
+          category: string;
+          soldUnits: number;
+          avgSellingPrice: number;
+          costPrice: number;
+          sellingRevenue: number;
+          totalCost: number;
+          grossProfit: number;
+          marginPercent: number;
+        }
+      >();
+
+      for (const order of soldOrders) {
+        let orderUnits = 0;
+        let orderRev = 0;
+        let orderCost = 0;
+
+        for (const item of order.items) {
+          const pcs = item.totalPcs || 0;
+          const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
+
+          // Accurate unit costing:
+          // If product costPrice is explicitly configured, use it; otherwise default to 70% of actual selling rate
+          let prodCost = 0;
+          if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
+            prodCost = item.product.costPrice;
+          } else {
+            prodCost = Math.round(item.unitPrice * 0.7);
+          }
+          const cost = Math.round(pcs * prodCost);
+          const profit = Math.round(subtotal - cost);
+
+          orderUnits += pcs;
+          orderRev += subtotal;
+          orderCost += cost;
+
+          grandTotalSoldUnits += pcs;
+          grandTotalSalesRevenue += subtotal;
+          grandTotalCostOfSold += cost;
+
+          const pId = item.productId;
+          if (!soldPerProductMap.has(pId)) {
+            soldPerProductMap.set(pId, {
+              productId: pId,
+              productName: item.productName || item.product?.name || "Garment",
+              category: item.product?.category || "Trouser",
+              soldUnits: 0,
+              avgSellingPrice: 0,
+              costPrice: prodCost,
+              sellingRevenue: 0,
+              totalCost: 0,
+              grossProfit: 0,
+              marginPercent: 0,
+            });
+          }
+          const entry = soldPerProductMap.get(pId)!;
+          entry.soldUnits += pcs;
+          entry.sellingRevenue += subtotal;
+          entry.totalCost += cost;
+          entry.grossProfit += profit;
+        }
+
+        const orderProfit = Math.round(orderRev - orderCost);
+        const orderMargin = orderRev > 0 ? Math.round((orderProfit / orderRev) * 1000) / 10 : 0;
+
+        billProfitBreakdown.push({
+          billNo: order.taxInvoiceNumber || String(order.id),
+          orderId: order.id,
+          customerName: order.customerName || "Customer",
+          date: (order.orderDate || order.createdAt).toISOString(),
+          totalPcs: orderUnits,
+          revenue: orderRev,
+          cost: orderCost,
+          profit: orderProfit,
+          marginPercent: orderMargin,
+        });
+      }
+
+      soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {
+        p.avgSellingPrice = p.soldUnits > 0 ? Math.round(p.sellingRevenue / p.soldUnits) : 0;
+        p.marginPercent = p.sellingRevenue > 0 ? Math.round((p.grossProfit / p.sellingRevenue) * 1000) / 10 : 0;
+        return p;
+      }).sort((a, b) => b.grossProfit - a.grossProfit);
+
+      grandTotalSoldProfit = Math.round(grandTotalSalesRevenue - grandTotalCostOfSold);
+      overallMarginPercent = grandTotalSalesRevenue > 0
+        ? Math.round((grandTotalSoldProfit / grandTotalSalesRevenue) * 1000) / 10
+        : 0;
     }
-
-    const soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {
-      p.avgSellingPrice = p.soldUnits > 0 ? Math.round(p.sellingRevenue / p.soldUnits) : 0;
-      p.marginPercent = p.sellingRevenue > 0 ? Math.round((p.grossProfit / p.sellingRevenue) * 1000) / 10 : 0;
-      return p;
-    }).sort((a, b) => b.grossProfit - a.grossProfit);
-
-    const grandTotalSoldProfit = Math.round(grandTotalSalesRevenue - grandTotalCostOfSold);
-    const overallMarginPercent = grandTotalSalesRevenue > 0
-      ? Math.round((grandTotalSoldProfit / grandTotalSalesRevenue) * 1000) / 10
-      : 0;
 
     return NextResponse.json({
       stockItems,

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Toaster } from "@/components/ui/Toast";
+import { ToastProvider } from "@/components/ui/Toast";
 import { CartProvider } from "@/components/providers/CartProvider";
+import StoreLayoutShell from "@/components/layout/StoreLayoutShell";
+import { EmployeeProvider } from "@/components/providers/EmployeeProvider";
 
 export const metadata: Metadata = {
   title: "IQ TROUSERS — Premium Garment Manufacturers & Wholesalers",
@@ -11,9 +13,6 @@ export const metadata: Metadata = {
   },
 };
 
-import StoreLayoutShell from "@/components/layout/StoreLayoutShell";
-import { EmployeeProvider } from "@/components/providers/EmployeeProvider";
-
 export default function RootLayout({
   children,
 }: {
@@ -22,12 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans bg-white text-gray-900 antialiased">
-        <EmployeeProvider>
-          <CartProvider>
-            <StoreLayoutShell>{children}</StoreLayoutShell>
-            <Toaster />
-          </CartProvider>
-        </EmployeeProvider>
+        <ToastProvider>
+          <EmployeeProvider>
+            <CartProvider>
+              <StoreLayoutShell>{children}</StoreLayoutShell>
+            </CartProvider>
+          </EmployeeProvider>
+        </ToastProvider>
       </body>
     </html>
   );

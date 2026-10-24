@@ -370,7 +370,7 @@ export default function OrderEditPage() {
               {status === "Pending" && (
                 isAdmin || Boolean(employee?.canEditOrders) || employee?.name?.trim().toLowerCase() === "krish shah" ? (
                   <Link
-                    href={`/orders/${orderId}/edit`}
+                    href={`/orders/new?orderId=${orderId}`}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-blue-900/20 cursor-pointer"
                     title="Edit items, products, size ratios, sets and prices on order form"
                   >

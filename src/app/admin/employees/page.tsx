@@ -262,6 +262,17 @@ export default function EmployeesPage() {
             : `🔒 Order Form Editing access REVOKED for "${name}".`,
           "success"
         );
+
+        // Broadcast permission change immediately to all open employee tabs & windows
+        try {
+          const ch = new BroadcastChannel("garmentpro_perm_channel");
+          ch.postMessage({ type: "PERMISSIONS_UPDATED", employeeId: id, canEditOrders: allowEdit });
+          ch.close();
+        } catch {}
+        try {
+          localStorage.setItem("garmentpro_perm_sync", Date.now().toString());
+        } catch {}
+
         fetchEmployees();
         fetchPerformanceData();
       } else {
@@ -307,6 +318,17 @@ export default function EmployeesPage() {
             : `🔒 Stock Update access REVOKED for "${name}".`,
           "success"
         );
+
+        // Broadcast permission change immediately to all open employee tabs & windows
+        try {
+          const ch = new BroadcastChannel("garmentpro_perm_channel");
+          ch.postMessage({ type: "PERMISSIONS_UPDATED", employeeId: id, canUpdateStock: allowStock });
+          ch.close();
+        } catch {}
+        try {
+          localStorage.setItem("garmentpro_perm_sync", Date.now().toString());
+        } catch {}
+
         fetchEmployees();
         fetchPerformanceData();
       } else {

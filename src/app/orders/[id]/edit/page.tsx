@@ -64,9 +64,17 @@ interface EditOrderItem {
 export default function EmployeeEditOrderPage() {
   const params = useParams();
   const router = useRouter();
+  const id = params?.id as string;
+
+  // Seamlessly redirect to the unified Order Form page with full customer details & items loaded
+  useEffect(() => {
+    if (id) {
+      router.replace(`/orders/new?orderId=${encodeURIComponent(id)}`);
+    }
+  }, [id, router]);
+
   const { toast } = useToast();
   const { employee, loading: empLoading } = useEmployee();
-  const id = params?.id as string;
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);

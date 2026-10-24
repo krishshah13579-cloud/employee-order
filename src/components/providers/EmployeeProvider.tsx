@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
+import { useToast } from "@/components/ui/Toast";
 
 export interface EmployeeSession {
   id: number;
@@ -37,8 +38,13 @@ export const useEmployee = () => useContext(EmployeeContext);
 export function EmployeeProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
   const [employee, setEmployee] = useState<EmployeeSession | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const prevEmployeeRef = useRef<EmployeeSession | null>(null);
+  const pathnameRef = useRef<string>(pathname);
+  pathnameRef.current = pathname;
 
   // Logout handler
   const logout = useCallback(async (reason?: string) => {
@@ -92,12 +98,34 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated && data.employee) {
-          setEmployee(data.employee);
-          localStorage.setItem("garmentpro_employee", JSON.stringify(data.employee));
-          localStorage.setItem("garmentpro_employee_name", data.employee.name);
-          return data.employee;
+          const prev = prevEmployeeRef.current;
+          const current: EmployeeSession = data.employee;
+
+          // Check for real-time permission changes and trigger appropriate toasts
+          if (prev && prev.id === current.id) {
+            if (!prev.canUpdateStock && current.canUpdateStock) {
+              toast("🎉 Stock Update Access Granted! You can now update garment stock.", "success");
+            } else if (prev.canUpdateStock && !current.canUpdateStock) {
+              toast("🔒 Stock Update Access Revoked by Administrator.", "error");
+              if (pathnameRef.current === "/update-stock") {
+                router.replace("/");
+              }
+            }
+            if (!prev.canEditOrders && current.canEditOrders) {
+              toast("✏️ Order Form Editing Access Approved by Administrator.", "success");
+            } else if (prev.canEditOrders && !current.canEditOrders) {
+              toast("🔒 Order Form Editing Access Revoked by Administrator.", "info");
+            }
+          }
+
+          prevEmployeeRef.current = current;
+          setEmployee(current);
+          localStorage.setItem("garmentpro_employee", JSON.stringify(current));
+          localStorage.setItem("garmentpro_employee_name", current.name);
+          return current;
         } else if (data.nightLogout) {
           setEmployee(null);
+          prevEmployeeRef.current = null;
           localStorage.removeItem("garmentpro_employee");
           localStorage.removeItem("garmentpro_employee_name");
           logout("night_logout");
@@ -106,15 +134,43 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
       }
 
       setEmployee(null);
+      prevEmployeeRef.current = null;
       localStorage.removeItem("garmentpro_employee");
       localStorage.removeItem("garmentpro_employee_name");
       return null;
     } catch {
       return null;
     }
-  }, [logout]);
+  }, [logout, router, toast]);
 
-  // Re-verify session whenever pathname changes or periodically every 15s to catch permission revocations right away
+  // Fast cross-tab real-time sync via BroadcastChannel & localStorage events
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("garmentpro_perm_channel");
+      channel.onmessage = () => {
+        refreshSession();
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "garmentpro_perm_sync") {
+        refreshSession();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      if (channel) {
+        try {
+          channel.close();
+        } catch {}
+      }
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [refreshSession]);
+
+  // Re-verify session whenever pathname changes or periodically every 3s to catch permission updates right away
   useEffect(() => {
     refreshSession();
   }, [pathname, refreshSession]);
@@ -122,7 +178,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const timer = setInterval(() => {
       refreshSession();
-    }, 15000);
+    }, 3000);
     return () => clearInterval(timer);
   }, [refreshSession]);
 

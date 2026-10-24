@@ -101,6 +101,10 @@ function OrderFormContent() {
 
   const customerIdParam = searchParams.get(PARAM_CUSTOMER_ID);
   const businessTypeParam = sanitizeBusinessType(searchParams.get(PARAM_BUSINESS_TYPE));
+  const orderIdParam = searchParams.get("orderId") || searchParams.get("editOrderId");
+  const editingOrderId = sanitizePositiveInt(orderIdParam);
+  const [editingOrderNumber, setEditingOrderNumber] = useState<string | null>(null);
+  const [loadingOrderToEdit, setLoadingOrderToEdit] = useState<boolean>(Boolean(editingOrderId));
 
   // Employee Name
   const [placedBy, setPlacedBy] = useState<string>("");
@@ -280,9 +284,9 @@ function OrderFormContent() {
     }
   }, []);
 
-  // Helper for returnTo URL ensuring customerId is carried safely when navigating to products
+  // Helper for returnTo URL ensuring customerId and editingOrderId are carried safely when navigating to products
   const getReturnToUrl = () => {
-    return buildOrderFormReturnUrl(selectedCustomerId);
+    return buildOrderFormReturnUrl(selectedCustomerId, editingOrderId);
   };
 
   // Sync draft back to localStorage whenever it changes
@@ -299,6 +303,8 @@ function OrderFormContent() {
       const cd = creditDaysVal !== undefined ? creditDaysVal : orderCreditDays;
       const bType = customBType || orderBusinessType || cust?.businessType || "RETAILER";
       const draftObj = {
+        editingOrderId,
+        editingOrderNumber,
         customerId,
         businessType: bType,
         customer: cust
@@ -328,6 +334,161 @@ function OrderFormContent() {
       console.error("Error saving draft to localStorage:", err);
     }
   };
+
+  // Cancel editing existing order and return to order details
+  const handleCancelEdit = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY_ORDER_DRAFT);
+      window.dispatchEvent(new Event("garmentpro_draft_updated"));
+    } catch {}
+    router.push(`/orders/${editingOrderId}`);
+  };
+
+  // When editingOrderId is present in query, load full customer details & items from existing order
+  useEffect(() => {
+    if (!editingOrderId) return;
+
+    let isMounted = true;
+    const loadOrderForEditing = async () => {
+      try {
+        setLoadingOrderToEdit(true);
+
+        // Check if draft in localStorage already contains this order with modified items
+        const raw = localStorage.getItem(STORAGE_KEY_ORDER_DRAFT);
+        if (raw) {
+          try {
+            const draft = JSON.parse(raw);
+            if (
+              draft?.editingOrderId === editingOrderId &&
+              Array.isArray(draft.items) &&
+              draft.items.length > 0
+            ) {
+              setEditingOrderNumber(draft.editingOrderNumber || null);
+              if (draft.customerId) setSelectedCustomerId(draft.customerId);
+              if (draft.placedBy) setPlacedBy(draft.placedBy);
+              if (draft.notes) setOrderNotes(draft.notes);
+              if (draft.creditDays !== undefined) setOrderCreditDays(draft.creditDays);
+              if (draft.businessType) setOrderBusinessType(draft.businessType);
+              setItems(draft.items);
+              setLoadingOrderToEdit(false);
+              return;
+            }
+          } catch {}
+        }
+
+        const res = await fetch(`/api/orders/${editingOrderId}`, { cache: "no-store" });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toast(err.error || `Failed to load order #${editingOrderId} for editing`, "error");
+          router.replace("/orders");
+          return;
+        }
+
+        const order = await res.json();
+        if (!isMounted) return;
+
+        setEditingOrderNumber(order.orderNumber);
+        if (order.customerId) {
+          setSelectedCustomerId(order.customerId);
+        }
+        if (order.placedBy) {
+          setPlacedBy(order.placedBy);
+        }
+        if (order.creditDays !== undefined) {
+          const cd = parseInt(order.creditDays, 10) || 0;
+          setOrderCreditDays(cd);
+          if (cd === 45) setIsCreditLocked(true);
+        }
+        if (order.businessType) {
+          setOrderBusinessType(order.businessType);
+        }
+
+        // Parse transport info from notes
+        const tMatch = (order.notes || "").match(
+          /\[TRANSPORT:\s*([^|\]]+)(?:\s*\|\s*Station:\s*([^\]]+))?\]/i
+        );
+        if (tMatch) {
+          setTransportName(tMatch[1].trim());
+          if (tMatch[2]) setTransportStation(tMatch[2].trim());
+        }
+        const cleanNotes = (order.notes || "").replace(/\[TRANSPORT:[^\]]*\]/gi, "").trim();
+        setOrderNotes(cleanNotes);
+
+        // Map order items to DraftOrderItem array
+        const loadedItems: DraftOrderItem[] = (order.items || []).map((it: any) => {
+          let colorSets: ColorSetEntry[] = [];
+          try {
+            if (typeof it.colorSets === "string") {
+              colorSets = JSON.parse(it.colorSets);
+            } else if (Array.isArray(it.colorSets)) {
+              colorSets = it.colorSets;
+            }
+          } catch {
+            colorSets = [];
+          }
+
+          let colorMixPcs: Record<string, Record<string, number>> | undefined = undefined;
+          try {
+            if (typeof it.colorMixPcs === "string") {
+              colorMixPcs = JSON.parse(it.colorMixPcs);
+            } else if (it.colorMixPcs && typeof it.colorMixPcs === "object") {
+              colorMixPcs = it.colorMixPcs;
+            }
+          } catch {}
+
+          return {
+            productId: it.productId,
+            productName: it.product?.name || it.productName || `Product #${it.productId}`,
+            category: it.product?.category,
+            imageUrl: it.product?.imageUrl,
+            colorSets,
+            sizeRatio: it.sizeRatio || it.product?.sizesRatio || "30 to 38",
+            sizesList: it.sizesList || it.product?.sizesList,
+            pcsPerSet: it.pcsPerSet || it.product?.pcsPerSet || 5,
+            totalSets: it.totalSets || 0,
+            totalPcs: it.totalPcs || 0,
+            retailerPrice: it.product?.retailerPrice,
+            wholesalerPrice: it.product?.wholesalerPrice,
+            unitPrice: it.unitPrice || it.product?.price || 0,
+            mixPcs: it.mixPcs || 0,
+            mixSizes: it.mixSizes || "",
+            colorMixPcs,
+            itemSubtotal: it.totalPrice || (it.totalPcs * (it.unitPrice || 0)),
+            notes: it.notes || "",
+          };
+        });
+
+        setItems(loadedItems);
+
+        // Write to draft in localStorage
+        try {
+          const draftObj = {
+            editingOrderId,
+            editingOrderNumber: order.orderNumber,
+            customerId: order.customerId,
+            businessType: order.businessType || order.customer?.businessType || "RETAILER",
+            creditDays: order.creditDays || 0,
+            items: loadedItems,
+            notes: cleanNotes,
+            placedBy: order.placedBy || "",
+          };
+          localStorage.setItem(STORAGE_KEY_ORDER_DRAFT, JSON.stringify(draftObj));
+          window.dispatchEvent(new Event("garmentpro_draft_updated"));
+        } catch {}
+      } catch (err: any) {
+        console.error("Error loading order to edit:", err);
+        toast("Failed to load order: " + err.message, "error");
+      } finally {
+        if (isMounted) setLoadingOrderToEdit(false);
+      }
+    };
+
+    loadOrderForEditing();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [editingOrderId, router, toast]);
 
   // Selected customer object (with strict customer isolation to prevent IDOR parameter tampering)
   const selectedCustomer = useMemo(() => {
@@ -799,6 +960,33 @@ function OrderFormContent() {
         })),
       };
 
+      if (editingOrderId) {
+        // Update existing order via PUT /api/orders/:id
+        const res = await fetch(`/api/orders/${editingOrderId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || `Failed to update order (${res.status})`);
+        }
+
+        const result = await res.json();
+
+        // Clear active draft
+        try {
+          localStorage.removeItem("garmentpro_order_draft");
+          window.dispatchEvent(new Event("garmentpro_draft_updated"));
+        } catch {}
+
+        setIsTransportModalOpen(false);
+        toast(`✅ Order #${result.orderNumber || editingOrderNumber || editingOrderId} updated successfully!`, "success");
+        router.push(`/orders/${editingOrderId}`);
+        return;
+      }
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -983,20 +1171,68 @@ function OrderFormContent() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {/* Loading existing order for editing indicator */}
+        {loadingOrderToEdit && (
+          <div className="p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-center gap-3 text-slate-700 font-bold text-sm shadow-sm">
+            <Loader2 size={18} className="animate-spin text-orange-500" />
+            <span>Loading Order #{editingOrderId} and customer details...</span>
+          </div>
+        )}
+
+        {/* Prominent Edit Order Banner */}
+        {editingOrderId && !loadingOrderToEdit && (
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-orange-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <Edit3 size={20} className="text-white" />
+              </div>
+              <div>
+                <div className="font-black text-base sm:text-lg tracking-tight">
+                  Editing Order #{editingOrderNumber || editingOrderId}
+                </div>
+                <div className="text-xs text-amber-100">
+                  Modifying items, sizes, quantities, and customer details for {selectedCustomer?.shopName || "Customer"}.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <X size={14} />
+                <span>Cancel Edit</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Title: Only keep H1 tag for Order Form */}
         <div className="flex items-center justify-between pb-1">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Order Form
+            Order Form {editingOrderId && <span className="text-sm font-bold text-orange-600 ml-2">(Edit Mode)</span>}
           </h1>
-          {items.length > 0 && (
+          {editingOrderId ? (
             <button
               type="button"
-              onClick={handleClearDraft}
+              onClick={handleCancelEdit}
               className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
-              <RotateCcw size={14} />
-              <span>Clear Form</span>
+              <X size={14} />
+              <span>Cancel Edit</span>
             </button>
+          ) : (
+            items.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearDraft}
+                className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <RotateCcw size={14} />
+                <span>Clear Form</span>
+              </button>
+            )
           )}
         </div>
 
@@ -1809,12 +2045,16 @@ function OrderFormContent() {
               type="button"
               disabled={isSubmitting || items.length === 0 || !selectedCustomerId}
               onClick={handleSubmitOrder}
-              className="w-full py-4 px-4 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full py-4 px-4 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
-              <FilePlus size={20} />
+              {editingOrderId ? <Edit3 size={20} /> : <FilePlus size={20} />}
               <span>
                 {isSubmitting
-                  ? "Submitting Wholesale Order..."
+                  ? editingOrderId
+                    ? "Updating Order..."
+                    : "Submitting Wholesale Order..."
+                  : editingOrderId
+                  ? `Update Order Form (${totalPcs} Pcs · ${formatCurrency(grandTotal)})`
                   : `Submit Order (${totalPcs} Pcs · ${formatCurrency(grandTotal)})`}
               </span>
             </button>
@@ -1828,7 +2068,7 @@ function OrderFormContent() {
       <Modal
         isOpen={isTransportModalOpen}
         onClose={() => !isSubmitting && setIsTransportModalOpen(false)}
-        title="Transport / Dispatch Details"
+        title={editingOrderId ? "Confirm Transport & Save Changes" : "Transport / Dispatch Details"}
         size="md"
         footer={
           <div className="flex items-center justify-end gap-2.5 w-full">
@@ -1836,7 +2076,7 @@ function OrderFormContent() {
               type="button"
               disabled={isSubmitting}
               onClick={() => setIsTransportModalOpen(false)}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
             >
               Cancel
             </button>
@@ -1849,12 +2089,12 @@ function OrderFormContent() {
               {isSubmitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Placing Order...</span>
+                  <span>{editingOrderId ? "Saving Changes..." : "Placing Order..."}</span>
                 </>
               ) : (
                 <>
                   <Truck size={14} />
-                  <span>Confirm Transport &amp; Submit</span>
+                  <span>{editingOrderId ? "Save Changes & Update Order" : "Confirm Transport & Submit"}</span>
                 </>
               )}
             </button>

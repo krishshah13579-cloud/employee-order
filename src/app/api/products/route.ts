@@ -35,9 +35,35 @@ export async function GET(request: NextRequest) {
 
     const inStockOnly = searchParams.get("in_stock_only") === "1" || searchParams.get("hide_out_of_stock") === "1";
 
+    const selectFields = fullGallery
+      ? undefined
+      : {
+          id: true,
+          name: true,
+          category: true,
+          colorsAvailable: true,
+          colorMapping: true,
+          sizesRatio: true,
+          sizesList: true,
+          pcsPerSet: true,
+          mrp: true,
+          retailerPrice: true,
+          wholesalerPrice: true,
+          price: true,
+          costPrice: true,
+          mixPcs: true,
+          setsColorwise: true,
+          sizeGuide: true,
+          imageUrl: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        };
+
     const rawProducts = await prisma.product.findMany({
       where,
       orderBy: { name: "asc" },
+      ...(selectFields ? { select: selectFields } : {}),
     });
 
     // Sort strictly in numerical sequence starting from IMP - 001 upwards

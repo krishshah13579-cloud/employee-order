@@ -150,9 +150,5 @@ function CartProviderInner({ children }: { children: React.ReactNode }) {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <ToastProvider>
-      <CartProviderInner>{children}</CartProviderInner>
-    </ToastProvider>
-  );
+  return <CartProviderInner>{children}</CartProviderInner>;
 }
