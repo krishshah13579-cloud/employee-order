@@ -16,6 +16,7 @@ import {
   Scissors,
   Lock,
   Edit,
+  Sparkles,
 } from "lucide-react";
 import { formatCurrency, formatProductNameWithMrp } from "@/lib/utils";
 import {
@@ -611,12 +612,12 @@ export default function EditOrderPage() {
       </div>
 
       {/* Guide Banner */}
-      <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-950 flex items-start gap-2.5 shadow-2xs">
-        <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <strong>Full-Page Product &amp; Order Editor:</strong> Directly configure garment products, size ratios, color-wise sets, and piece rates.
-          If both <strong>28 to 36</strong> and <strong>28 to 34 (4 pc set)</strong> exist, 28 to 36 is prioritized first.
-          Total pieces, piece counts per set, and 5% GST automatically recalculate live.
+      <div className="px-4 py-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 flex items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <AlertCircle size={15} className="text-blue-600 shrink-0" />
+          <span>
+            <strong>Product &amp; Ratio Editor:</strong> Select size ratios, color sets, and piece rates. <strong>28 to 36</strong> is prioritized over 28 to 34. Total pieces and 5% GST recalculate live.
+          </span>
         </div>
       </div>
 
@@ -632,41 +633,43 @@ export default function EditOrderPage() {
             </h2>
           </div>
 
-          {/* Add Product Dropdown */}
-          {availableProducts.length > 0 && (
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedProductToAdd}
-                onChange={(e) => setSelectedProductToAdd(e.target.value)}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-700 cursor-pointer max-w-[280px] truncate font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="">+ Add Product from Catalogue...</option>
-                {availableProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.category}) — ₹{p.retailerPrice || p.price}/pc
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!selectedProductToAdd}
-                onClick={() => handleAddProduct(selectedProductToAdd)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 transition"
-              >
-                <Plus size={14} />
-                <span>Add Product</span>
-              </button>
+          {/* Add Product Dropdown & Browse Store */}
+          <div className="flex flex-wrap items-center gap-2">
+            {availableProducts.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={selectedProductToAdd}
+                  onChange={(e) => setSelectedProductToAdd(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-700 cursor-pointer max-w-[240px] truncate font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs"
+                >
+                  <option value="">+ Add Product from Catalogue...</option>
+                  {availableProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.category}) — ₹{p.retailerPrice || p.price}/pc
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selectedProductToAdd}
+                  onClick={() => handleAddProduct(selectedProductToAdd)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 transition shadow-2xs"
+                >
+                  <Plus size={14} />
+                  <span>Add</span>
+                </button>
+              </div>
+            )}
 
-              <Link
-                href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
-                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 transition"
-                title="Browse store to select products, colors, and mix sizes"
-              >
-                <Plus size={14} />
-                <span>Browse Store &amp; Mix</span>
-              </Link>
-            </div>
-          )}
+            <Link
+              href={`/products?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
+              className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition shadow-xs"
+              title="Browse store to select products, colors, and mix sizes"
+            >
+              <Sparkles size={14} className="text-orange-200" />
+              <span>Browse Store &amp; Mix</span>
+            </Link>
+          </div>
         </div>
 
         {/* Product Items List */}
@@ -674,25 +677,27 @@ export default function EditOrderPage() {
           {orderItems.map((item, itIdx) => (
             <div
               key={itIdx}
-              className="p-4 sm:p-5 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-4 text-xs transition hover:border-slate-300 shadow-2xs"
+              className="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl space-y-4 text-xs transition hover:border-slate-300 shadow-xs"
             >
               {/* Product Header Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                  <span className="w-7 h-7 rounded-lg bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                     {itIdx + 1}
                   </span>
                   <div>
-                    <span className="text-base font-black text-slate-900">
-                      {formatProductNameWithMrp(
-                        item.productName,
-                        item.mrp || item.product?.mrp,
-                        item.unitPrice
-                      )}
-                    </span>
-                    <span className="ml-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      {item.product?.category || "Apparel"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black text-slate-900">
+                        {formatProductNameWithMrp(
+                          item.productName,
+                          item.mrp || item.product?.mrp,
+                          item.unitPrice
+                        )}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wide">
+                        {item.product?.category || "Formal Wear"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -701,7 +706,7 @@ export default function EditOrderPage() {
                     <span className="text-blue-700 font-extrabold text-sm">
                       {item.totalSets} Sets ({item.totalPcs} Pcs)
                     </span>
-                    <span className="text-slate-400 mx-2">=</span>
+                    <span className="text-slate-300 mx-2">=</span>
                     <span className="text-emerald-700 font-extrabold text-sm">
                       {formatCurrency(item.itemSubtotal)}
                     </span>
@@ -709,11 +714,11 @@ export default function EditOrderPage() {
 
                   <Link
                     href={`/products/${item.productId}?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/orders/${order.id}/edit`)}`}
-                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer flex items-center gap-1 font-bold text-xs"
+                    className="px-2.5 py-1.5 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center gap-1 font-bold text-xs border border-blue-200 shadow-2xs"
                     title="Edit sets and mix sizes on product page"
                   >
-                    <Edit size={14} />
-                    <span className="hidden sm:inline">Product Page</span>
+                    <Edit size={13} />
+                    <span>Product Page</span>
                   </Link>
 
                   {orderItems.length > 1 && (
@@ -730,19 +735,18 @@ export default function EditOrderPage() {
               </div>
 
               {/* Size Ratio Selector Row */}
-              {/* Prioritizing: 28 to 36 first, then 28 to 34 (4 pc set) */}
-              <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between text-xs">
                   <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Scissors size={13} className="text-blue-600" />
                     <span>Select Size Ratio / Pack:</span>
                   </label>
-                  <span className="text-[11px] font-mono font-semibold text-blue-700">
+                  <span className="text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     1 Set = {item.pcsPerSet} Pcs [{item.sizesList}]
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-0.5">
                   {item.availableRatios.map((ratioKey) => {
                     const isSelected = item.sizeRatio === ratioKey;
                     const pcs = getPcsFromRatio(ratioKey);
@@ -753,23 +757,17 @@ export default function EditOrderPage() {
                         key={ratioKey}
                         type="button"
                         onClick={() => handleRatioChange(itIdx, ratioKey)}
-                        className={`px-3 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs ${
                           isSelected
                             ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                            : "bg-slate-50 hover:bg-blue-50 text-slate-800 border-slate-200 hover:border-blue-300"
+                            : "bg-white hover:bg-blue-50/60 text-slate-700 border-slate-200 hover:border-blue-300"
                         }`}
                       >
-                        <div className="font-black text-xs flex items-center justify-between">
-                          <span>{ratioKey}</span>
-                          {isSelected && <Check size={13} className="text-white shrink-0" />}
-                        </div>
-                        <div
-                          className={`text-[10px] font-medium mt-0.5 ${
-                            isSelected ? "text-blue-100" : "text-slate-500"
-                          }`}
-                        >
-                          {pcs} pcs/set {isFourPcSet ? "• 4 pc set" : ""}
-                        </div>
+                        <span>{ratioKey}</span>
+                        <span className={`text-[10px] font-normal ${isSelected ? "text-blue-100" : "text-slate-400"}`}>
+                          ({pcs} pcs{isFourPcSet ? " · 4 pc set" : ""})
+                        </span>
+                        {isSelected && <Check size={12} className="text-white shrink-0 ml-0.5" />}
                       </button>
                     );
                   })}
@@ -779,16 +777,24 @@ export default function EditOrderPage() {
               {/* Color-wise Sets Stepper Grid */}
               {item.colorSets && item.colorSets.length > 0 && (
                 <div className="space-y-2 pt-1">
-                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Color-Wise Sets:
+                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>Color-Wise Sets:</span>
+                    <span className="text-[11px] text-slate-500 font-semibold lowercase">
+                      total: <strong className="text-slate-900 font-bold">{item.totalSets} sets</strong>
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                     {item.colorSets.map((cs, cIdx) => {
                       const cHex = getColorHex(cs.color);
+                      const count = Number(cs.sets) || 0;
                       return (
                         <div
                           key={cIdx}
-                          className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition"
+                          className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
+                            count > 0
+                              ? "bg-blue-50/40 border-blue-200 shadow-2xs"
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
                         >
                           <div className="flex items-center gap-2 min-w-0 pr-1.5">
                             <span
@@ -796,7 +802,9 @@ export default function EditOrderPage() {
                               style={{ backgroundColor: cHex.hex }}
                             />
                             <span
-                              className="truncate text-xs font-bold text-slate-800"
+                              className={`truncate text-xs font-bold ${
+                                count > 0 ? "text-blue-950 font-black" : "text-slate-700"
+                              }`}
                               title={cs.color}
                             >
                               {cs.color}
@@ -811,7 +819,7 @@ export default function EditOrderPage() {
                                 handleEditColorSet(
                                   itIdx,
                                   cIdx,
-                                  (Number(cs.sets) || 0) - 1
+                                  count - 1
                                 )
                               }
                               className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-black text-xs font-black transition cursor-pointer"
@@ -821,7 +829,7 @@ export default function EditOrderPage() {
                             <input
                               type="number"
                               min="0"
-                              value={cs.sets === 0 ? "" : cs.sets}
+                              value={count === 0 ? "" : count}
                               placeholder="0"
                               onChange={(e) =>
                                 handleEditColorSet(
@@ -838,7 +846,7 @@ export default function EditOrderPage() {
                                 handleEditColorSet(
                                   itIdx,
                                   cIdx,
-                                  (Number(cs.sets) || 0) + 1
+                                  count + 1
                                 )
                               }
                               className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-black text-xs font-black transition cursor-pointer"
@@ -853,8 +861,8 @@ export default function EditOrderPage() {
                 </div>
               )}
 
-              {/* Mix Sizes Section with Remove Button */}
-              {(item.mixSizes || (item.mixPcs && item.mixPcs > 0)) && (
+              {/* Mix Sizes Section with Remove Button (Boolean guard ensures no stray '0') */}
+              {Boolean(item.mixSizes || (item.mixPcs && Number(item.mixPcs) > 0)) && (
                 <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -883,7 +891,7 @@ export default function EditOrderPage() {
               )}
 
               {/* Price Row */}
-              <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-200/80 gap-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between pt-3 border-t border-slate-200/80 gap-3 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-700">Price / Piece (₹):</span>
                   <input
@@ -894,15 +902,19 @@ export default function EditOrderPage() {
                     onChange={(e) =>
                       handleEditUnitPrice(itIdx, parseFloat(e.target.value) || 0)
                     }
-                    className="w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-28 px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white shadow-2xs"
                   />
                   <span className="text-slate-400 text-[11px]">per PC</span>
                 </div>
 
-                <div className="text-slate-600 text-xs">
-                  Rate per Set: <strong>₹{(item.unitPrice * item.pcsPerSet).toLocaleString("en-IN")}</strong>
-                  <span className="text-slate-400 mx-1.5">•</span>
-                  Subtotal: <strong className="text-emerald-700">{formatCurrency(item.itemSubtotal)}</strong>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-slate-600">
+                    Rate per Set: <strong className="text-slate-900 font-bold">₹{(item.unitPrice * item.pcsPerSet).toLocaleString("en-IN")}</strong>
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-slate-600">
+                    Subtotal: <strong className="text-emerald-700 font-extrabold text-sm font-mono">{formatCurrency(item.itemSubtotal)}</strong>
+                  </span>
                 </div>
               </div>
             </div>

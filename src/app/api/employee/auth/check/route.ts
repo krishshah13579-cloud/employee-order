@@ -10,6 +10,33 @@ export async function GET(_req: NextRequest) {
     const sessionCookie = cookieStore.get("garmentpro_emp_session");
 
     if (!sessionCookie?.value) {
+      // Check if user is logged in via Admin Panel (iq_admin_session)
+      const adminCookie = cookieStore.get("iq_admin_session");
+      if (adminCookie?.value) {
+        const decodedAdmin = verifyToken<{ username: string; id?: number }>(adminCookie.value);
+        if (decodedAdmin?.username) {
+          const adminAccount = await prisma.adminAccount.findUnique({
+            where: { username: decodedAdmin.username },
+            select: { id: true, username: true },
+          });
+          if (adminAccount) {
+            return NextResponse.json({
+              authenticated: true,
+              isAdmin: true,
+              employee: {
+                id: 0,
+                name: adminAccount.username || "Super Admin",
+                email: "admin@iqtrousers.com",
+                designation: "Super Administrator",
+                isTeamLeader: true,
+                canEditOrders: true,
+                mobileNumber: "",
+                isActive: true,
+              },
+            });
+          }
+        }
+      }
       return NextResponse.json({ authenticated: false });
     }
 
