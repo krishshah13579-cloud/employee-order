@@ -35,6 +35,9 @@ import {
   Edit3,
   Lock,
   Boxes,
+  Pencil,
+  ChevronDown,
+  MoreVertical,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -125,6 +128,7 @@ export default function EmployeesPage() {
   const [selectedEmpId, setSelectedEmpId] = useState<number | null>(null);
   const [empSearch, setEmpSearch] = useState("");
   const [customerFilterSearch, setCustomerFilterSearch] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   // Allocation Modal State
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
@@ -548,85 +552,109 @@ export default function EmployeesPage() {
           ══════════════════════════════════════════════════════════════ */}
       {activeTab === "access" && (
         <div className="space-y-6">
-          {/* Key KPI Stats Grid */}
+          {/* Key KPI Stats Grid - Styled matching Photo 3 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Turnover */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <TrendingUp size={20} />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  TURNOVER
+                </span>
+              </div>
+              <div className="mt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Total Staff Turnover
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <TrendingUp size={16} />
-                </div>
+                <span className="text-2xl font-black text-slate-900 font-mono tracking-tight block mt-0.5">
+                  {loadingPerf ? "..." : formatCurrency(perfData?.overview.totalCompanyTurnover || 0)}
+                </span>
               </div>
-              <div className="text-2xl font-black text-gray-900 font-mono">
-                {loadingPerf ? "..." : formatCurrency(perfData?.overview.totalCompanyTurnover || 0)}
-              </div>
-              <div className="text-[11px] text-gray-500 mt-1">
-                Generated across all active sales orders
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Generated across orders</span>
+                <span className="text-emerald-600 font-bold">Live</span>
               </div>
             </div>
 
             {/* Active Sales Staff */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <UserCheck size={20} />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/60">
+                  ACTIVE STAFF
+                </span>
+              </div>
+              <div className="mt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Sales Force Status
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <UserCheck size={16} />
+                <div className="text-2xl font-black text-slate-900 font-mono flex items-baseline gap-2 mt-0.5">
+                  <span>{loadingPerf ? "..." : perfData?.overview.activeEmployees || 0}</span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    / {perfData?.overview.totalEmployees || 0} active
+                  </span>
                 </div>
               </div>
-              <div className="text-2xl font-black text-gray-900 font-mono flex items-baseline gap-2">
-                <span>{loadingPerf ? "..." : perfData?.overview.activeEmployees || 0}</span>
-                <span className="text-xs font-semibold text-gray-400">
-                  / {perfData?.overview.totalEmployees || 0} active
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1 text-amber-700 font-bold">
+                  <Crown size={12} /> {perfData?.overview.teamLeaders || 0} T.L.
                 </span>
-              </div>
-              <div className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
-                <Crown size={12} />
-                <span>{perfData?.overview.teamLeaders || 0} Team Leader(s) with 24*7 rights</span>
+                <span className="text-slate-400">24*7 Access</span>
               </div>
             </div>
 
             {/* Allocated Customers */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Customer Portfolios
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                  <Briefcase size={20} />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200/60">
+                  PORTFOLIOS
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                  <Briefcase size={16} />
+              </div>
+              <div className="mt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Allocated Shops
+                </span>
+                <div className="text-2xl font-black text-slate-900 font-mono flex items-baseline gap-2 mt-0.5">
+                  <span>{loadingPerf ? "..." : perfData?.overview.totalAllocatedCustomers || 0}</span>
+                  <span className="text-xs font-semibold text-slate-400">assigned</span>
                 </div>
               </div>
-              <div className="text-2xl font-black text-gray-900 font-mono flex items-baseline gap-2">
-                <span>{loadingPerf ? "..." : perfData?.overview.totalAllocatedCustomers || 0}</span>
-                <span className="text-xs font-semibold text-gray-400">allocated</span>
-              </div>
-              <div className="text-[11px] text-gray-500 mt-1">
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
                 <span className="font-bold text-amber-700">
-                  {perfData?.overview.totalUnallocatedCustomers || 0} unallocated
-                </span>{" "}
-                shops pending assignment
+                  {perfData?.overview.totalUnallocatedCustomers || 0} unassigned
+                </span>
+                <span className="text-slate-400">Shops</span>
               </div>
             </div>
 
             {/* Allocated Customer Outstanding */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Allocated Outstanding
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
-                  <IndianRupee size={16} />
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <IndianRupee size={20} />
                 </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60">
+                  OUTSTANDING
+                </span>
               </div>
-              <div className="text-2xl font-black text-red-600 font-mono">
-                {loadingPerf ? "..." : formatCurrency(perfData?.overview.totalAllocatedOutstanding || 0)}
+              <div className="mt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Total Outstanding
+                </span>
+                <span className="text-2xl font-black text-rose-600 font-mono tracking-tight block mt-0.5">
+                  {loadingPerf ? "..." : formatCurrency(perfData?.overview.totalAllocatedOutstanding || 0)}
+                </span>
               </div>
-              <div className="text-[11px] text-gray-500 mt-1">
-                Total credit balance across assigned customers
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Credit balances</span>
+                <span className="text-rose-600 font-bold">Due</span>
               </div>
             </div>
           </div>
@@ -770,104 +798,36 @@ export default function EmployeesPage() {
                         </div>
                       </div>
 
-                      {/* Fast Access Action Controls */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* PIN Reset Button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPinModalEmp({ id: selectedProfile.id, name: selectedProfile.name });
-                            setNewPin("1234");
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
-                          title="Reset employee login PIN"
+                      {/* Fast Access Action Controls - Clean, subtle & in dropdown */}
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {/* 1. Approve Edit Access Checkbox */}
+                        <label
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
+                            selectedProfile.canEditOrders
+                              ? "bg-blue-50/80 border-blue-300 text-blue-900 hover:bg-blue-100"
+                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                          } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
+                          title={selectedProfile.canEditOrders ? "Uncheck to revoke edit order permission" : "Check to approve edit order permission"}
                         >
-                          <KeyRound size={13} className="text-gray-500" />
-                          <span>Reset PIN</span>
-                        </button>
-
-                        {/* T.L. Toggle */}
-                        {selectedProfile.isTeamLeader ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleTL(selectedProfile.id, selectedProfile.name, false)}
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedProfile.canEditOrders)}
                             disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 hover:bg-red-50 text-amber-800 hover:text-red-700 border border-amber-300 hover:border-red-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Remove Team Leader 24*7 rights"
-                          >
-                            <Crown size={13} />
-                            <span>Remove T.L.</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleTL(selectedProfile.id, selectedProfile.name, true)}
-                            disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 hover:border-orange-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Grant Team Leader status (24*7 portal access)"
-                          >
-                            <Crown size={13} className="text-orange-600" />
-                            <span>Make T.L. (24*7)</span>
-                          </button>
-                        )}
+                            onChange={(e) =>
+                              handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, e.target.checked)
+                            }
+                            className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                          />
+                          <Edit3 size={13} className={selectedProfile.canEditOrders ? "text-blue-600" : "text-gray-400"} />
+                          <span>Approve Edit Access</span>
+                        </label>
 
-                        {/* Active / Inactive Toggle */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleToggleActive(selectedProfile.id, selectedProfile.name, selectedProfile.isActive)
-                          }
-                          disabled={togglingId === selectedProfile.id}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer disabled:opacity-50 ${
-                            selectedProfile.isActive
-                              ? "bg-emerald-50 hover:bg-red-50 text-emerald-800 hover:text-red-700 border-emerald-300 hover:border-red-300"
-                              : "bg-gray-100 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border-gray-300"
-                          }`}
-                        >
-                          {selectedProfile.isActive ? (
-                            <>
-                              <CheckCircle size={13} className="text-emerald-600" />
-                              <span>Active Access</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={13} className="text-gray-400" />
-                              <span>Inactive (Suspended)</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* Order Form Edit Permission (Admin Approval) */}
-                        {selectedProfile.canEditOrders ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, false)}
-                            disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-red-50 text-blue-800 hover:text-red-700 border border-blue-300 hover:border-red-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Revoke Admin approval to edit pending orders"
-                          >
-                            <Edit3 size={13} className="text-blue-600" />
-                            <span>Revoke Edit Access</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleOrderEdit(selectedProfile.id, selectedProfile.name, true)}
-                            disabled={togglingId === selectedProfile.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-300 hover:border-blue-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                            title="Grant Admin approval to edit pending order forms"
-                          >
-                            <Edit3 size={13} className="text-gray-500" />
-                            <span>Approve Edit Access</span>
-                          </button>
-                        )}
-
-                        {/* Inventory Stock Update Permission (Checkbox Button) */}
+                        {/* 2. Stock Update Access Checkbox */}
                         <label
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
                             selectedProfile.canUpdateStock
-                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-                              : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"
+                              ? "bg-emerald-50/80 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                           } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
                           title={selectedProfile.canUpdateStock ? "Uncheck to revoke stock update access right away" : "Check to allow stock update access"}
                         >
@@ -881,45 +841,146 @@ export default function EmployeesPage() {
                             className="w-4 h-4 text-emerald-600 bg-white border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
                           />
                           <Boxes size={13} className={selectedProfile.canUpdateStock ? "text-emerald-600" : "text-gray-400"} />
-                          <span>{selectedProfile.canUpdateStock ? "Stock Update Allowed" : "Stock Update Access"}</span>
+                          <span>Stock Update Access</span>
                         </label>
+
+                        {/* 3. Edit Employee Button */}
+                        <Link
+                          href={`/admin/employees/${selectedProfile.id}/edit`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                          title="Edit employee details and permissions"
+                        >
+                          <Pencil size={12} />
+                          <span>Edit</span>
+                        </Link>
+
+                        {/* 4. Clean Actions Dropdown (Reset PIN, Toggle T.L., Toggle Active) */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                          >
+                            <MoreVertical size={13} className="text-gray-500" />
+                            <span>Actions</span>
+                            <ChevronDown size={12} className={`text-gray-400 transition-transform ${profileMenuOpen ? "rotate-180" : ""}`} />
+                          </button>
+
+                          {profileMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setProfileMenuOpen(false)}
+                              />
+                              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfileMenuOpen(false);
+                                    setPinModalEmp({ id: selectedProfile.id, name: selectedProfile.name });
+                                    setNewPin("1234");
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <KeyRound size={13} className="text-gray-500 shrink-0" />
+                                  <span>Reset Login PIN</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfileMenuOpen(false);
+                                    handleToggleTL(selectedProfile.id, selectedProfile.name, !selectedProfile.isTeamLeader);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Crown size={13} className={selectedProfile.isTeamLeader ? "text-amber-600 shrink-0" : "text-gray-400 shrink-0"} />
+                                  <span>{selectedProfile.isTeamLeader ? "Remove Team Leader (T.L.)" : "Make Team Leader (24*7)"}</span>
+                                </button>
+
+                                <div className="border-t border-gray-100 my-1" />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfileMenuOpen(false);
+                                    handleToggleActive(selectedProfile.id, selectedProfile.name, selectedProfile.isActive);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  {selectedProfile.isActive ? (
+                                    <>
+                                      <XCircle size={13} className="text-red-500 shrink-0" />
+                                      <span className="text-red-600">Deactivate Account</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle size={13} className="text-emerald-500 shrink-0" />
+                                      <span className="text-emerald-600">Activate Account</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Sales Metrics Cards */}
+                    {/* Sales Metrics Cards - Styled subtly matching Photo 3 */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-1">
-                      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                          Total Revenue
-                        </span>
-                        <span className="text-base font-black text-gray-900 font-mono">
+                      <div className="p-4 bg-white rounded-2xl border border-gray-200/80 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between text-gray-400 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Total Revenue
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200/50">
+                            SALES
+                          </span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 font-mono block mt-1">
                           {formatCurrency(selectedProfile.stats.totalRevenue)}
                         </span>
                       </div>
 
-                      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                          Orders Booked
-                        </span>
-                        <span className="text-base font-black text-gray-900 font-mono">
+                      <div className="p-4 bg-white rounded-2xl border border-gray-200/80 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between text-gray-400 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Orders Booked
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/50">
+                            ORDERS
+                          </span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 font-mono block mt-1">
                           {selectedProfile.stats.totalOrders}
                         </span>
                       </div>
 
-                      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                          Volume Sold
-                        </span>
-                        <span className="text-base font-black text-gray-900 font-mono">
+                      <div className="p-4 bg-white rounded-2xl border border-gray-200/80 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between text-gray-400 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Volume Sold
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200/50">
+                            SETS/PCS
+                          </span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 font-mono block mt-1">
                           {selectedProfile.stats.totalSets}s / {selectedProfile.stats.totalPcs}p
                         </span>
                       </div>
 
-                      <div className="p-3 bg-orange-50/60 rounded-xl border border-orange-200/80">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-700 block">
-                          Customer Outstanding
-                        </span>
-                        <span className="text-base font-black text-orange-800 font-mono">
+                      <div className="p-4 bg-white rounded-2xl border border-orange-200/80 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between text-orange-400 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-orange-700">
+                            Customer Outstanding
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                            DUE
+                          </span>
+                        </div>
+                        <span className="text-lg font-black text-orange-800 font-mono block mt-1">
                           {formatCurrency(selectedProfile.stats.allocatedOutstanding)}
                         </span>
                       </div>
