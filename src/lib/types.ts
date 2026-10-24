@@ -82,6 +82,7 @@ export interface EmployeeData {
   designation: string;
   isTeamLeader?: boolean;
   canEditOrders?: boolean;
+  canUpdateStock?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

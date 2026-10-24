@@ -16,6 +16,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Filter,
+  Tag,
+  Plus,
+  Trash2,
+  ArrowUpRight,
+  ShieldAlert,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -47,6 +52,19 @@ interface StockItem {
   isActive: boolean;
 }
 
+interface SoldProfitBreakdownItem {
+  productId: number;
+  productName: string;
+  category: string;
+  unitsSold: number;
+  sellingRevenue: number;
+  avgSellingPrice: number;
+  costPrice: number;
+  totalCost: number;
+  grossProfit: number;
+  marginPercent: number;
+}
+
 interface StockMetrics {
   totalStyles: number;
   activeInStock: number;
@@ -54,10 +72,53 @@ interface StockMetrics {
   grandTotalMixPcs: number;
   grandTotalPcs: number;
   grandTotalValuation: number;
+  grandTotalSoldUnits?: number;
+  grandTotalSalesRevenue?: number;
+  grandTotalCostOfSold?: number;
+  grandTotalSoldProfit?: number;
+  overallMarginPercent?: number;
+  soldProfitBreakdown?: SoldProfitBreakdownItem[];
 }
+
+interface AccessoryItemData {
+  id: number;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  minAlertQty: number;
+  costPerUnit: number;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface AccessorySummary {
+  totalItems: number;
+  totalQuantity: number;
+  lowStockCount: number;
+  totalValuation: number;
+}
+
+const ACCESSORY_CATEGORIES = [
+  "All",
+  "Buttons",
+  "Tags",
+  "Size Label",
+  "Flag Label",
+  "Zippers",
+  "Pocketing",
+  "Care Label",
+  "Others",
+];
 
 export default function AdminStockPage() {
   const { toast } = useToast();
+
+  // Active view tab
+  const [activeTab, setActiveTab] = useState<"GARMENT_STOCK" | "PROFIT_REPORT" | "ACCESSORIES">("GARMENT_STOCK");
+
+  // Garment Stock state
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [metrics, setMetrics] = useState<StockMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,19 +134,39 @@ export default function AdminStockPage() {
   const [syncingStore, setSyncingStore] = useState(false);
   const [modalCustomRatio, setModalCustomRatio] = useState("");
 
+  // Profit Report search state
+  const [profitSearch, setProfitSearch] = useState("");
+
+  // Accessories state
+  const [accessories, setAccessories] = useState<AccessoryItemData[]>([]);
+  const [accessorySummary, setAccessorySummary] = useState<AccessorySummary | null>(null);
+  const [accessoriesLoading, setAccessoriesLoading] = useState(false);
+  const [selectedAccessoryCategory, setSelectedAccessoryCategory] = useState("All");
+  const [accessorySearch, setAccessorySearch] = useState("");
+  const [isAddAccessoryOpen, setIsAddAccessoryOpen] = useState(false);
+  const [editingAccessory, setEditingAccessory] = useState<AccessoryItemData | null>(null);
+  const [savingAccessory, setSavingAccessory] = useState(false);
+  const [accessoryForm, setAccessoryForm] = useState({
+    name: "",
+    category: "Buttons",
+    quantity: "1000",
+    unit: "Pcs",
+    minAlertQty: "200",
+    costPerUnit: "1.00",
+    notes: "",
+  });
+
   const handleSyncStore = async () => {
     try {
       setSyncingStore(true);
       let data: any = null;
       let ok = false;
 
-      // 1. Direct browser fetch to storefront (human browser passes Cloudflare Bot Fight Mode with clearance cookies)
+      // 1. Direct browser fetch to storefront
       try {
         const directRes = await fetch("https://www.iqtrousers.in/api/sync-stock", {
           method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
+          headers: { Accept: "application/json" },
         });
         if (directRes.ok) {
           data = await directRes.json();
@@ -95,7 +176,7 @@ export default function AdminStockPage() {
         console.warn("Direct browser sync attempt failed, trying backend proxy:", browserErr);
       }
 
-      // 2. If direct browser fetch couldn't connect, fallback to backend proxy
+      // 2. Fallback to backend proxy
       if (!ok) {
         const res = await fetch("/api/admin/stock/sync", {
           method: "POST",
@@ -111,7 +192,7 @@ export default function AdminStockPage() {
         );
         fetchStock();
       } else {
-        toast(data?.error || "Storefront sync encountered an issue (Cloudflare Bot Check). Please open www.iqtrousers.in once in another tab.", "error");
+        toast(data?.error || "Storefront sync encountered an issue. Please open www.iqtrousers.in once.", "error");
       }
     } catch (e: any) {
       toast("Storefront sync error: " + e.message, "error");
@@ -136,8 +217,24 @@ export default function AdminStockPage() {
     }
   };
 
+  const fetchAccessories = async () => {
+    try {
+      setAccessoriesLoading(true);
+      const res = await fetch("/api/admin/stock/accessories", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load accessories");
+      const data = await res.json();
+      setAccessories(data.items || []);
+      setAccessorySummary(data.summary || null);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setAccessoriesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStock();
+    fetchAccessories();
   }, []);
 
   const categories = useMemo(() => {
@@ -164,12 +261,38 @@ export default function AdminStockPage() {
     });
   }, [stockItems, search, selectedCategory]);
 
+  // Profit breakdown filtered
+  const filteredProfitBreakdown = useMemo(() => {
+    const list = metrics?.soldProfitBreakdown || [];
+    if (!profitSearch.trim()) return list;
+    const q = profitSearch.toLowerCase();
+    return list.filter(
+      (it) =>
+        it.productName.toLowerCase().includes(q) ||
+        it.category.toLowerCase().includes(q)
+    );
+  }, [metrics?.soldProfitBreakdown, profitSearch]);
+
+  // Accessories filtered
+  const filteredAccessories = useMemo(() => {
+    return accessories.filter((it) => {
+      const matchCat =
+        selectedAccessoryCategory === "All" ||
+        it.category.toLowerCase() === selectedAccessoryCategory.toLowerCase();
+      const matchSearch =
+        !accessorySearch.trim() ||
+        it.name.toLowerCase().includes(accessorySearch.toLowerCase()) ||
+        it.category.toLowerCase().includes(accessorySearch.toLowerCase()) ||
+        (it.notes && it.notes.toLowerCase().includes(accessorySearch.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [accessories, selectedAccessoryCategory, accessorySearch]);
+
   const openEditModal = (item: StockItem) => {
     setEditingItem(item);
     setEditMixPcs(item.mixPcs || 0);
     setEditCostPrice(item.costPrice !== null && item.costPrice !== undefined ? String(item.costPrice) : "");
     const initialRatios = item.detailedRatioSets ? JSON.parse(JSON.stringify(item.detailedRatioSets)) : {};
-    // Ensure all colors have at least one ratio entry
     for (const c of item.colors) {
       const clean = cleanColorName(c);
       if (!initialRatios[clean] || Object.keys(initialRatios[clean]).length === 0) {
@@ -243,111 +366,305 @@ export default function AdminStockPage() {
     }
   };
 
+  // Accessories management
+  const handleOpenAddAccessory = () => {
+    setEditingAccessory(null);
+    setAccessoryForm({
+      name: "",
+      category: "Buttons",
+      quantity: "1000",
+      unit: "Pcs",
+      minAlertQty: "200",
+      costPerUnit: "1.00",
+      notes: "",
+    });
+    setIsAddAccessoryOpen(true);
+  };
+
+  const handleOpenEditAccessory = (item: AccessoryItemData) => {
+    setEditingAccessory(item);
+    setAccessoryForm({
+      name: item.name,
+      category: item.category,
+      quantity: String(item.quantity),
+      unit: item.unit,
+      minAlertQty: String(item.minAlertQty),
+      costPerUnit: String(item.costPerUnit),
+      notes: item.notes || "",
+    });
+    setIsAddAccessoryOpen(true);
+  };
+
+  const handleSaveAccessory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingAccessory(true);
+      const isEdit = !!editingAccessory;
+      const url = "/api/admin/stock/accessories";
+      const method = isEdit ? "PUT" : "POST";
+      const payload: any = {
+        name: accessoryForm.name.trim(),
+        category: accessoryForm.category.trim(),
+        quantity: parseInt(accessoryForm.quantity, 10) || 0,
+        unit: accessoryForm.unit.trim() || "Pcs",
+        minAlertQty: parseInt(accessoryForm.minAlertQty, 10) || 0,
+        costPerUnit: parseFloat(accessoryForm.costPerUnit) || 0,
+        notes: accessoryForm.notes.trim() || null,
+      };
+      if (isEdit) {
+        payload.id = editingAccessory.id;
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to save trim/accessory item");
+      }
+
+      toast(`${accessoryForm.name} saved successfully!`, "success");
+      setIsAddAccessoryOpen(false);
+      setEditingAccessory(null);
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setSavingAccessory(false);
+    }
+  };
+
+  const handleAdjustAccessoryQty = async (id: number, delta: number) => {
+    try {
+      const it = accessories.find((a) => a.id === id);
+      if (!it) return;
+      const newQty = Math.max(0, it.quantity + delta);
+
+      const res = await fetch("/api/admin/stock/accessories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, quantity: newQty }),
+      });
+
+      if (!res.ok) throw new Error("Failed to adjust quantity");
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message || "Failed to adjust", "error");
+    }
+  };
+
+  const handleDeleteAccessory = async (id: number, name: string) => {
+    if (!confirm(`Delete accessory "${name}" from stock tracking?`)) return;
+    try {
+      const res = await fetch(`/api/admin/stock/accessories?id=${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete accessory");
+      toast(`Deleted ${name}`, "success");
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
-          {/* Top Header & Breadcrumbs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                <Boxes size={14} className="text-blue-600" />
-                <span>Inventory & Valuation Control</span>
-              </div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Stock Management
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Monitor available sets per color, loose mix pieces, garment costing, and total valuation.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-              <button
-                type="button"
-                onClick={handleSyncStore}
-                disabled={syncingStore}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-                title="Sync live pieces with E-Commerce Storefront (iqtrousers.in)"
-              >
-                <RefreshCw size={13} className={syncingStore ? "animate-spin" : ""} />
-                <span>{syncingStore ? "Syncing Storefront..." : "Sync Storefront"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={fetchStock}
-                disabled={loading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-              >
-                <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-                <span>Refresh Stock</span>
-              </button>
-            </div>
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <Boxes size={14} className="text-blue-600" />
+            <span>Inventory & Valuation Control</span>
           </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            Stock Management
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Monitor available sets, loose stock, sold unit profit, and trims (buttons, tags & labels).
+          </p>
+        </div>
 
-          {/* ═══════════════════════════════════════════
-              METRIC KPI CARDS
-              ═══════════════════════════════════════════ */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Package size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                  Total Styles
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
-                  {metrics?.totalStyles ?? 0}
-                </span>
-              </div>
-            </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={handleSyncStore}
+            disabled={syncingStore}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            title="Sync live pieces with E-Commerce Storefront (iqtrousers.in)"
+          >
+            <RefreshCw size={13} className={syncingStore ? "animate-spin" : ""} />
+            <span>{syncingStore ? "Syncing Storefront..." : "Sync Storefront"}</span>
+          </button>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <Boxes size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                  Total Sets
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
-                  {metrics?.grandTotalSets ?? 0}
-                </span>
-              </div>
-            </div>
+          <button
+            type="button"
+            onClick={() => {
+              fetchStock();
+              fetchAccessories();
+            }}
+            disabled={loading || accessoriesLoading}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            <RefreshCw size={13} className={loading || accessoriesLoading ? "animate-spin" : ""} />
+            <span>Refresh All</span>
+          </button>
+        </div>
+      </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                <Layers size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                  Total Pieces (Sets + Mix)
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
-                  {metrics?.grandTotalPcs ?? 0}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <DollarSign size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                  Inventory Valuation
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono">
-                  {formatCurrency(metrics?.grandTotalValuation ?? 0)}
-                </span>
-              </div>
-            </div>
+      {/* ═══════════════════════════════════════════
+          5 METRIC KPI CARDS (PROFIT TAB BESIDE INVENTORY VALUATION)
+          ═══════════════════════════════════════════ */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {/* 1. Total Styles */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Package size={20} />
           </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Total Styles
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              {metrics?.totalStyles ?? 0}
+            </span>
+          </div>
+        </div>
 
-          {/* ═══════════════════════════════════════════
-              FILTER & SEARCH TOOLBAR
-              ═══════════════════════════════════════════ */}
+        {/* 2. Total Sets */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <Boxes size={20} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Total Sets
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              {metrics?.grandTotalSets ?? 0}
+            </span>
+          </div>
+        </div>
+
+        {/* 3. Total Pieces */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <Layers size={20} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Total Pieces
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              {metrics?.grandTotalPcs ?? 0}
+            </span>
+          </div>
+        </div>
+
+        {/* 4. Inventory Valuation */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <DollarSign size={20} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Inventory Valuation
+            </span>
+            <span className="text-lg sm:text-xl font-black text-amber-700 font-mono">
+              {formatCurrency(metrics?.grandTotalValuation ?? 0)}
+            </span>
+          </div>
+        </div>
+
+        {/* 5. Sold Units Profit Card (Beside Inventory Valuation) */}
+        <div
+          onClick={() => setActiveTab("PROFIT_REPORT")}
+          className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-xs flex items-center gap-3.5 cursor-pointer hover:border-emerald-400 transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <TrendingUp size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">
+                Total Sold Profit
+              </span>
+              <ArrowUpRight size={12} className="text-emerald-700 opacity-60" />
+            </div>
+            <span className="text-lg sm:text-xl font-black text-emerald-700 font-mono">
+              {formatCurrency(metrics?.grandTotalSoldProfit ?? 0)}
+            </span>
+            <span className="text-[10px] font-bold text-emerald-800 block">
+              {metrics?.grandTotalSoldUnits ?? 0} sold ({metrics?.overallMarginPercent ?? 0}% margin)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          MAIN TABS SWITCHER
+          ═══════════════════════════════════════════ */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("GARMENT_STOCK")}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+            activeTab === "GARMENT_STOCK"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <Boxes size={14} />
+          <span>Garment Inventory ({stockItems.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("PROFIT_REPORT")}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+            activeTab === "PROFIT_REPORT"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <TrendingUp size={14} className={activeTab === "PROFIT_REPORT" ? "text-white" : "text-emerald-600"} />
+          <span>Sold Stock & Profit Tab</span>
+          {metrics && (metrics.grandTotalSoldUnits ?? 0) > 0 && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
+              activeTab === "PROFIT_REPORT" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+            }`}>
+              {metrics.grandTotalSoldUnits} Sold
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("ACCESSORIES")}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+            activeTab === "ACCESSORIES"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <Tag size={14} className={activeTab === "ACCESSORIES" ? "text-white" : "text-blue-600"} />
+          <span>Buttons, Tags, Size & Flag Labels ({accessories.length})</span>
+          {accessorySummary && accessorySummary.lowStockCount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {accessorySummary.lowStockCount} Low
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          VIEW 1: GARMENT INVENTORY (RATIO SETS & MIX PCS)
+          ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "GARMENT_STOCK" && (
+        <div className="space-y-4">
+          {/* Toolbar */}
           <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search
@@ -382,10 +699,7 @@ export default function AdminStockPage() {
             </div>
           </div>
 
-          {/* ═══════════════════════════════════════════
-              STOCK TABLE
-              Columns: Product Name, Colors, Set, Mix Pcs, Costing, Total Price
-              ═══════════════════════════════════════════ */}
+          {/* Garments Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -486,7 +800,7 @@ export default function AdminStockPage() {
                                 </span>
                               </div>
 
-                              {/* Multi-ratio tags if present */}
+                              {/* Multi-ratio tags */}
                               <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                                 {Object.entries(detailed).map(([col, ratios]) => {
                                   const ratioParts = Object.entries(ratios)
@@ -551,9 +865,351 @@ export default function AdminStockPage() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          VIEW 2: SOLD UNITS & PROFIT TAB (SOLD STOCK METRICS & PER-STYLE BREAKDOWN)
+          ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "PROFIT_REPORT" && (
+        <div className="space-y-4">
+          {/* Summary Banner */}
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-6 rounded-2xl text-white shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs uppercase tracking-wider font-bold text-emerald-100">
+                  Total Sold Units Profit Summary
+                </span>
+                <h2 className="text-3xl font-black mt-1 font-mono">
+                  {formatCurrency(metrics?.grandTotalSoldProfit ?? 0)}
+                </h2>
+                <p className="text-xs text-emerald-100 mt-1 max-w-xl">
+                  Total gross profit calculated from all confirmed & fulfilled orders minus garment cost price.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white/10 backdrop-blur-xs p-4 rounded-xl border border-white/20">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">Total Sold Units</span>
+                  <span className="text-xl font-black font-mono">{metrics?.grandTotalSoldUnits ?? 0}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">Sales Revenue</span>
+                  <span className="text-xl font-black font-mono">{formatCurrency(metrics?.grandTotalSalesRevenue ?? 0)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">Cost of Sold</span>
+                  <span className="text-xl font-black font-mono">{formatCurrency(metrics?.grandTotalCostOfSold ?? 0)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">Overall Margin</span>
+                  <span className="text-xl font-black font-mono text-emerald-300">+{metrics?.overallMarginPercent ?? 0}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search style or category in profit breakdown..."
+                value={profitSearch}
+                onChange={(e) => setProfitSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-600 transition"
+              />
+            </div>
+            <span className="text-xs text-slate-500 font-semibold">
+              Showing {filteredProfitBreakdown.length} sold styles
+            </span>
+          </div>
+
+          {/* Profit Breakdown Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">Style Code</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4 text-center">Units Sold</th>
+                    <th className="py-3 px-4 text-right">Avg Selling Rate</th>
+                    <th className="py-3 px-4 text-right">Cost Price / Unit</th>
+                    <th className="py-3 px-4 text-right">Total Revenue</th>
+                    <th className="py-3 px-4 text-right">Total Cost</th>
+                    <th className="py-3 px-4 text-right">Gross Profit</th>
+                    <th className="py-3 px-4 text-center">Margin %</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {filteredProfitBreakdown.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                        <TrendingUp size={32} className="mx-auto mb-2 text-slate-300" />
+                        <span>No sold items found in orders yet. Once orders are placed and processed, profit metrics show here.</span>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProfitBreakdown.map((row) => (
+                      <tr key={row.productId} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          {row.productName}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-700">
+                            {row.category}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono font-bold text-slate-800">
+                          {row.unitsSold} pcs
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">
+                          {formatCurrency(row.avgSellingPrice)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          {formatCurrency(row.costPrice)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          {formatCurrency(row.sellingRevenue)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          {formatCurrency(row.totalCost)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-black text-emerald-700 text-sm">
+                          +{formatCurrency(row.grossProfit)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {row.marginPercent}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          VIEW 3: BUTTONS, TAGS, SIZE LABEL, FLAG LABEL & ACCESSORIES
+          ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "ACCESSORIES" && (
+        <div className="space-y-4">
+          {/* Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Trim Types</span>
+              <span className="text-xl font-black text-slate-900 font-mono">
+                {accessorySummary?.totalItems ?? accessories.length}
+              </span>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Units In Stock</span>
+              <span className="text-xl font-black text-blue-700 font-mono">
+                {(accessorySummary?.totalQuantity ?? 0).toLocaleString("en-IN")}
+              </span>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Low Stock Alerts</span>
+              <span className={`text-xl font-black font-mono ${
+                (accessorySummary?.lowStockCount ?? 0) > 0 ? "text-red-600" : "text-emerald-600"
+              }`}>
+                {accessorySummary?.lowStockCount ?? 0}
+              </span>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Trims Valuation</span>
+              <span className="text-xl font-black text-amber-700 font-mono">
+                {formatCurrency(accessorySummary?.totalValuation ?? 0)}
+              </span>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search buttons, hangtags, labels, zippers..."
+                value={accessorySearch}
+                onChange={(e) => setAccessorySearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-600 transition"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 overflow-x-auto">
+                {ACCESSORY_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedAccessoryCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                      selectedAccessoryCategory === cat
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenAddAccessory}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0 ml-auto"
+              >
+                <Plus size={14} />
+                <span>Add Trim / Accessory</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Accessories Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">Trim / Accessory Name</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4 text-center">Current Stock</th>
+                    <th className="py-3 px-4 text-center">Min Alert Level</th>
+                    <th className="py-3 px-4 text-right">Cost / Unit</th>
+                    <th className="py-3 px-4 text-right">Total Valuation</th>
+                    <th className="py-3 px-4 text-center">Quick Adjust</th>
+                    <th className="py-3 px-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {accessoriesLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-slate-300" />
+                        <span>Loading accessories stock...</span>
+                      </td>
+                    </tr>
+                  ) : filteredAccessories.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <Tag size={32} className="mx-auto mb-2 text-slate-300" />
+                        <span>No trims or accessories found. Click &quot;Add Trim / Accessory&quot; above to add buttons, labels, tags, etc.</span>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAccessories.map((item) => {
+                      const isLow = item.quantity <= item.minAlertQty;
+                      const itemValuation = Math.round(item.quantity * item.costPerUnit);
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-slate-900 block text-xs">
+                              {item.name}
+                            </span>
+                            {item.notes && (
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                {item.notes}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                              <Tag size={10} className="text-slate-500" />
+                              <span>{item.category}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono font-black text-sm">
+                            <span className={isLow ? "text-red-600" : "text-slate-900"}>
+                              {item.quantity.toLocaleString("en-IN")} {item.unit}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-xs">
+                            {isLow ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                <ShieldAlert size={11} />
+                                <span>Low &le; {item.minAlertQty}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">&ge; {item.minAlertQty} {item.unit}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-slate-700">
+                            {formatCurrency(item.costPerUnit)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-amber-700">
+                            {formatCurrency(itemValuation)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustAccessoryQty(item.id, -100)}
+                                className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center text-xs cursor-pointer"
+                                title="Deduct 100"
+                              >
+                                -100
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustAccessoryQty(item.id, 100)}
+                                className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center text-xs cursor-pointer"
+                                title="Add 100"
+                              >
+                                +100
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustAccessoryQty(item.id, 500)}
+                                className="px-1.5 h-6 rounded bg-blue-50 hover:bg-blue-100 font-bold text-blue-700 flex items-center justify-center text-[10px] cursor-pointer"
+                                title="Add 500"
+                              >
+                                +500
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditAccessory(item)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <Edit size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAccessory(item.id, item.name)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════
-          EDIT STOCK & RATIO SETS MODAL
+          EDIT STOCK & RATIO SETS MODAL (GARMENTS)
           ═══════════════════════════════════════════ */}
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -593,7 +1249,7 @@ export default function AdminStockPage() {
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-600 outline-none"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Used to calculate total inventory stock valuation.
+                  Used to calculate total inventory stock valuation and sold unit profits.
                 </span>
               </div>
 
@@ -807,6 +1463,156 @@ export default function AdminStockPage() {
                 <span>{savingEdit ? "Saving Stock..." : "Save Changes"}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          ADD / EDIT TRIM OR ACCESSORY MODAL
+          ═══════════════════════════════════════════ */}
+      {isAddAccessoryOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {editingAccessory ? "Edit Trim / Accessory" : "Add Trim or Accessory"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Track buttons, hangtags, size & flag labels, zippers, and pocketing materials.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddAccessoryOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAccessory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. IQ Shank Button 24L, Trouser Hangtag, Woven Size Label"
+                  value={accessoryForm.name}
+                  onChange={(e) => setAccessoryForm({ ...accessoryForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Category *
+                  </label>
+                  <select
+                    value={accessoryForm.category}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                  >
+                    <option value="Buttons">Buttons</option>
+                    <option value="Tags">Tags</option>
+                    <option value="Size Label">Size Label</option>
+                    <option value="Flag Label">Flag Label</option>
+                    <option value="Zippers">Zippers</option>
+                    <option value="Pocketing">Pocketing</option>
+                    <option value="Care Label">Care Label</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Unit (e.g. Pcs, Meters)
+                  </label>
+                  <input
+                    type="text"
+                    value={accessoryForm.unit}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, unit: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Initial Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={accessoryForm.quantity}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, quantity: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Min Alert Qty
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={accessoryForm.minAlertQty}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, minAlertQty: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Cost / Unit (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={accessoryForm.costPerUnit}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, costPerUnit: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Notes / Supplier Specs (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Sourced from TrimEx Mumbai, metallic antique brass finish"
+                  value={accessoryForm.notes}
+                  onChange={(e) => setAccessoryForm({ ...accessoryForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-600 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAccessoryOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAccessory}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Save size={13} />
+                  <span>{savingAccessory ? "Saving..." : editingAccessory ? "Update Trim" : "Add to Stock"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

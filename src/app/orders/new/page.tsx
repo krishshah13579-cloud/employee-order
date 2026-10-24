@@ -1511,12 +1511,6 @@ function OrderFormContent() {
                   items.map((item, index) => {
                     const itemTotalPcs = item.totalPcs || ((item.totalSets || 0) * (item.pcsPerSet || 5));
                     const prodData = productsMap[item.productId];
-                    const mixInfo = getProductMixSizesInfo(
-                      prodData?.setsColorwise,
-                      item.mixPcs !== undefined ? item.mixPcs : (prodData?.mixPcs || 0)
-                    );
-                    const mixTotal = item.mixPcs !== undefined ? item.mixPcs : mixInfo.totalMixPcs;
-                    const mixSummary = item.mixSizes || mixInfo.sizesSummary;
 
                     return (
                       <tr key={index} className="hover:bg-slate-50/80 transition-colors">

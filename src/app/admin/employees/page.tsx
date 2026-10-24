@@ -34,6 +34,7 @@ import {
   Sparkles,
   Edit3,
   Lock,
+  Boxes,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -61,6 +62,7 @@ interface EmployeePerformanceProfile {
   designation: string;
   isTeamLeader: boolean;
   canEditOrders?: boolean;
+  canUpdateStock?: boolean;
   isActive: boolean;
   createdAt?: string;
   stats: {
@@ -245,6 +247,38 @@ export default function EmployeesPage() {
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update order editing permissions", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // Handle Inventory Stock Update permission toggle
+  const handleToggleStockUpdate = async (id: number, name: string, allowStock: boolean) => {
+    try {
+      setTogglingId(id);
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          canUpdateStock: allowStock,
+        }),
+      });
+
+      if (res.ok) {
+        toast(
+          allowStock
+            ? `✅ Stock Update access APPROVED for "${name}"!`
+            : `🔒 Stock Update access REVOKED for "${name}".`,
+          "success"
+        );
+        fetchEmployees();
+        fetchPerformanceData();
+      } else {
+        const err = await res.json();
+        toast(err.error || "Failed to update stock update permissions", "error");
       }
     } catch (err: any) {
       toast("Error: " + err.message, "error");
@@ -827,6 +861,31 @@ export default function EmployeesPage() {
                             <span>Approve Edit Access</span>
                           </button>
                         )}
+
+                        {/* Inventory Stock Update Permission */}
+                        {selectedProfile.canUpdateStock ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, false)}
+                            disabled={togglingId === selectedProfile.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-red-50 text-emerald-800 hover:text-red-700 border border-emerald-300 hover:border-red-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            title="Revoke Stock Update Access"
+                          >
+                            <Boxes size={13} className="text-emerald-600" />
+                            <span>Revoke Stock Access</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStockUpdate(selectedProfile.id, selectedProfile.name, true)}
+                            disabled={togglingId === selectedProfile.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 hover:border-emerald-300 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            title="Grant Stock Update Access to this employee"
+                          >
+                            <Boxes size={13} className="text-gray-500" />
+                            <span>Allow Stock Update</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1074,6 +1133,7 @@ export default function EmployeesPage() {
                     <th className="py-3.5 px-6">Designation</th>
                     <th className="py-3.5 px-6">T.L. Status (24*7 Access)</th>
                     <th className="py-3.5 px-6">Order Edit Access</th>
+                    <th className="py-3.5 px-6">Stock Update Access</th>
                     <th className="py-3.5 px-6">Email Address</th>
                     <th className="py-3.5 px-6">Mobile Number</th>
                     <th className="py-3.5 px-6">Residential Address</th>
@@ -1203,6 +1263,42 @@ export default function EmployeesPage() {
                               >
                                 <Edit3 size={12} className="text-blue-600" />
                                 <span>Approve</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          {emp.canUpdateStock ? (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-full text-xs font-bold shadow-2xs">
+                                <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                                <span>Allowed</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStockUpdate(emp.id, emp.name, false)}
+                                disabled={togglingId === emp.id}
+                                className="text-[11px] font-semibold text-gray-500 hover:text-red-600 hover:underline cursor-pointer disabled:opacity-50"
+                                title="Revoke Stock Update Access"
+                              >
+                                Revoke
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                <Lock size={10} className="text-gray-400 shrink-0" />
+                                <span>Locked</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStockUpdate(emp.id, emp.name, true)}
+                                disabled={togglingId === emp.id}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                                title="Grant Stock Update Access to this employee"
+                              >
+                                <Boxes size={12} className="text-emerald-600" />
+                                <span>Allow</span>
                               </button>
                             </div>
                           )}

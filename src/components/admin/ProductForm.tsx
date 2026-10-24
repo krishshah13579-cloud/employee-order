@@ -1814,31 +1814,6 @@ export default function ProductForm({
                 </div>
                 <p className="text-[10px] text-emerald-700 mt-1">Costing basis shown on Admin Stock tab to calculate total valuation</p>
               </div>
-
-              <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-800">
-                    Mix Pcs (Loose Stock)
-                  </label>
-                  <span className="text-[10px] font-semibold text-slate-600 bg-slate-200/70 px-1.5 py-0.5 rounded">
-                    Loose Pieces
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.mixPcs ?? 0}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      mixPcs: Math.max(0, parseInt(e.target.value, 10) || 0),
-                    })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-600 font-mono font-bold text-slate-900"
-                />
-                <p className="text-[10px] text-slate-500 mt-1">Non-packaged individual sample or loose pieces</p>
-              </div>
             </div>
           </div>
         </div>

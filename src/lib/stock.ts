@@ -1130,6 +1130,14 @@ export function parseMixSizesForDisplay(
   item: { colorMixPcs?: Record<string, Record<string, number>> | null; mixSizes?: string | null; mixPcs?: number },
   prodData?: { colorMapping?: string | null; colorsAvailable?: string | null } | null
 ): FormattedMixEntry[] {
+  // If no mix pieces are selected for this item, never mention mix sizes
+  if (item.mixPcs !== undefined && item.mixPcs !== null && item.mixPcs <= 0) {
+    return [];
+  }
+  if (!item.colorMixPcs && (!item.mixSizes || item.mixSizes === "None" || item.mixSizes.trim() === "")) {
+    return [];
+  }
+
   const result: FormattedMixEntry[] = [];
 
   // 1. Try colorMixPcs object first

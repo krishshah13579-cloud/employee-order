@@ -38,19 +38,34 @@ model AdminProfile {
 
 // 2. Employee Page (Employee Details: Name, Email, PIN, Mobile Number, Address, Proof (Upload))
 model Employee {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String?  // Staff Email Address
-  pin          String   @default("1234") // Secret PIN for employee portal login
-  mobileNumber String
-  address      String
-  proofUrl     String?  // Photo or document link (Aadhar / PAN / Driving License)
-  designation  String   @default("Sales Representative")
-  isTeamLeader Boolean  @default(false) // T.L. has unrestricted 24*7 access to employee panel
-  canEditOrders Boolean @default(false) // Admin approval to edit pending order forms
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String?  // Staff Email Address
+  pin           String   @default("1234") // Secret PIN for employee portal login
+  mobileNumber  String
+  address       String
+  proofUrl      String?  // Photo or document link (Aadhar / PAN / Driving License)
+  designation   String   @default("Sales Representative")
+  isTeamLeader  Boolean  @default(false) // T.L. has unrestricted 24*7 access to employee panel
+  canEditOrders Boolean  @default(false) // Admin approval to edit pending order forms
+  canUpdateStock Boolean @default(false) // Admin approval to update inventory stock
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Trims & Accessories Tracking (Buttons, Tags, Size Label, Flag Label, etc.)
+model AccessoryItem {
+  id          Int      @id @default(autoincrement())
+  name        String
+  category    String   // "Buttons", "Tags", "Size Label", "Flag Label", "Zippers", "Thread", "Packaging", "Other"
+  quantity    Int      @default(0)
+  unit        String   @default("Pcs") // "Pcs", "Gross", "Meters", "Rolls", "Boxes"
+  minAlertQty Int      @default(100)
+  costPerUnit Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // 3. Customer Page (Customer Details: Shop Name / Firm Name, GST No./PAN No., Address, City, State, Phone Number, Visiting Card (Photo/Upload))

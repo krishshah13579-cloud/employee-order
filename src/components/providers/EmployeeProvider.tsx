@@ -10,6 +10,7 @@ export interface EmployeeSession {
   designation: string;
   isTeamLeader?: boolean;
   canEditOrders?: boolean;
+  canUpdateStock?: boolean;
   mobileNumber?: string;
   email?: string;
   address?: string;
@@ -126,6 +127,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
               designation: "Administrator",
               isTeamLeader: true,
               canEditOrders: true,
+              canUpdateStock: true,
             };
             setEmployee(adminEmployee);
             localStorage.setItem("garmentpro_employee", JSON.stringify(adminEmployee));

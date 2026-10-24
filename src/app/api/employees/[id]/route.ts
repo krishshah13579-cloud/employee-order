@@ -13,6 +13,7 @@ const SAFE_EMPLOYEE_SELECT = {
   designation: true,
   isTeamLeader: true,
   canEditOrders: true,
+  canUpdateStock: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -129,6 +130,9 @@ export async function PATCH(
     }
     if (body.canEditOrders !== undefined) {
       updateData.canEditOrders = Boolean(body.canEditOrders);
+    }
+    if (body.canUpdateStock !== undefined) {
+      updateData.canUpdateStock = Boolean(body.canUpdateStock);
     }
     if (body.pin !== undefined && body.pin.trim()) {
       updateData.pin = hashPassword(body.pin.trim());

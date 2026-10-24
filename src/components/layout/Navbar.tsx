@@ -17,6 +17,7 @@ import {
   MapPin,
   Clock,
   ShieldCheck,
+  Boxes,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -39,11 +40,19 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const canUpdateStock = Boolean(
+    employee?.canUpdateStock ||
+    employee?.isTeamLeader ||
+    employee?.designation === "Administrator" ||
+    employee?.id === 0
+  );
+
   const navLinks = [
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/orders/new", label: "Order Form", icon: FilePlus },
     { href: "/orders", label: "Order Page", icon: Package },
     { href: "/visiting-customers", label: "Visiting Customer", icon: MapPin },
+    ...(canUpdateStock ? [{ href: "/update-stock", label: "Update Stock", icon: Boxes }] : []),
   ];
 
   return (

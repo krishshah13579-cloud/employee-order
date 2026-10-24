@@ -878,9 +878,9 @@ function ProductDetailContent() {
       retailerPrice: retPrice,
       wholesalerPrice: whoPrice,
       unitPrice: unitPrice,
-      mixPcs: totalMixPieces,
-      mixSizes: selectedMixSummary || (mixInfo.totalMixPcs > 0 ? mixInfo.sizesSummary : "None"),
-      colorMixPcs: colorMixPcs,
+      mixPcs: totalMixPieces > 0 ? totalMixPieces : 0,
+      mixSizes: totalMixPieces > 0 && selectedMixSummary ? selectedMixSummary : undefined,
+      colorMixPcs: totalMixPieces > 0 && Object.keys(colorMixPcs).length > 0 ? colorMixPcs : undefined,
       itemSubtotal: totalAmount,
       notes: itemNotes.trim() || undefined,
     };

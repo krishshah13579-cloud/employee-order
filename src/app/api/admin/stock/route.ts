@@ -11,16 +11,18 @@ import {
 } from "@/lib/stock";
 import { sendColorSoldOutNotification } from "@/lib/email";
 import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
-import { requireAdmin } from "@/lib/auth-security";
+import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) {
-      return auth.errorResponse!;
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+
+    if (!admin && (!employee || !employee.canUpdateStock)) {
+      return NextResponse.json({ error: "Unauthorized. Stock update permission required." }, { status: 401 });
     }
 
     const rawProducts = await prisma.product.findMany({
@@ -82,13 +84,92 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Calculate aggregated metrics
+    // Calculate aggregated inventory metrics
     const totalStyles = stockItems.length;
     const activeInStock = stockItems.filter((i) => i.totalSets > 0 || i.mixPcs > 0).length;
     const grandTotalSets = stockItems.reduce((acc, i) => acc + i.totalSets, 0);
     const grandTotalMixPcs = stockItems.reduce((acc, i) => acc + i.mixPcs, 0);
     const grandTotalPcs = stockItems.reduce((acc, i) => acc + i.totalPcs, 0);
     const grandTotalValuation = stockItems.reduce((acc, i) => acc + i.totalValuation, 0);
+
+    // Calculate aggregated sold units & profit from non-cancelled orders
+    const soldItems = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          status: { not: "Cancelled" },
+        },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            costPrice: true,
+            retailerPrice: true,
+            price: true,
+          },
+        },
+      },
+    });
+
+    let grandTotalSoldUnits = 0;
+    let grandTotalSalesRevenue = 0;
+    let grandTotalCostOfSold = 0;
+
+    const soldPerProductMap = new Map<
+      number,
+      {
+        productId: number;
+        productName: string;
+        soldUnits: number;
+        revenue: number;
+        totalCost: number;
+        profit: number;
+        marginPercent: number;
+      }
+    >();
+
+    for (const item of soldItems) {
+      const pcs = item.totalPcs || 0;
+      const subtotal = item.itemSubtotal || 0;
+      const prodCost = item.product?.costPrice !== null && item.product?.costPrice !== undefined
+        ? item.product.costPrice
+        : Math.round(((item.product?.retailerPrice || item.product?.price || item.unitPrice) * 0.7));
+      const cost = Math.round(pcs * prodCost);
+      const profit = Math.round(subtotal - cost);
+
+      grandTotalSoldUnits += pcs;
+      grandTotalSalesRevenue += subtotal;
+      grandTotalCostOfSold += cost;
+
+      const pId = item.productId;
+      if (!soldPerProductMap.has(pId)) {
+        soldPerProductMap.set(pId, {
+          productId: pId,
+          productName: item.productName || item.product?.name || "Garment",
+          soldUnits: 0,
+          revenue: 0,
+          totalCost: 0,
+          profit: 0,
+          marginPercent: 0,
+        });
+      }
+      const entry = soldPerProductMap.get(pId)!;
+      entry.soldUnits += pcs;
+      entry.revenue += subtotal;
+      entry.totalCost += cost;
+      entry.profit += profit;
+    }
+
+    const soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {
+      p.marginPercent = p.revenue > 0 ? Math.round((p.profit / p.revenue) * 1000) / 10 : 0;
+      return p;
+    }).sort((a, b) => b.profit - a.profit);
+
+    const grandTotalSoldProfit = Math.round(grandTotalSalesRevenue - grandTotalCostOfSold);
+    const overallMarginPercent = grandTotalSalesRevenue > 0
+      ? Math.round((grandTotalSoldProfit / grandTotalSalesRevenue) * 1000) / 10
+      : 0;
 
     return NextResponse.json({
       stockItems,
@@ -99,6 +180,12 @@ export async function GET(request: NextRequest) {
         grandTotalMixPcs,
         grandTotalPcs,
         grandTotalValuation,
+        grandTotalSoldUnits,
+        grandTotalSalesRevenue,
+        grandTotalCostOfSold,
+        grandTotalSoldProfit,
+        overallMarginPercent,
+        soldProfitBreakdown,
       },
     }, {
       headers: {
@@ -116,9 +203,11 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) {
-      return auth.errorResponse!;
+    const admin = await getAdminSession(request);
+    const employee = await getEmployeeSession(request);
+
+    if (!admin && (!employee || !employee.canUpdateStock)) {
+      return NextResponse.json({ error: "Permission Denied: Stock update access required." }, { status: 403 });
     }
 
     const body = await request.json();
