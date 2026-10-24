@@ -950,7 +950,8 @@ export function deductSetsFromStock(
  */
 export function restoreSetsToStock(
   setsColorwise: string | null | undefined,
-  returnedColorSets: { color: string; sets: number; ratio?: string }[]
+  returnedColorSets: { color: string; sets: number; ratio?: string }[],
+  returnedLoosePieces?: { color: string; size: string; count: number }[] | Record<string, Record<string, number>>
 ): string {
   const stockWithLoose = parseDetailedColorStockWithLoose(setsColorwise);
 
@@ -973,6 +974,47 @@ export function restoreSetsToStock(
     const defaultRatioKey = orderItem.ratio || sortedRatioKeys[0] || "28 to 36";
     stockWithLoose[matchedColor].ratios[defaultRatioKey] =
       (stockWithLoose[matchedColor].ratios[defaultRatioKey] || 0) + setsToRestore;
+  }
+
+  // Restore loose single pieces if provided
+  if (returnedLoosePieces) {
+    if (Array.isArray(returnedLoosePieces)) {
+      for (const lp of returnedLoosePieces) {
+        const targetColor = cleanColorName(lp.color.trim());
+        let matchedColor = Object.keys(stockWithLoose).find(
+          (c) => c.toLowerCase() === targetColor.toLowerCase()
+        );
+        if (!matchedColor) {
+          matchedColor = targetColor;
+          stockWithLoose[matchedColor] = { ratios: {}, loosePcs: {} };
+        }
+        if (!stockWithLoose[matchedColor].loosePcs) {
+          stockWithLoose[matchedColor].loosePcs = {};
+        }
+        const loose = stockWithLoose[matchedColor].loosePcs;
+        loose[lp.size] = (loose[lp.size] || 0) + Math.max(0, lp.count);
+      }
+    } else if (typeof returnedLoosePieces === "object") {
+      for (const [col, sizesMap] of Object.entries(returnedLoosePieces)) {
+        const targetColor = cleanColorName(col.trim());
+        let matchedColor = Object.keys(stockWithLoose).find(
+          (c) => c.toLowerCase() === targetColor.toLowerCase()
+        );
+        if (!matchedColor) {
+          matchedColor = targetColor;
+          stockWithLoose[matchedColor] = { ratios: {}, loosePcs: {} };
+        }
+        if (!stockWithLoose[matchedColor].loosePcs) {
+          stockWithLoose[matchedColor].loosePcs = {};
+        }
+        const loose = stockWithLoose[matchedColor].loosePcs;
+        if (typeof sizesMap === "object" && sizesMap !== null) {
+          for (const [sz, count] of Object.entries(sizesMap)) {
+            loose[sz] = (loose[sz] || 0) + Math.max(0, Number(count) || 0);
+          }
+        }
+      }
+    }
   }
 
   return JSON.stringify(stockWithLoose);

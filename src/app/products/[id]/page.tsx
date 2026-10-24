@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense } from "reac
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getClientSessionId } from "@/lib/session";
-import { sanitizeInternalReturnTo, PARAM_RETURN_TO } from "@/lib/navigation";
+import { sanitizeInternalReturnTo, PARAM_RETURN_TO, APP_ROUTES } from "@/lib/navigation";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -70,8 +70,10 @@ function ProductDetailContent() {
   const { toast } = useToast();
 
   const productId = params?.id as string;
-  const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
   const orderIdParam = searchParams.get("orderId");
+  const rawReturnTo = searchParams.get(PARAM_RETURN_TO);
+  const defaultReturnTo = orderIdParam ? `/admin/orders/${orderIdParam}` : APP_ROUTES.ORDERS_NEW;
+  const returnTo = sanitizeInternalReturnTo(rawReturnTo, defaultReturnTo);
 
   const [product, setProduct] = useState<ProductData | null>(null);
   const [editingOrder, setEditingOrder] = useState<any>(null);
@@ -1025,7 +1027,7 @@ function ProductDetailContent() {
             className="px-3 py-1 bg-black/25 hover:bg-black/40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
           >
             <ArrowLeft size={13} />
-            <span>Return to Order</span>
+            <span>Return to Order #{editingOrder.orderNumber || orderIdParam}</span>
           </Link>
         </div>
       )}
@@ -1050,7 +1052,11 @@ function ProductDetailContent() {
             className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-semibold transition"
           >
             <ArrowLeft size={14} />
-            <span>Back to Order Form</span>
+            <span>
+              {orderIdParam || returnTo.includes("/admin")
+                ? `Return to Order #${editingOrder?.orderNumber || orderIdParam}`
+                : "Back to Order Form"}
+            </span>
           </Link>
         </div>
       </div>

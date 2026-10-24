@@ -806,6 +806,11 @@ export default function OrderInvoicePage() {
                             );
                           })}
                       </div>
+                      {it.notes && (
+                        <div className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1.5 inline-block">
+                          {it.notes}
+                        </div>
+                      )}
                     </td>
                     <td className="p-3 border-r border-gray-200">
                       <span className="font-semibold text-blue-900 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">

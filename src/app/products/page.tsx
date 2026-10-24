@@ -31,7 +31,7 @@ import {
   isColorSoldOut,
 } from "@/lib/stock";
 import type { ProductData } from "@/lib/types";
-import { sanitizeInternalReturnTo, PARAM_RETURN_TO } from "@/lib/navigation";
+import { sanitizeInternalReturnTo, PARAM_RETURN_TO, APP_ROUTES } from "@/lib/navigation";
 
 const DEFAULT_STORE_CATEGORIES = [
   "All",
@@ -43,8 +43,10 @@ const DEFAULT_STORE_CATEGORIES = [
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = sanitizeInternalReturnTo(searchParams.get(PARAM_RETURN_TO));
   const orderId = searchParams.get("orderId");
+  const rawReturnTo = searchParams.get(PARAM_RETURN_TO);
+  const defaultReturnTo = orderId ? `/admin/orders/${orderId}` : APP_ROUTES.ORDERS_NEW;
+  const returnTo = sanitizeInternalReturnTo(rawReturnTo, defaultReturnTo);
 
   const getProductDetailUrl = (pId: number) => {
     const q = new URLSearchParams();

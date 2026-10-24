@@ -21,6 +21,7 @@ export const APP_ROUTES = {
   CHECKOUT: "/checkout",
   CUSTOMERS_NEW: "/customers/new",
   ORDERS: "/orders",
+  ADMIN: "/admin",
 } as const;
 
 // Allowed Business Types Whitelist
@@ -63,6 +64,7 @@ export function sanitizeInternalReturnTo(
     APP_ROUTES.CHECKOUT,
     APP_ROUTES.CUSTOMERS_NEW,
     APP_ROUTES.ORDERS,
+    APP_ROUTES.ADMIN,
   ];
 
   const isAllowed =

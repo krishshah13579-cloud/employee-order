@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession, requireAdmin, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
-import { calculateOrderedColorSetsPieces } from "@/lib/stock";
+import { calculateOrderedColorSetsPieces, deductSetsFromStock, restoreSetsToStock } from "@/lib/stock";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 import { sanitizePositiveInt } from "@/lib/navigation";
+
+function parseMixSizesFromNotes(notes?: string | null): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (!notes) return result;
+  const match = notes.match(/\[Mix Sizes:\s*([^\]]+)\]/i);
+  if (!match) return result;
+  const inside = match[1];
+  const parts = inside.split(",");
+  for (const part of parts) {
+    const itemMatch = part.trim().match(/^([^\s(]+)(?:\s*\(([0-9]+)\s*(?:pcs)?\))?/i);
+    if (itemMatch) {
+      const sz = itemMatch[1].trim();
+      const cnt = itemMatch[2] ? parseInt(itemMatch[2], 10) || 1 : 1;
+      result[sz] = (result[sz] || 0) + cnt;
+    }
+  }
+  return result;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -391,6 +409,95 @@ export async function PUT(
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       if (validatedItems.length > 0) {
+        // Automatically sync product inventory stock for the updated order items:
+        // 1. Collect previous order deductions
+        const prevProductDeductions = new Map<
+          number,
+          { orderedSets: { color: string; sets: number; ratio?: string }[]; orderedLoose: Record<string, Record<string, number>> }
+        >();
+        if (existingOrder.status !== "Cancelled" && Array.isArray(existingOrder.items)) {
+          for (const it of existingOrder.items) {
+            const pid = it.productId;
+            if (!prevProductDeductions.has(pid)) {
+              prevProductDeductions.set(pid, { orderedSets: [], orderedLoose: {} });
+            }
+            let colorSetsArray: any[] = [];
+            try {
+              colorSetsArray = typeof it.colorSets === "string" ? JSON.parse(it.colorSets) : it.colorSets;
+            } catch {}
+            if (Array.isArray(colorSetsArray)) {
+              for (const cs of colorSetsArray) {
+                const sets = parseInt(cs.sets, 10) || 0;
+                if (sets > 0) {
+                  prevProductDeductions.get(pid)!.orderedSets.push({ color: cs.color, sets, ratio: it.sizeRatio });
+                }
+              }
+            }
+            const looseFromNotes = parseMixSizesFromNotes(it.notes);
+            if (Object.keys(looseFromNotes).length > 0) {
+              const colorKey = colorSetsArray[0]?.color || "Standard";
+              prevProductDeductions.get(pid)!.orderedLoose[colorKey] = looseFromNotes;
+            }
+          }
+        }
+
+        // 2. Collect new order deductions
+        const newProductDeductions = new Map<
+          number,
+          { orderedSets: { color: string; sets: number; ratio?: string }[]; orderedLoose: Record<string, Record<string, number>> }
+        >();
+        if (nextStatus !== "Cancelled") {
+          for (const it of validatedItems) {
+            const pid = it.productId;
+            if (!newProductDeductions.has(pid)) {
+              newProductDeductions.set(pid, { orderedSets: [], orderedLoose: {} });
+            }
+            let colorSetsArray: any[] = [];
+            try {
+              colorSetsArray = typeof it.colorSets === "string" ? JSON.parse(it.colorSets) : it.colorSets;
+            } catch {}
+            if (Array.isArray(colorSetsArray)) {
+              for (const cs of colorSetsArray) {
+                const sets = parseInt(cs.sets, 10) || 0;
+                if (sets > 0) {
+                  newProductDeductions.get(pid)!.orderedSets.push({ color: cs.color, sets, ratio: it.sizeRatio });
+                }
+              }
+            }
+            const looseFromNotes = parseMixSizesFromNotes(it.notes);
+            if (Object.keys(looseFromNotes).length > 0) {
+              const colorKey = colorSetsArray[0]?.color || "Standard";
+              newProductDeductions.get(pid)!.orderedLoose[colorKey] = looseFromNotes;
+            }
+          }
+        }
+
+        // 3. Apply stock adjustments to inventory
+        const allPids = new Set([...prevProductDeductions.keys(), ...newProductDeductions.keys()]);
+        for (const pid of allPids) {
+          const prod = await tx.product.findUnique({
+            where: { id: pid },
+            select: { id: true, setsColorwise: true },
+          });
+          if (prod && prod.setsColorwise && prod.setsColorwise.trim() !== "") {
+            let currentStock = prod.setsColorwise;
+            // Restore previous
+            if (prevProductDeductions.has(pid)) {
+              const prev = prevProductDeductions.get(pid)!;
+              currentStock = restoreSetsToStock(currentStock, prev.orderedSets, prev.orderedLoose);
+            }
+            // Deduct new
+            if (newProductDeductions.has(pid)) {
+              const nextD = newProductDeductions.get(pid)!;
+              currentStock = deductSetsFromStock(currentStock, nextD.orderedSets, nextD.orderedLoose);
+            }
+            await tx.product.update({
+              where: { id: pid },
+              data: { setsColorwise: currentStock },
+            });
+          }
+        }
+
         await tx.orderItem.deleteMany({ where: { orderId } });
         await tx.orderItem.createMany({ data: validatedItems });
       }
