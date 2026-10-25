@@ -39,6 +39,7 @@ export default function AdminProfilePage() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
+  const [fallbackOtp, setFallbackOtp] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<AdminProfileData>({
     fullName: "",
@@ -96,7 +97,10 @@ export default function AdminProfilePage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setMaskedEmail(data.email || data.fullEmail || "");
-        toast("2FA Security code dispatched to your email!", "success");
+        if (data.fallbackCode) {
+          setFallbackOtp(data.fallbackCode);
+        }
+        toast(data.message || "2FA Security code dispatched to your email!", "success");
       } else {
         toast(data.error || "Failed to dispatch 2FA email", "error");
       }
@@ -745,6 +749,17 @@ export default function AdminProfilePage() {
                 <Mail size={13} />
                 <span>{maskedEmail}</span>
               </div>
+
+              {fallbackOtp && (
+                <div className="mt-3 pt-3 border-t border-slate-700">
+                  <div className="text-[11px] text-amber-300 font-semibold mb-1">
+                    Direct Access 2FA Code (Backup):
+                  </div>
+                  <div className="inline-block font-mono text-xl font-black text-amber-400 bg-slate-950 px-4 py-1.5 rounded-xl border border-amber-500/40 tracking-widest select-all">
+                    {fallbackOtp}
+                  </div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-4">

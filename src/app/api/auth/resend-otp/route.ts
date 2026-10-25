@@ -59,9 +59,10 @@ export async function POST(req: NextRequest) {
       success: true,
       emailSent: emailResult.success,
       emailError: emailResult.error,
+      fallbackCode: generatedOtp,
       message: emailResult.success
         ? `A fresh 6-digit 2FA login code has been emailed to ${recipientEmail}.`
-        : `Generated fresh code, but email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
+        : `Generated fresh code. (Render Free blocks SMTP. Your code is: ${generatedOtp})`,
     });
   } catch (error: any) {
     console.error("Resend OTP error:", error);

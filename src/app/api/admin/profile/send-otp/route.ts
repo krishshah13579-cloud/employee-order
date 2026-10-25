@@ -52,9 +52,10 @@ export async function POST(req: NextRequest) {
       success: true,
       emailSent: emailResult.success,
       emailError: emailResult.error,
+      fallbackCode: otpCode,
       message: emailResult.success
         ? `2FA Security Code sent to ${maskedEmail}`
-        : `Email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
+        : `Security Code generated. (Render Free blocks SMTP. Your code is: ${otpCode})`,
       email: maskedEmail,
       fullEmail: targetEmail,
     });

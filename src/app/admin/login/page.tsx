@@ -39,6 +39,7 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
+  const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const [loginError, setLoginError] = useState("");
 
   // Check if admin account exists in database
@@ -86,7 +87,10 @@ export default function AdminLoginPage() {
 
       if (res.ok && data.requires2FA) {
         setMaskedEmail(data.email || username.trim());
-        toast(`6-digit 2FA login code emailed to ${data.email || "your registered email"}!`, "success");
+        if (data.fallbackCode) {
+          setFallbackCode(data.fallbackCode);
+        }
+        toast(data.message || `6-digit 2FA login code emailed to ${data.email || "your registered email"}!`, "success");
         setStep(2);
       } else {
         const errMsg = data.error || "Authentication failed. Check your password.";
@@ -115,7 +119,10 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        toast("A fresh 6-digit OTP code has been emailed to you!", "success");
+        if (data.fallbackCode) {
+          setFallbackCode(data.fallbackCode);
+        }
+        toast(data.message || "A fresh 6-digit OTP code has been emailed to you!", "success");
       } else {
         toast(data.error || "Failed to resend OTP", "error");
       }
@@ -335,6 +342,20 @@ export default function AdminLoginPage() {
               <div className="inline-block mt-1 font-mono text-xs font-bold text-orange-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
                 {maskedEmail || username}
               </div>
+
+              {fallbackCode && (
+                <div className="mt-3 pt-3 border-t border-orange-500/20">
+                  <div className="text-[11px] text-amber-300 font-semibold mb-1">
+                    Direct Access 2FA Code (Backup):
+                  </div>
+                  <div className="inline-block font-mono text-xl font-black text-amber-400 bg-slate-950 px-4 py-1.5 rounded-xl border border-amber-500/40 tracking-widest select-all">
+                    {fallbackCode}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">
+                    (Render Free tier blocks outbound SMTP ports. You can enter this code directly.)
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

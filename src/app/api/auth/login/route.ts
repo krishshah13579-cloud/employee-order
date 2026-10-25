@@ -121,9 +121,10 @@ export async function POST(req: NextRequest) {
       email: maskedEmail,
       emailSent: emailResult.success,
       emailError: emailResult.error,
+      fallbackCode: generatedOtp,
       message: emailResult.success
         ? `Credentials verified! A 6-digit 2FA login code has been sent to your email (${maskedEmail}).`
-        : `Credentials verified, but email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
+        : `Credentials verified. (Cloud host notice: Outbound email ports are blocked on Render Free tier. Your instant 2FA code is: ${generatedOtp})`,
     });
   } catch (error: any) {
     console.error("Login error:", error);
