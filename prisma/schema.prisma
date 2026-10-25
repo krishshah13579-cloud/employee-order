@@ -1,11 +1,17 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["wholesale", "public"]
 }
+
+// ==========================================
+// WHOLESALE SCHEMA (GARMENT ORDERS BACKEND)
+// ==========================================
 
 // Admin Authentication & 2FA Credentials Stored in Database
 model AdminAccount {
@@ -17,6 +23,8 @@ model AdminAccount {
   lastOtp          String?   // Latest generated 2FA OTP stored in DB
   otpExpiresAt     DateTime?
   updatedAt        DateTime  @updatedAt
+
+  @@schema("wholesale")
 }
 
 // 1. Admin Page (Admin Details)
@@ -34,6 +42,8 @@ model AdminProfile {
   ifscCode    String   @default("HDFC0001357")
   notes       String?  @default("IQ TROUSERS — Premium Quality Mens & Boys Garment Manufacturers")
   updatedAt   DateTime @updatedAt
+
+  @@schema("wholesale")
 }
 
 // 2. Employee Page (Employee Details: Name, Email, PIN, Mobile Number, Address, Proof (Upload))
@@ -52,6 +62,8 @@ model Employee {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@schema("wholesale")
 }
 
 // Trims & Accessories Tracking (Buttons, Tags, Size Label, Flag Label, etc.)
@@ -66,6 +78,8 @@ model AccessoryItem {
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@schema("wholesale")
 }
 
 // 3. Customer Page (Customer Details: Shop Name / Firm Name, GST No./PAN No., Address, City, State, Phone Number, Visiting Card (Photo/Upload))
@@ -91,6 +105,8 @@ model Customer {
   payments        Payment[]
   salesReturns    SalesReturn[]
   salesInvoices   SalesInvoice[]
+
+  @@schema("wholesale")
 }
 
 // 5. Product Page (Product Details: Product Name, Colors Available, Sizes, Price, No of Set Colorwise, Size Guide)
@@ -117,9 +133,11 @@ model Product {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
+
+  @@schema("wholesale")
 }
 
-// 4. Order Page (Order Details: Customer Name, Customer GST/PAN No., Order Date, Product Name (Colors), SET (Color Wise) like A-2, B-3, C-2, SIZES (all size mandatory) like 30 to 38, PCS = SET * PCS like if there are 5 set for the product and the sizes are 30 to 38 it would be like 5*5 = 25 PCS, Price, Total Price, at last add 5% GST)
+// 4. Order Page (Order Details: Customer Name, Customer GST/PAN No., Order Date, Product Name, Sets, Sizes, Price, Total Price, GST)
 model Order {
   id              Int         @id @default(autoincrement())
   orderNumber     String      @unique
@@ -148,6 +166,8 @@ model Order {
   updatedAt        DateTime    @updatedAt
   customer         Customer    @relation(fields: [customerId], references: [id])
   items            OrderItem[]
+
+  @@schema("wholesale")
 }
 
 model OrderItem {
@@ -166,6 +186,8 @@ model OrderItem {
   notes        String?
   order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product      Product @relation(fields: [productId], references: [id])
+
+  @@schema("wholesale")
 }
 
 // 6. Category Page (Organize products into custom categories and collections)
@@ -177,6 +199,8 @@ model Category {
   image       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@schema("wholesale")
 }
 
 // 7. Payment Ledger (Track payments received from customers for outstanding settlement)
@@ -192,6 +216,8 @@ model Payment {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@schema("wholesale")
 }
 
 // 8. Sales Return / Credit Note (Track product returns and credit against customer outstanding)
@@ -212,6 +238,8 @@ model SalesReturn {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@schema("wholesale")
 }
 
 // 9. Sales Register & Invoicing (Track all sales invoices, cash sales, and credit sales)
@@ -244,6 +272,8 @@ model SalesInvoice {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@schema("wholesale")
 }
 
 // 9. Invoice & Order Form Template Settings
@@ -273,6 +303,8 @@ model InvoiceTemplate {
   defaultTransport String   @default("Patel Transport Co.")
   defaultHsn       String   @default("6203")
   updatedAt        DateTime @updatedAt
+
+  @@schema("wholesale")
 }
 
 // 10. Security & Compliance Audit Log
@@ -287,6 +319,8 @@ model AuditLog {
   ipAddress  String?  // Client IP address
   status     String   @default("SUCCESS") // "SUCCESS", "FAILURE", "BLOCKED"
   createdAt  DateTime @default(now())
+
+  @@schema("wholesale")
 }
 
 // 11. Live Real-Time Stock Reservations (Prevents over-allocation when multiple employees add sets)
@@ -304,6 +338,7 @@ model StockReservation {
   @@index([productId, color])
   @@index([sessionId])
   @@index([expiresAt])
+  @@schema("wholesale")
 }
 
 // 12. Visited Customer (Field Visiting Cards with Mandatory UPPERCASE City)
@@ -324,5 +359,195 @@ model VisitedCustomer {
   @@index([city])
   @@index([employeeId])
   @@index([createdAt])
+  @@schema("wholesale")
 }
 
+// ==========================================
+// PUBLIC SCHEMA (E-COMMERCE WEBSITE STORE)
+// ==========================================
+
+model EcommerceUser {
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  phone             String?   @unique
+  phoneVerified     Boolean   @default(false)
+  firstDiscountCode String?
+  password          String
+  role              String    @default("USER") // USER or ADMIN
+  twoFactorCode        String?
+  twoFactorExpires     DateTime?
+  resetPasswordCode    String?
+  resetPasswordExpires DateTime?
+  visitCount           Int       @default(1)
+  lastVisitedAt        DateTime  @default(now())
+  expiredCouponCampaignSentAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  orders            EcommerceOrder[]
+  reviews           EcommerceReview[]
+  cartItems         EcommerceCartItem[]
+  discounts         EcommerceDiscount[]
+
+  @@map("User")
+  @@schema("public")
+}
+
+model EcommerceCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  products    EcommerceProduct[]
+  createdAt   DateTime  @default(now())
+
+  @@map("Category")
+  @@schema("public")
+}
+
+model EcommerceProduct {
+  id               String              @id @default(cuid())
+  name             String
+  slug             String              @unique
+  description      String
+  careInstructions String?             @default("")
+  price            Float
+  comparePrice     Float?
+  images           String              // JSON array of image URLs
+  sizes            String?             @default("[\"28\",\"30\",\"32\",\"34\",\"36\",\"38\",\"40\",\"42\",\"44\"]")
+  colors           String?             @default("[]") // JSON array of available colors
+  inventory        String?             @default("{}") // JSON map: variant stock availability by color and size
+  sizeGuide        String?             @default("")
+  category         EcommerceCategory   @relation(fields: [categoryId], references: [id])
+  categoryId       String
+  stock            Int                 @default(0)
+  featured         Boolean             @default(false)
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  orderItems       EcommerceOrderItem[]
+  reviews          EcommerceReview[]
+  cartItems        EcommerceCartItem[]
+
+  @@index([categoryId])
+  @@index([active])
+  @@index([featured])
+  @@map("Product")
+  @@schema("public")
+}
+
+model EcommerceOrder {
+  id              String               @id @default(cuid())
+  user            EcommerceUser        @relation(fields: [userId], references: [id])
+  userId          String
+  items           EcommerceOrderItem[]
+  total           Float
+  status          String               @default("PENDING") // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+  trackingNumber  String?
+  shippingAddress String               // JSON
+  paymentIntent   String?
+  discountCode    String?
+  discountAmount  Float                @default(0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("Order")
+  @@schema("public")
+}
+
+model EcommerceOrderItem {
+  id        String           @id @default(cuid())
+  order     EcommerceOrder   @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   EcommerceProduct @relation(fields: [productId], references: [id])
+  productId String
+  size      String?
+  quantity  Int
+  price     Float
+
+  @@map("OrderItem")
+  @@schema("public")
+}
+
+model EcommerceReview {
+  id        String           @id @default(cuid())
+  rating    Int
+  comment   String
+  user      EcommerceUser    @relation(fields: [userId], references: [id])
+  userId    String
+  product   EcommerceProduct @relation(fields: [productId], references: [id])
+  productId String
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, productId])
+  @@map("Review")
+  @@schema("public")
+}
+
+model EcommerceCartItem {
+  id        String           @id @default(cuid())
+  user      EcommerceUser    @relation(fields: [userId], references: [id])
+  userId    String
+  product   EcommerceProduct @relation(fields: [productId], references: [id])
+  productId String
+  size      String?
+  quantity  Int              @default(1)
+
+  @@unique([userId, productId, size])
+  @@map("CartItem")
+  @@schema("public")
+}
+
+model EcommerceDiscount {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  type           String         // PERCENTAGE or FIXED
+  value          Float
+  minOrder       Float          @default(0)
+  maxDiscount    Float?
+  maxUses        Int?
+  usedCount      Int            @default(0)
+  active         Boolean        @default(true)
+  expiresAt      DateTime?
+  userId         String?
+  user           EcommerceUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userPhone      String?
+  description    String?
+  targetAudience String?        @default("ALL")
+  minOrders      Int?           @default(0)
+  maxOrders      Int?
+  minSpend       Float?         @default(0)
+  createdAt      DateTime       @default(now())
+
+  @@index([userId])
+  @@index([active])
+  @@map("Discount")
+  @@schema("public")
+}
+
+model EcommerceNewsletterSubscriber {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  discountCode String?
+  createdAt    DateTime @default(now())
+
+  @@map("NewsletterSubscriber")
+  @@schema("public")
+}
+
+model EcommercePhoneVerification {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("PhoneVerification")
+  @@schema("public")
+}
