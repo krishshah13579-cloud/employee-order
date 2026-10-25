@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         subtitle: `${o.customer?.shopName || "Customer"} placed an order of ₹${o.grandTotal.toLocaleString("en-IN")}`,
         timestamp: o.createdAt,
         status: o.status,
-        link: `/admin/orders/${o.id}`,
+        link: `/admin/employee/orders/${o.id}`,
       })),
       ...recentCustomers.map((c) => ({
         id: `customer-${c.id}`,
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
         title: `New Customer: ${c.shopName}`,
         subtitle: `Registered from ${c.city || "Gujarat"}${c.phoneNumber ? ` • Ph: ${c.phoneNumber}` : ""}`,
         timestamp: c.createdAt,
-        link: `/admin/customers`,
+        link: `/admin/employee/customers`,
       })),
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 

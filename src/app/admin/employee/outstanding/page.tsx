@@ -380,19 +380,21 @@ export default function AdminOutstandingPage() {
       let dispatchedCount = 0;
       let usedGateway = false;
 
-      // 1. Try local gateway first
-      try {
-        const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
-          method: "POST",
-          signal: AbortSignal.timeout(10000),
-        }).catch(() => null);
+      // 1. Try local gateway first if in development / HTTP environment
+      if (typeof window !== "undefined" && window.location.protocol === "http:") {
+        try {
+          const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
+            method: "POST",
+            signal: AbortSignal.timeout(4000),
+          }).catch(() => null);
 
-        if (localRes && localRes.ok) {
-          const localData = await localRes.json();
-          dispatchedCount = localData.count || 0;
-          usedGateway = true;
-        }
-      } catch {}
+          if (localRes && localRes.ok) {
+            const localData = await localRes.json();
+            dispatchedCount = localData.count || 0;
+            usedGateway = true;
+          }
+        } catch {}
+      }
 
       // 2. Fallback to API route
       if (!usedGateway) {

@@ -82,6 +82,20 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
+    // Check if user has orders
+    const userOrdersCount = await prisma.ecommerceOrder.count({ where: { userId: id } });
+    if (userOrdersCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete user: ${userOrdersCount} order(s) are linked to this customer account.` },
+        { status: 400 }
+      );
+    }
+
+    // Clean up dependent cart items, reviews, discounts
+    await prisma.ecommerceCartItem.deleteMany({ where: { userId: id } });
+    await prisma.ecommerceReview.deleteMany({ where: { userId: id } });
+    await prisma.ecommerceDiscount.deleteMany({ where: { userId: id } });
+
     await prisma.ecommerceUser.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "User deleted" });
   } catch (error: any) {

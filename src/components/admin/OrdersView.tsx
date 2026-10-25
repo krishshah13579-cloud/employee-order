@@ -245,7 +245,7 @@ export default function OrdersView({
         <div className="flex items-center gap-2 self-start md:self-auto">
           {isSuperAdmin && activeTab !== "BILLS" && (
             <Link
-              href="/admin/orders/new"
+              href="/admin/employee/orders/new"
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Plus size={16} />
@@ -263,8 +263,8 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("ORDERS");
-              if (pathname.startsWith("/admin/invoices") || pathname.startsWith("/admin/bills")) {
-                router.push("/admin/orders");
+              if (pathname.includes("/invoices") || pathname.includes("/bills")) {
+                router.push("/admin/employee/orders");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
                 url.searchParams.set("tab", "orders");
@@ -286,8 +286,8 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("INVOICES");
-              if (pathname === "/admin/orders" || pathname === "/admin/bills") {
-                router.push("/admin/invoices");
+              if (pathname.includes("/orders") || pathname.includes("/bills")) {
+                router.push("/admin/employee/invoices");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
                 url.searchParams.set("tab", "invoices");
@@ -309,8 +309,8 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("BILLS");
-              if (pathname === "/admin/orders" || pathname === "/admin/invoices") {
-                router.push("/admin/bills");
+              if (pathname.includes("/orders") || pathname.includes("/invoices")) {
+                router.push("/admin/employee/bills");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
                 url.searchParams.set("tab", "bills");
@@ -593,7 +593,7 @@ export default function OrdersView({
                             {/* Edit Button (if order status is converted back to Pending) */}
                             {o.status === "Pending" && (
                               <Link
-                                href={`/admin/orders/${o.id}`}
+                                href={`/admin/employee/orders/${o.id}`}
                                 className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                                 title="Edit Order Form"
                               >
@@ -741,7 +741,7 @@ export default function OrdersView({
 
                             {/* Edit Order */}
                             <Link
-                              href={`/admin/orders/${o.id}`}
+                              href={`/admin/employee/orders/${o.id}`}
                               className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                               title="Edit Order Form items & quantities"
                             >
@@ -750,7 +750,7 @@ export default function OrdersView({
 
                             {/* View Dedicated Page */}
                             <Link
-                              href={`/admin/orders/${o.id}?format=order-form`}
+                              href={`/admin/employee/orders/${o.id}?format=order-form`}
                               className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
                               title="View Order Form"
                             >

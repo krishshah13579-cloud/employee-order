@@ -148,19 +148,21 @@ export default function AdminWhatsAppPage() {
     }
     setDispatchingWeeklyNow(true);
     try {
-      // Try local gateway cron endpoint first
+      // Try local gateway cron endpoint first if on HTTP
       let triggered = false;
-      try {
-        const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
-          method: "POST",
-          signal: AbortSignal.timeout(10000),
-        }).catch(() => null);
-        if (localRes && localRes.ok) {
-          const localData = await localRes.json();
-          toast(`✅ Weekly payment reminders sent directly to ${localData.count || 0} customers via WhatsApp (8128756632)!`, "success");
-          triggered = true;
-        }
-      } catch {}
+      if (typeof window !== "undefined" && window.location.protocol === "http:") {
+        try {
+          const localRes = await fetch("http://localhost:5050/api/cron/payment-reminders", {
+            method: "POST",
+            signal: AbortSignal.timeout(4000),
+          }).catch(() => null);
+          if (localRes && localRes.ok) {
+            const localData = await localRes.json();
+            toast(`✅ Weekly payment reminders sent directly to ${localData.count || 0} customers via WhatsApp (8128756632)!`, "success");
+            triggered = true;
+          }
+        } catch {}
+      }
 
       if (!triggered) {
         const res = await fetch("/api/admin/outstanding/whatsapp-all", {

@@ -212,12 +212,21 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
   useEffect(() => {
     if (pathname.startsWith("/admin/online")) {
       setActiveMode("online");
+      try { localStorage.setItem("admin_active_mode", "online"); } catch {}
     } else if (
       pathname.startsWith("/admin/employee") ||
       pathname === "/admin" ||
       pathname.startsWith("/employee")
     ) {
       setActiveMode("employee");
+      try { localStorage.setItem("admin_active_mode", "employee"); } catch {}
+    } else if (pathname === "/admin/stock") {
+      try {
+        const saved = localStorage.getItem("admin_active_mode");
+        if (saved === "online" || saved === "employee") {
+          setActiveMode(saved);
+        }
+      } catch {}
     }
   }, [pathname]);
 

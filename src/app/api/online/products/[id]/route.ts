@@ -102,6 +102,20 @@ export async function DELETE(
 
   const { id } = await params;
   try {
+    const orderItemsCount = await prisma.ecommerceOrderItem.count({ where: { productId: id } });
+    if (orderItemsCount > 0) {
+      await prisma.ecommerceProduct.update({
+        where: { id },
+        data: { active: false, stock: 0 },
+      });
+      return NextResponse.json({
+        success: true,
+        message: "Product has existing order history; deactivated from store catalog.",
+      });
+    }
+
+    await prisma.ecommerceCartItem.deleteMany({ where: { productId: id } });
+    await prisma.ecommerceReview.deleteMany({ where: { productId: id } });
     await prisma.ecommerceProduct.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "Product deleted" });
   } catch (error: any) {
