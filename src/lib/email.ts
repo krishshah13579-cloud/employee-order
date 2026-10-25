@@ -68,12 +68,18 @@ export async function sendOtpEmail(
   // 1. Dispatch via Gmail SMTP if GMAIL_USER and GMAIL_APP_PASSWORD are provided
   if (gmailUser && gmailAppPassword) {
     try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
       const transporter = nodemailer.createTransport({
-        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
         auth: {
           user: gmailUser.trim(),
-          pass: gmailAppPassword.replace(/\s+/g, "").trim(), // Strip spaces if copied from Google
+          pass: cleanPass,
         },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 5000,
       });
 
       await transporter.sendMail({
@@ -86,8 +92,34 @@ export async function sendOtpEmail(
       console.log(`✅ 2FA OTP email successfully dispatched via Gmail to ${toEmail}`);
       return { success: true };
     } catch (err: any) {
-      console.error("Failed to dispatch email via Gmail SMTP:", err.message);
-      lastError = err.message || "Invalid Gmail credentials";
+      console.error("Failed to dispatch email via Gmail SMTP (port 465):", err.message);
+      // Fallback: try port 587 (TLS) if 465 timed out or was blocked by host
+      try {
+        const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+        const fallbackTransporter = nodemailer.createTransport({
+          host: "smtp.gmail.com",
+          port: 587,
+          secure: false,
+          auth: {
+            user: gmailUser.trim(),
+            pass: cleanPass,
+          },
+          connectionTimeout: 4000,
+          greetingTimeout: 4000,
+          socketTimeout: 5000,
+        });
+        await fallbackTransporter.sendMail({
+          from: `"IQ TROUSERS Security" <${gmailUser.trim()}>`,
+          to: toEmail,
+          subject: `🔐 Your 2FA Security Code: ${otpCode}`,
+          html: htmlContent,
+        });
+        console.log(`✅ 2FA OTP email successfully dispatched via Gmail (port 587) to ${toEmail}`);
+        return { success: true };
+      } catch (fallbackErr: any) {
+        console.error("Failed to dispatch email via Gmail SMTP (port 587):", fallbackErr.message);
+        lastError = fallbackErr.message || err.message;
+      }
     }
   }
 

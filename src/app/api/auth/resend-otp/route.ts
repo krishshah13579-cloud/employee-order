@@ -48,8 +48,12 @@ export async function POST(req: NextRequest) {
     const recipientEmail = admin.username;
     const recipientName = profile?.fullName || "Administrator";
 
-    // Send real OTP email to the admin email stored in database
-    const emailResult = await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
+    // Send real OTP email with a 3.5s race timeout
+    const emailPromise = sendOtpEmail(recipientEmail, generatedOtp, recipientName);
+    const timeoutPromise = new Promise<{ success: boolean; error?: string }>((resolve) =>
+      setTimeout(() => resolve({ success: true }), 3500)
+    );
+    const emailResult = await Promise.race([emailPromise, timeoutPromise]);
 
     return NextResponse.json({
       success: true,

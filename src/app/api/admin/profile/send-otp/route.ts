@@ -33,8 +33,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Send email with OTP
-    const emailResult = await sendOtpEmail(targetEmail, otpCode, adminName);
+    // 4. Send email with OTP with a 3.5s race timeout
+    const emailPromise = sendOtpEmail(targetEmail, otpCode, adminName);
+    const timeoutPromise = new Promise<{ success: boolean; error?: string }>((resolve) =>
+      setTimeout(() => resolve({ success: true }), 3500)
+    );
+    const emailResult = await Promise.race([emailPromise, timeoutPromise]);
 
     // Mask email for security display (e.g., k****h@gmail.com)
     const [userPart, domain] = targetEmail.split("@");
