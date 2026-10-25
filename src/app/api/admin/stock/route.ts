@@ -344,6 +344,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Real-time auto-sync directly to E-Commerce database
+    try {
+      const { syncWholesaleProductToEcommerce } = await import("@/lib/stock-sync");
+      await syncWholesaleProductToEcommerce(id);
+    } catch (ecomSyncErr) {
+      console.warn("Direct E-Commerce stock sync warning:", ecomSyncErr);
+    }
+
     // Real-time auto-sync to Storefront (www.iqtrousers.in)
     try {
       const totalSets = getTotalAvailableSets(updated.setsColorwise);

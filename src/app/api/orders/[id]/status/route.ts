@@ -83,6 +83,8 @@ export async function PUT(
                   where: { id: product.id },
                   data: { setsColorwise: restored },
                 });
+                const { syncWholesaleProductToEcommerce } = await import("@/lib/stock-sync");
+                syncWholesaleProductToEcommerce(product.id).catch(() => {});
               }
             }
           } catch (e) {
@@ -112,6 +114,8 @@ export async function PUT(
                   where: { id: product.id },
                   data: { setsColorwise: deducted },
                 });
+                const { syncWholesaleProductToEcommerce } = await import("@/lib/stock-sync");
+                syncWholesaleProductToEcommerce(product.id).catch(() => {});
               }
             }
           } catch (e) {

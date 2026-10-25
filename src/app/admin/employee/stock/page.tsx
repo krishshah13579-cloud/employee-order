@@ -170,41 +170,18 @@ export default function AdminStockPage() {
   const handleSyncStore = async () => {
     try {
       setSyncingStore(true);
-      let data: any = null;
-      let ok = false;
-
-      // 1. Direct browser fetch to storefront
-      try {
-        const directRes = await fetch("https://www.iqtrousers.in/api/sync-stock", {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        });
-        if (directRes.ok) {
-          data = await directRes.json();
-          ok = Boolean(data?.success);
-        }
-      } catch (browserErr) {
-        console.warn("Direct browser sync attempt failed, trying backend proxy:", browserErr);
+      const res = await fetch("/api/admin/stock/sync-ecommerce", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to synchronize storefront stock");
       }
-
-      // 2. Fallback to backend proxy
-      if (!ok) {
-        const res = await fetch("/api/admin/stock/sync", {
-          method: "POST",
-        });
-        data = await res.json();
-        ok = res.ok && Boolean(data?.success);
-      }
-
-      if (ok && data?.success) {
-        toast(
-          `Synced ${data.syncedStylesCount || 0} styles with E-Commerce Storefront! Out-of-stock items hidden automatically.`,
-          "success"
-        );
-        fetchStock();
-      } else {
-        toast(data?.error || "Storefront sync encountered an issue. Please open www.iqtrousers.in once.", "error");
-      }
+      toast(
+        data?.message || `Synced products with E-Commerce Storefront! Out-of-stock items hidden automatically.`,
+        "success"
+      );
+      fetchStock();
     } catch (e: any) {
       toast("Storefront sync error: " + e.message, "error");
     } finally {

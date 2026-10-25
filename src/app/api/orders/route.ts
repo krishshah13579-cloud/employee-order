@@ -445,6 +445,18 @@ export async function POST(request: NextRequest) {
       await releaseReservations(body.sessionId).catch(() => {});
     }
 
+    // Auto-synchronize affected products with E-Commerce store stock
+    try {
+      const { syncWholesaleProductToEcommerce } = await import("@/lib/stock-sync");
+      for (const { product } of productDeductionsMap.values()) {
+        syncWholesaleProductToEcommerce(product.id).catch((err) =>
+          console.error(`Auto-sync error for product ${product.id}:`, err)
+        );
+      }
+    } catch (syncErr) {
+      console.error("Stock sync import error:", syncErr);
+    }
+
     // Send immediate email notification alert to admin (non-blocking)
     sendNewOrderNotification({
       orderNumber: createdOrder.orderNumber,
