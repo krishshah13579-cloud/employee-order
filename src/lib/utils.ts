@@ -660,3 +660,43 @@ export function expandOrderItemsForInvoice(items: any[]): ExpandedInvoiceRow[] {
 
   return result;
 }
+
+export function formatPrice(price: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price);
+}
+
+export function getOrderStatusColor(status: string): string {
+  switch (status?.toUpperCase()) {
+    case "PENDING":
+      return "bg-amber-100 text-amber-800";
+    case "CONFIRMED":
+      return "bg-blue-100 text-blue-800";
+    case "PROCESSING":
+    case "DISPATCHED":
+      return "bg-indigo-100 text-indigo-800";
+    case "SHIPPED":
+    case "IN_TRANSIT":
+      return "bg-purple-100 text-purple-800";
+    case "OUT_FOR_DELIVERY":
+      return "bg-teal-100 text-teal-800";
+    case "DELIVERED":
+      return "bg-emerald-100 text-emerald-800";
+    case "CANCELLED":
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w ]+/g, "")
+    .replace(/ +/g, "-");
+}
+
