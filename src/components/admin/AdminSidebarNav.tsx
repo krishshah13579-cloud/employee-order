@@ -29,7 +29,6 @@ import {
   Users,
   Globe,
   Briefcase,
-  Layers,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -40,116 +39,116 @@ interface AdminSidebarNavProps {
 const employeeNavItems = [
   {
     name: "Dashboard",
-    href: "/employee",
+    href: "/admin/employee",
     icon: LayoutDashboard,
     exact: true,
   },
   {
     name: "Admin Details",
-    href: "/employee/profile",
+    href: "/admin/employee/profile",
     icon: ShieldCheck,
     exact: false,
   },
   {
     name: "Employees",
-    href: "/employee/employees",
+    href: "/admin/employee/employees",
     icon: UserCheck,
     exact: false,
   },
   {
     name: "Customers",
-    href: "/employee/customers",
+    href: "/admin/employee/customers",
     icon: Store,
     exact: false,
   },
   {
     name: "Visited Customers",
-    href: "/employee/visited-customers",
+    href: "/admin/employee/visited-customers",
     icon: MapPin,
     exact: false,
   },
   {
     name: "Products",
-    href: "/employee/products",
+    href: "/admin/employee/products",
     icon: Package,
     exact: false,
   },
   {
     name: "Categories",
-    href: "/employee/categories",
+    href: "/admin/employee/categories",
     icon: FolderTree,
     exact: false,
   },
   {
     name: "Order Forms",
-    href: "/employee/orders",
+    href: "/admin/employee/orders",
     icon: ShoppingCart,
     exact: false,
   },
   {
     name: "Sales Register",
-    href: "/employee/sales",
+    href: "/admin/employee/sales",
     icon: BadgePercent,
     exact: false,
   },
   {
     name: "Outstanding",
-    href: "/employee/outstanding",
+    href: "/admin/employee/outstanding",
     icon: Receipt,
     exact: false,
   },
   {
     name: "Print Ledger",
-    href: "/employee/ledger",
+    href: "/admin/employee/ledger",
     icon: BookOpen,
     exact: false,
   },
   {
     name: "Returns",
-    href: "/employee/returns",
+    href: "/admin/employee/returns",
     icon: RotateCcw,
     exact: false,
   },
   {
     name: "Invoices",
-    href: "/employee/invoices",
+    href: "/admin/employee/invoices",
     icon: FileText,
     exact: false,
   },
   {
     name: "Stock (Common)",
-    href: "/stock",
+    href: "/admin/stock",
     icon: Boxes,
     exact: false,
     isCommon: true,
   },
   {
     name: "Profit",
-    href: "/employee/profit",
+    href: "/admin/employee/profit",
     icon: TrendingUp,
     exact: false,
   },
   {
     name: "Reports",
-    href: "/employee/reports",
+    href: "/admin/employee/reports",
     icon: FileText,
     exact: false,
   },
   {
     name: "Invoice Settings",
-    href: "/employee/invoice-settings",
+    href: "/admin/employee/invoice-settings",
     icon: SlidersHorizontal,
     exact: false,
   },
   {
     name: "WhatsApp Gateway",
-    href: "/employee/whatsapp",
+    href: "/admin/employee/whatsapp",
     icon: MessageCircle,
     exact: false,
   },
   {
     name: "Security Audit",
-    href: "/employee/audit",
+    href: "/admin/employee/audit",
     icon: ShieldAlert,
     exact: false,
   },
@@ -159,43 +158,43 @@ const employeeNavItems = [
 const onlineNavItems = [
   {
     name: "Dashboard",
-    href: "/online",
+    href: "/admin/online",
     icon: LayoutDashboard,
     exact: true,
   },
   {
     name: "Products",
-    href: "/online/products",
+    href: "/admin/online/products",
     icon: Package,
     exact: false,
   },
   {
     name: "Categories",
-    href: "/online/categories",
+    href: "/admin/online/categories",
     icon: FolderTree,
     exact: false,
   },
   {
     name: "Orders",
-    href: "/online/orders",
+    href: "/admin/online/orders",
     icon: ShoppingCart,
     exact: false,
   },
   {
     name: "Discounts",
-    href: "/online/discounts",
+    href: "/admin/online/discounts",
     icon: Tag,
     exact: false,
   },
   {
     name: "Customers",
-    href: "/online/users",
+    href: "/admin/online/users",
     icon: Users,
     exact: false,
   },
   {
     name: "Stock (Common)",
-    href: "/stock",
+    href: "/admin/stock",
     icon: Boxes,
     exact: false,
     isCommon: true,
@@ -207,13 +206,17 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
   const router = useRouter();
   const [adminUser, setAdminUser] = useState({ name: "Administrator", email: "" });
 
-  // Remember the active mode ('employee' or 'online')
+  // Remember active mode: 'online' vs 'employee'
   const [activeMode, setActiveMode] = useState<"employee" | "online">("employee");
 
   useEffect(() => {
-    if (pathname.startsWith("/online")) {
+    if (pathname.startsWith("/admin/online")) {
       setActiveMode("online");
-    } else if (pathname.startsWith("/employee") || pathname.startsWith("/admin")) {
+    } else if (
+      pathname.startsWith("/admin/employee") ||
+      pathname === "/admin" ||
+      pathname.startsWith("/employee")
+    ) {
       setActiveMode("employee");
     }
   }, [pathname]);
@@ -249,7 +252,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
       {/* Brand Header */}
       <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
         <Link
-          href={activeMode === "online" ? "/online" : "/employee"}
+          href={activeMode === "online" ? "/admin/online" : "/admin/employee"}
           onClick={onItemClick}
           className="flex items-center gap-3 group min-w-0"
         >
@@ -291,7 +294,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
       <div className="p-3 border-b border-gray-100 bg-zinc-50/80 shrink-0">
         <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-200/70 rounded-xl">
           <Link
-            href="/online"
+            href="/admin/online"
             onClick={() => {
               setActiveMode("online");
               if (onItemClick) onItemClick();
@@ -307,7 +310,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
           </Link>
 
           <Link
-            href="/employee"
+            href="/admin/employee"
             onClick={() => {
               setActiveMode("employee");
               if (onItemClick) onItemClick();
@@ -331,7 +334,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
             {activeMode === "online" ? "Online Store (E-Commerce)" : "Wholesale (Garment Orders)"}
           </p>
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-zinc-100 text-zinc-600 uppercase">
-            {activeMode === "online" ? "/online" : "/employee"}
+            {activeMode === "online" ? "/admin/online" : "/admin/employee"}
           </span>
         </div>
         <nav className="space-y-1 mt-1">

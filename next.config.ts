@@ -12,16 +12,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/admin",
-        destination: "/employee",
-      },
-      {
-        source: "/admin/:path((?!login).*)",
-        destination: "/employee/:path*",
-      },
-      {
-        source: "/employee/order/:id*",
-        destination: "/employee/orders/:id*",
+        source: "/admin/employee/order/:id*",
+        destination: "/admin/employee/orders/:id*",
       },
       {
         source: "/order/:id*",
