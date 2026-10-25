@@ -49,11 +49,15 @@ export async function POST(req: NextRequest) {
     const recipientName = profile?.fullName || "Administrator";
 
     // Send real OTP email to the admin email stored in database
-    await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
+    const emailResult = await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
 
     return NextResponse.json({
       success: true,
-      message: `A fresh 6-digit 2FA login code has been emailed to ${recipientEmail}.`,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
+      message: emailResult.success
+        ? `A fresh 6-digit 2FA login code has been emailed to ${recipientEmail}.`
+        : `Generated fresh code, but email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
     });
   } catch (error: any) {
     console.error("Resend OTP error:", error);

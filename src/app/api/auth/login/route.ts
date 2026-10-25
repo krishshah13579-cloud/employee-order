@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const recipientName = profile?.fullName || "Administrator";
 
     // Send real OTP email to the admin email stored in database
-    await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
+    const emailResult = await sendOtpEmail(recipientEmail, generatedOtp, recipientName);
 
     // Mask email for UI display
     const [userPart, domain] = recipientEmail.split("@");
@@ -115,7 +115,11 @@ export async function POST(req: NextRequest) {
       requires2FA: true,
       username: admin.username,
       email: maskedEmail,
-      message: `Credentials verified! A 6-digit 2FA login code has been sent to your email (${maskedEmail}).`,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
+      message: emailResult.success
+        ? `Credentials verified! A 6-digit 2FA login code has been sent to your email (${maskedEmail}).`
+        : `Credentials verified, but email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
     });
   } catch (error: any) {
     console.error("Login error:", error);

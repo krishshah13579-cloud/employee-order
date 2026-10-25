@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Send email with OTP
-    await sendOtpEmail(targetEmail, otpCode, adminName);
+    const emailResult = await sendOtpEmail(targetEmail, otpCode, adminName);
 
     // Mask email for security display (e.g., k****h@gmail.com)
     const [userPart, domain] = targetEmail.split("@");
@@ -46,7 +46,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `2FA Security Code sent to ${maskedEmail}`,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
+      message: emailResult.success
+        ? `2FA Security Code sent to ${maskedEmail}`
+        : `Email delivery issue: ${emailResult.error || "Please check Gmail App Password"}.`,
       email: maskedEmail,
       fullEmail: targetEmail,
     });

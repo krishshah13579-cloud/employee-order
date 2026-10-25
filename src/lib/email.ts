@@ -24,7 +24,7 @@ export async function sendOtpEmail(
   toEmail: string,
   otpCode: string,
   adminName: string = "Administrator"
-) {
+): Promise<{ success: boolean; error?: string }> {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -38,6 +38,8 @@ export async function sendOtpEmail(
   console.log(`OTP Code  : ${otpCode}`);
   console.log(`Timestamp : ${new Date().toISOString()}`);
   console.log(`======================================================\n`);
+
+  let lastError = "";
 
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
@@ -77,14 +79,15 @@ export async function sendOtpEmail(
       await transporter.sendMail({
         from: `"IQ TROUSERS Security" <${gmailUser.trim()}>`,
         to: toEmail,
-        subject: `🔐 Your 2FA Security Code to Edit Admin Details: ${otpCode}`,
+        subject: `🔐 Your 2FA Security Code: ${otpCode}`,
         html: htmlContent,
       });
 
       console.log(`✅ 2FA OTP email successfully dispatched via Gmail to ${toEmail}`);
-      return true;
+      return { success: true };
     } catch (err: any) {
       console.error("Failed to dispatch email via Gmail SMTP:", err.message);
+      lastError = err.message || "Invalid Gmail credentials";
     }
   }
 
@@ -100,7 +103,7 @@ export async function sendOtpEmail(
         body: JSON.stringify({
           from: fromEmail,
           to: [toEmail],
-          subject: `🔐 Your 2FA Security Code to Edit Admin Details: ${otpCode}`,
+          subject: `🔐 Your 2FA Security Code: ${otpCode}`,
           html: htmlContent,
         }),
       });
@@ -108,12 +111,14 @@ export async function sendOtpEmail(
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         console.error("Resend API response error:", errorData);
+        lastError = "Resend API error";
       } else {
         console.log("✅ 2FA OTP email successfully dispatched via Resend to", toEmail);
-        return true;
+        return { success: true };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to dispatch email via Resend:", err);
+      lastError = err.message;
     }
   }
 
@@ -129,7 +134,7 @@ export async function sendOtpEmail(
         body: JSON.stringify({
           sender: { name: "IQ TROUSERS Security", email: gmailUser || "security@iqtrousers.com" },
           to: [{ email: toEmail, name: adminName }],
-          subject: `🔐 Your 2FA Security Code to Edit Admin Details: ${otpCode}`,
+          subject: `🔐 Your 2FA Security Code: ${otpCode}`,
           htmlContent: htmlContent,
         }),
       });
@@ -137,22 +142,25 @@ export async function sendOtpEmail(
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         console.error("Brevo API response error:", errorData);
+        lastError = "Brevo API error";
       } else {
         console.log("✅ 2FA OTP email successfully dispatched via Brevo to", toEmail);
-        return true;
+        return { success: true };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to dispatch email via Brevo:", err);
+      lastError = err.message;
     }
   }
 
   if (!gmailUser && !resendApiKey && !brevoApiKey) {
     console.warn(
-      "⚠️ [Email Notice] No email credentials found in environment variables. Add GMAIL_USER & GMAIL_APP_PASSWORD in Vercel to receive 2FA emails."
+      "⚠️ [Email Notice] No email credentials found in environment variables. Add GMAIL_USER & GMAIL_APP_PASSWORD to receive 2FA emails."
     );
+    lastError = "Email credentials (GMAIL_USER & GMAIL_APP_PASSWORD) not configured in environment variables.";
   }
 
-  return true;
+  return { success: false, error: lastError };
 }
 
 /**
