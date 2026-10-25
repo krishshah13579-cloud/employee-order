@@ -22,124 +22,183 @@ import {
   BadgePercent,
   SlidersHorizontal,
   ShieldAlert,
-  FileCheck2,
   X,
   MapPin,
   TrendingUp,
+  Tag,
+  Users,
+  Globe,
+  Briefcase,
+  Layers,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
   onItemClick?: () => void;
 }
 
-const navItems = [
+// 1. Employee (Wholesale B2B) Navigation Items
+const employeeNavItems = [
   {
     name: "Dashboard",
-    href: "/admin",
+    href: "/employee",
     icon: LayoutDashboard,
     exact: true,
   },
   {
     name: "Admin Details",
-    href: "/admin/profile",
+    href: "/employee/profile",
     icon: ShieldCheck,
     exact: false,
   },
   {
     name: "Employees",
-    href: "/admin/employees",
+    href: "/employee/employees",
     icon: UserCheck,
     exact: false,
   },
   {
     name: "Customers",
-    href: "/admin/customers",
+    href: "/employee/customers",
     icon: Store,
     exact: false,
   },
   {
     name: "Visited Customers",
-    href: "/admin/visited-customers",
+    href: "/employee/visited-customers",
     icon: MapPin,
     exact: false,
   },
   {
     name: "Products",
-    href: "/admin/products",
+    href: "/employee/products",
     icon: Package,
     exact: false,
   },
   {
     name: "Categories",
-    href: "/admin/categories",
+    href: "/employee/categories",
     icon: FolderTree,
     exact: false,
   },
   {
     name: "Order Forms",
-    href: "/admin/orders",
+    href: "/employee/orders",
     icon: ShoppingCart,
     exact: false,
   },
   {
     name: "Sales Register",
-    href: "/admin/sales",
+    href: "/employee/sales",
     icon: BadgePercent,
     exact: false,
   },
   {
     name: "Outstanding",
-    href: "/admin/outstanding",
+    href: "/employee/outstanding",
     icon: Receipt,
     exact: false,
   },
   {
     name: "Print Ledger",
-    href: "/admin/ledger",
+    href: "/employee/ledger",
     icon: BookOpen,
     exact: false,
   },
   {
     name: "Returns",
-    href: "/admin/returns",
+    href: "/employee/returns",
     icon: RotateCcw,
     exact: false,
   },
   {
-    name: "Stock",
-    href: "/admin/stock",
-    icon: Boxes,
+    name: "Invoices",
+    href: "/employee/invoices",
+    icon: FileText,
     exact: false,
   },
   {
+    name: "Stock (Common)",
+    href: "/stock",
+    icon: Boxes,
+    exact: false,
+    isCommon: true,
+  },
+  {
     name: "Profit",
-    href: "/admin/profit",
+    href: "/employee/profit",
     icon: TrendingUp,
     exact: false,
   },
   {
     name: "Reports",
-    href: "/admin/reports",
+    href: "/employee/reports",
     icon: FileText,
     exact: false,
   },
   {
     name: "Invoice Settings",
-    href: "/admin/invoice-settings",
+    href: "/employee/invoice-settings",
     icon: SlidersHorizontal,
     exact: false,
   },
   {
     name: "WhatsApp Gateway",
-    href: "/admin/whatsapp",
+    href: "/employee/whatsapp",
     icon: MessageCircle,
     exact: false,
   },
   {
     name: "Security Audit",
-    href: "/admin/audit",
+    href: "/employee/audit",
     icon: ShieldAlert,
     exact: false,
+  },
+];
+
+// 2. Admin (Online E-Commerce) Navigation Items
+const onlineNavItems = [
+  {
+    name: "Dashboard",
+    href: "/online",
+    icon: LayoutDashboard,
+    exact: true,
+  },
+  {
+    name: "Products",
+    href: "/online/products",
+    icon: Package,
+    exact: false,
+  },
+  {
+    name: "Categories",
+    href: "/online/categories",
+    icon: FolderTree,
+    exact: false,
+  },
+  {
+    name: "Orders",
+    href: "/online/orders",
+    icon: ShoppingCart,
+    exact: false,
+  },
+  {
+    name: "Discounts",
+    href: "/online/discounts",
+    icon: Tag,
+    exact: false,
+  },
+  {
+    name: "Customers",
+    href: "/online/users",
+    icon: Users,
+    exact: false,
+  },
+  {
+    name: "Stock (Common)",
+    href: "/stock",
+    icon: Boxes,
+    exact: false,
+    isCommon: true,
   },
 ];
 
@@ -147,6 +206,17 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [adminUser, setAdminUser] = useState({ name: "Administrator", email: "" });
+
+  // Remember the active mode ('employee' or 'online')
+  const [activeMode, setActiveMode] = useState<"employee" | "online">("employee");
+
+  useEffect(() => {
+    if (pathname.startsWith("/online")) {
+      setActiveMode("online");
+    } else if (pathname.startsWith("/employee") || pathname.startsWith("/admin")) {
+      setActiveMode("employee");
+    }
+  }, [pathname]);
 
   useEffect(() => {
     fetch("/api/admin/profile")
@@ -172,12 +242,14 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
     }
   };
 
+  const navItems = activeMode === "online" ? onlineNavItems : employeeNavItems;
+
   return (
     <div className="flex flex-col h-full bg-white select-none overflow-hidden">
       {/* Brand Header */}
       <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
         <Link
-          href="/admin"
+          href={activeMode === "online" ? "/online" : "/employee"}
           onClick={onItemClick}
           className="flex items-center gap-3 group min-w-0"
         >
@@ -199,7 +271,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
         </Link>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-amber-400 tracking-wider uppercase">
-            Admin
+            Super Admin
           </span>
           {onItemClick && (
             <button
@@ -215,12 +287,54 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
         </div>
       </div>
 
+      {/* Mode Switcher: Admin (Online) vs Employee (Wholesale) */}
+      <div className="p-3 border-b border-gray-100 bg-zinc-50/80 shrink-0">
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-200/70 rounded-xl">
+          <Link
+            href="/online"
+            onClick={() => {
+              setActiveMode("online");
+              if (onItemClick) onItemClick();
+            }}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all ${
+              activeMode === "online"
+                ? "bg-white text-zinc-950 shadow-xs"
+                : "text-zinc-600 hover:text-zinc-950 hover:bg-white/50"
+            }`}
+          >
+            <Globe className={`w-3.5 h-3.5 ${activeMode === "online" ? "text-emerald-600" : "text-zinc-500"}`} />
+            <span>Admin</span>
+          </Link>
+
+          <Link
+            href="/employee"
+            onClick={() => {
+              setActiveMode("employee");
+              if (onItemClick) onItemClick();
+            }}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all ${
+              activeMode === "employee"
+                ? "bg-white text-zinc-950 shadow-xs"
+                : "text-zinc-600 hover:text-zinc-950 hover:bg-white/50"
+            }`}
+          >
+            <Briefcase className={`w-3.5 h-3.5 ${activeMode === "employee" ? "text-orange-600" : "text-zinc-500"}`} />
+            <span>Employee</span>
+          </Link>
+        </div>
+      </div>
+
       {/* Scrollable Navigation Section */}
       <div className="flex-1 overflow-y-auto overscroll-contain p-3">
-        <p className="px-3 pt-1 pb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-          Wholesale Management
-        </p>
-        <nav className="space-y-1">
+        <div className="flex items-center justify-between px-3 pt-1 pb-1.5">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            {activeMode === "online" ? "Online Store (E-Commerce)" : "Wholesale (Garment Orders)"}
+          </p>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-zinc-100 text-zinc-600 uppercase">
+            {activeMode === "online" ? "/online" : "/employee"}
+          </span>
+        </div>
+        <nav className="space-y-1 mt-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.exact
@@ -235,17 +349,28 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   isActive
                     ? "bg-zinc-950 text-white shadow-xs font-bold"
+                    : item.isCommon
+                    ? "text-zinc-900 bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/60 font-bold"
                     : "text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100/80"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon
                     className={`w-4 h-4 ${
-                      isActive ? "text-amber-400" : "text-zinc-400 group-hover:text-zinc-950"
+                      isActive
+                        ? "text-amber-400"
+                        : item.isCommon
+                        ? "text-amber-600"
+                        : "text-zinc-400 group-hover:text-zinc-950"
                     }`}
                   />
                   <span>{item.name}</span>
                 </div>
+                {item.isCommon && !isActive && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900 tracking-wider">
+                    SHARED
+                  </span>
+                )}
                 {isActive && (
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 )}
@@ -290,7 +415,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
           </div>
         </div>
 
-        {/* View Storefront Link (Delegates Super Admin Access through Admin Panel) */}
+        {/* View Storefront Link */}
         <Link
           href="/api/admin/open-store?target=/"
           target="_blank"
