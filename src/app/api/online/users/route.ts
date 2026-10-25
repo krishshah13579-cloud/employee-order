@@ -42,3 +42,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
+  try {
+    const body = await req.json();
+    const { id, role, phoneVerified } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    const data: any = {};
+    if (role) data.role = role;
+    if (phoneVerified !== undefined) data.phoneVerified = Boolean(phoneVerified);
+
+    const updated = await prisma.ecommerceUser.update({
+      where: { id },
+      data,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
+  try {
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    await prisma.ecommerceUser.delete({ where: { id } });
+    return NextResponse.json({ success: true, message: "User deleted" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+

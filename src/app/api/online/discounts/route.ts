@@ -89,15 +89,45 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, active } = body;
+    const {
+      id,
+      code,
+      type,
+      value,
+      minOrder,
+      maxDiscount,
+      maxUses,
+      expiresAt,
+      description,
+      targetAudience,
+      minOrders,
+      maxOrders,
+      minSpend,
+      active,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Discount ID is required" }, { status: 400 });
     }
 
+    const data: any = {};
+    if (code) data.code = code.trim().toUpperCase();
+    if (type) data.type = type;
+    if (value !== undefined) data.value = Number(value);
+    if (minOrder !== undefined) data.minOrder = Number(minOrder);
+    if (maxDiscount !== undefined) data.maxDiscount = maxDiscount ? Number(maxDiscount) : null;
+    if (maxUses !== undefined) data.maxUses = maxUses ? Number(maxUses) : null;
+    if (expiresAt !== undefined) data.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    if (description !== undefined) data.description = description?.trim() || null;
+    if (targetAudience !== undefined) data.targetAudience = targetAudience;
+    if (minOrders !== undefined) data.minOrders = minOrders ? Number(minOrders) : 0;
+    if (maxOrders !== undefined) data.maxOrders = maxOrders ? Number(maxOrders) : null;
+    if (minSpend !== undefined) data.minSpend = minSpend ? Number(minSpend) : 0;
+    if (active !== undefined) data.active = Boolean(active);
+
     const updated = await prisma.ecommerceDiscount.update({
       where: { id },
-      data: { active: Boolean(active) },
+      data,
     });
 
     return NextResponse.json(updated);
@@ -105,6 +135,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const PUT = PATCH;
 
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdmin(req);

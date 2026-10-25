@@ -67,3 +67,28 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const PUT = PATCH;
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
+  try {
+    const url = new URL(req.url);
+    const orderId = url.searchParams.get("orderId");
+
+    if (!orderId) {
+      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+    }
+
+    // Delete items first then order
+    await prisma.ecommerceOrderItem.deleteMany({ where: { orderId } });
+    await prisma.ecommerceOrder.delete({ where: { id: orderId } });
+
+    return NextResponse.json({ success: true, message: "Order deleted successfully" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
