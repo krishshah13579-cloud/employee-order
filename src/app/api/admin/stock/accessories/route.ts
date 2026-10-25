@@ -4,18 +4,6 @@ import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-se
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_ACCESSORIES = [
-  { name: "IQ Metallic Shank Button (24L)", category: "Buttons", quantity: 5000, unit: "Pcs", minAlertQty: 1000, costPerUnit: 1.8 },
-  { name: "Horn Trouser Fly Button (20L)", category: "Buttons", quantity: 8200, unit: "Pcs", minAlertQty: 1500, costPerUnit: 0.9 },
-  { name: "IQ Trousers Premium Hangtag", category: "Tags", quantity: 3500, unit: "Pcs", minAlertQty: 800, costPerUnit: 2.2 },
-  { name: "Barcode MRP Price Tag", category: "Tags", quantity: 4200, unit: "Pcs", minAlertQty: 1000, costPerUnit: 0.6 },
-  { name: "Woven Waistband Size Label (30-38)", category: "Size Label", quantity: 6000, unit: "Pcs", minAlertQty: 1200, costPerUnit: 0.45 },
-  { name: "IQ Signature Back Pocket Flag Label", category: "Flag Label", quantity: 4500, unit: "Pcs", minAlertQty: 1000, costPerUnit: 1.1 },
-  { name: "YKK Metal Trouser Zipper (6 inch)", category: "Zippers", quantity: 2400, unit: "Pcs", minAlertQty: 500, costPerUnit: 6.5 },
-  { name: "Cotton Herringbone Pocketing Fabric", category: "Pocketing", quantity: 450, unit: "Meters", minAlertQty: 100, costPerUnit: 42.0 },
-  { name: "Poly Satin Wash Care Label", category: "Care Label", quantity: 3800, unit: "Pcs", minAlertQty: 800, costPerUnit: 0.35 },
-];
-
 export async function GET(req: NextRequest) {
   try {
     const admin = await getAdminSession(req);
@@ -23,14 +11,6 @@ export async function GET(req: NextRequest) {
 
     if (!admin && !employee) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Seed default items if table is empty
-    const count = await prisma.accessoryItem.count();
-    if (count === 0) {
-      await prisma.accessoryItem.createMany({
-        data: DEFAULT_ACCESSORIES,
-      });
     }
 
     const { searchParams } = new URL(req.url);
