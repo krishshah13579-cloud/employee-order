@@ -38,9 +38,13 @@ export async function GET(req: NextRequest) {
       60 * 60 * 24 * 7 // 7 days
     );
 
+    const isHttps =
+      req.headers.get("x-forwarded-proto") === "https" ||
+      req.nextUrl.protocol === "https:";
+
     cookieStore.set("garmentpro_emp_session", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,

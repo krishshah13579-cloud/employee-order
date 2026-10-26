@@ -103,12 +103,16 @@ export async function POST(req: NextRequest) {
       message: "2FA Verification successful! Welcome to IQ TROUSERS Admin.",
     });
 
-    // Set secure HTTP-only cookie for session
+    const isHttps =
+      req.headers.get("x-forwarded-proto") === "https" ||
+      req.nextUrl.protocol === "https:";
+
+    // Set secure HTTP-only cookie for session (matches transport security)
     response.cookies.set({
       name: "iq_admin_session",
       value: sessionToken,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: "lax",

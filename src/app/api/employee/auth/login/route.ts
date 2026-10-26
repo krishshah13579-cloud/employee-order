@@ -104,10 +104,14 @@ export async function POST(req: NextRequest) {
       loggedInAt: new Date().toISOString(),
     }, 60 * 60 * 24 * 30); // 30 days
 
+    const isHttps =
+      req.headers.get("x-forwarded-proto") === "https" ||
+      req.nextUrl.protocol === "https:";
+
     const cookieStore = await cookies();
     cookieStore.set("garmentpro_emp_session", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
