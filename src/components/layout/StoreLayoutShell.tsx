@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import EmployeeWelcomeBreadcrumb from "@/components/layout/EmployeeWelcomeBreadcrumb";
+import MobilePhoneNavbar from "@/components/layout/MobilePhoneNavbar";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { Loader2 } from "lucide-react";
 
@@ -77,7 +78,8 @@ export default function StoreLayoutShell({
         <Navbar />
         <EmployeeWelcomeBreadcrumb />
       </div>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+      <MobilePhoneNavbar />
     </div>
   );
 }

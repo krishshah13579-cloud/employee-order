@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
-import NotificationBell from "@/components/notifications/NotificationBell";
 import InstallAppModal from "@/components/notifications/InstallAppModal";
 import { useNotifications } from "@/components/notifications/NotificationProvider";
 
@@ -116,9 +115,8 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Right Action: Notifications & Dedicated Profile Icon */}
+          {/* Right Action: Dedicated Profile Icon */}
           <div className="hidden lg:flex items-center space-x-3">
-            <NotificationBell />
             {employee && (
               <div className="relative" ref={profileRef}>
                 <button
@@ -230,7 +228,6 @@ export default function Navbar() {
 
           {/* Mobile Menu Actions */}
           <div className="flex items-center space-x-2 lg:hidden">
-            <NotificationBell />
             {employee && (
               <button
                 type="button"
