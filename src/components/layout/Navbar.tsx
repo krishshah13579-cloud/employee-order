@@ -18,13 +18,18 @@ import {
   Clock,
   ShieldCheck,
   Boxes,
+  Smartphone,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import InstallAppModal from "@/components/notifications/InstallAppModal";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 
 export default function Navbar() {
   const pathname = usePathname();
   const { employee, logout } = useEmployee();
+  const { setIsInstallGuideOpen } = useNotifications();
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [profileOpen, setProfileOpen] = useState<boolean>(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -111,8 +116,9 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Right Action: Dedicated Profile Icon */}
+          {/* Right Action: Notifications & Dedicated Profile Icon */}
           <div className="hidden lg:flex items-center space-x-3">
+            <NotificationBell />
             {employee && (
               <div className="relative" ref={profileRef}>
                 <button
@@ -223,7 +229,8 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Actions */}
-          <div className="flex items-center space-x-2.5 lg:hidden">
+          <div className="flex items-center space-x-2 lg:hidden">
+            <NotificationBell />
             {employee && (
               <button
                 type="button"
@@ -334,9 +341,31 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            {/* Mobile WebApp Install Guide Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  setIsInstallGuideOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl bg-blue-50 text-[#162082] border border-blue-200/90 hover:bg-blue-100 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-blue-700" />
+                  <span>Save WebApp to iPhone / Android</span>
+                </div>
+                <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full font-black">
+                  App Guide
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* iPhone / iPad / Android Installation Guide Modal */}
+      <InstallAppModal />
     </nav>
   );
 }
