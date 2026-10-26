@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   title: "IQ TROUSERS — Premium Garment Manufacturers & Wholesalers",
   description: "IQ TROUSERS B2B Wholesale Order Collection & Factory Management System",
   icons: {
-    icon: "/images/iq-logo.jpg",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
