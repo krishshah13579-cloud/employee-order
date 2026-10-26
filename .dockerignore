@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+.next
+.whatsapp-auth
+*.log
+.DS_Store
+*.db
+*.db-shm
+*.db-wal
+.vscode
+.vercel
