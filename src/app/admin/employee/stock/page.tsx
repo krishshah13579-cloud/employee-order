@@ -22,11 +22,13 @@ import {
   ArrowUpRight,
   ShieldAlert,
   FileText,
+  Share2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
 import { cleanColorName } from "@/lib/stock";
+import { shareProductStockWithImage } from "@/lib/stockShare";
 
 interface StockItem {
   id: number;
@@ -447,6 +449,56 @@ export default function AdminStockPage() {
     }
   };
 
+  const [sharingItemId, setSharingItemId] = useState<number | null>(null);
+
+  const handleShareItemStock = async (item: StockItem) => {
+    setSharingItemId(item.id);
+    try {
+      const colorStockList: { color: string; sets: number; pcs: number }[] = [];
+      const ratioKey = item.sizesRatio || "28 to 36";
+      const pcs = item.pcsPerSet || 5;
+
+      if (item.detailedRatioSets) {
+        for (const [col, ratios] of Object.entries(item.detailedRatioSets)) {
+          const setsCount = ratios[ratioKey] || 0;
+          colorStockList.push({
+            color: col,
+            sets: setsCount,
+            pcs: setsCount * pcs,
+          });
+        }
+      } else {
+        for (const col of item.colors) {
+          colorStockList.push({
+            color: col,
+            sets: 0,
+            pcs: 0,
+          });
+        }
+      }
+
+      await shareProductStockWithImage(
+        {
+          productName: item.name,
+          category: item.category,
+          price: item.wholesalerPrice || item.price,
+          ratio: ratioKey,
+          pcsPerSet: pcs,
+          imageUrl: item.imageUrl,
+          colorStock: colorStockList,
+          mixStock: item.mixPcs > 0 ? [{ size: "Mix", pcs: item.mixPcs }] : undefined,
+          totalSets: item.totalSets,
+          totalPcs: item.totalPcs,
+        },
+        (msg, type) => toast(msg, type)
+      );
+    } catch (e: any) {
+      toast(e.message || "Failed to share stock", "error");
+    } finally {
+      setSharingItemId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -805,14 +857,27 @@ export default function AdminStockPage() {
 
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1 mx-auto cursor-pointer"
-                            >
-                              <Edit size={12} />
-                              <span>Edit Stock</span>
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(item)}
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Edit live stock and ratios"
+                              >
+                                <Edit size={12} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareItemStock(item)}
+                                disabled={sharingItemId === item.id}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                title="Share stock details and product photo via WhatsApp"
+                              >
+                                <Share2 size={12} className={sharingItemId === item.id ? "animate-spin" : ""} />
+                                <span>{sharingItemId === item.id ? "Sharing..." : "Share"}</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
