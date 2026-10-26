@@ -29,7 +29,6 @@ import {
   ZoomIn,
   ZoomOut,
   X,
-  Share2,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -40,7 +39,6 @@ import {
   isGstPanRegistered,
 } from "@/lib/utils";
 import { getColorHex } from "@/lib/colors";
-import { shareProductStockWithImage } from "@/lib/stockShare";
 import {
   getAvailableSetsForColor,
   getTotalAvailableSets,
@@ -1057,55 +1055,6 @@ function ProductDetailContent() {
 
   const totalProductStock = getTotalAvailableSets(product.setsColorwise);
 
-  const [sharingStock, setSharingStock] = useState(false);
-
-  const handleShareStock = async () => {
-    if (!product) return;
-    setSharingStock(true);
-    try {
-      const colorStockList = availableColors.map((col) => {
-        const detail = getColorStockDetail(col);
-        const ratioSets = detail.ratios[activeRatio] || 0;
-        return {
-          color: col,
-          sets: ratioSets,
-          pcs: ratioSets * activePcsPerSet,
-        };
-      });
-
-      // Gather mix sizes
-      const mixList: { size: string; pcs: number }[] = [];
-      for (const col of availableColors) {
-        const detail = getColorStockDetail(col);
-        for (const [sz, count] of Object.entries(detail.loosePcs)) {
-          if (count > 0) {
-            mixList.push({ size: `${sz} (${col})`, pcs: count });
-          }
-        }
-      }
-
-      await shareProductStockWithImage(
-        {
-          productName: product.name,
-          category: product.category,
-          price: unitPrice,
-          ratio: activeRatio,
-          pcsPerSet: activePcsPerSet,
-          imageUrl: activeColorPhoto || product.imageUrl,
-          colorStock: colorStockList,
-          mixStock: mixList,
-          totalSets: totalProductStock,
-          totalPcs: totalProductStock * activePcsPerSet,
-        },
-        (msg, type) => toast(msg, type)
-      );
-    } catch (e: any) {
-      toast(e.message || "Failed to share stock", "error");
-    } finally {
-      setSharingStock(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
       <UserHeader showBack />
@@ -1242,26 +1191,13 @@ function ProductDetailContent() {
 
             {/* Product Wholesale Specs Card */}
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-900">
-                    {product.name}
-                  </h1>
-                  <div className="text-xs font-semibold text-slate-500 mt-0.5">
-                    Category: <span className="text-slate-800 font-bold">{product.category}</span>
-                  </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900">
+                  {product.name}
+                </h1>
+                <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                  Category: <span className="text-slate-800 font-bold">{product.category}</span>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleShareStock}
-                  disabled={sharingStock}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer shrink-0 active:scale-95"
-                  title="Share live stock breakdown and product photo via WhatsApp"
-                >
-                  <Share2 size={14} className={sharingStock ? "animate-spin" : ""} />
-                  <span>{sharingStock ? "Sharing..." : "Share Stock"}</span>
-                </button>
               </div>
 
               {/* Pricing & Packaging Formula */}

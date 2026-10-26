@@ -23,7 +23,6 @@ import {
   ShieldAlert,
   Camera,
   Image as ImageIcon,
-  Share2,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { useToast } from "@/components/ui/Toast";
@@ -36,7 +35,6 @@ import {
   sortSizeRatioKeys,
 } from "@/lib/stock";
 import { STANDARD_SIZE_RATIOS } from "@/lib/types";
-import { shareProductStockWithImage } from "@/lib/stockShare";
 
 interface StockProduct {
   id: number;
@@ -80,55 +78,6 @@ export default function UpdateStockPage() {
   const [modalImageUrl, setModalImageUrl] = useState<string>("");
   const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [sharingStockId, setSharingStockId] = useState<number | null>(null);
-
-  const handleShareStockProduct = async (p: StockProduct) => {
-    setSharingStockId(p.id);
-    try {
-      const colorStockList: { color: string; sets: number; pcs: number }[] = [];
-      const ratioKey = p.sizesRatio || "28 to 36";
-      const pcs = p.pcsPerSet || 5;
-
-      if (p.detailedRatioSets) {
-        for (const [col, ratios] of Object.entries(p.detailedRatioSets)) {
-          const setsCount = ratios[ratioKey] || 0;
-          colorStockList.push({
-            color: col,
-            sets: setsCount,
-            pcs: setsCount * pcs,
-          });
-        }
-      } else {
-        for (const col of p.colors) {
-          colorStockList.push({
-            color: col,
-            sets: 0,
-            pcs: 0,
-          });
-        }
-      }
-
-      await shareProductStockWithImage(
-        {
-          productName: p.name,
-          category: p.category,
-          price: p.retailerPrice || p.wholesalerPrice || p.price,
-          ratio: ratioKey,
-          pcsPerSet: pcs,
-          imageUrl: p.imageUrl,
-          colorStock: colorStockList,
-          mixStock: p.mixPcs > 0 ? [{ size: "Mix", pcs: p.mixPcs }] : undefined,
-          totalSets: p.totalSets,
-          totalPcs: p.totalPcs,
-        },
-        (msg, type) => toast(msg, type)
-      );
-    } catch (e: any) {
-      toast(e.message || "Failed to share stock", "error");
-    } finally {
-      setSharingStockId(null);
-    }
-  };
 
   // Strict authorization check: Only allowed if explicitly granted or super admin
   const isAuthorized = Boolean(
@@ -603,26 +552,14 @@ export default function UpdateStockPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleShareStockProduct(p)}
-                          disabled={sharingStockId === p.id}
-                          className="inline-flex items-center gap-1 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 border border-emerald-200/60"
-                          title="Share live stock and product photo via WhatsApp"
-                        >
-                          <Share2 size={13} className={sharingStockId === p.id ? "animate-spin" : ""} />
-                          <span>{sharingStockId === p.id ? "Sharing..." : "Share"}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(p)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer active:scale-95"
-                        >
-                          <Edit size={13} />
-                          <span>Update Stock</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(p)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <Edit size={13} />
+                        <span>Update Stock</span>
+                      </button>
                     </div>
                   </div>
                 </div>
