@@ -152,7 +152,7 @@ export default function AdminLoginPage() {
 
       if (res.ok && data.success) {
         toast("2FA Verified! Welcome to IQ TROUSERS Admin.", "success");
-        router.push("/admin");
+        window.location.href = "/admin/employee";
       } else {
         toast(data.error || "Invalid OTP code. Please check your email.", "error");
       }

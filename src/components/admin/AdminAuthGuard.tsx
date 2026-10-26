@@ -17,7 +17,7 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
 
     const verifyAuth = async () => {
       try {
-        const res = await fetch("/api/auth/check");
+        const res = await fetch("/api/auth/check", { cache: "no-store" });
         const data = await res.json();
         if (!data.authenticated) {
           router.replace("/admin/login");

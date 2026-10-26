@@ -60,7 +60,7 @@ export default function EmployeeLoginPage() {
       setSubmitting(true);
       const res = await login(name.trim(), pin.trim());
       if (res.success) {
-        router.replace("/");
+        window.location.href = "/";
       } else {
         setErrorMsg(res.error || "Invalid name or PIN entered.");
       }
