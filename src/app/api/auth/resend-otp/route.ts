@@ -55,14 +55,20 @@ export async function POST(req: NextRequest) {
     );
     const emailResult = await Promise.race([emailPromise, timeoutPromise]);
 
+    // Zero plain-text leaks: never expose OTP in response if email delivered successfully.
+    const isProd = process.env.NODE_ENV === "production";
+    const allowDevFallback = !emailResult.success && !isProd;
+
     return NextResponse.json({
       success: true,
       emailSent: emailResult.success,
-      emailError: emailResult.error,
-      fallbackCode: generatedOtp,
+      emailError: emailResult.success ? undefined : emailResult.error,
+      fallbackCode: allowDevFallback ? generatedOtp : undefined,
       message: emailResult.success
         ? `A fresh 6-digit 2FA login code has been emailed to ${recipientEmail}.`
-        : `Generated fresh code. (Render Free blocks SMTP. Your code is: ${generatedOtp})`,
+        : (allowDevFallback
+            ? `Generated fresh code in development: ${generatedOtp}`
+            : `Email delivery failed (${emailResult.error || "SMTP issue"}). Please check email configuration.`),
     });
   } catch (error: any) {
     console.error("Resend OTP error:", error);

@@ -115,16 +115,22 @@ export async function POST(req: NextRequest) {
         : userPart;
     const maskedEmail = domain ? `${maskedUser}@${domain}` : recipientEmail;
 
+    // Zero plain-text leaks: never expose OTP in response if email delivered successfully.
+    const isProd = process.env.NODE_ENV === "production";
+    const allowDevFallback = !emailResult.success && !isProd;
+
     return NextResponse.json({
       requires2FA: true,
       username: admin.username,
       email: maskedEmail,
       emailSent: emailResult.success,
-      emailError: emailResult.error,
-      fallbackCode: generatedOtp,
+      emailError: emailResult.success ? undefined : emailResult.error,
+      fallbackCode: allowDevFallback ? generatedOtp : undefined,
       message: emailResult.success
         ? `Credentials verified! A 6-digit 2FA login code has been sent to your email (${maskedEmail}).`
-        : `Credentials verified. (Cloud host notice: Outbound email ports are blocked on Render Free tier. Your instant 2FA code is: ${generatedOtp})`,
+        : (allowDevFallback
+            ? `Credentials verified. Outbound email failed in dev. Your code is: ${generatedOtp}`
+            : `Credentials verified. However, email delivery failed (${emailResult.error || "SMTP issue"}). Please contact your administrator.`),
     });
   } catch (error: any) {
     console.error("Login error:", error);
