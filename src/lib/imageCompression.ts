@@ -6,9 +6,9 @@
 
 export async function compressImageFile(
   file: File,
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.85
+  maxWidth = 3840,
+  maxHeight = 3840,
+  quality = 0.90
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     // If not an image, read directly as data URL

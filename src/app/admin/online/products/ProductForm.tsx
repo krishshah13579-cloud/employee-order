@@ -122,14 +122,14 @@ async function safeParseResponse(res: Response): Promise<{ ok: boolean; data: an
 }
 
 /**
- * Client-side high-fidelity photo processing to optimized Data URL:
- * Converts camera/phone uploads into sharp 1600px WebP/JPEG data URLs (85% quality).
- * Preserves crisp fabric textures and weaves without pixelation or generation loss.
+ * Client-side 4K Ultra-HD photo processing to optimized Data URL:
+ * Preserves camera/phone uploads at full 4K UHD resolution (up to 3840px, 90% quality).
+ * Preserves 100% sharp fabric weave, texture, and stitch detail on zoom.
  */
 async function fileToOptimizedDataUrl(
   file: File,
-  maxDimension = 1600,
-  quality = 0.85
+  maxDimension = 3840,
+  quality = 0.90
 ): Promise<string> {
   return new Promise((resolve) => {
     try {
@@ -216,7 +216,7 @@ async function fileToOptimizedDataUrl(
  */
 async function compressBase64Image(
   dataUri: string,
-  maxDimension = 1600
+  maxDimension = 3840
 ): Promise<string> {
   // If already a valid data URI or URL, never re-compress to prevent generation loss
   if (!dataUri || typeof dataUri !== "string") {
