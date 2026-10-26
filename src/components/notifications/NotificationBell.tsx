@@ -10,9 +10,9 @@ import {
   UserPlus,
   CheckCheck,
   Smartphone,
-  ExternalLink,
   X,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useNotifications, LiveNotification } from "./NotificationProvider";
 
@@ -39,6 +39,9 @@ export default function NotificationBell() {
     markAllAsRead,
     requestPermission,
     permission,
+    soundEnabled,
+    toggleSound,
+    playNotificationSound,
     isTrayOpen,
     setIsTrayOpen,
     setIsInstallGuideOpen,
@@ -123,6 +126,18 @@ export default function NotificationBell() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={toggleSound}
+                className="p-1 text-gray-500 hover:text-black rounded cursor-pointer"
+                title={soundEnabled ? "Mute notification chime" : "Unmute notification chime"}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-[#162082]" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={markAllAsRead}
                 className="text-[11px] font-bold text-[#162082] hover:underline flex items-center gap-1 cursor-pointer"
                 title="Mark all as read"
@@ -133,7 +148,7 @@ export default function NotificationBell() {
               <button
                 type="button"
                 onClick={() => setIsTrayOpen(false)}
-                className="sm:hidden p-1 rounded-md text-gray-500 hover:text-black"
+                className="sm:hidden p-1 rounded-md text-gray-500 hover:text-black cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -155,16 +170,39 @@ export default function NotificationBell() {
             </button>
           </div>
 
-          {/* Enable Notifications Permission Bar (if not yet granted) */}
-          {permission !== "granted" && (
-            <div className="px-3.5 py-2 bg-amber-50 border-b border-amber-200/80 flex items-center justify-between gap-2 text-xs">
-              <span className="text-[11px] text-amber-900 font-medium">
-                Enable live push alerts on lock screen
-              </span>
+          {/* Enable Notifications Permission Bar */}
+          {permission === "granted" ? (
+            <div className="px-3.5 py-2 bg-emerald-50 border-b border-emerald-200/80 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-emerald-800">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="text-[11px] font-bold">
+                  Lock-Screen &amp; Live Alerts Active
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={playNotificationSound}
+                className="px-2.5 py-1 bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Play test chime"
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Test Chime</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-3 bg-gradient-to-r from-blue-900 to-[#162082] text-white border-b border-blue-950 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-extrabold leading-tight">
+                  Enable iPhone &amp; Live Alerts
+                </p>
+                <p className="text-[10px] text-blue-200 leading-tight mt-0.5">
+                  Instant chime &amp; lock-screen alerts for new articles &amp; orders
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={requestPermission}
-                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold transition shrink-0"
+                className="px-3 py-1.5 bg-white text-[#162082] hover:bg-blue-50 rounded-xl text-xs font-black shadow-sm transition active:scale-95 shrink-0 cursor-pointer"
               >
                 Allow Alerts
               </button>
@@ -176,7 +214,7 @@ export default function NotificationBell() {
             <button
               type="button"
               onClick={() => setActiveTab("ALL")}
-              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 ${
+              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 cursor-pointer ${
                 activeTab === "ALL"
                   ? "bg-gray-900 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -187,7 +225,7 @@ export default function NotificationBell() {
             <button
               type="button"
               onClick={() => setActiveTab("ARTICLE")}
-              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 ${
+              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 cursor-pointer ${
                 activeTab === "ARTICLE"
                   ? "bg-emerald-700 text-white"
                   : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
@@ -198,7 +236,7 @@ export default function NotificationBell() {
             <button
               type="button"
               onClick={() => setActiveTab("ORDER")}
-              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 ${
+              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 cursor-pointer ${
                 activeTab === "ORDER"
                   ? "bg-blue-700 text-white"
                   : "bg-blue-50 text-blue-800 hover:bg-blue-100"
@@ -209,7 +247,7 @@ export default function NotificationBell() {
             <button
               type="button"
               onClick={() => setActiveTab("CUSTOMER")}
-              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 ${
+              className={`px-2.5 py-1 rounded-full font-bold transition shrink-0 cursor-pointer ${
                 activeTab === "CUSTOMER"
                   ? "bg-purple-700 text-white"
                   : "bg-purple-50 text-purple-800 hover:bg-purple-100"
@@ -231,7 +269,7 @@ export default function NotificationBell() {
                   key={notif.id}
                   href={notif.link}
                   onClick={() => setIsTrayOpen(false)}
-                  className="p-3 sm:p-3.5 hover:bg-gray-50 flex items-start gap-3 transition-colors block text-left"
+                  className="p-3 sm:p-3.5 hover:bg-gray-50 flex items-start gap-3 transition-colors block text-left cursor-pointer"
                 >
                   <div className="p-2 rounded-xl bg-gray-100 shrink-0 mt-0.5">
                     {getNotificationIcon(notif.type)}

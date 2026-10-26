@@ -1,6 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import Link from "next/link";
+import { Sparkles, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 export interface LiveNotification {
@@ -19,6 +28,10 @@ interface NotificationContextType {
   loading: boolean;
   permission: NotificationPermission;
   isStandalone: boolean;
+  isIos: boolean;
+  soundEnabled: boolean;
+  toggleSound: () => void;
+  playNotificationSound: () => void;
   requestPermission: () => Promise<boolean>;
   markAllAsRead: () => void;
   refreshNotifications: () => Promise<void>;
@@ -26,6 +39,49 @@ interface NotificationContextType {
   setIsTrayOpen: (open: boolean) => void;
   isInstallGuideOpen: boolean;
   setIsInstallGuideOpen: (open: boolean) => void;
+  activeBanner: LiveNotification | null;
+  dismissBanner: () => void;
+}
+
+// Pure Web Audio API Synthesized Two-Tone Bell Chime (D5 -> A5)
+function playSynthesizedChime() {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
+
+    // First note: High clear chime (587.33 Hz - D5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.25, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    // Second note: Harmonic ring (880 Hz - A5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, now + 0.1);
+    gain2.gain.setValueAtTime(0.3, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.6);
+  } catch (err) {
+    console.warn("Audio chime could not play:", err);
+  }
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -34,6 +90,10 @@ const NotificationContext = createContext<NotificationContextType>({
   loading: false,
   permission: "default",
   isStandalone: false,
+  isIos: false,
+  soundEnabled: true,
+  toggleSound: () => {},
+  playNotificationSound: () => {},
   requestPermission: async () => false,
   markAllAsRead: () => {},
   refreshNotifications: async () => {},
@@ -41,6 +101,8 @@ const NotificationContext = createContext<NotificationContextType>({
   setIsTrayOpen: () => {},
   isInstallGuideOpen: false,
   setIsInstallGuideOpen: () => {},
+  activeBanner: null,
+  dismissBanner: () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -52,21 +114,60 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState<boolean>(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [isIos, setIsIos] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isTrayOpen, setIsTrayOpen] = useState<boolean>(false);
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState<boolean>(false);
+  const [activeBanner, setActiveBanner] = useState<LiveNotification | null>(null);
 
   const lastSeenIdRef = useRef<string | null>(null);
   const initializedRef = useRef<boolean>(false);
+  const bannerTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const soundEnabledRef = useRef<boolean>(true);
+  soundEnabledRef.current = soundEnabled;
 
-  // Check standalone mode (PWA on iOS / Android)
+  const dismissBanner = useCallback(() => {
+    setActiveBanner(null);
+    if (bannerTimerRef.current) {
+      clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+    }
+  }, []);
+
+  const playNotificationSound = useCallback(() => {
+    playSynthesizedChime();
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("iq_sound_alerts_enabled", next ? "true" : "false");
+      if (next) {
+        playSynthesizedChime();
+      }
+      return next;
+    });
+  }, []);
+
+  // Check standalone mode and device characteristics
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const isIosDevice =
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      setIsIos(isIosDevice);
+
       const isIosStandalone = (window.navigator as any).standalone === true;
       const isDisplayStandalone = window.matchMedia("(display-mode: standalone)").matches;
       setIsStandalone(Boolean(isIosStandalone || isDisplayStandalone));
 
       if ("Notification" in window) {
         setPermission(Notification.permission);
+      }
+
+      const storedSound = localStorage.getItem("iq_sound_alerts_enabled");
+      if (storedSound !== null) {
+        setSoundEnabled(storedSound === "true");
       }
 
       // Register PWA service worker
@@ -77,7 +178,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             console.log("PWA Service Worker registered:", reg.scope);
           })
           .catch((err) => {
-            console.warn("PWA Service Worker registration failed:", err);
+            console.warn("PWA Service Worker registration skipped:", err);
           });
       }
 
@@ -85,42 +186,99 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  // Request browser & iPhone notification permission
+  // Request browser & iPhone notification permission with full cross-browser fallback
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      toast("Notifications not supported in this browser", "error");
+    // 1. Immediately play the chime to unlock Web Audio context on user gesture
+    playSynthesizedChime();
+    setSoundEnabled(true);
+    localStorage.setItem("iq_sound_alerts_enabled", "true");
+
+    if (typeof window === "undefined") return false;
+
+    const isIosDevice =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const isInstalled =
+      (window.navigator as any).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches;
+
+    // Case A: iPhone / iPad in regular Safari browser tab (Apple hides Notification API until added to Home Screen)
+    if (isIosDevice && !isInstalled) {
+      toast("Live in-app alerts & sound chime enabled!", "success");
+      setIsInstallGuideOpen(true);
+      return true;
+    }
+
+    // Case B: Browser does not support Notification API
+    if (!("Notification" in window)) {
+      toast("Live in-app alerts & sound chime are active!", "success");
+      return true;
+    }
+
+    // Case C: Notification was previously blocked in browser settings
+    if (Notification.permission === "denied") {
+      toast(
+        "Notifications are blocked in your browser settings. Please enable them in browser settings.",
+        "error"
+      );
       return false;
     }
 
+    // Case D: Standard permission request (supporting both Promise and legacy Safari callback)
     try {
-      const res = await Notification.requestPermission();
-      setPermission(res);
-      if (res === "granted") {
-        toast("Live iPhone & WebApp alerts enabled!", "success");
+      let result: NotificationPermission = "default";
+      try {
+        const promiseResult = Notification.requestPermission();
+        if (promiseResult && typeof promiseResult.then === "function") {
+          result = await promiseResult;
+        } else {
+          result = await new Promise<NotificationPermission>((resolve) => {
+            Notification.requestPermission((p) => resolve(p));
+          });
+        }
+      } catch {
+        result = await new Promise<NotificationPermission>((resolve) => {
+          try {
+            Notification.requestPermission((p) => resolve(p));
+          } catch {
+            resolve("denied");
+          }
+        });
+      }
+
+      setPermission(result);
+
+      if (result === "granted") {
+        toast("Push & lock-screen alerts enabled successfully!", "success");
         try {
           if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.ready;
             reg.showNotification("IQ TROUSERS Wholesale", {
-              body: "Live alerts are now active for orders, status updates, and new articles!",
+              body: "Live alerts are now active for new articles, orders, and status updates!",
               icon: "/apple-touch-icon.png",
               badge: "/apple-touch-icon.png",
             });
           } else {
             new Notification("IQ TROUSERS Wholesale", {
-              body: "Live alerts are now active for orders, status updates, and new articles!",
+              body: "Live alerts are now active for new articles, orders, and status updates!",
               icon: "/apple-touch-icon.png",
             });
           }
-        } catch {}
+        } catch (err) {
+          console.warn("Test push skipped:", err);
+        }
         return true;
       } else {
-        toast("Notification permissions were not granted", "error");
+        toast("In-app live alerts and sound are active!", "info");
         return false;
       }
-    } catch {
-      return false;
+    } catch (err) {
+      console.warn("requestPermission error:", err);
+      toast("In-app live alerts & sound are active!", "success");
+      return true;
     }
-  }, [toast]);
+  }, [toast, setIsInstallGuideOpen]);
 
   // Fetch live notifications
   const fetchLiveNotifications = useCallback(async () => {
@@ -136,7 +294,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       if (list.length === 0) return;
 
-      const storedLastSeen = lastSeenIdRef.current || localStorage.getItem("iq_last_seen_notification_id");
+      const storedLastSeen =
+        lastSeenIdRef.current ||
+        localStorage.getItem("iq_last_seen_notification_id");
 
       // Calculate unread count
       if (!storedLastSeen) {
@@ -151,11 +311,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (initializedRef.current && storedLastSeen && list.length > 0) {
         const topItem = list[0];
         if (topItem.id !== storedLastSeen) {
-          // Trigger in-app toast
+          // 1. Show floating in-app banner
+          setActiveBanner(topItem);
+          if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+          bannerTimerRef.current = setTimeout(() => {
+            setActiveBanner(null);
+          }, 6500);
+
+          // 2. Play synthesized chime if sound enabled
+          if (soundEnabledRef.current) {
+            playSynthesizedChime();
+          }
+
+          // 3. Fallback toast
           toast(topItem.title, "info");
 
-          // Trigger System Push Notification on iPhone / iPad / Desktop if granted
-          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+          // 4. Trigger system push notification if granted
+          if (
+            typeof window !== "undefined" &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
             try {
               if ("serviceWorker" in navigator) {
                 const reg = await navigator.serviceWorker.ready;
@@ -172,7 +348,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 });
               }
             } catch (err) {
-              console.warn("Push trigger failed:", err);
+              console.warn("Push trigger skipped:", err);
             }
           }
         }
@@ -200,6 +376,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     };
   }, [fetchLiveNotifications]);
 
@@ -220,6 +397,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         loading,
         permission,
         isStandalone,
+        isIos,
+        soundEnabled,
+        toggleSound,
+        playNotificationSound,
         requestPermission,
         markAllAsRead,
         refreshNotifications: fetchLiveNotifications,
@@ -227,8 +408,55 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setIsTrayOpen,
         isInstallGuideOpen,
         setIsInstallGuideOpen,
+        activeBanner,
+        dismissBanner,
       }}
     >
+      {/* Floating In-App Live Alert Pill (iOS Dynamic Island Style) */}
+      {activeBanner && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9999] w-[94vw] max-w-md animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-[#162082] text-white p-3.5 rounded-2xl shadow-2xl border border-blue-400/40 flex items-start gap-3 backdrop-blur-md">
+            <div className="p-2 rounded-xl bg-white/10 shrink-0 mt-0.5 text-white">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-black tracking-wider uppercase text-blue-200">
+                  {activeBanner.type === "ARTICLE"
+                    ? "New Article Arrival"
+                    : activeBanner.type === "ORDER_STATUS"
+                    ? "Order Status Update"
+                    : activeBanner.type === "ORDER_PLACED"
+                    ? "New Order Placed"
+                    : "New Customer Added"}
+                </span>
+                <button
+                  type="button"
+                  onClick={dismissBanner}
+                  className="text-white/60 hover:text-white p-1 cursor-pointer"
+                  aria-label="Dismiss alert"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="font-bold text-xs sm:text-sm text-white truncate mt-0.5">
+                {activeBanner.title}
+              </p>
+              <p className="text-[11px] text-blue-100 line-clamp-1 mt-0.5">
+                {activeBanner.subtitle}
+              </p>
+            </div>
+            <Link
+              href={activeBanner.link}
+              onClick={dismissBanner}
+              className="px-3 py-1.5 bg-white text-[#162082] rounded-xl text-xs font-black shrink-0 hover:bg-blue-50 transition shadow-xs self-center"
+            >
+              View
+            </Link>
+          </div>
+        </div>
+      )}
+
       {children}
     </NotificationContext.Provider>
   );
