@@ -78,6 +78,18 @@ export async function middleware(request: NextRequest) {
                    request.headers.get("x-real-ip") ||
                    "unknown";
   const userAgent = request.headers.get("user-agent") || "";
+  const host = request.headers.get("host") || "";
+
+  // 0. Internal Docker & Coolify Container Healthcheck
+  const isInternalLocalhost =
+    clientIp === "127.0.0.1" ||
+    clientIp === "::1" ||
+    host.startsWith("localhost") ||
+    host.startsWith("127.0.0.1");
+
+  if (isInternalLocalhost && (rawPath === "/" || rawPath === "/api/health")) {
+    return new NextResponse("OK", { status: 200 });
+  }
 
   // 1. Check raw path and search for traversal sequences
   const isTraversal = TRAVERSAL_PATTERNS.some(
