@@ -380,6 +380,48 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleDeleteDevice = async (deviceId: string, name: string) => {
+    if (!confirm(`Are you sure you want to PERMANENTLY DELETE the device record for "${name}"?`)) return;
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_device", deviceId }),
+      });
+      if (res.ok) {
+        toast(`Device "${name}" deleted permanently.`, "success");
+        fetchDevices();
+      } else {
+        const data = await res.json();
+        toast(data.error || "Failed to delete device", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    }
+  };
+
+  const handleDeleteAllRevokedDevices = async () => {
+    const revokedCount = devices.filter((d) => !d.isActive).length;
+    if (revokedCount === 0) return;
+    if (!confirm(`Are you sure you want to permanently delete ALL ${revokedCount} revoked device records? This cannot be undone.`)) return;
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_all_revoked_devices" }),
+      });
+      if (res.ok) {
+        toast(`Successfully deleted ${revokedCount} revoked device records.`, "success");
+        fetchDevices();
+      } else {
+        const data = await res.json();
+        toast(data.error || "Failed to delete revoked devices", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    }
+  };
+
   useEffect(() => {
     fetchPerformanceData();
     fetchDevices();
@@ -1866,6 +1908,17 @@ export default function EmployeesPage() {
                   Terminals verified with cryptographically signed 365-day HMAC tokens. Revoking a lost/stolen device takes effect immediately.
                 </p>
               </div>
+              {devices.some((d) => !d.isActive) && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAllRevokedDevices}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer self-start sm:self-auto shrink-0 shadow-2xs"
+                  title="Permanently remove all revoked device records from the database"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All Revoked ({devices.filter((d) => !d.isActive).length})</span>
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -1961,14 +2014,25 @@ export default function EmployeesPage() {
                               Revoke Access
                             </button>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleReactivateDevice(dev.deviceId, dev.name || "Terminal")}
-                              className="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
-                              title="Restore device authorization"
-                            >
-                              Re-activate
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleReactivateDevice(dev.deviceId, dev.name || "Terminal")}
+                                className="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
+                                title="Restore device authorization"
+                              >
+                                Re-activate
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDevice(dev.deviceId, dev.name || "Terminal")}
+                                className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer inline-flex items-center gap-1"
+                                title="Permanently delete this revoked device record"
+                              >
+                                <Trash2 size={12} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
