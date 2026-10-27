@@ -116,8 +116,10 @@ export default function CustomerForm({
           ? (isWithoutGst ? "WHOLESALER WITHOUT GST" : "WHOLESALER")
           : (isWithoutGst ? "RETAILER WITHOUT GST" : "RETAILER");
 
+      const isCashCustomer = formData.shopName.trim().toUpperCase().includes("CASH");
+
       const finalGst =
-        isWithoutGst && (!formData.gstPanNo.trim() || formData.gstPanNo.trim().toUpperCase() === "N/A")
+        (isWithoutGst || isCashCustomer) && (!formData.gstPanNo.trim() || formData.gstPanNo.trim().toUpperCase() === "N/A")
           ? "URP"
           : formData.gstPanNo.trim().toUpperCase();
 
@@ -220,22 +222,30 @@ export default function CustomerForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-              <span>GST No. / PAN No. {isWithoutGst ? "(Optional - Without GST)" : "*"}</span>
-              {isWithoutGst && (
-                <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                  No GST Needed
-                </span>
-              )}
-            </label>
-            <input
-              type="text"
-              required={!isWithoutGst}
-              value={formData.gstPanNo}
-              onChange={(e) => setFormData({ ...formData, gstPanNo: e.target.value.toUpperCase() })}
-              placeholder={isWithoutGst ? "Optional (URP / No GST)" : "e.g. 24ABCDE1234F1Z5 or ABCDE1234F"}
-              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
-            />
+            {(() => {
+              const isCash = formData.shopName.trim().toUpperCase().includes("CASH");
+              const noGstReq = isWithoutGst || isCash;
+              return (
+                <>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>GST No. / PAN No. {noGstReq ? "(Optional - No GST Needed)" : "*"}</span>
+                    {noGstReq && (
+                      <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        {isCash ? "No GST Needed (Cash Customer)" : "No GST Needed"}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    required={!noGstReq}
+                    value={formData.gstPanNo}
+                    onChange={(e) => setFormData({ ...formData, gstPanNo: e.target.value.toUpperCase() })}
+                    placeholder={noGstReq ? "Optional (Cash Customer / URP)" : "e.g. 24ABCDE1234F1Z5 or ABCDE1234F"}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+                  />
+                </>
+              );
+            })()}
           </div>
 
           <div>

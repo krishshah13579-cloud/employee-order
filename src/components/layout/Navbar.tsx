@@ -307,37 +307,6 @@ export default function Navbar() {
             </div>
           )}
 
-          <div className="space-y-1">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/"
-                  : link.href === "/orders/new"
-                  ? pathname === "/orders/new"
-                  : link.href === "/orders"
-                  ? pathname === "/orders" ||
-                    (pathname.startsWith("/orders/") && pathname !== "/orders/new")
-                  : pathname.startsWith(link.href);
-
-              return (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-gray-100 text-black font-bold"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-gray-500" />
-                    <span>{link.label}</span>
-                  </div>
-                </Link>
-              );
-            })}
             {/* Mobile WebApp Install Guide Button */}
             <div className="pt-2">
               <button
@@ -357,7 +326,6 @@ export default function Navbar() {
                 </span>
               </button>
             </div>
-          </div>
         </div>
       )}
 

@@ -337,7 +337,7 @@ function ProductsContent() {
             PRODUCTS GRID
             ═══════════════════════════════════════════ */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 pb-28">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
                 key={idx}
@@ -403,18 +403,14 @@ function ProductsContent() {
               const sortedRatios = sortSizeRatioKeys(Array.from(ratioSet));
               const displayRatio = sortedRatios[0] || product.sizesRatio || "28 to 36";
               const displayPcs = getPcsFromRatio(displayRatio, product.pcsPerSet || 5);
-              const mixInfo = getProductMixSizesInfo(product.setsColorwise, (product as any).mixPcs || 0);
-
-              return (
-                <div
+              const mixInfo = getProductMixSizesInfo(product.setsColorwise, (product as any).mixPcs || 0);              return (
+                <Link
                   key={product.id}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-200 overflow-hidden flex flex-col group"
+                  href={getProductDetailUrl(product.id)}
+                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-200 overflow-hidden flex flex-col group cursor-pointer focus:outline-none"
                 >
                   {/* Product Image Box */}
-                  <Link
-                    href={getProductDetailUrl(product.id)}
-                    className="relative w-full h-64 bg-slate-100 overflow-hidden block"
-                  >
+                  <div className="relative w-full aspect-[4/5] sm:h-64 bg-slate-100 overflow-hidden block">
                     <img
                       src={coverImage}
                       alt={product.name}
@@ -426,62 +422,57 @@ function ProductsContent() {
                     />
 
                     {/* Category Badge */}
-                    <span className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md text-orange-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-slate-700/60 shadow-sm">
+                    <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 bg-slate-950/80 backdrop-blur-md text-orange-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-slate-700/60 shadow-sm">
                       {product.category}
                     </span>
+                  </div>
 
-
-                  </Link>
-
-                  {/* Card Content */}
-                  <div className="p-4 flex-1 flex flex-col justify-between">
+                  {/* Card Info Box (Clickable) */}
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between bg-white">
                     <div>
                       {/* Product Name */}
-                      <Link
-                        href={getProductDetailUrl(product.id)}
-                        className="font-black text-slate-900 text-base hover:text-orange-600 transition-colors line-clamp-1"
-                      >
+                      <h3 className="font-black text-slate-900 text-sm sm:text-base group-hover:text-orange-600 transition-colors line-clamp-1">
                         {product.name}
-                      </Link>
+                      </h3>
 
                       {/* Sizes Ratio */}
-                      <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                      <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-slate-500">
                         <span>Sizes: {displayRatio}</span>
-                        <span className="font-semibold text-slate-700">
-                          {displayPcs} Pcs / Set
+                        <span className="font-semibold text-slate-700 hidden sm:inline">
+                          {displayPcs} Pcs/Set
                         </span>
                       </div>
 
                       {/* Mix Sizes Available */}
-                      <div className="mt-1 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-medium">Mix Sizes:</span>
+                      <div className="mt-0.5 sm:mt-1 flex items-center justify-between text-[11px] sm:text-xs">
+                        <span className="text-slate-500 font-medium">Mix:</span>
                         {mixInfo.totalMixPcs > 0 ? (
                           <span
-                            className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-mono truncate max-w-[170px]"
+                            className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded text-[9px] sm:text-[10px] font-mono truncate max-w-[120px] sm:max-w-[170px]"
                             title={mixInfo.sizesSummary}
                           >
-                            {mixInfo.totalMixPcs} Pcs ({mixInfo.sizesSummary})
+                            {mixInfo.totalMixPcs} Pcs
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">0 pcs</span>
+                          <span className="text-slate-400 text-[10px] sm:text-[11px]">0 pcs</span>
                         )}
                       </div>
 
                       {/* Colors Palette Preview */}
-                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                      <div className="mt-1.5 sm:mt-2 flex items-center gap-1 sm:gap-1.5 flex-wrap">
                         {colorList.slice(0, 5).map((col, idx) => {
                           const hex = getColorHex(col).hex;
                           return (
                             <span
                               key={idx}
                               title={col}
-                              className="w-4 h-4 rounded-full border border-slate-300 shadow-xs inline-block"
+                              className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-slate-300 shadow-xs inline-block shrink-0"
                               style={{ backgroundColor: hex }}
                             />
                           );
                         })}
                         {colorList.length > 5 && (
-                          <span className="text-[10px] font-bold text-slate-500">
+                          <span className="text-[9px] sm:text-[10px] font-bold text-slate-500">
                             +{colorList.length - 5}
                           </span>
                         )}
@@ -489,13 +480,13 @@ function ProductsContent() {
                     </div>
 
                     {/* Price & Action Button */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <div className="mt-3 pt-2.5 sm:mt-4 sm:pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                       <div>
-                        <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-                          <span>Rate per PC</span>
+                        <div className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                          <span>Rate</span>
                           {draftInfo?.customerName && (
                             <span
-                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              className={`text-[8px] sm:text-[9px] font-black uppercase px-1 py-0.2 rounded ${
                                 draftInfo.businessType === "WHOLESALER" || draftInfo.businessType === "WHOLESALER WITHOUT GST"
                                   ? "bg-purple-100 text-purple-800"
                                   : draftInfo.businessType === "RETAILER WITH SPECIAL DISCOUNT"
@@ -525,13 +516,13 @@ function ProductsContent() {
                             : (hasSplDisc ? Math.max(0, ret - splDisc) : ret);
 
                           return (
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <div className="flex items-baseline gap-1 flex-wrap">
                               {product.mrp && product.mrp > activePrice && (
-                                <span className="text-xs text-slate-400 line-through font-mono">
-                                  MRP {formatCurrency(product.mrp)}
+                                <span className="text-[10px] sm:text-xs text-slate-400 line-through font-mono">
+                                  ₹{product.mrp}
                                 </span>
                               )}
-                              <span className="text-lg font-black text-slate-900 font-mono">
+                              <span className="text-sm sm:text-lg font-black text-slate-900 font-mono">
                                 {formatCurrency(activePrice)}
                               </span>
                             </div>
@@ -539,16 +530,14 @@ function ProductsContent() {
                         })()}
                       </div>
 
-                      <Link
-                        href={getProductDetailUrl(product.id)}
-                        className="px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 transition flex items-center gap-1.5"
-                      >
-                        <span>Select Colors</span>
-                        <ArrowRight size={14} />
-                      </Link>
+                      <div className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl text-[10px] sm:text-xs font-bold shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform flex items-center gap-1 shrink-0">
+                        <span className="hidden sm:inline">Select Colors</span>
+                        <span className="sm:hidden">View</span>
+                        <ArrowRight size={12} className="sm:w-3.5 sm:h-3.5" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

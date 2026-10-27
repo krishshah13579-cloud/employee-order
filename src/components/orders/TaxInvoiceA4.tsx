@@ -225,11 +225,17 @@ export default function TaxInvoiceA4({
       : displayRows.reduce((acc, it) => acc + (Number(it.totalSets) || 0), 0);
   }, [isEditing, items, displayRows]);
 
-  const subtotal = useMemo(() => {
+  const rawSubtotal = useMemo(() => {
     return isEditing
       ? items.reduce((acc, it) => acc + (Number(it.itemSubtotal) || (Number(it.totalPcs) || 0) * (Number(it.unitPrice) || 0)), 0)
       : displayRows.reduce((acc, it) => acc + (Number(it.itemSubtotal) || 0), 0);
   }, [isEditing, items, displayRows]);
+
+  const isCashCustomer = Boolean(
+    (order.customerName || order.customer?.shopName || "").toUpperCase().includes("CASH") ||
+    String(order.businessType || order.customer?.businessType || "").toUpperCase().includes("CASH")
+  );
+
   const isWithoutGst =
     order.gstRate === 0 ||
     order.businessType === "WHOLESALER WITHOUT GST" ||
@@ -242,10 +248,23 @@ export default function TaxInvoiceA4({
     order.customer?.businessType === "RETAILER WITHOUT GST" ||
     order.customer?.businessType === "RETAILER (WITHOUT GST)" ||
     String(order.customer?.businessType || "").toUpperCase().includes("WITHOUT GST");
-  const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
-  const cgst = Math.round((gstAmount / 2) * 100) / 100;
-  const sgst = Math.round((gstAmount / 2) * 100) / 100;
-  const grandTotal = Math.round(subtotal + gstAmount);
+
+  let subtotal = Math.round(rawSubtotal);
+  let gstAmount = 0;
+  let grandTotal = subtotal;
+
+  if (isCashCustomer) {
+    // For Cash Customer: GST is inclusive inside the 600
+    subtotal = Math.round(rawSubtotal / 1.05);
+    gstAmount = Math.round(rawSubtotal) - subtotal;
+    grandTotal = Math.round(rawSubtotal);
+  } else if (!isWithoutGst) {
+    gstAmount = Math.round(subtotal * 0.05);
+    grandTotal = subtotal + gstAmount;
+  }
+
+  const cgst = Math.round(gstAmount / 2);
+  const sgst = gstAmount - cgst;
 
   // No artificial filler rows to prevent stretching table height
   const emptyRowsCount = 0;

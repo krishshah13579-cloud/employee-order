@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
       pendingOrders,
       totalCustomers,
       totalEmployees,
-      totalProducts,
+      totalProducts: inStockProductsCount,
       inStockProducts: inStockProductsCount,
       totalCategories: categoriesRaw.length,
       categories: categoriesRaw.map((c) => c.name),

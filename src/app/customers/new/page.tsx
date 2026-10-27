@@ -279,8 +279,9 @@ function CustomerRegistrationContent() {
       toast("Mandatory: Please enter Firm Name / Shop Name", "error");
       return;
     }
+    const isCashCustomer = shopName.trim().toUpperCase().includes("CASH");
     const isNoGst =
-      businessType === "WHOLESALER WITHOUT GST" || businessType === "RETAILER WITHOUT GST";
+      businessType === "WHOLESALER WITHOUT GST" || businessType === "RETAILER WITHOUT GST" || isCashCustomer;
 
     if (!isNoGst && (!gstPanNo.trim() || gstPanNo.trim().toUpperCase() === "N/A")) {
       toast("Mandatory: Please enter valid GST No. or PAN No.", "error");

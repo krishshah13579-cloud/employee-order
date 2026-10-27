@@ -328,7 +328,7 @@ export default function HomePage() {
               </h3>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
-                  {loading ? "..." : stats?.totalProducts ?? 0}
+                  {loading ? "..." : (stats?.inStockProducts ?? stats?.totalProducts ?? 0)}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
                   designs available

@@ -221,20 +221,7 @@ function ProductDetailContent() {
           console.error("Error reading draft:", e);
         }
 
-        // Auto-select 1 set for the first available in-stock color if draft has no sets yet
-        const hasExisting = Object.values(initial).some((s) => s > 0);
-        if (!hasExisting && colors.length > 0) {
-          const firstInStock = colors.find(
-            (c) => getAvailableSetsForColor(data.setsColorwise, c, data.colorMapping) > 0
-          );
-          if (firstInStock) {
-            initial[firstInStock] = 1;
-            setActiveColor(firstInStock);
-          } else {
-            setActiveColor(colors[0]);
-          }
-        }
-
+        // Initialize sets selection from draft if present
         setColorSetsSelection(initial);
       } catch (err: any) {
         console.error("Error loading product:", err);
@@ -530,13 +517,6 @@ function ProductDetailContent() {
 
     return { sizeGuideData: rows, guideTemplateName: templateName };
   }, [product, productAvailableSizes]);
-
-  // Synchronize activeColor with availableColors
-  useEffect(() => {
-    if (availableColors.length > 0 && (!activeColor || !availableColors.includes(activeColor))) {
-      setActiveColor(availableColors[0]);
-    }
-  }, [availableColors, activeColor]);
 
   // Images list
   const allImages = useMemo(() => {
@@ -1048,10 +1028,12 @@ function ProductDetailContent() {
     );
   }
 
-  // Resolve photo based on active selected color
-  const activeColorPhoto = activeColor
-    ? getProductColorImage(product, activeColor)
-    : (allImages[activeImageIndex] || allImages[0] || getProductCoverImage(product?.imageUrl));
+  // Resolve photo: prioritize current selected carousel image, or active selected color photo, or cover photo
+  const activeColorPhoto =
+    (allImages && allImages.length > 0 && allImages[activeImageIndex]) ||
+    (activeColor ? getProductColorImage(product, activeColor) : null) ||
+    allImages[0] ||
+    getProductCoverImage(product?.imageUrl);
 
   const totalProductStock = getTotalAvailableSets(product.setsColorwise);
 
@@ -1166,15 +1148,25 @@ function ProductDetailContent() {
 
               {/* Thumbnails row */}
               {allImages.length > 1 && (
-                <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
+                <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none">
                   {allImages.map((imgUrl, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setActiveImageIndex(idx)}
+                      onClick={() => {
+                        setActiveImageIndex(idx);
+                        const matchedColor = availableColors.find(
+                          (col) => getProductColorImage(product, col) === imgUrl
+                        );
+                        if (matchedColor) {
+                          setActiveColor(matchedColor);
+                        } else {
+                          setActiveColor("");
+                        }
+                      }}
                       className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
                         activeImageIndex === idx
-                          ? "border-orange-500 ring-2 ring-orange-500/30"
+                          ? "border-orange-500 ring-2 ring-orange-500/30 scale-105"
                           : "border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100"
                       }`}
                     >
@@ -2093,7 +2085,17 @@ function ProductDetailContent() {
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => setActiveImageIndex(idx)}
+                    onClick={() => {
+                      setActiveImageIndex(idx);
+                      const matchedColor = availableColors.find(
+                        (col) => getProductColorImage(product, col) === imgUrl
+                      );
+                      if (matchedColor) {
+                        setActiveColor(matchedColor);
+                      } else {
+                        setActiveColor("");
+                      }
+                    }}
                     className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                       activeImageIndex === idx
                         ? "border-orange-500 ring-2 ring-orange-500/50 scale-105"
