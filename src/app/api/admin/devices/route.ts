@@ -246,11 +246,120 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // E. Permanently Delete a Revoked Device Record
+    if (action === "delete_device") {
+      const deviceId = body.deviceId;
+      if (!deviceId) {
+        return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
+      }
+
+      await prisma.authorizedDevice.delete({
+        where: { deviceId },
+      });
+
+      await recordAuditLog({
+        action: "DEVICE_DELETED",
+        actorType: "ADMIN",
+        actorName: "Super Admin",
+        details: `Permanently deleted device record: ${deviceId}`,
+        ipAddress: ip,
+        status: "SUCCESS",
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Revoked device deleted permanently.",
+      });
+    }
+
+    // F. Permanently Delete ALL Revoked Devices
+    if (action === "delete_all_revoked_devices") {
+      const result = await prisma.authorizedDevice.deleteMany({
+        where: { isActive: false },
+      });
+
+      await recordAuditLog({
+        action: "DEVICES_CLEARED",
+        actorType: "ADMIN",
+        actorName: "Super Admin",
+        details: `Permanently deleted all revoked device records (${result.count} devices)`,
+        ipAddress: ip,
+        status: "SUCCESS",
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: result.count,
+        message: `Successfully deleted ${result.count} revoked device record(s).`,
+      });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
     console.error("Device management action error:", error);
     return NextResponse.json(
       { error: "Action failed: " + error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+    const { searchParams } = new URL(req.url);
+    const deviceId = searchParams.get("deviceId");
+    const clearAllRevoked = searchParams.get("allRevoked") === "true";
+
+    if (clearAllRevoked) {
+      const result = await prisma.authorizedDevice.deleteMany({
+        where: { isActive: false },
+      });
+
+      await recordAuditLog({
+        action: "DEVICES_CLEARED",
+        actorType: "ADMIN",
+        actorName: "Super Admin",
+        details: `Permanently deleted all revoked device records (${result.count} devices)`,
+        ipAddress: ip,
+        status: "SUCCESS",
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: result.count,
+        message: `Deleted ${result.count} revoked devices.`,
+      });
+    }
+
+    if (!deviceId) {
+      return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
+    }
+
+    await prisma.authorizedDevice.delete({
+      where: { deviceId },
+    });
+
+    await recordAuditLog({
+      action: "DEVICE_DELETED",
+      actorType: "ADMIN",
+      actorName: "Super Admin",
+      details: `Permanently deleted device record: ${deviceId}`,
+      ipAddress: ip,
+      status: "SUCCESS",
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Device deleted permanently.",
+    });
+  } catch (error: any) {
+    console.error("Delete device error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete device: " + error.message },
       { status: 500 }
     );
   }
