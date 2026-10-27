@@ -474,9 +474,9 @@ export async function dispatchAutomatedWhatsApp(
   // 1. Free Self-Hosted Baileys Gateway (100% Free, sends directly from linked WhatsApp Business 8128756632)
   const candidateGateways = [
     process.env.WHATSAPP_GATEWAY_URL,
+    "http://192.168.29.5:5050",
     "http://whatsapp-gateway:5050",
     "http://10.0.1.1:5050",
-    "http://172.17.0.1:5050",
     "http://127.0.0.1:5050",
     "http://localhost:5050",
   ].filter(Boolean) as string[];
