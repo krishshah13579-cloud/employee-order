@@ -26,15 +26,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const updated = updateWhatsAppSettings(body);
 
-    // Also forward to local gateway if available
-    try {
-      await fetch("http://localhost:5050/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-        signal: AbortSignal.timeout(2000),
-      }).catch(() => null);
-    } catch {}
+    // Also forward to gateway if available
+    const candidateGateways = [
+      process.env.WHATSAPP_GATEWAY_URL,
+      "http://whatsapp-gateway:5050",
+      "http://10.0.1.1:5050",
+      "http://127.0.0.1:5050",
+      "http://localhost:5050",
+    ].filter(Boolean) as string[];
+
+    for (const url of candidateGateways) {
+      try {
+        const res = await fetch(`${url}/api/settings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated),
+          signal: AbortSignal.timeout(1000),
+        }).catch(() => null);
+        if (res && res.ok) break;
+      } catch {}
+    }
 
     return NextResponse.json({ success: true, settings: updated });
   } catch (error: any) {

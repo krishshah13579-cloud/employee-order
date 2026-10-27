@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth-security";
 
-const GATEWAY_URL = process.env.WHATSAPP_GATEWAY_URL || "http://127.0.0.1:5050";
+const CANDIDATE_GATEWAYS = [
+  process.env.WHATSAPP_GATEWAY_URL,
+  "http://whatsapp-gateway:5050",
+  "http://10.0.1.1:5050",
+  "http://172.17.0.1:5050",
+  "http://127.0.0.1:5050",
+  "http://localhost:5050",
+].filter(Boolean) as string[];
+
+async function getGatewayUrl(): Promise<string> {
+  for (const url of CANDIDATE_GATEWAYS) {
+    try {
+      const res = await fetch(`${url}/api/status`, { signal: AbortSignal.timeout(800) });
+      if (res.ok) return url;
+    } catch {}
+  }
+  return CANDIDATE_GATEWAYS[0] || "http://127.0.0.1:5050";
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,10 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const gatewayUrl = await getGatewayUrl();
+
     // Query local Baileys Gateway
     try {
-      const statusRes = await fetch(`${GATEWAY_URL}/api/status`, {
-        signal: AbortSignal.timeout(2000),
+      const statusRes = await fetch(`${gatewayUrl}/api/status`, {
+        signal: AbortSignal.timeout(3000),
       });
 
       if (!statusRes.ok) {
@@ -28,8 +47,8 @@ export async function GET(request: NextRequest) {
       let qr = null;
 
       if (!statusData.connected) {
-        const qrRes = await fetch(`${GATEWAY_URL}/api/qr`, {
-          signal: AbortSignal.timeout(2000),
+        const qrRes = await fetch(`${gatewayUrl}/api/qr`, {
+          signal: AbortSignal.timeout(3000),
         }).catch(() => null);
         if (qrRes && qrRes.ok) {
           const qrData = await qrRes.json();
@@ -66,9 +85,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const action = body.action || "test";
+    const gatewayUrl = await getGatewayUrl();
 
     if (action === "disconnect") {
-      const res = await fetch(`${GATEWAY_URL}/api/disconnect`, {
+      const res = await fetch(`${gatewayUrl}/api/disconnect`, {
         method: "POST",
         signal: AbortSignal.timeout(5000),
       });
@@ -81,7 +101,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Phone number and message are required" }, { status: 400 });
       }
 
-      const res = await fetch(`${GATEWAY_URL}/api/send`, {
+      const res = await fetch(`${gatewayUrl}/api/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to, message }),

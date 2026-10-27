@@ -22,13 +22,13 @@ export default function InstallAppModal() {
             <div className="w-12 h-12 rounded-2xl bg-white p-1 shadow-md flex items-center justify-center">
               <img
                 src="/apple-touch-icon.png"
-                alt="IQ Trousers"
+                alt="OBEXA"
                 className="w-full h-full object-contain rounded-xl"
               />
             </div>
             <div>
               <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
-                Save WebApp on Your Phone
+                Save OBEXA WebApp on Your Phone
               </h3>
               <p className="text-xs text-blue-200">
                 Install as a full native web app on iPhone, iPad &amp; Android
@@ -80,7 +80,7 @@ export default function InstallAppModal() {
               <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-[#162082] shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-900 leading-relaxed font-medium">
-                  Saving on your iPhone home screen opens IQ Trousers in <strong>full-screen standalone mode</strong> (without Safari address bars) with your custom logo as the app icon!
+                  Saving on your iPhone home screen opens OBEXA in <strong>full-screen standalone mode</strong> (without Safari address bars) with your custom logo as the app icon!
                 </p>
               </div>
 
@@ -128,7 +128,7 @@ export default function InstallAppModal() {
                       </span>
                     </p>
                     <p className="text-xs text-gray-500">
-                      The IQ Trousers logo icon will automatically show as the app face.
+                      The OBEXA logo icon will automatically show as the app face.
                     </p>
                   </div>
                 </div>
@@ -142,7 +142,7 @@ export default function InstallAppModal() {
                       Tap <strong>Add</strong> in the top-right corner
                     </p>
                     <p className="text-xs text-gray-500">
-                      The webapp will instantly appear on your iPhone home screen!
+                      The OBEXA webapp will instantly appear on your iPhone home screen!
                     </p>
                   </div>
                 </div>

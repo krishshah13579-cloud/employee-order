@@ -333,13 +333,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         try {
           if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.ready;
-            reg.showNotification("IQ TROUSERS Wholesale", {
+            reg.showNotification("OBEXA Wholesale", {
               body: "Live alerts are now active for new articles, orders, and status updates!",
               icon: "/apple-touch-icon.png",
               badge: "/apple-touch-icon.png",
             });
           } else {
-            new Notification("IQ TROUSERS Wholesale", {
+            new Notification("OBEXA Wholesale", {
               body: "Live alerts are now active for new articles, orders, and status updates!",
               icon: "/apple-touch-icon.png",
             });
@@ -496,8 +496,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       {activeBanner && (
         <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-[9999] w-[95vw] max-w-md animate-in slide-in-from-top-4 duration-300">
           <div className="bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-md">
-              IQ
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white font-black text-[9px] flex items-center justify-center shrink-0 shadow-md">
+              OBEXA
             </div>
             <Link
               href={activeBanner.link || "/notification"}
