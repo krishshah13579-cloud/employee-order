@@ -402,6 +402,26 @@ model DeviceAccessInvite {
   @@schema("wholesale")
 }
 
+// 21. Web Push Subscriptions (VAPID background lock-screen notifications)
+model PushSubscription {
+  id           Int       @id @default(autoincrement())
+  endpoint     String    @unique
+  p256dh       String    // Client public key
+  auth         String    // Client auth secret
+  employeeId   Int?      // Linked employee (null for Super Admin)
+  employeeName String?   // Linked employee name
+  role         String    @default("EMPLOYEE") // "SUPER_ADMIN" | "TEAM_LEADER" | "EMPLOYEE"
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([endpoint])
+  @@index([employeeId])
+  @@index([role])
+  @@schema("wholesale")
+}
+
 // ==========================================
 // PUBLIC SCHEMA (E-COMMERCE WEBSITE STORE)
 // ==========================================

@@ -73,10 +73,37 @@ export default function NotificationPage() {
     markAllAsRead,
     refreshNotifications,
     loading,
+    permission,
+    requestPermission,
   } = useNotifications();
 
   const [activeFilter, setActiveFilter] = useState<"ALL" | "ORDERS" | "ARTICLES" | "CUSTOMERS">("ALL");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isTestingPush, setIsTestingPush] = useState<boolean>(false);
+
+  const handleTestPush = async () => {
+    setIsTestingPush(true);
+    try {
+      const res = await fetch("/api/notifications/test-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "🔔 IQ TROUSERS Lock-Screen Test",
+          message: "Background VAPID Push is fully active on your phone!",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || "Test push dispatched! Lock your phone to see it on your lock screen.");
+      } else {
+        alert(data.error || "Failed to dispatch test push.");
+      }
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
 
   // Automatically mark notifications as read when opening this dedicated page
   useEffect(() => {
@@ -260,6 +287,52 @@ export default function NotificationPage() {
           })}
         </div>
       </header>
+
+      {/* VAPID Lock-Screen Push Banner */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4">
+        {permission === "granted" ? (
+          <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-emerald-950">
+                  Lock-Screen Push Alerts Active
+                </p>
+                <p className="text-[11px] text-emerald-700">
+                  You will receive updates even when this app is closed or phone is locked.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleTestPush}
+              disabled={isTestingPush}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer self-start sm:self-auto shrink-0 disabled:opacity-50"
+            >
+              {isTestingPush ? "Dispatching..." : "Test Lock-Screen Push"}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+            <div>
+              <p className="text-xs font-extrabold flex items-center gap-1.5">
+                <Bell className="w-4 h-4" />
+                <span>Enable Background Lock-Screen Alerts</span>
+              </p>
+              <p className="text-[11px] text-orange-100 mt-0.5">
+                Receive new orders and article updates even when you are out of the webapp.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={requestPermission}
+              className="px-3.5 py-1.5 bg-white text-orange-700 hover:bg-orange-50 font-bold text-xs rounded-xl transition shadow-xs cursor-pointer self-start sm:self-auto shrink-0"
+            >
+              Turn On
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Main Notification Stream */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-5">

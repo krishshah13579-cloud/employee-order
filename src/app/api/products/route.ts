@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { getSizesFromRatio } from "@/lib/stock";
 import { requireAdmin } from "@/lib/auth-security";
+import { sendWebPushNotification } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -239,6 +240,13 @@ export async function POST(request: NextRequest) {
     } catch (ecommErr) {
       console.warn("Could not auto-mirror to ecommerce store:", ecommErr);
     }
+
+    // Send background VAPID Web Push alert to all employee devices
+    sendWebPushNotification({
+      title: `🎉 New Article Arrival: ${product.name}`,
+      body: `${product.category} • Colors: ${product.colorsAvailable || "Available"} • ₹${product.price}/pc`,
+      url: `/products/${product.id}`,
+    }).catch((err) => console.warn("[WEB-PUSH] Product notify error:", err));
 
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {

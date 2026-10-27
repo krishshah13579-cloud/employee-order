@@ -49,6 +49,68 @@ interface NotificationContextType {
   }) => void;
 }
 
+// Convert URL-safe base64 to Uint8Array for VAPID subscription
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Subscribe browser to VAPID Web Push and store in server DB
+async function subscribeToPush(): Promise<boolean> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (!("pushManager" in reg)) return false;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const keyRes = await fetch("/api/notifications/subscribe");
+      const keyData = await keyRes.json();
+      if (!keyData.publicKey) return false;
+
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+      });
+    }
+
+    let employeeId: number | undefined;
+    let employeeName: string | undefined;
+    let role = "EMPLOYEE";
+    try {
+      const empRaw = localStorage.getItem("employee") || localStorage.getItem("iq_employee_user");
+      if (empRaw) {
+        const emp = JSON.parse(empRaw);
+        employeeId = emp.id;
+        employeeName = emp.name;
+        role = emp.role || (emp.isTeamLeader ? "TEAM_LEADER" : "EMPLOYEE");
+      }
+    } catch {}
+
+    await fetch("/api/notifications/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        employeeId,
+        employeeName,
+        role,
+      }),
+    });
+
+    return true;
+  } catch (err) {
+    console.warn("Push subscription sync skipped:", err);
+    return false;
+  }
+}
+
 // Pure Web Audio API Synthesized Two-Tone Bell Chime (D5 -> A5)
 function playSynthesizedChime() {
   if (typeof window === "undefined") return;
@@ -249,12 +311,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setSoundEnabled(storedSound === "true");
       }
 
-      // Register PWA service worker
+      // Register PWA service worker and sync push subscription
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker
           .register("/sw.js")
           .then((reg) => {
             console.log("PWA Service Worker registered:", reg.scope);
+            if ("Notification" in window && Notification.permission === "granted") {
+              subscribeToPush();
+            }
           })
           .catch((err) => {
             console.warn("PWA Service Worker registration skipped:", err);
@@ -331,6 +396,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (result === "granted") {
         toast("Push & lock-screen alerts enabled successfully!", "success");
         try {
+          // Subscribe with browser PushManager and store VAPID subscription in DB
+          await subscribeToPush();
+
           if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.ready;
             reg.showNotification("OBEXA Wholesale", {
