@@ -1,5 +1,5 @@
-// Service Worker for IQ TROUSERS Wholesale PWA
-const CACHE_NAME = "iq-trousers-wholesale-v1";
+// Service Worker for OBEXA Wholesale PWA
+const CACHE_NAME = "obexa-wholesale-v1";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -34,7 +34,7 @@ self.addEventListener("push", (event) => {
   if (event.data) {
     try {
       const payload = event.data.json();
-      const title = payload.title || "IQ TROUSERS Wholesale";
+      const title = payload.title || "OBEXA Wholesale";
       const options = {
         body: payload.body || "New update from administration",
         icon: payload.icon || "/apple-touch-icon.png",

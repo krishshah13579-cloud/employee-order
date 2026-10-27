@@ -77,7 +77,8 @@ export default function Navbar() {
             />
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-tight text-gray-950 font-sans uppercase leading-none">
-                IQ Trousers
+                <span className="sm:hidden">OBEXA</span>
+                <span className="hidden sm:inline">IQ Trousers</span>
               </span>
             </div>
           </Link>
@@ -350,7 +351,7 @@ export default function Navbar() {
               >
                 <div className="flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-blue-700" />
-                  <span>Save WebApp to iPhone / Android</span>
+                  <span>Save OBEXA WebApp to iPhone / Android</span>
                 </div>
                 <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full font-black">
                   App Guide

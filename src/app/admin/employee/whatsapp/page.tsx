@@ -56,54 +56,57 @@ export default function AdminWhatsAppPage() {
   const [dispatchingWeeklyNow, setDispatchingWeeklyNow] = useState(false);
 
   const fetchStatus = async () => {
-    // 1. Direct browser fetch to local gateway on port 5050 (checks localhost and 127.0.0.1)
-    const localGateways = ["http://localhost:5050", "http://127.0.0.1:5050"];
-    for (const baseUrl of localGateways) {
-      try {
-        const localStatusRes = await fetch(`${baseUrl}/api/status`, {
-          signal: AbortSignal.timeout(2000),
-        }).catch(() => null);
-
-        if (localStatusRes && localStatusRes.ok) {
-          const localStatus = await localStatusRes.json();
-          let qrDataUrl = null;
-
-          if (!localStatus.connected) {
-            const qrRes = await fetch(`${baseUrl}/api/qr`, {
-              signal: AbortSignal.timeout(2000),
-            }).catch(() => null);
-            if (qrRes && qrRes.ok) {
-              const qrJson = await qrRes.json();
-              qrDataUrl = qrJson.qr;
-            }
-          }
-
-          setGateway({
-            online: true,
-            status: localStatus.status || (localStatus.connected ? "CONNECTED" : "NEED_SCAN"),
-            connected: Boolean(localStatus.connected),
-            phone: localStatus.phone || (localStatus.connected ? "8128756632" : null),
-            name: localStatus.name || "Krish Clothing Co.",
-            qr: qrDataUrl,
-          });
-          setLoading(false);
-          return;
-        }
-      } catch {}
-    }
-
-    // 2. Fallback to server route /api/admin/whatsapp
+    // 1. Primary: Query server proxy route /api/admin/whatsapp (connected 24/7 on server without Mixed Content issues)
     try {
       const res = await fetch("/api/admin/whatsapp");
       if (res.ok) {
         const data = await res.json();
         setGateway(data);
+        setLoading(false);
+        if (data.online) return;
       }
-    } catch (e) {
-      setGateway((prev) => ({ ...prev, online: false, status: "OFFLINE" }));
-    } finally {
-      setLoading(false);
+    } catch (e) {}
+
+    // 2. Fallback: Direct local browser check (if developing on localhost)
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      const localGateways = ["http://localhost:5050", "http://127.0.0.1:5050"];
+      for (const baseUrl of localGateways) {
+        try {
+          const localStatusRes = await fetch(`${baseUrl}/api/status`, {
+            signal: AbortSignal.timeout(1500),
+          }).catch(() => null);
+
+          if (localStatusRes && localStatusRes.ok) {
+            const localStatus = await localStatusRes.json();
+            let qrDataUrl = null;
+
+            if (!localStatus.connected) {
+              const qrRes = await fetch(`${baseUrl}/api/qr`, {
+                signal: AbortSignal.timeout(1500),
+              }).catch(() => null);
+              if (qrRes && qrRes.ok) {
+                const qrJson = await qrRes.json();
+                qrDataUrl = qrJson.qr;
+              }
+            }
+
+            setGateway({
+              online: true,
+              status: localStatus.status || (localStatus.connected ? "CONNECTED" : "NEED_SCAN"),
+              connected: Boolean(localStatus.connected),
+              phone: localStatus.phone || (localStatus.connected ? "8128756632" : null),
+              name: localStatus.name || "Krish Clothing Co.",
+              qr: qrDataUrl,
+            });
+            setLoading(false);
+            return;
+          }
+        } catch {}
+      }
     }
+
+    setGateway((prev) => ({ ...prev, online: false, status: "OFFLINE" }));
+    setLoading(false);
   };
 
   const fetchSettings = async () => {
@@ -190,23 +193,6 @@ export default function AdminWhatsAppPage() {
     }
     setSendingTest(true);
 
-    // Try direct local dispatch first
-    try {
-      const directRes = await fetch("http://localhost:5050/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testPhone, message: testMessage }),
-        signal: AbortSignal.timeout(10000),
-      }).catch(() => null);
-
-      if (directRes && directRes.ok) {
-        toast(`✅ Test message sent directly to ${testPhone} from 8128756632!`, "success");
-        setSendingTest(false);
-        return;
-      }
-    } catch {}
-
-    // Fallback to proxy
     try {
       const res = await fetch("/api/admin/whatsapp", {
         method: "POST",
@@ -232,13 +218,6 @@ export default function AdminWhatsAppPage() {
       return;
     }
     setDisconnecting(true);
-
-    try {
-      await fetch("http://localhost:5050/api/disconnect", {
-        method: "POST",
-        signal: AbortSignal.timeout(3000),
-      }).catch(() => null);
-    } catch {}
 
     try {
       await fetch("/api/admin/whatsapp", {

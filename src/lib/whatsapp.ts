@@ -472,50 +472,60 @@ export async function dispatchAutomatedWhatsApp(
   }
 
   // 1. Free Self-Hosted Baileys Gateway (100% Free, sends directly from linked WhatsApp Business 8128756632)
-  const gatewayUrl = process.env.WHATSAPP_GATEWAY_URL || "http://127.0.0.1:5050";
-  try {
-    const statusRes = await fetch(`${gatewayUrl}/api/status`, {
-      method: "GET",
-      signal: AbortSignal.timeout(2000),
-    }).catch(() => null);
+  const candidateGateways = [
+    process.env.WHATSAPP_GATEWAY_URL,
+    "http://whatsapp-gateway:5050",
+    "http://10.0.1.1:5050",
+    "http://172.17.0.1:5050",
+    "http://127.0.0.1:5050",
+    "http://localhost:5050",
+  ].filter(Boolean) as string[];
 
-    if (statusRes && statusRes.ok) {
-      const statusData = await statusRes.json().catch(() => ({}));
-      if (statusData.connected) {
-        const docPayload = documentOptions?.pdfBase64 || documentOptions?.pdfUrl;
-        if (docPayload) {
-          const sendDocRes = await fetch(`${gatewayUrl}/api/send-document`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: cleanPhone,
-              documentBase64: documentOptions?.pdfBase64,
-              documentUrl: documentOptions?.pdfUrl,
-              filename: documentOptions?.filename,
-              caption: message,
-            }),
-            signal: AbortSignal.timeout(20000),
-          });
-          if (sendDocRes.ok) {
-            console.log(`✅ [BAILEYS] PDF document dispatched directly to ${cleanPhone}`);
-            return { success: true, method: "BAILEYS_GATEWAY_DOCUMENT" };
-          }
-        } else {
-          const sendChatRes = await fetch(`${gatewayUrl}/api/send`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ to: cleanPhone, message }),
-            signal: AbortSignal.timeout(10000),
-          });
-          if (sendChatRes.ok) {
-            console.log(`✅ [BAILEYS] Chat message dispatched directly to ${cleanPhone}`);
-            return { success: true, method: "BAILEYS_GATEWAY_CHAT" };
+  for (const gatewayUrl of candidateGateways) {
+    try {
+      const statusRes = await fetch(`${gatewayUrl}/api/status`, {
+        method: "GET",
+        signal: AbortSignal.timeout(1500),
+      }).catch(() => null);
+
+      if (statusRes && statusRes.ok) {
+        const statusData = await statusRes.json().catch(() => ({}));
+        if (statusData.connected) {
+          const docPayload = documentOptions?.pdfBase64 || documentOptions?.pdfUrl;
+          if (docPayload) {
+            const sendDocRes = await fetch(`${gatewayUrl}/api/send-document`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: cleanPhone,
+                documentBase64: documentOptions?.pdfBase64,
+                documentUrl: documentOptions?.pdfUrl,
+                filename: documentOptions?.filename,
+                caption: message,
+              }),
+              signal: AbortSignal.timeout(20000),
+            });
+            if (sendDocRes.ok) {
+              console.log(`✅ [BAILEYS] PDF document dispatched directly to ${cleanPhone}`);
+              return { success: true, method: "BAILEYS_GATEWAY_DOCUMENT" };
+            }
+          } else {
+            const sendChatRes = await fetch(`${gatewayUrl}/api/send`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ to: cleanPhone, message }),
+              signal: AbortSignal.timeout(10000),
+            });
+            if (sendChatRes.ok) {
+              console.log(`✅ [BAILEYS] Chat message dispatched directly to ${cleanPhone}`);
+              return { success: true, method: "BAILEYS_GATEWAY_CHAT" };
+            }
           }
         }
       }
+    } catch (gatewayErr: any) {
+      // Continue to next candidate
     }
-  } catch (gatewayErr: any) {
-    // Local gateway offline or busy, continue to fallback
   }
 
   // 2. Direct Linked WhatsApp Gateway (UltraMsg) - Fallback
