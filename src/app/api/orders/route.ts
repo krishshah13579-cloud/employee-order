@@ -14,6 +14,7 @@ import { requireAdmin, getAdminSession, getEmployeeSession, isSpecialTeamLeaderK
 import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
 import { releaseReservations } from "@/lib/reservations";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
+import { sendWebPushNotification } from "@/lib/web-push";
 
 export async function GET(request: NextRequest) {
   try {
@@ -590,6 +591,13 @@ export async function POST(request: NextRequest) {
         console.error("Auto sales invoice sync error on order creation:", siErr);
       }
     }
+
+    // Send background VAPID Web Push alert to all employee devices
+    sendWebPushNotification({
+      title: `📦 New Order Placed: #${createdOrder.orderNumber}`,
+      body: `${createdOrder.customerName} • ₹${createdOrder.grandTotal.toLocaleString("en-IN")}${createdOrder.placedBy ? ` • By ${createdOrder.placedBy}` : ""}`,
+      url: `/orders/${createdOrder.id}`,
+    }).catch((err) => console.warn("[WEB-PUSH] Order notify error:", err));
 
     return NextResponse.json(
       {

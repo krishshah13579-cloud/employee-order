@@ -6,6 +6,7 @@ import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { recordAuditLog } from "@/lib/audit";
 import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
+import { sendWebPushNotification } from "@/lib/web-push";
 
 export async function PUT(
   request: NextRequest,
@@ -230,6 +231,13 @@ export async function PUT(
         console.error("Auto WhatsApp notification error:", waErr);
       }
     }
+
+    // Send background VAPID Web Push alert to employee devices
+    sendWebPushNotification({
+      title: `🚚 Order #${updatedOrder.orderNumber} Status: ${updatedOrder.status.toUpperCase()}`,
+      body: `${updatedOrder.customerName} • ₹${updatedOrder.grandTotal.toLocaleString("en-IN")}`,
+      url: `/orders`,
+    }).catch((err) => console.warn("[WEB-PUSH] Status notify error:", err));
 
     return NextResponse.json({
       ...updatedOrder,
