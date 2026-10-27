@@ -212,12 +212,29 @@ export default function NewOrderPage() {
 
   const orderTotalSets = orderItems.reduce((acc, it) => acc + getItemTotalSets(it), 0);
   const orderTotalPcs = orderItems.reduce((acc, it) => acc + getItemTotalPcs(it), 0);
-  const orderSubtotal = orderItems.reduce((acc, it) => acc + getItemSubtotal(it), 0);
+  const rawSubtotal = Math.round(orderItems.reduce((acc, it) => acc + getItemSubtotal(it), 0));
   const isWithoutGst =
     (activeCustomer?.businessType || "").toUpperCase().includes("WITHOUT GST") ||
     (activeCustomer?.businessType || "").toUpperCase().includes("NO GST");
-  const orderGst = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05);
-  const orderGrandTotal = Math.round(orderSubtotal + orderGst);
+  const isCashCustomer = Boolean(
+    (activeCustomer?.shopName || "").toUpperCase().includes("CASH") ||
+    (activeCustomer?.businessType || "").toUpperCase().includes("CASH")
+  );
+
+  let orderSubtotal = rawSubtotal;
+  let orderGst = 0;
+  let orderGrandTotal = rawSubtotal;
+
+  if (isCashCustomer) {
+    // For Cash Customer: GST is inclusive (e.g. 600 includes 5% GST)
+    orderSubtotal = Math.round(rawSubtotal / 1.05);
+    orderGst = rawSubtotal - orderSubtotal;
+    orderGrandTotal = rawSubtotal;
+  } else if (!isWithoutGst) {
+    orderSubtotal = rawSubtotal;
+    orderGst = Math.round(orderSubtotal * 0.05);
+    orderGrandTotal = orderSubtotal + orderGst;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

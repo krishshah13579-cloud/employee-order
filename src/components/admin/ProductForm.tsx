@@ -1043,8 +1043,8 @@ export default function ProductForm({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // High compression to ensure fast loading (<150KB per image)
-        const dataUrl = await compressImageFile(file, 850, 850, 0.70);
+        // Crisp 4K Ultra-HD garment photo processing (3840px, 90% WebP/JPEG)
+        const dataUrl = await compressImageFile(file, 3840, 3840, 0.90);
         uploadedUrls.push(dataUrl);
       }
 

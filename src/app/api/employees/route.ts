@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, hashPassword } from "@/lib/auth-security";
 import { recordAuditLog } from "@/lib/audit";
+import { sendEmployeeOnboardingEmail } from "@/lib/email";
 
 // Safe fields to expose to frontend (never expose secret pin)
 const SAFE_EMPLOYEE_SELECT = {
@@ -93,6 +94,20 @@ export async function POST(req: NextRequest) {
       details: `Created employee record for "${employee.name}" with hashed PIN`,
       status: "SUCCESS",
     });
+
+    // Send onboarding welcome email if employee has an email address
+    const rawPin = (pin || "1234").trim();
+    if (employee.email) {
+      try {
+        await sendEmployeeOnboardingEmail({
+          to: employee.email,
+          username: employee.name,
+          pin: rawPin,
+        });
+      } catch (mailErr) {
+        console.error("Failed to dispatch employee onboarding email:", mailErr);
+      }
+    }
 
     return NextResponse.json(employee, { status: 201 });
   } catch (error: any) {

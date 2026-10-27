@@ -37,6 +37,7 @@ import {
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 import { formatCurrency, formatDate, isGstPanRegistered } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
@@ -98,6 +99,7 @@ function OrderFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { showInAppNotification } = useNotifications();
 
   const customerIdParam = searchParams.get(PARAM_CUSTOMER_ID);
   const businessTypeParam = sanitizeBusinessType(searchParams.get(PARAM_BUSINESS_TYPE));
@@ -552,13 +554,19 @@ function OrderFormContent() {
     );
   }, [effectiveBusinessType, selectedCustomer, orderBusinessType]);
 
+  const isCashCustomer = useMemo(() => {
+    const shop = (selectedCustomer?.shopName || "").toUpperCase();
+    const bt = (effectiveBusinessType || selectedCustomer?.businessType || orderBusinessType || "").toUpperCase();
+    return shop.includes("CASH") || bt.includes("CASH");
+  }, [selectedCustomer, effectiveBusinessType, orderBusinessType]);
+
   const isCustomerGstRegistered = useMemo(() => {
     if (!selectedCustomer) return false;
-    if (isWithoutGst) {
-      return true; // No GST/PAN needed for without GST customers
+    if (isWithoutGst || isCashCustomer) {
+      return true; // No GST/PAN needed for without GST or Cash customers
     }
     return isGstPanRegistered(selectedCustomer.gstPanNo);
-  }, [selectedCustomer, isWithoutGst]);
+  }, [selectedCustomer, isWithoutGst, isCashCustomer]);
 
   // Automatically open editable GST/PAN field if customer is NOT registered & synchronize customer metadata
   useEffect(() => {
@@ -875,13 +883,35 @@ function OrderFormContent() {
   };
 
 
-  // Mathematical Calculations
+  // Mathematical Calculations (All rounded off to whole rupee)
   const totalSets = items.reduce((sum, it) => sum + (it.totalSets || 0), 0);
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
-  const subtotal = items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0);
-  const gstRate = isWithoutGst ? 0 : 5.0; // 5% GST or 0% for Wholesaler Without GST
-  const gstAmount = isWithoutGst ? 0 : Math.round(subtotal * 0.05 * 100) / 100;
-  const grandTotal = Math.round(subtotal + gstAmount);
+  const rawItemTotal = Math.round(items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0));
+
+  let subtotal = rawItemTotal;
+  let gstRate = isWithoutGst ? 0 : 5.0;
+  let gstAmount = 0;
+  let grandTotal = rawItemTotal;
+
+  if (isCashCustomer) {
+    // For Cash Customer: GST is inclusive inside the price (e.g. 600 includes 5% GST)
+    subtotal = Math.round(rawItemTotal / 1.05);
+    gstAmount = rawItemTotal - subtotal;
+    grandTotal = rawItemTotal;
+    gstRate = 5.0;
+  } else if (!isWithoutGst) {
+    // Standard GST: 5% added on top and rounded off to whole rupee
+    subtotal = rawItemTotal;
+    gstAmount = Math.round(subtotal * 0.05);
+    grandTotal = subtotal + gstAmount;
+    gstRate = 5.0;
+  } else {
+    // Without GST
+    subtotal = rawItemTotal;
+    gstAmount = 0;
+    grandTotal = rawItemTotal;
+    gstRate = 0;
+  }
 
   // Step 1: Validate and Open Transport Popup Modal
   const handleSubmitOrder = () => {
@@ -892,8 +922,8 @@ function OrderFormContent() {
       return;
     }
 
-    // 1b. Mandatory GST/PAN Registration Check (skipped for Without GST customers)
-    if (!isWithoutGst && !isGstPanRegistered(selectedCustomer.gstPanNo)) {
+    // 1b. Mandatory GST/PAN Registration Check (skipped for Without GST customers & Cash Customers)
+    if (!isWithoutGst && !isCashCustomer && !isGstPanRegistered(selectedCustomer.gstPanNo)) {
       toast("Mandatory: Customer is NOT GST/PAN registered. Please enter and save GST/PAN details before booking order.", "error");
       setIsEditingGstPan(true);
       return;
@@ -992,7 +1022,14 @@ function OrderFormContent() {
         } catch {}
 
         setIsTransportModalOpen(false);
-        toast(`✅ Order #${result.orderNumber || editingOrderNumber || editingOrderId} updated successfully!`, "success");
+        const orderNum = result.orderNumber || editingOrderNumber || editingOrderId;
+        toast(`✅ Order #${orderNum} updated successfully!`, "success");
+        showInAppNotification({
+          title: `Order #${orderNum} Updated`,
+          subtitle: `${selectedCustomer?.shopName || "Customer"} • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`,
+          type: "ORDER_STATUS",
+          link: `/orders/${editingOrderId}`,
+        });
         router.push(`/orders/${editingOrderId}`);
         return;
       }
@@ -1029,6 +1066,13 @@ function OrderFormContent() {
       });
 
       setIsTransportModalOpen(false);
+      showInAppNotification({
+        title: `📦 Order #${result.orderNumber} Placed Successfully`,
+        subtitle: `${selectedCustomer!.shopName} • ₹${Math.round(result.grandTotal || grandTotal).toLocaleString("en-IN")} • ${result.totalSets || totalSets} Sets`,
+        type: "ORDER_PLACED",
+        link: "/orders",
+      });
+
       if (result.whatsAppSent) {
         toast(`✅ Order #${result.orderNumber} placed & WhatsApp sent to customer!`, "success");
       } else {
@@ -2042,7 +2086,7 @@ function OrderFormContent() {
                 </div>
 
                 <div className="flex justify-between text-slate-600">
-                  <span>GST (5%):</span>
+                  <span>{isCashCustomer ? "GST (5% Inclusive):" : isWithoutGst ? "GST (0%):" : "GST (5%):"}</span>
                   <span className="font-bold text-slate-900 text-sm">
                     {formatCurrency(gstAmount)}
                   </span>

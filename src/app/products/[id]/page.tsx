@@ -15,6 +15,8 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   RotateCcw,
   Sparkles,
   Layers,
@@ -23,6 +25,10 @@ import {
   CheckCircle2,
   Truck,
   Trash2,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  X,
 } from "lucide-react";
 import { UserHeader } from "@/components/user/UserHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -82,6 +88,8 @@ function ProductDetailContent() {
 
   // Gallery state
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   // Multiple Color Selection State: Map of colorName -> sets count
   const [colorSetsSelection, setColorSetsSelection] = useState<Record<string, number>>({});
@@ -213,20 +221,7 @@ function ProductDetailContent() {
           console.error("Error reading draft:", e);
         }
 
-        // Auto-select 1 set for the first available in-stock color if draft has no sets yet
-        const hasExisting = Object.values(initial).some((s) => s > 0);
-        if (!hasExisting && colors.length > 0) {
-          const firstInStock = colors.find(
-            (c) => getAvailableSetsForColor(data.setsColorwise, c, data.colorMapping) > 0
-          );
-          if (firstInStock) {
-            initial[firstInStock] = 1;
-            setActiveColor(firstInStock);
-          } else {
-            setActiveColor(colors[0]);
-          }
-        }
-
+        // Initialize sets selection from draft if present
         setColorSetsSelection(initial);
       } catch (err: any) {
         console.error("Error loading product:", err);
@@ -523,18 +518,33 @@ function ProductDetailContent() {
     return { sizeGuideData: rows, guideTemplateName: templateName };
   }, [product, productAvailableSizes]);
 
-  // Synchronize activeColor with availableColors
-  useEffect(() => {
-    if (availableColors.length > 0 && (!activeColor || !availableColors.includes(activeColor))) {
-      setActiveColor(availableColors[0]);
-    }
-  }, [availableColors, activeColor]);
-
   // Images list
   const allImages = useMemo(() => {
     if (!product?.imageUrl) return [];
     return getProductAllImages(product.imageUrl);
   }, [product]);
+
+  // Handle keyboard navigation & body scroll lock for lightbox
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsLightboxOpen(false);
+        setZoomLevel(1);
+      } else if (e.key === "ArrowLeft" && allImages.length > 1) {
+        setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+      } else if (e.key === "ArrowRight" && allImages.length > 1) {
+        setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isLightboxOpen, allImages.length]);
 
   // Colorwise available stock lookup
   const colorStockMap = useMemo(() => {
@@ -1018,10 +1028,12 @@ function ProductDetailContent() {
     );
   }
 
-  // Resolve photo based on active selected color
-  const activeColorPhoto = activeColor
-    ? getProductColorImage(product, activeColor)
-    : (allImages[activeImageIndex] || allImages[0] || getProductCoverImage(product?.imageUrl));
+  // Resolve photo: prioritize current selected carousel image, or active selected color photo, or cover photo
+  const activeColorPhoto =
+    (allImages && allImages.length > 0 && allImages[activeImageIndex]) ||
+    (activeColor ? getProductColorImage(product, activeColor) : null) ||
+    allImages[0] ||
+    getProductCoverImage(product?.imageUrl);
 
   const totalProductStock = getTotalAvailableSets(product.setsColorwise);
 
@@ -1085,18 +1097,24 @@ function ProductDetailContent() {
           <div className="lg:col-span-5 space-y-6">
             {/* Main Product Photo for Active Color */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-3">
-              <div className="relative w-full aspect-square bg-slate-100 rounded-xl overflow-hidden">
+              <div
+                onClick={() => {
+                  setIsLightboxOpen(true);
+                  setZoomLevel(1);
+                }}
+                className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-zoom-in group"
+              >
                 <img
                   src={activeColorPhoto}
                   alt={`${product.name} - ${activeColor || "Garment"}`}
-                  className="w-full h-full object-cover transition-opacity duration-300"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'><rect width='400' height='400' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='600' fill='%2394a3b8'>Garment Photo</text></svg>";
                   }}
                 />
 
-                <span className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md text-orange-400 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg border border-slate-700/60 shadow-sm flex items-center gap-1.5">
+                <span className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md text-orange-400 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg border border-slate-700/60 shadow-sm flex items-center gap-1.5 z-10 pointer-events-none">
                   {activeColor && (
                     <span
                       className="w-2.5 h-2.5 rounded-full border border-white/50"
@@ -1106,20 +1124,49 @@ function ProductDetailContent() {
                   <span>{activeColor ? `${activeColor}` : product.category}</span>
                 </span>
 
+                {/* Enlarge Button in top right */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLightboxOpen(true);
+                    setZoomLevel(1);
+                  }}
+                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-white px-3 py-1.5 rounded-lg border border-slate-700/60 backdrop-blur-md text-xs font-bold shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 z-10 cursor-pointer"
+                  title="Click to enlarge image in 4K"
+                >
+                  <Maximize2 size={13} className="text-orange-400" />
+                  <span>Enlarge</span>
+                </button>
 
+                {/* Hover zoom hint at bottom */}
+                <div className="absolute inset-x-0 bottom-0 py-2.5 bg-gradient-to-t from-slate-950/70 via-slate-950/30 to-transparent flex items-center justify-center gap-1.5 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                  <ZoomIn size={14} className="text-orange-400" />
+                  <span>Click photo to enlarge in full resolution</span>
+                </div>
               </div>
 
               {/* Thumbnails row */}
               {allImages.length > 1 && (
-                <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
+                <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none">
                   {allImages.map((imgUrl, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setActiveImageIndex(idx)}
+                      onClick={() => {
+                        setActiveImageIndex(idx);
+                        const matchedColor = availableColors.find(
+                          (col) => getProductColorImage(product, col) === imgUrl
+                        );
+                        if (matchedColor) {
+                          setActiveColor(matchedColor);
+                        } else {
+                          setActiveColor("");
+                        }
+                      }}
                       className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
                         activeImageIndex === idx
-                          ? "border-orange-500 ring-2 ring-orange-500/30"
+                          ? "border-orange-500 ring-2 ring-orange-500/30 scale-105"
                           : "border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100"
                       }`}
                     >
@@ -1875,6 +1922,198 @@ function ProductDetailContent() {
           </div>
         </div>
       </main>
+
+      {/* ═══════════════════════════════════════════
+          FULLSCREEN 4K IMAGE ENLARGE / LIGHTBOX MODAL
+          ═══════════════════════════════════════════ */}
+      {isLightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none"
+          onClick={() => {
+            setIsLightboxOpen(false);
+            setZoomLevel(1);
+          }}
+        >
+          {/* Top Bar */}
+          <div
+            className="flex items-center justify-between px-4 sm:px-6 py-4 bg-gradient-to-b from-black/90 to-transparent z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Product & Color Title */}
+            <div className="flex items-center gap-3">
+              <div>
+                <h3 className="text-white font-bold text-sm sm:text-base flex items-center gap-2">
+                  <span>{product.name}</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded border border-orange-500/30">
+                    4K Ultra HD
+                  </span>
+                </h3>
+                <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                  {activeColor && (
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white/50"
+                        style={{ backgroundColor: getColorHex(activeColor).hex }}
+                      />
+                      <span>{activeColor}</span>
+                    </span>
+                  )}
+                  <span>•</span>
+                  <span>{product.category}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Zoom Controls & Close Button */}
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 text-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel((z) => Math.max(0.75, +(z - 0.25).toFixed(2)))}
+                  disabled={zoomLevel <= 0.75}
+                  className="p-1.5 hover:bg-slate-800 disabled:opacity-40 rounded-lg transition cursor-pointer"
+                  title="Zoom Out (-)"
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(1)}
+                  className="px-2.5 py-1 text-xs font-mono font-bold hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                  title="Reset Zoom"
+                >
+                  {Math.round(zoomLevel * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                  disabled={zoomLevel >= 3}
+                  className="p-1.5 hover:bg-slate-800 disabled:opacity-40 rounded-lg transition cursor-pointer"
+                  title="Zoom In (+)"
+                >
+                  <ZoomIn size={16} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLightboxOpen(false);
+                  setZoomLevel(1);
+                }}
+                className="bg-slate-800/90 hover:bg-rose-600 text-white p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-700 hover:border-rose-500 transition cursor-pointer flex items-center gap-1.5"
+                title="Close (Esc)"
+              >
+                <X size={18} />
+                <span className="text-xs font-semibold hidden sm:inline">Close</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Enlarge Image Viewport */}
+          <div
+            className="flex-1 relative flex items-center justify-center p-2 sm:p-6 overflow-hidden"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsLightboxOpen(false);
+                setZoomLevel(1);
+              }
+            }}
+          >
+            {/* Previous Arrow */}
+            {allImages.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+                }}
+                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 text-white p-2.5 sm:p-3 rounded-full border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-110 z-20 cursor-pointer"
+                title="Previous Image (←)"
+              >
+                <ChevronLeft size={22} />
+              </button>
+            )}
+
+            {/* Enlarge Image */}
+            <div
+              className="relative max-w-full max-h-full flex items-center justify-center overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={activeColorPhoto}
+                alt={`${product.name} - Enlarge 4K`}
+                onDoubleClick={() => setZoomLevel((z) => (z === 1 ? 2 : 1))}
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transition: "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
+                  maxHeight: "75vh",
+                  maxWidth: "88vw",
+                }}
+                className="object-contain rounded-xl shadow-2xl cursor-zoom-in select-none"
+              />
+            </div>
+
+            {/* Next Arrow */}
+            {allImages.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+                }}
+                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 text-white p-2.5 sm:p-3 rounded-full border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-110 z-20 cursor-pointer"
+                title="Next Image (→)"
+              >
+                <ChevronRight size={22} />
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Bar: Thumbnails & Helper Hint */}
+          <div
+            className="flex flex-col items-center gap-2 pb-4 pt-2 bg-gradient-to-t from-black/90 to-transparent z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[11px] text-slate-400 font-medium">
+              Double-click photo to toggle 2x zoom • Use Arrow keys to browse photos • Press Esc to close
+            </div>
+
+            {allImages.length > 1 && (
+              <div className="flex items-center gap-2 max-w-full overflow-x-auto px-4 py-1">
+                {allImages.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveImageIndex(idx);
+                      const matchedColor = availableColors.find(
+                        (col) => getProductColorImage(product, col) === imgUrl
+                      );
+                      if (matchedColor) {
+                        setActiveColor(matchedColor);
+                      } else {
+                        setActiveColor("");
+                      }
+                    }}
+                    className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                      activeImageIndex === idx
+                        ? "border-orange-500 ring-2 ring-orange-500/50 scale-105"
+                        : "border-slate-700 hover:border-slate-500 opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`Thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

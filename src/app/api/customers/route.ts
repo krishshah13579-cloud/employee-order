@@ -168,15 +168,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isCashCustomer = finalShopName.toUpperCase().includes("CASH");
+
     const isNoGst =
       rawBusinessType === "WHOLESALER WITHOUT GST" ||
       rawBusinessType === "WHOLESALE WITHOUT GST" ||
       rawBusinessType === "RETAILER WITHOUT GST" ||
       rawBusinessType === "RETAILER (WITHOUT GST)" ||
       rawBusinessType.includes("WITHOUT GST") ||
-      rawBusinessType.includes("NO GST");
+      rawBusinessType.includes("NO GST") ||
+      isCashCustomer;
 
-    // GST/PAN is strictly mandatory EXCEPT for Without GST customers (Wholesaler or Retailer)
+    // GST/PAN is strictly mandatory EXCEPT for Without GST customers and Cash Customers
     if (isNoGst) {
       if (!gstPanNo || gstPanNo === "N/A") {
         gstPanNo = "URP"; // Unregistered Person / Non-GST

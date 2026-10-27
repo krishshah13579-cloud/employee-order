@@ -28,10 +28,12 @@ import { compressImageFile } from "@/lib/imageCompression";
 import { scanVisitingCard } from "@/lib/visitingCardOcr";
 import { Modal } from "@/components/ui/Modal";
 import type { VisitedCustomerData } from "@/lib/types";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 
 export default function VisitingCustomerPage() {
   const { employee } = useEmployee();
   const { toast } = useToast();
+  const { showInAppNotification } = useNotifications();
 
   // File input refs for mobile camera and gallery upload
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -174,6 +176,12 @@ export default function VisitingCustomerPage() {
       }
 
       toast("✅ Visiting customer saved successfully with city in CAPITAL!", "success");
+      showInAppNotification({
+        title: `👤 Customer Saved: ${shopName.trim() || "New Customer"}`,
+        subtitle: `City: ${city.toUpperCase()} • Ph: ${phone.trim() || "—"}`,
+        type: "CUSTOMER",
+        link: "/visiting-customers",
+      });
 
       // Reset Form
       setVisitingCardUrl("");

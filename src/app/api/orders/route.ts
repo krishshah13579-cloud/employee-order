@@ -325,7 +325,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // GST calculation: 0% if Without GST (Wholesale or Retailer), else 5%
+    // GST calculation: 0% if Without GST, inclusive for Cash Customer, else 5%
     const effectiveBusinessType = (body.businessType || (customer as any).businessType || "RETAILER").trim().toUpperCase();
     const isWithoutGst =
       effectiveBusinessType === "WHOLESALER WITHOUT GST" ||
@@ -335,9 +335,34 @@ export async function POST(request: NextRequest) {
       effectiveBusinessType.includes("WITHOUT GST") ||
       effectiveBusinessType.includes("NO GST") ||
       body.gstRate === 0;
-    const gstRate = isWithoutGst ? 0 : 5.0;
-    const gstAmount = isWithoutGst ? 0 : Math.round(orderSubtotal * 0.05 * 100) / 100;
-    const grandTotal = Math.round(orderSubtotal + gstAmount);
+
+    const isCashCustomer = Boolean(
+      (customer.shopName || "").toUpperCase().includes("CASH") ||
+      effectiveBusinessType.includes("CASH")
+    );
+
+    let finalSubtotal = Math.round(orderSubtotal);
+    let gstRate = isWithoutGst ? 0 : 5.0;
+    let gstAmount = 0;
+    let grandTotal = finalSubtotal;
+
+    if (isCashCustomer) {
+      // Cash Customer: GST is inclusive inside the amount (e.g. 600 includes 5% GST)
+      finalSubtotal = Math.round(orderSubtotal / 1.05);
+      gstAmount = Math.round(orderSubtotal) - finalSubtotal;
+      grandTotal = Math.round(orderSubtotal);
+      gstRate = 5.0;
+    } else if (!isWithoutGst) {
+      finalSubtotal = Math.round(orderSubtotal);
+      gstAmount = Math.round(finalSubtotal * 0.05);
+      grandTotal = finalSubtotal + gstAmount;
+      gstRate = 5.0;
+    } else {
+      finalSubtotal = Math.round(orderSubtotal);
+      gstAmount = 0;
+      grandTotal = finalSubtotal;
+      gstRate = 0;
+    }
 
     // Determine Order Number: use custom Order No. from previous written form, or auto-generate
     const customOrderNumber = body.orderNumber ? String(body.orderNumber).trim() : "";
@@ -419,7 +444,7 @@ export async function POST(request: NextRequest) {
           creditDays: body.creditDays !== undefined ? (parseInt(body.creditDays, 10) || 0) : ((customer as any).creditDays || 0),
           orderDate: orderDate ? new Date(orderDate) : new Date(),
           status: initialStatus,
-          subtotal: orderSubtotal,
+          subtotal: finalSubtotal,
           gstRate: gstRate,
           gstAmount: gstAmount,
           grandTotal: grandTotal,

@@ -8,6 +8,18 @@
   }
 }
 
+/* iOS Safe Area Insets for standalone iPhone / iPad WebApps */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  nav {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

@@ -611,3 +611,110 @@ export async function sendColorSoldOutNotification(items: SoldOutColorItem[]) {
   }
 }
 
+export interface SendEmployeeOnboardingParams {
+  to: string;
+  username: string;
+  pin: string;
+}
+
+/**
+ * Dispatches onboarding welcome email to newly created employees with access link and credentials
+ */
+export async function sendEmployeeOnboardingEmail({
+  to,
+  username,
+  pin,
+}: SendEmployeeOnboardingParams): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const appUrl = process.env.NEXTAUTH_URL || "https://employee.iqtrousers.in";
+
+  const subject = `Your Onboarding is Done - IQ Trousers Order Form Access`;
+
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+        <h1 style="color: #0f172a; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+        <p style="color: #ea580c; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Employee Onboarding Portal</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <p style="font-size: 15px; font-weight: 800; color: #0f172a; line-height: 1.6; text-transform: uppercase; margin: 0 0 16px 0;">
+          YOUR ONBOARDING PROCESS IS DONE. USE THIS BELOW LINK TO OPEN THE ORDER FORM WEB APPLICATION.
+        </p>
+
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${appUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff !important; font-weight: 700; font-size: 14px; padding: 12px 28px; text-decoration: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(234,88,12,0.3);">
+            Open Order Form Web Application &rarr;
+          </a>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+          <p style="color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin: 0 0 10px 0;">Your Employee Login Credentials</p>
+          <p style="color: #0f172a; font-size: 15px; margin: 4px 0;"><strong>Username:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${username}</span></p>
+          <p style="color: #0f172a; font-size: 15px; margin: 8px 0 0 0;"><strong>PIN:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${pin}</span></p>
+        </div>
+
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+          Best of luck with your journey ahead.
+        </p>
+
+        <p style="color: #0f172a; font-size: 14px; line-height: 1.6; margin: 0;">
+          Best Regards,<br>
+          <strong>Krish Sandip Shah</strong>
+        </p>
+      </div>
+
+      <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+        IQ Trousers Wholesale Operations &bull; Ahmedabad, Gujarat<br>
+        Direct Web Application URL: <a href="${appUrl}" style="color: #ea580c;">${appUrl}</a>
+      </div>
+    </div>
+  `;
+
+  const textContent = `YOUR ONBOARDING PROCESS IS DONE. USE THIS BELOW LINK TO OPEN THE ORDER FORM WEB APPLICATION.
+
+Order Form Web Application: ${appUrl}
+
+Your Username is ${username} and PIN is ${pin}. Best of luck with your journey ahead.
+
+Best Regards,
+Krish Sandip Shah`;
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser.trim(),
+          pass: cleanPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS" <${gmailUser.trim()}>`,
+        to,
+        subject,
+        text: textContent,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Onboarding email successfully sent to ${to} (${username})`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send employee onboarding email via Gmail:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`📋 [EMPLOYEE ONBOARDING DISPATCH]`);
+  console.log(`To: ${to}`);
+  console.log(`Username: ${username} | PIN: ${pin}`);
+  console.log(`Link: ${appUrl}`);
+  console.log(`======================================================\n`);
+
+  return { success: true };
+}
+

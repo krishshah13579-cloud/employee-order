@@ -178,6 +178,68 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Auto-reflect newly added product into e-commerce store under New Arrivals
+    try {
+      const slugBase = name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-")
+        .replace(/^-+/, "")
+        .replace(/-+$/, "");
+      const defaultCat = await prisma.ecommerceCategory.findFirst();
+      if (defaultCat) {
+        const comparePrice = numMrp && numMrp > 0 ? numMrp : Math.round((retailerPrice || 800) * 1.33);
+        const retailPrice = Math.round(comparePrice * 0.75);
+        const colList = (colorsAvailable || "").split(",").map((c: string) => c.trim()).filter(Boolean);
+        const szList = (sizesList || "30, 32, 34, 36, 38").split(",").map((s: string) => s.trim()).filter(Boolean);
+
+        const inventoryMap: Record<string, Record<string, number>> = {};
+        let totalPcs = 0;
+        for (const col of colList) {
+          inventoryMap[col] = {};
+          for (const sz of szList) {
+            inventoryMap[col][sz] = 1;
+            totalPcs += 1;
+          }
+        }
+
+        let imagesArr: string[] = [];
+        if (imageUrl) imagesArr.push(imageUrl);
+        if (imagesArr.length === 0) imagesArr.push("https://images.unsplash.com/photo-1542272604-780c96856592?w=800");
+
+        let finalSlug = slugBase || `product-${product.id}`;
+        let cnt = 1;
+        while (await prisma.ecommerceProduct.findUnique({ where: { slug: finalSlug } })) {
+          finalSlug = `${slugBase}-${cnt}`;
+          cnt++;
+        }
+
+        await prisma.ecommerceProduct.create({
+          data: {
+            name: name.trim(),
+            slug: finalSlug,
+            description: "Premium handcrafted trousers tailored for perfection, unmatched all-day comfort, and refined silhouette.",
+            careInstructions: "Machine wash cold with like colors. Line dry in shade. Warm iron.",
+            price: retailPrice,
+            comparePrice,
+            images: JSON.stringify(imagesArr),
+            sizes: JSON.stringify(szList),
+            colors: JSON.stringify(colList),
+            inventory: JSON.stringify(inventoryMap),
+            categoryId: defaultCat.id,
+            stock: totalPcs,
+            featured: false,
+            active: true,
+            createdAt: new Date(),
+          },
+        });
+      }
+    } catch (ecommErr) {
+      console.warn("Could not auto-mirror to ecommerce store:", ecommErr);
+    }
+
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {
     console.error("Error creating product:", error);

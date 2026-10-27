@@ -1,6 +1,6 @@
-/** Format a number as Indian Rupee currency */
+/** Format a number as Indian Rupee currency (always rounded to integer whole rupees) */
 export function formatCurrency(amount: number): string {
-  return `₹${amount.toLocaleString("en-IN")}`;
+  return `₹${Math.round(amount || 0).toLocaleString("en-IN")}`;
 }
 
 /** Format a date string to a readable format */
