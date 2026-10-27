@@ -362,6 +362,46 @@ model VisitedCustomer {
   @@schema("wholesale")
 }
 
+// 19. Authorized Devices (Restricted Terminal Access to employee.iqtrousers.in)
+model AuthorizedDevice {
+  id           Int       @id @default(autoincrement())
+  deviceId     String    @unique // Unique hardware/browser signature id
+  name         String?   // Friendly device name (e.g. "Rahul - Vivo Y200", "Admin - MacBook Pro")
+  role         String    @default("EMPLOYEE") // "SUPER_ADMIN" | "TEAM_LEADER" | "EMPLOYEE"
+  employeeId   Int?      // Linked employee ID (null for Super Admin)
+  employeeName String?   // Linked employee name snapshot
+  userAgent    String?   // Browser User-Agent
+  ipAddress    String?   // IP Address
+  isActive     Boolean   @default(true) // Admin can revoke with 1 click
+  lastUsedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deviceId])
+  @@index([employeeId])
+  @@index([isActive])
+  @@schema("wholesale")
+}
+
+// 20. Device Access Invites (Single-Use WhatsApp Activation Links)
+model DeviceAccessInvite {
+  id           Int       @id @default(autoincrement())
+  inviteCode   String    @unique // Cryptographic random single-use token
+  employeeId   Int?      // Target employee
+  employeeName String?   // Target employee name
+  role         String    @default("EMPLOYEE")
+  isUsed       Boolean   @default(false)
+  usedAt       DateTime?
+  usedDeviceId String?   // ID of the device that claimed this link
+  expiresAt    DateTime  // e.g. 7 days
+  createdBy    String    @default("Super Admin")
+  createdAt    DateTime  @default(now())
+
+  @@index([inviteCode])
+  @@index([employeeId])
+  @@schema("wholesale")
+}
+
 // ==========================================
 // PUBLIC SCHEMA (E-COMMERCE WEBSITE STORE)
 // ==========================================

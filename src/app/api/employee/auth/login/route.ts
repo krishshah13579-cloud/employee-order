@@ -3,6 +3,12 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
 import { signToken, verifyPassword, hashPassword } from "@/lib/auth-security";
+import {
+  signDeviceToken,
+  DEVICE_AUTH_COOKIE,
+  ALT_DEVICE_AUTH_COOKIE,
+  DEVICE_COOKIE_MAX_AGE,
+} from "@/lib/device-gate";
 import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
@@ -116,6 +122,27 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
+
+    // Renew 365-day device authorization cookie for authenticated employee
+    try {
+      const devToken = await signDeviceToken({
+        deviceId: `dev_emp_${employee.id}_active`,
+        role: isTL ? "TEAM_LEADER" : "EMPLOYEE",
+        employeeId: employee.id,
+        employeeName: employee.name,
+      });
+      const devCookieOpts = {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: "lax" as const,
+        path: "/",
+        maxAge: DEVICE_COOKIE_MAX_AGE,
+      };
+      cookieStore.set(DEVICE_AUTH_COOKIE, devToken, devCookieOpts);
+      cookieStore.set(ALT_DEVICE_AUTH_COOKIE, devToken, devCookieOpts);
+    } catch (dErr) {
+      console.warn("Failed to refresh employee device token:", dErr);
+    }
 
     await recordAuditLog({
       action: "EMPLOYEE_LOGIN_SUCCESS",

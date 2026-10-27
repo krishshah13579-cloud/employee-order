@@ -41,6 +41,12 @@ import {
   MoreVertical,
   CheckSquare,
   Square,
+  Smartphone,
+  Copy,
+  ExternalLink,
+  Ban,
+  Laptop,
+  Send,
 } from "lucide-react";
 import type { EmployeeData } from "@/lib/types";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -114,9 +120,53 @@ interface PerformanceData {
   }[];
 }
 
+interface AuthorizedDeviceItem {
+  id: number;
+  deviceId: string;
+  name: string | null;
+  role: string;
+  employeeId: number | null;
+  employeeName: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  isActive: boolean;
+  lastUsedAt: string;
+  createdAt: string;
+}
+
+interface DeviceInviteItem {
+  id: number;
+  inviteCode: string;
+  employeeId: number | null;
+  employeeName: string | null;
+  role: string;
+  isUsed: boolean;
+  usedAt: string | null;
+  usedDeviceId: string | null;
+  expiresAt: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export default function EmployeesPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"access" | "directory">("access");
+  const [activeTab, setActiveTab] = useState<"access" | "directory" | "devices">("access");
+
+  // Device Security & Blackout Gate state
+  const [devices, setDevices] = useState<AuthorizedDeviceItem[]>([]);
+  const [invites, setInvites] = useState<DeviceInviteItem[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [selectedDeviceEmpId, setSelectedDeviceEmpId] = useState<string>("");
+  const [generatedInvite, setGeneratedInvite] = useState<{
+    accessUrl: string;
+    whatsappShareUrl: string;
+    employeeName: string;
+    expiresAt: string;
+    inviteCode: string;
+  } | null>(null);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
   // Directory state
   const [employees, setEmployees] = useState<EmployeeData[]>([]);
@@ -188,9 +238,120 @@ export default function EmployeesPage() {
     }
   };
 
+  // Fetch Authorized Devices and Invites
+  const fetchDevices = async () => {
+    setLoadingDevices(true);
+    try {
+      const res = await fetch("/api/admin/devices");
+      if (res.ok) {
+        const data = await res.json();
+        setDevices(data.devices || []);
+        setInvites(data.invites || []);
+      }
+    } catch (err) {
+      console.error("Failed to load devices", err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleGenerateInvite = async (empId?: number, empName?: string, phone?: string) => {
+    setIsGeneratingInvite(true);
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate_invite",
+          employeeId: empId,
+          employeeName: empName,
+          mobileNumber: phone,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGeneratedInvite({
+          accessUrl: data.accessUrl,
+          whatsappShareUrl: data.whatsappShareUrl,
+          employeeName: empName || data.invite.employeeName || "Employee",
+          expiresAt: data.invite.expiresAt,
+          inviteCode: data.invite.inviteCode,
+        });
+        setDeviceModalOpen(true);
+        fetchDevices();
+        toast("One-time WhatsApp access link generated!", "success");
+      } else {
+        toast(data.error || "Could not generate invite link", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
+  const handleRevokeDevice = async (deviceId: string, name: string) => {
+    if (!confirm(`Are you sure you want to REVOKE access for ${name}? This device will immediately be locked out with a 403 Forbidden screen.`)) return;
+    setRevokingDeviceId(deviceId);
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke_device", deviceId }),
+      });
+      if (res.ok) {
+        toast(`Access blocked for ${name}.`, "success");
+        fetchDevices();
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
+  const handleReactivateDevice = async (deviceId: string, name: string) => {
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reactivate_device", deviceId }),
+      });
+      if (res.ok) {
+        toast(`Access restored for ${name}.`, "success");
+        fetchDevices();
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    }
+  };
+
+  const handleDeleteInvite = async (inviteId: number) => {
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_invite", inviteId }),
+      });
+      if (res.ok) {
+        toast("One-time invite cancelled.", "success");
+        fetchDevices();
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    }
+  };
+
   useEffect(() => {
     fetchPerformanceData();
+    fetchDevices();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "devices") {
+      fetchDevices();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -598,6 +759,24 @@ export default function EmployeesPage() {
             {employees.length}
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("devices")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "devices"
+              ? "border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
+          }`}
+        >
+          <ShieldCheck size={14} className={activeTab === "devices" ? "text-orange-600" : "text-gray-400"} />
+          <span>Device Security &amp; Gate</span>
+          {devices.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+              {devices.filter((d) => d.isActive).length} Active
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -898,6 +1077,17 @@ export default function EmployeesPage() {
                         </button>
 
                         {/* 3. Edit Employee Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateInvite(selectedProfile.id, selectedProfile.name, selectedProfile.mobileNumber)}
+                          disabled={isGeneratingInvite}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                          title="Generate single-use WhatsApp device access link"
+                        >
+                          <Smartphone size={13} className="text-emerald-600" />
+                          <span>WhatsApp Device Link</span>
+                        </button>
+
                         <Link
                           href={`/admin/employee/employees/${selectedProfile.id}/edit`}
                           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
@@ -1446,6 +1636,15 @@ export default function EmployeesPage() {
                           </button>
                         </td>
                         <td className="py-4 px-6 text-right space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateInvite(emp.id, emp.name, emp.mobileNumber)}
+                            disabled={isGeneratingInvite}
+                            className="p-1.5 inline-flex text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            title="Send WhatsApp Device Authorization Link"
+                          >
+                            <Smartphone size={15} />
+                          </button>
                           <Link
                             href={`/admin/employee/employees/${emp.id}/edit`}
                             className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
@@ -1472,8 +1671,377 @@ export default function EmployeesPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          MODAL: ALLOCATE CUSTOMERS TO SELECTED EMPLOYEE
+          TAB 3: DEVICE SECURITY & ACCESS GATE
           ══════════════════════════════════════════════════════════════ */}
+      {activeTab === "devices" && (
+        <div className="space-y-6">
+          {/* Top Enterprise Security Banner */}
+          <div className="bg-gradient-to-r from-zinc-900 via-slate-900 to-zinc-900 text-white rounded-3xl p-6 border border-zinc-800 shadow-lg relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/40 text-orange-400 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      SUBDOMAIN LOCKDOWN ACTIVE
+                    </span>
+                    <span className="text-xs text-zinc-400 font-mono">employee.iqtrousers.in</span>
+                  </div>
+                  <h2 className="text-xl font-bold tracking-tight text-white">
+                    Cryptographic Device Gatekeeper
+                  </h2>
+                  <p className="text-xs text-zinc-300 max-w-2xl mt-1 leading-relaxed">
+                    Outside hackers, web crawlers, search engines, and unauthorized mobile/desktop terminals are blacked out with an immediate <strong>403 Forbidden</strong> response. Terminal access is restricted strictly to registered company devices with HMAC-SHA256 hardware tokens.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDeviceEmpId(employees[0]?.id ? String(employees[0].id) : "");
+                    setDeviceModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30 flex items-center gap-2 cursor-pointer"
+                >
+                  <Smartphone size={15} />
+                  <span>Generate WhatsApp Access Link</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={fetchDevices}
+                  disabled={loadingDevices}
+                  className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-xl transition cursor-pointer"
+                  title="Refresh devices"
+                >
+                  <RefreshCw size={15} className={loadingDevices ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-zinc-800/80">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                  Active Approved Devices
+                </span>
+                <span className="text-2xl font-black text-emerald-400 font-mono mt-0.5 block">
+                  {devices.filter((d) => d.isActive).length}
+                </span>
+                <span className="text-[10px] text-zinc-400">Total authorized terminals</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                  Revoked / Blocked
+                </span>
+                <span className="text-2xl font-black text-rose-400 font-mono mt-0.5 block">
+                  {devices.filter((d) => !d.isActive).length}
+                </span>
+                <span className="text-[10px] text-zinc-400">Terminals locked out</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                  Pending Invites
+                </span>
+                <span className="text-2xl font-black text-amber-400 font-mono mt-0.5 block">
+                  {invites.filter((i) => !i.isUsed && new Date(i.expiresAt) > new Date()).length}
+                </span>
+                <span className="text-[10px] text-zinc-400">Unused WhatsApp links</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                  Web Crawler Blockout
+                </span>
+                <span className="text-sm font-black text-emerald-400 font-mono mt-1.5 flex items-center gap-1.5">
+                  <CheckCircle size={14} /> Robots + X-Robots 403
+                </span>
+                <span className="text-[10px] text-zinc-400">Zero search indexing</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Super Admin Multi-Device Master Passkey Box */}
+          <div className="bg-amber-50/60 border border-amber-200 rounded-3xl p-5 shadow-2xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <Crown size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                    <span>Super Admin Master Access (Unlimited Devices)</span>
+                    <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                      5+ Devices Ready
+                    </span>
+                  </h3>
+                  <p className="text-xs text-amber-800/90 mt-1 max-w-3xl leading-relaxed">
+                    Super Admin can authorize any device (Laptop, iPhone, iPad, Home PC, Office PC) instantly without limits. When opening <strong>employee.iqtrousers.in</strong> on an unknown device, simply click <strong>"Super Admin Master Unlock"</strong> on the 403 screen and enter the Master Passkey below.
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-amber-900 font-semibold">Master Passkey:</span>
+                    <code className="bg-white px-2.5 py-1 rounded-lg border border-amber-300 font-mono text-xs font-bold text-amber-950">
+                      IQ-SUPERADMIN-MASTER-PASS-2026
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText("IQ-SUPERADMIN-MASTER-PASS-2026");
+                        toast("Master Passkey copied to clipboard!", "success");
+                      }}
+                      className="p-1 hover:bg-amber-100 text-amber-700 rounded-md transition cursor-pointer"
+                      title="Copy Passkey"
+                    >
+                      <Copy size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const url = "https://employee.iqtrousers.in/auth/access?master_key=IQ-SUPERADMIN-MASTER-PASS-2026";
+                  navigator.clipboard.writeText(url);
+                  toast("Super Admin 1-Click Master Unlock Link copied!", "success");
+                }}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition shadow-2xs flex items-center gap-1.5 self-start md:self-center shrink-0 cursor-pointer"
+              >
+                <Copy size={13} />
+                <span>Copy 1-Click Master Link</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section: Authorized Devices Table */}
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-2xs overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Laptop size={16} className="text-orange-600" />
+                  <span>Approved Company Terminals &amp; Mobile Devices</span>
+                  <span className="text-xs font-mono text-gray-400 font-normal">({devices.length})</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Terminals verified with cryptographically signed 365-day HMAC tokens. Revoking a lost/stolen device takes effect immediately.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-gray-50/75 border-b border-gray-100 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3.5 px-6">Device Name &amp; Signature</th>
+                    <th className="py-3.5 px-6">Role / Access Level</th>
+                    <th className="py-3.5 px-6">Linked Personnel</th>
+                    <th className="py-3.5 px-6">IP &amp; Last Active</th>
+                    <th className="py-3.5 px-6">Status</th>
+                    <th className="py-3.5 px-6 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loadingDevices ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                        <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-orange-600" />
+                        <span>Loading approved devices...</span>
+                      </td>
+                    </tr>
+                  ) : devices.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                        <Smartphone size={24} className="mx-auto mb-2 text-gray-300" />
+                        <p className="font-semibold text-gray-600">No authorized devices yet.</p>
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          Generate a WhatsApp access link to authorize employee phones, or use Master Unlock for Admin devices.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    devices.map((dev) => (
+                      <tr key={dev.id} className="hover:bg-gray-50/60 transition">
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
+                              {dev.role === "SUPER_ADMIN" ? <Crown size={16} className="text-amber-600" /> : <Smartphone size={16} />}
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-900 block">
+                                {dev.name || "Authorized Terminal"}
+                              </span>
+                              <span className="font-mono text-[10px] text-gray-400 block truncate max-w-[200px]">
+                                {dev.deviceId}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              dev.role === "SUPER_ADMIN"
+                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : dev.role === "TEAM_LEADER"
+                                ? "bg-purple-100 text-purple-900 border border-purple-300"
+                                : "bg-blue-100 text-blue-900 border border-blue-200"
+                            }`}
+                          >
+                            {dev.role}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-medium text-gray-800">
+                          {dev.employeeName || "Super Admin"}
+                        </td>
+                        <td className="py-4 px-6 text-gray-500 font-mono text-[11px]">
+                          <div>{dev.ipAddress || "Unknown IP"}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            Active: {dev.lastUsedAt ? new Date(dev.lastUsedAt).toLocaleDateString() : "Never"}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          {dev.isActive ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle size={11} className="text-emerald-600" /> Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                              <Ban size={11} className="text-rose-600" /> Revoked
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          {dev.isActive ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeDevice(dev.deviceId, dev.name || "Terminal")}
+                              disabled={revokingDeviceId === dev.deviceId}
+                              className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer disabled:opacity-50"
+                              title="Immediately lock out this device"
+                            >
+                              Revoke Access
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleReactivateDevice(dev.deviceId, dev.name || "Terminal")}
+                              className="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
+                              title="Restore device authorization"
+                            >
+                              Re-activate
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section: Pending & Recent Single-Use Invites */}
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-2xs overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Send size={16} className="text-emerald-600" />
+                  <span>Single-Use WhatsApp Authorization Invites</span>
+                  <span className="text-xs font-mono text-gray-400 font-normal">({invites.length})</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Each link can only be used once from the employee's phone to enroll their hardware token.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-gray-50/75 border-b border-gray-100 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3.5 px-6">Target Personnel</th>
+                    <th className="py-3.5 px-6">Invite Code</th>
+                    <th className="py-3.5 px-6">Created / Expires</th>
+                    <th className="py-3.5 px-6">Status</th>
+                    <th className="py-3.5 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {invites.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-400">
+                        No invitations generated yet. Click "Generate WhatsApp Access Link" to invite a staff member.
+                      </td>
+                    </tr>
+                  ) : (
+                    invites.map((inv) => {
+                      const isExpired = new Date(inv.expiresAt) < new Date();
+                      const fullUrl = `https://employee.iqtrousers.in/auth/access?key=${inv.inviteCode}`;
+                      return (
+                        <tr key={inv.id} className="hover:bg-gray-50/60 transition">
+                          <td className="py-4 px-6 font-bold text-gray-900">
+                            {inv.employeeName || "Employee"}
+                          </td>
+                          <td className="py-4 px-6 font-mono text-gray-600">
+                            <span className="bg-gray-100 px-2 py-0.5 rounded text-[11px]">
+                              {inv.inviteCode}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-gray-500">
+                            <div>{new Date(inv.createdAt).toLocaleDateString()}</div>
+                            <div className="text-[10px] text-gray-400">
+                              Expires: {new Date(inv.expiresAt).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            {inv.isUsed ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
+                                <CheckCircle size={10} className="text-gray-500" /> Claimed &amp; Bound
+                              </span>
+                            ) : isExpired ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700">
+                                Expired
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Pending Claim
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 px-6 text-right space-x-2">
+                            {!inv.isUsed && !isExpired && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(fullUrl);
+                                  toast("Access link copied to clipboard!", "success");
+                                }}
+                                className="p-1.5 inline-flex text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition"
+                                title="Copy Access Link"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInvite(inv.id)}
+                              className="p-1.5 inline-flex text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Delete Invite"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       {isAllocateModalOpen && selectedProfile && (
         <Modal
           isOpen={isAllocateModalOpen}
@@ -1734,6 +2302,122 @@ export default function EmployeesPage() {
               alt="KYC Proof Document"
               className="max-h-[70vh] w-auto rounded-xl object-contain shadow-xs"
             />
+          </div>
+        </Modal>
+      )}
+
+      {/* Device WhatsApp Access Link Modal */}
+      {deviceModalOpen && (
+        <Modal
+          isOpen={deviceModalOpen}
+          onClose={() => {
+            setDeviceModalOpen(false);
+            setGeneratedInvite(null);
+          }}
+          title="Generate WhatsApp Device Access Link"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Generate a single-use authorization link for an employee. When tapped on their phone, their device will be registered for 365 days.
+            </p>
+
+            {!generatedInvite ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Select Employee:
+                  </label>
+                  <select
+                    value={selectedDeviceEmpId}
+                    onChange={(e) => setSelectedDeviceEmpId(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {employees.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} ({e.mobileNumber}) - {e.designation}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emp = employees.find((e) => String(e.id) === selectedDeviceEmpId);
+                      handleGenerateInvite(emp?.id, emp?.name, emp?.mobileNumber);
+                    }}
+                    disabled={isGeneratingInvite || !selectedDeviceEmpId}
+                    className="w-full py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Smartphone size={14} />
+                    <span>{isGeneratingInvite ? "Generating Link..." : "Create Single-Use Invite Link"}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                  <CheckCircle size={16} className="text-emerald-600" />
+                  <span>Access Link Ready for {generatedInvite.employeeName}!</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-emerald-800 mb-1">
+                    Direct Authorization URL:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={generatedInvite.accessUrl}
+                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono text-gray-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedInvite.accessUrl);
+                        toast("Link copied to clipboard!", "success");
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-1">
+                  <a
+                    href={generatedInvite.whatsappShareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2"
+                  >
+                    <Send size={14} />
+                    <span>Send via WhatsApp</span>
+                  </a>
+                </div>
+
+                <p className="text-[11px] text-emerald-700 text-center">
+                  ⚠️ Note: Valid for 7 days. Can only be activated on 1 device.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-gray-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeviceModalOpen(false);
+                  setGeneratedInvite(null);
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </Modal>
       )}

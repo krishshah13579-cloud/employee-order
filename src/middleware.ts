@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  DEVICE_AUTH_COOKIE,
+  ALT_DEVICE_AUTH_COOKIE,
+  verifyDeviceToken,
+  isBotOrCrawler,
+} from "@/lib/device-gate";
+import { renderForbiddenPage } from "@/lib/device-forbidden-html";
 
 /**
- * Global Anti-Traversal & Anti-Crawling Security Middleware
- * Prevents directory traversal attacks (e.g. ../../../, %2e%2e, null bytes)
- * and blocks unauthorized crawling into sensitive system files/folders.
+ * Global Enterprise Security Middleware for employee.iqtrousers.in:
+ * 1. Directory traversal & path injection protection
+ * 2. Search engine & automated crawler/bot blackout (robots / noindex / 403)
+ * 3. Cryptographic Hardware/Device Gatekeeper (Restricted Terminal Lock)
  */
 
 // Patterns indicating directory traversal or malicious climbing attempts
@@ -44,11 +52,32 @@ const RESTRICTED_TARGETS = [
   /\.(db|sqlite|sqlite3|sql|pem|key|crt|bak|config)$/i,
 ];
 
-export function middleware(request: NextRequest) {
+// Public whitelist: paths that do NOT require a device cookie to load
+const PUBLIC_WHITELIST = [
+  /^\/_next\//,
+  /^\/favicon\.ico$/,
+  /^\/robots\.txt$/,
+  /^\/manifest\.json$/,
+  /^\/sw\.js$/,
+  /^\/apple-touch-icon\.png$/,
+  /^\/icon-192\.png$/,
+  /^\/icon-512\.png$/,
+  /^\/auth\/access/,
+  /^\/api\/auth\/device-unlock/,
+  /^\/api\/auth\/device-request/,
+  /^\/api\/auth\/device-verify/,
+  /^\/api\/webhook/,
+];
+
+export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
   const rawPath = url.pathname;
   const rawSearch = url.search;
   const fullUrl = request.url;
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+                   request.headers.get("x-real-ip") ||
+                   "unknown";
+  const userAgent = request.headers.get("user-agent") || "";
 
   // 1. Check raw path and search for traversal sequences
   const isTraversal = TRAVERSAL_PATTERNS.some(
@@ -56,7 +85,7 @@ export function middleware(request: NextRequest) {
   );
 
   if (isTraversal) {
-    console.warn(`[SECURITY ALERT] Blocked directory traversal attempt: ${request.method} ${fullUrl} from IP: ${request.headers.get("x-forwarded-for") || "unknown"}`);
+    console.warn(`[SECURITY ALERT] Blocked directory traversal attempt: ${request.method} ${fullUrl} from IP: ${clientIp}`);
     return new NextResponse(
       JSON.stringify({
         error: "Forbidden",
@@ -69,6 +98,7 @@ export function middleware(request: NextRequest) {
           "Content-Type": "application/json",
           "X-Content-Type-Options": "nosniff",
           "X-Frame-Options": "DENY",
+          "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
         },
       }
     );
@@ -97,6 +127,7 @@ export function middleware(request: NextRequest) {
             "Content-Type": "application/json",
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
+            "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
           },
         }
       );
@@ -121,29 +152,99 @@ export function middleware(request: NextRequest) {
             "Content-Type": "application/json",
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
+            "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
           },
         }
       );
     }
   } catch (err) {
-    // Malformed URI encoding is suspicious
     return new NextResponse("Bad Request: Malformed URI sequence", { status: 400 });
   }
 
-  // Add security headers to response
-  const response = NextResponse.next();
+  // 4. Block Automated Bots, Crawlers, and Scrapers (Total Bot Blackout)
+  // Allow browser navigation, but reject known scrapers / bots unless it's sw or favicon
+  if (rawPath !== "/favicon.ico" && rawPath !== "/robots.txt") {
+    if (isBotOrCrawler(userAgent)) {
+      return new NextResponse(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "403 Forbidden: Automated crawlers, scrapers, and bot agents are strictly blocked on employee.iqtrousers.in.",
+          statusCode: 403,
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
+          },
+        }
+      );
+    }
+  }
+
+  // 5. Check Public Whitelist (Assets & Device Authentication Endpoints)
+  const isWhitelisted = PUBLIC_WHITELIST.some((pattern) => pattern.test(rawPath));
+  if (isWhitelisted) {
+    return applySecurityHeaders(NextResponse.next(), request);
+  }
+
+  // 6. Device Authorization Gate Check
+  const deviceCookie =
+    request.cookies.get(DEVICE_AUTH_COOKIE)?.value ||
+    request.cookies.get(ALT_DEVICE_AUTH_COOKIE)?.value;
+
+  const validDevice = await verifyDeviceToken(deviceCookie);
+
+  if (!validDevice) {
+    // Missing or invalid device token: strictly block with 403 Forbidden
+    if (rawPath.startsWith("/api/")) {
+      return new NextResponse(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "403 Forbidden: Unauthorized device. Terminal access restricted to approved company devices.",
+          statusCode: 403,
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
+          },
+        }
+      );
+    }
+
+    // For web browser navigation: render sleek 403 Forbidden page
+    const html = renderForbiddenPage(clientIp, userAgent, fullUrl);
+    return new NextResponse(html, {
+      status: 403,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
+      },
+    });
+  }
+
+  // Authorized device: allow request to proceed with all security headers
+  return applySecurityHeaders(NextResponse.next(), request);
+}
+
+function applySecurityHeaders(response: NextResponse, request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set("X-XSS-Protection", "1; mode=block");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+
   if (request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https") {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
   response.headers.set("X-DNS-Prefetch-Control", "on");
   response.headers.set("X-Download-Options", "noopen");
 
-  // Content-Security-Policy (CSP) - OWASP & CIS v8 Compliant
   const cspHeader = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
@@ -164,12 +265,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

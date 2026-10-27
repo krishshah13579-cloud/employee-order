@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkOtpRateLimit, recordFailedOtpAttempt, resetOtpAttempts, signToken } from "@/lib/auth-security";
+import {
+  signDeviceToken,
+  DEVICE_AUTH_COOKIE,
+  ALT_DEVICE_AUTH_COOKIE,
+  DEVICE_COOKIE_MAX_AGE,
+} from "@/lib/device-gate";
 import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
@@ -117,6 +123,26 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: "lax",
     });
+
+    // Automatically authorize this admin terminal for 365 Days
+    try {
+      const deviceToken = await signDeviceToken({
+        deviceId: `dev_admin_${admin.id}_${Date.now()}`,
+        role: "SUPER_ADMIN",
+        employeeName: admin.username,
+      });
+      const devOpts = {
+        httpOnly: true,
+        secure: isHttps,
+        path: "/",
+        maxAge: DEVICE_COOKIE_MAX_AGE,
+        sameSite: "lax" as const,
+      };
+      response.cookies.set(DEVICE_AUTH_COOKIE, deviceToken, devOpts);
+      response.cookies.set(ALT_DEVICE_AUTH_COOKIE, deviceToken, devOpts);
+    } catch (devErr) {
+      console.warn("Failed to set admin device gate cookie:", devErr);
+    }
 
     return response;
   } catch (error: any) {
