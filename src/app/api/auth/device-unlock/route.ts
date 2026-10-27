@@ -26,41 +26,87 @@ export async function POST(req: NextRequest) {
     const password = (body.password || "").trim();
 
     let isAuthorized = false;
-    let authRole: "SUPER_ADMIN" = "SUPER_ADMIN";
+    let authRole: "SUPER_ADMIN" | "TEAM_LEADER" | "EMPLOYEE" = "SUPER_ADMIN";
     let adminName = "Super Admin";
+    let employeeId: number | undefined = undefined;
+    let redirectUrl = "/admin/login";
 
     // 1. Check Master Device Passkey
     if (isValidMasterKey(masterKey)) {
       isAuthorized = true;
-    } else if (username && password) {
-      // 2. Fallback: Check Admin Account Credentials from Database
+      authRole = "SUPER_ADMIN";
+      adminName = "Super Admin";
+      redirectUrl = "/admin/login";
+    } else if (masterKey) {
+      // 2. Check if masterKey is an Employee WhatsApp Single-Use Invite Code
+      const invite = await prisma.deviceAccessInvite.findUnique({
+        where: { inviteCode: masterKey },
+      });
+
+      if (invite) {
+        if (invite.isUsed) {
+          return NextResponse.json(
+            { error: "This authorization code has already been used on another device." },
+            { status: 410 }
+          );
+        }
+        if (new Date() > invite.expiresAt) {
+          return NextResponse.json(
+            { error: "This authorization code has expired. Please ask for a new link." },
+            { status: 410 }
+          );
+        }
+
+        // Mark invite as used
+        await prisma.deviceAccessInvite.update({
+          where: { id: invite.id },
+          data: {
+            isUsed: true,
+            usedAt: new Date(),
+          },
+        });
+
+        isAuthorized = true;
+        authRole = invite.role as any;
+        adminName = invite.employeeName || "Employee";
+        employeeId = invite.employeeId || undefined;
+        redirectUrl = invite.role === "SUPER_ADMIN" ? "/admin/login" : "/login";
+      }
+    }
+
+    if (!isAuthorized && username && password) {
+      // 3. Fallback: Check Admin Account Credentials from Database
       const admin = await prisma.adminAccount.findUnique({
         where: { username },
       });
       if (admin && verifyPassword(password, admin.password)) {
         isAuthorized = true;
         adminName = admin.username;
+        authRole = "SUPER_ADMIN";
+        redirectUrl = "/admin/login";
       }
     }
 
     if (!isAuthorized) {
       await recordAuditLog({
         action: "DEVICE_UNLOCK_FAILED",
-        actorType: "ADMIN",
+        actorType: "SYSTEM",
         actorName: username || "Unknown",
-        details: `Invalid master passkey or admin credentials attempted from IP: ${ip}`,
+        details: `Invalid passkey or activation code attempted from IP: ${ip}`,
         ipAddress: ip,
         status: "FAILURE",
       });
 
       return NextResponse.json(
-        { error: "Invalid Super Admin Master Passkey or credentials." },
+        { error: "Invalid Passkey or Authorization Code." },
         { status: 401 }
       );
     }
 
     // Generate unique device ID
-    const deviceId = `dev_admin_${generateRandomCode(16)}`;
+    const deviceId = authRole === "SUPER_ADMIN"
+      ? `dev_admin_${generateRandomCode(16)}`
+      : `dev_emp_${generateRandomCode(16)}`;
 
     // Store in AuthorizedDevice table
     try {
@@ -69,6 +115,7 @@ export async function POST(req: NextRequest) {
           deviceId,
           name: deviceName,
           role: authRole,
+          employeeId,
           employeeName: adminName,
           userAgent,
           ipAddress: ip,
@@ -84,6 +131,7 @@ export async function POST(req: NextRequest) {
     const deviceToken = await signDeviceToken({
       deviceId,
       role: authRole,
+      employeeId,
       employeeName: adminName,
     });
 
@@ -93,9 +141,9 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      message: "Device successfully authorized for 365 days.",
+      message: `Device successfully authorized for ${adminName} (365 days).`,
       deviceId,
-      redirectUrl: "/admin/login",
+      redirectUrl,
     });
 
     // Set 365-day cookie on both primary and fallback cookie names

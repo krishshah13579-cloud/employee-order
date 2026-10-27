@@ -31,16 +31,35 @@ function DeviceAccessContent() {
     }
   }, []);
 
-  // Auto-verify if key or master_key is present in URL
+  // Auto-verify if key or master_key is present in URL or window.location
   useEffect(() => {
-    if (keyParam || masterKeyParam) {
-      handleVerify(keyParam, masterKeyParam);
+    let key = keyParam;
+    let masterKey = masterKeyParam;
+    if (typeof window !== "undefined") {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        key = urlParams.get("key") || keyParam;
+        masterKey = urlParams.get("master_key") || masterKeyParam;
+      } catch (e) {}
+    }
+
+    if (key || masterKey) {
+      setInputKey(key || masterKey);
+      handleVerify(key, masterKey);
     }
   }, [keyParam, masterKeyParam]);
 
   const handleVerify = async (keyToUse?: string, masterKeyToUse?: string) => {
-    const k = (keyToUse !== undefined ? keyToUse : inputKey).trim();
-    const mk = (masterKeyToUse !== undefined ? masterKeyToUse : "").trim();
+    let k = (keyToUse !== undefined ? keyToUse : inputKey).trim();
+    let mk = (masterKeyToUse !== undefined ? masterKeyToUse : "").trim();
+
+    if (!k && !mk && typeof window !== "undefined") {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        k = (urlParams.get("key") || "").trim();
+        mk = (urlParams.get("master_key") || "").trim();
+      } catch (e) {}
+    }
 
     if (!k && !mk) {
       setStatus("error");
