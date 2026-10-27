@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateRandomCode } from "@/lib/device-gate";
+import { dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { recordAuditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -89,24 +90,45 @@ export async function POST(req: NextRequest) {
       const cleanBase = baseUrl.replace(/\/$/, "");
       const accessUrl = `${cleanBase}/auth/access?key=${inviteCode}`;
 
-      // WhatsApp preformatted message
-      const whatsappText = encodeURIComponent(
+      // WhatsApp plain text message for direct dispatch
+      const rawMessageText =
         `*IQ TROUSERS — Device Authorization Link*\n\n` +
         `Hello ${employeeName},\n` +
         `Here is your official device authorization link for the IQ Trousers Employee Portal:\n\n` +
         `👉 ${accessUrl}\n\n` +
-        `⚠️ *Important Note:* Tap this link once from your mobile phone to approve your device for 365 days. Do not forward this link to anyone.`
-      );
+        `⚠️ *Important Note:* Tap this link once from your mobile phone to approve your device for 365 days. Do not forward this link to anyone.`;
 
+      // 1. Direct Background Dispatch via logged-in WhatsApp Gateway (Baileys / Meta API)
+      let directSent = false;
+      let dispatchMethod = "NONE";
+      let dispatchError = "";
+
+      if (mobileNumber) {
+        try {
+          const sendResult = await dispatchAutomatedWhatsApp(mobileNumber, rawMessageText);
+          directSent = sendResult.success;
+          dispatchMethod = sendResult.method;
+          if (!sendResult.success) {
+            dispatchError = sendResult.error || "Gateway dispatch failed";
+          }
+        } catch (dispatchErr: any) {
+          dispatchError = dispatchErr.message;
+        }
+      }
+
+      // WhatsApp web link fallback
+      const whatsappText = encodeURIComponent(rawMessageText);
       const whatsappShareUrl = mobileNumber
         ? `https://wa.me/${mobileNumber.replace(/[^0-9]/g, "")}?text=${whatsappText}`
         : `https://wa.me/?text=${whatsappText}`;
 
       await recordAuditLog({
-        action: "DEVICE_INVITE_GENERATED",
+        action: directSent ? "DEVICE_INVITE_SENT_WHATSAPP" : "DEVICE_INVITE_GENERATED",
         actorType: "ADMIN",
         actorName: "Super Admin",
-        details: `Generated WhatsApp device invite link for ${employeeName} (Expires: ${expiresAt.toISOString()})`,
+        details: directSent
+          ? `Dispatched device invite directly via logged-in WhatsApp to ${employeeName} (${mobileNumber})`
+          : `Generated WhatsApp device invite link for ${employeeName} (Expires: ${expiresAt.toISOString()})`,
         ipAddress: ip,
         status: "SUCCESS",
       });
@@ -116,7 +138,45 @@ export async function POST(req: NextRequest) {
         invite,
         accessUrl,
         whatsappShareUrl,
-        message: `Device invite link generated for ${employeeName}!`,
+        directSent,
+        dispatchMethod,
+        dispatchError,
+        employeeName,
+        mobileNumber,
+        message: directSent
+          ? `Authorization link sent directly to ${employeeName}'s WhatsApp (+91 ${mobileNumber}) from your logged-in WhatsApp business account!`
+          : `Device invite link generated for ${employeeName}!`,
+      });
+    }
+
+    // Direct re-send to WhatsApp
+    if (action === "send_invite_direct") {
+      const inviteCode = body.inviteCode;
+      const employeeName = body.employeeName || "Employee";
+      const mobileNumber = body.mobileNumber || "";
+
+      if (!mobileNumber || !inviteCode) {
+        return NextResponse.json({ error: "mobileNumber and inviteCode are required" }, { status: 400 });
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://employee.iqtrousers.in";
+      const accessUrl = `${baseUrl.replace(/\/$/, "")}/auth/access?key=${inviteCode}`;
+      const rawMessageText =
+        `*IQ TROUSERS — Device Authorization Link*\n\n` +
+        `Hello ${employeeName},\n` +
+        `Here is your official device authorization link for the IQ Trousers Employee Portal:\n\n` +
+        `👉 ${accessUrl}\n\n` +
+        `⚠️ *Important Note:* Tap this link once from your mobile phone to approve your device for 365 days. Do not forward this link to anyone.`;
+
+      const sendResult = await dispatchAutomatedWhatsApp(mobileNumber, rawMessageText);
+
+      return NextResponse.json({
+        success: sendResult.success,
+        method: sendResult.method,
+        error: sendResult.error,
+        message: sendResult.success
+          ? `Sent directly to ${employeeName} on WhatsApp (+91 ${mobileNumber})!`
+          : `Could not send via logged-in WhatsApp: ${sendResult.error || "Gateway unreachable"}`,
       });
     }
 

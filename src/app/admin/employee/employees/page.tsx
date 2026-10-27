@@ -164,8 +164,11 @@ export default function EmployeesPage() {
     employeeName: string;
     expiresAt: string;
     inviteCode: string;
+    directSent?: boolean;
+    mobileNumber?: string;
   } | null>(null);
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [isSendingDirect, setIsSendingDirect] = useState(false);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
   // Directory state
@@ -276,10 +279,16 @@ export default function EmployeesPage() {
           employeeName: empName || data.invite.employeeName || "Employee",
           expiresAt: data.invite.expiresAt,
           inviteCode: data.invite.inviteCode,
+          directSent: data.directSent,
+          mobileNumber: phone || data.mobileNumber,
         });
         setDeviceModalOpen(true);
         fetchDevices();
-        toast("One-time WhatsApp access link generated!", "success");
+        if (data.directSent) {
+          toast(data.message || "Sent directly via logged-in WhatsApp!", "success");
+        } else {
+          toast("Access link generated!", "success");
+        }
       } else {
         toast(data.error || "Could not generate invite link", "error");
       }
@@ -287,6 +296,35 @@ export default function EmployeesPage() {
       toast("Error: " + err.message, "error");
     } finally {
       setIsGeneratingInvite(false);
+    }
+  };
+
+  const handleSendInviteDirect = async (inviteCode: string, employeeName: string, mobileNumber?: string) => {
+    setIsSendingDirect(true);
+    try {
+      const res = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_invite_direct",
+          inviteCode,
+          employeeName,
+          mobileNumber,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast(`Sent directly to ${employeeName} via logged-in WhatsApp!`, "success");
+        if (generatedInvite) {
+          setGeneratedInvite({ ...generatedInvite, directSent: true });
+        }
+      } else {
+        toast(data.error || "Failed to dispatch via WhatsApp gateway", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setIsSendingDirect(false);
     }
   };
 
@@ -2011,17 +2049,31 @@ export default function EmployeesPage() {
                           </td>
                           <td className="py-4 px-6 text-right space-x-2">
                             {!inv.isUsed && !isExpired && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(fullUrl);
-                                  toast("Access link copied to clipboard!", "success");
-                                }}
-                                className="p-1.5 inline-flex text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition"
-                                title="Copy Access Link"
-                              >
-                                <Copy size={14} />
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const emp = employees.find((e) => e.id === inv.employeeId);
+                                    handleSendInviteDirect(inv.inviteCode, inv.employeeName || "Employee", emp?.mobileNumber);
+                                  }}
+                                  disabled={isSendingDirect}
+                                  className="p-1.5 inline-flex text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition"
+                                  title="Send directly from logged-in WhatsApp (KRISH CLOTHING CO)"
+                                >
+                                  <Send size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(fullUrl);
+                                    toast("Access link copied to clipboard!", "success");
+                                  }}
+                                  className="p-1.5 inline-flex text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition"
+                                  title="Copy Access Link"
+                                >
+                                  <Copy size={14} />
+                                </button>
+                              </>
                             )}
                             <button
                               type="button"
@@ -2364,6 +2416,25 @@ export default function EmployeesPage() {
                   <span>Access Link Ready for {generatedInvite.employeeName}!</span>
                 </div>
 
+                {/* Direct WhatsApp Send Status */}
+                {generatedInvite.directSent ? (
+                  <div className="p-3 bg-emerald-100/90 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-medium">
+                    <p className="font-bold flex items-center gap-1.5 text-emerald-950">
+                      <span>🚀 Delivered Directly via Logged-In WhatsApp!</span>
+                    </p>
+                    <p className="text-[11px] text-emerald-800 mt-1">
+                      Sent to <strong>{generatedInvite.employeeName}</strong> {generatedInvite.mobileNumber ? `(+91 ${generatedInvite.mobileNumber})` : ""} from your connected business WhatsApp (KRISH CLOTHING CO).
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                    <p className="font-bold">Dispatch to Employee Phone:</p>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      Click below to send directly from your logged-in WhatsApp terminal:
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[11px] font-semibold text-emerald-800 mb-1">
                     Direct Authorization URL:
@@ -2388,15 +2459,36 @@ export default function EmployeesPage() {
                   </div>
                 </div>
 
-                <div className="pt-1">
+                <div className="pt-1 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendInviteDirect(
+                        generatedInvite.inviteCode,
+                        generatedInvite.employeeName,
+                        generatedInvite.mobileNumber
+                      )
+                    }
+                    disabled={isSendingDirect}
+                    className="w-full py-2.5 bg-zinc-950 hover:bg-black text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Send size={14} className="text-emerald-400" />
+                    <span>
+                      {isSendingDirect
+                        ? "Sending via Logged-In WhatsApp..."
+                        : generatedInvite.directSent
+                        ? "Re-Send via Logged-In WhatsApp"
+                        : "Send via Logged-In WhatsApp"}
+                    </span>
+                  </button>
+
                   <a
                     href={generatedInvite.whatsappShareUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-2.5 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 font-semibold text-[11px] rounded-xl transition flex items-center justify-center gap-2 text-center"
                   >
-                    <Send size={14} />
-                    <span>Send via WhatsApp</span>
+                    <span>Or open WhatsApp Web / App (Manual Fallback)</span>
                   </a>
                 </div>
 
