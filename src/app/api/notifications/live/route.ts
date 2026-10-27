@@ -6,9 +6,12 @@ export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+
     const [recentProducts, recentOrders, recentCustomers] = await Promise.all([
       prisma.product.findMany({
-        take: 10,
+        take: Math.min(limit, 30),
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -22,7 +25,7 @@ export async function GET(req: NextRequest) {
       }).catch(() => []),
 
       prisma.order.findMany({
-        take: 15,
+        take: Math.min(limit, 40),
         orderBy: { updatedAt: "desc" },
         select: {
           id: true,
@@ -38,7 +41,7 @@ export async function GET(req: NextRequest) {
       }).catch(() => []),
 
       prisma.customer.findMany({
-        take: 10,
+        take: Math.min(limit, 25),
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -122,7 +125,7 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({
-      notifications: notifications.slice(0, 30),
+      notifications: notifications.slice(0, limit),
       count: notifications.length,
       latestTimestamp: notifications.length > 0 ? notifications[0].timestamp : null,
     });

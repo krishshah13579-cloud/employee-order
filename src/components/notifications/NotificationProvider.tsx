@@ -41,6 +41,12 @@ interface NotificationContextType {
   setIsInstallGuideOpen: (open: boolean) => void;
   activeBanner: LiveNotification | null;
   dismissBanner: () => void;
+  showInAppNotification: (params: {
+    title: string;
+    subtitle: string;
+    type?: LiveNotification["type"];
+    link?: string;
+  }) => void;
 }
 
 // Pure Web Audio API Synthesized Two-Tone Bell Chime (D5 -> A5)
@@ -103,6 +109,7 @@ const NotificationContext = createContext<NotificationContextType>({
   setIsInstallGuideOpen: () => {},
   activeBanner: null,
   dismissBanner: () => {},
+  showInAppNotification: () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -137,6 +144,78 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const playNotificationSound = useCallback(() => {
     playSynthesizedChime();
   }, []);
+
+  const showInAppNotification = useCallback(
+    ({
+      title,
+      subtitle,
+      type = "ORDER_STATUS",
+      link = "/notification",
+    }: {
+      title: string;
+      subtitle: string;
+      type?: LiveNotification["type"];
+      link?: string;
+    }) => {
+      const newItem: LiveNotification = {
+        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        title,
+        subtitle,
+        timestamp: new Date().toISOString(),
+        link: link || "/notification",
+        badgeColor:
+          type === "ARTICLE"
+            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+            : type === "ORDER_STATUS"
+            ? "bg-blue-100 text-blue-800 border-blue-300"
+            : type === "ORDER_PLACED"
+            ? "bg-amber-100 text-amber-800 border-amber-300"
+            : "bg-purple-100 text-purple-800 border-purple-300",
+      };
+
+      setNotifications((prev) => [newItem, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+      setActiveBanner(newItem);
+
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = setTimeout(() => {
+        setActiveBanner(null);
+      }, 7000);
+
+      if (soundEnabledRef.current) {
+        playSynthesizedChime();
+      }
+
+      // Trigger system push notification if enabled
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.ready.then((reg) => {
+              reg.showNotification(title, {
+                body: subtitle,
+                icon: "/apple-touch-icon.png",
+                badge: "/apple-touch-icon.png",
+                data: { url: link || "/notification" },
+              });
+            });
+          } else {
+            new Notification(title, {
+              body: subtitle,
+              icon: "/apple-touch-icon.png",
+            });
+          }
+        } catch (e) {
+          console.warn("Push trigger skipped:", e);
+        }
+      }
+    },
+    []
+  );
 
   const toggleSound = useCallback(() => {
     setSoundEnabled((prev) => {
@@ -410,18 +489,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setIsInstallGuideOpen,
         activeBanner,
         dismissBanner,
+        showInAppNotification,
       }}
     >
-      {/* Floating In-App Live Alert Pill (iOS Dynamic Island Style) */}
+      {/* Native-Style Mobile App In-Screen Notification Banner */}
       {activeBanner && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9999] w-[94vw] max-w-md animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-[#162082] text-white p-3.5 rounded-2xl shadow-2xl border border-blue-400/40 flex items-start gap-3 backdrop-blur-md">
-            <div className="p-2 rounded-xl bg-white/10 shrink-0 mt-0.5 text-white">
-              <Sparkles className="w-4 h-4 text-amber-300" />
+        <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-[9999] w-[95vw] max-w-md animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-md">
+              IQ
             </div>
-            <div className="flex-1 min-w-0">
+            <Link
+              href={activeBanner.link || "/notification"}
+              onClick={dismissBanner}
+              className="flex-1 min-w-0 cursor-pointer group"
+            >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-black tracking-wider uppercase text-blue-200">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-orange-400">
                   {activeBanner.type === "ARTICLE"
                     ? "New Article Arrival"
                     : activeBanner.type === "ORDER_STATUS"
@@ -430,29 +514,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     ? "New Order Placed"
                     : "New Customer Added"}
                 </span>
-                <button
-                  type="button"
-                  onClick={dismissBanner}
-                  className="text-white/60 hover:text-white p-1 cursor-pointer"
-                  aria-label="Dismiss alert"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <span className="text-[10px] text-slate-400">Just now</span>
               </div>
-              <p className="font-bold text-xs sm:text-sm text-white truncate mt-0.5">
+              <p className="font-bold text-xs sm:text-sm text-white truncate mt-0.5 group-hover:text-orange-300 transition-colors">
                 {activeBanner.title}
               </p>
-              <p className="text-[11px] text-blue-100 line-clamp-1 mt-0.5">
+              <p className="text-[11px] text-slate-300 line-clamp-1 mt-0.5">
                 {activeBanner.subtitle}
               </p>
-            </div>
-            <Link
-              href={activeBanner.link}
-              onClick={dismissBanner}
-              className="px-3 py-1.5 bg-white text-[#162082] rounded-xl text-xs font-black shrink-0 hover:bg-blue-50 transition shadow-xs self-center"
-            >
-              View
             </Link>
+            <button
+              type="button"
+              onClick={dismissBanner}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer shrink-0"
+              aria-label="Dismiss notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

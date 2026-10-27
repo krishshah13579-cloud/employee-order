@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Boxes,
   Smartphone,
+  Bell,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -28,7 +29,7 @@ import { useNotifications } from "@/components/notifications/NotificationProvide
 export default function Navbar() {
   const pathname = usePathname();
   const { employee, logout } = useEmployee();
-  const { setIsInstallGuideOpen } = useNotifications();
+  const { setIsInstallGuideOpen, unreadCount } = useNotifications();
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [profileOpen, setProfileOpen] = useState<boolean>(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -117,6 +118,21 @@ export default function Navbar() {
 
           {/* Right Action: Dedicated Profile Icon */}
           <div className="hidden lg:flex items-center space-x-3">
+            {/* Notification Bell Icon in Header (Top Right Corner before Employee Icon) */}
+            <Link
+              href="/notification"
+              className="relative p-2 rounded-full text-slate-600 hover:text-black hover:bg-slate-100 transition flex items-center justify-center cursor-pointer"
+              title="Notifications"
+              aria-label="View Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white font-bold text-[10px] flex items-center justify-center shadow-xs">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+
             {employee && (
               <div className="relative" ref={profileRef}>
                 <button
@@ -228,6 +244,21 @@ export default function Navbar() {
 
           {/* Mobile Menu Actions */}
           <div className="flex items-center space-x-2 lg:hidden">
+            {/* Notification Bell in Mobile Header (before Employee Icon) */}
+            <Link
+              href="/notification"
+              className="relative p-1.5 rounded-full text-slate-700 hover:text-black hover:bg-slate-100 transition flex items-center justify-center cursor-pointer"
+              title="Notifications"
+              aria-label="View Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-600 text-white font-bold text-[9px] flex items-center justify-center shadow-xs">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+
             {employee && (
               <button
                 type="button"

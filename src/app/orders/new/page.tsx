@@ -37,6 +37,7 @@ import {
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 import { formatCurrency, formatDate, isGstPanRegistered } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
 import { getColorHex } from "@/lib/colors";
@@ -98,6 +99,7 @@ function OrderFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { showInAppNotification } = useNotifications();
 
   const customerIdParam = searchParams.get(PARAM_CUSTOMER_ID);
   const businessTypeParam = sanitizeBusinessType(searchParams.get(PARAM_BUSINESS_TYPE));
@@ -1020,7 +1022,14 @@ function OrderFormContent() {
         } catch {}
 
         setIsTransportModalOpen(false);
-        toast(`✅ Order #${result.orderNumber || editingOrderNumber || editingOrderId} updated successfully!`, "success");
+        const orderNum = result.orderNumber || editingOrderNumber || editingOrderId;
+        toast(`✅ Order #${orderNum} updated successfully!`, "success");
+        showInAppNotification({
+          title: `Order #${orderNum} Updated`,
+          subtitle: `${selectedCustomer?.shopName || "Customer"} • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`,
+          type: "ORDER_STATUS",
+          link: `/orders/${editingOrderId}`,
+        });
         router.push(`/orders/${editingOrderId}`);
         return;
       }
@@ -1057,6 +1066,13 @@ function OrderFormContent() {
       });
 
       setIsTransportModalOpen(false);
+      showInAppNotification({
+        title: `📦 Order #${result.orderNumber} Placed Successfully`,
+        subtitle: `${selectedCustomer!.shopName} • ₹${Math.round(result.grandTotal || grandTotal).toLocaleString("en-IN")} • ${result.totalSets || totalSets} Sets`,
+        type: "ORDER_PLACED",
+        link: "/orders",
+      });
+
       if (result.whatsAppSent) {
         toast(`✅ Order #${result.orderNumber} placed & WhatsApp sent to customer!`, "success");
       } else {
