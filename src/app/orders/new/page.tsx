@@ -31,6 +31,7 @@ import {
   Upload,
   Loader2,
   Truck,
+  Calendar,
   Image as ImageIcon,
   MessageCircle,
 } from "lucide-react";
@@ -174,6 +175,11 @@ function OrderFormContent() {
   const [isTransportModalOpen, setIsTransportModalOpen] = useState<boolean>(false);
   const [transportName, setTransportName] = useState<string>("");
   const [transportStation, setTransportStation] = useState<string>("");
+
+  // T.L. / Admin option to move Customer Without GST to Bill (Without GST) vs Tax Invoice (with 5% GST)
+  const [moveToBillWithoutGst, setMoveToBillWithoutGst] = useState<boolean>(true);
+  const [manualBillNumber, setManualBillNumber] = useState<string>("");
+  const [orderDateInput, setOrderDateInput] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // Confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
@@ -888,8 +894,10 @@ function OrderFormContent() {
   const totalPcs = items.reduce((sum, it) => sum + (it.totalPcs || 0), 0);
   const rawItemTotal = Math.round(items.reduce((sum, it) => sum + (it.itemSubtotal || 0), 0));
 
+  const effectiveIsBillWithoutGst = isWithoutGst ? moveToBillWithoutGst : false;
+
   let subtotal = rawItemTotal;
-  let gstRate = isWithoutGst ? 0 : 5.0;
+  let gstRate = effectiveIsBillWithoutGst ? 0 : 5.0;
   let gstAmount = 0;
   let grandTotal = rawItemTotal;
 
@@ -899,14 +907,14 @@ function OrderFormContent() {
     gstAmount = rawItemTotal - subtotal;
     grandTotal = rawItemTotal;
     gstRate = 5.0;
-  } else if (!isWithoutGst) {
-    // Standard GST: 5% added on top and rounded off to whole rupee
+  } else if (!effectiveIsBillWithoutGst) {
+    // Standard GST or Customer Without GST where NO was selected (Add 5% GST to invoice)
     subtotal = rawItemTotal;
     gstAmount = Math.round(subtotal * 0.05);
     grandTotal = subtotal + gstAmount;
     gstRate = 5.0;
   } else {
-    // Without GST
+    // Without GST (Moved to Bill Without GST)
     subtotal = rawItemTotal;
     gstAmount = 0;
     grandTotal = rawItemTotal;
@@ -960,6 +968,11 @@ function OrderFormContent() {
       return;
     }
 
+    if (isWithoutGst && moveToBillWithoutGst && !manualBillNumber.trim()) {
+      toast("Mandatory: Please enter the Manual Bill Number for Bill (Without GST)", "error");
+      return;
+    }
+
     const finalPlacedBy = (employee?.name || placedBy).trim();
     if (!finalPlacedBy) {
       toast("Mandatory: Please log in as an employee to place orders", "error");
@@ -983,6 +996,11 @@ function OrderFormContent() {
         placedBy: finalPlacedBy,
         businessType: effectiveBusinessType,
         creditDays: orderCreditDays,
+        isBillWithoutGst: effectiveIsBillWithoutGst,
+        manualBillNumber: effectiveIsBillWithoutGst ? manualBillNumber.trim() : undefined,
+        orderDate: orderDateInput,
+        gstRate,
+        billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
         notes: finalNotes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -2143,7 +2161,7 @@ function OrderFormContent() {
             </button>
             <button
               type="button"
-              disabled={isSubmitting || !transportName.trim()}
+              disabled={isSubmitting || !transportName.trim() || (isWithoutGst && moveToBillWithoutGst && !manualBillNumber.trim())}
               onClick={handleFinalSubmitOrder}
               className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-md shadow-orange-500/20 transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
@@ -2181,6 +2199,85 @@ function OrderFormContent() {
               </p>
             </div>
           </div>
+
+          {/* Customer Without GST: Move to Bill Without GST vs Add 5% GST to Invoice */}
+          {isWithoutGst && (
+            <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs font-black text-amber-950 uppercase tracking-wide block">
+                    Move to Bill (Without GST)?
+                  </span>
+                  <span className="text-[11px] text-amber-800">
+                    Customer registered Without GST ({effectiveBusinessType})
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMoveToBillWithoutGst(true)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      moveToBillWithoutGst
+                        ? "bg-emerald-600 text-white shadow-xs font-black"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    YES (Bill No GST)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMoveToBillWithoutGst(false)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      !moveToBillWithoutGst
+                        ? "bg-amber-600 text-white shadow-xs font-black"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    NO (Add 5% GST)
+                  </button>
+                </div>
+              </div>
+
+              {moveToBillWithoutGst ? (
+                <div className="space-y-2.5 pt-2 border-t border-amber-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-900 mb-1">
+                        Manual Bill Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualBillNumber}
+                        onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
+                        placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
+                        className="w-full px-3 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-900 mb-1 flex items-center gap-1">
+                        <Calendar size={12} className="text-emerald-700" /> Bill Date (Past / Post-Dated)
+                      </label>
+                      <input
+                        type="date"
+                        value={orderDateInput}
+                        onChange={(e) => setOrderDateInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-emerald-800 font-medium">
+                    0% GST applied. This bill will be moved directly to "Bill (Without GST)" with this manual bill number.
+                  </p>
+                </div>
+              ) : (
+                <div className="pt-2 border-t border-amber-200">
+                  <p className="text-[11px] text-amber-900 font-semibold">
+                    5% GST (₹{Math.round(rawItemTotal * 0.05).toLocaleString("en-IN")}) will be added to the invoice and routed to the Tax Invoice register.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             <div>
