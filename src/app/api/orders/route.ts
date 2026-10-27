@@ -153,6 +153,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least one product item is required" }, { status: 400 });
     }
 
+    // Determine order date & check past-dated / post-dated status
+    const effectiveOrderDate = body.orderDate
+      ? new Date(body.orderDate)
+      : body.billDate
+      ? new Date(body.billDate)
+      : body.taxInvoiceDate
+      ? new Date(body.taxInvoiceDate)
+      : new Date();
+
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const tomorrowMidnight = new Date(todayMidnight);
+    tomorrowMidnight.setDate(tomorrowMidnight.getDate() + 1);
+
+    const isPastDated = !isNaN(effectiveOrderDate.getTime()) && effectiveOrderDate.getTime() < todayMidnight.getTime();
+    const isPostDated = !isNaN(effectiveOrderDate.getTime()) && effectiveOrderDate.getTime() >= tomorrowMidnight.getTime();
+
+    const isExplicitBillWithoutGst = Boolean(
+      body.isBillWithoutGst === true ||
+      body.billType === "NON_GST" ||
+      body.billType === "BILL_WITHOUT_GST"
+    );
+
+    // Skip live stock deduction for:
+    // 1. Past-dated bills (warehouse stock is already present physical stock)
+    // 2. Post-dated bills without GST (future-dated accounting bills)
+    // 3. When explicitly requested via skipStockDeduction
+    const shouldDeductStock =
+      !isPastDated &&
+      !(isPostDated && isExplicitBillWithoutGst) &&
+      !body.skipStockDeduction;
+
     // Process Wholesale Order Items
     let orderSubtotal = 0;
     let orderTotalPcs = 0;
@@ -222,8 +254,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Enforce stock availability only for requested sets (> 0)
-      if (product.setsColorwise && product.setsColorwise.trim() !== "") {
+      // Enforce live stock availability check only if stock will actually be deducted from warehouse
+      const isMixProduct = product.name.toUpperCase().includes("IMPORTED TROUSER");
+      if (shouldDeductStock && !isMixProduct && product.setsColorwise && product.setsColorwise.trim() !== "") {
         for (const cs of colorSetsArray) {
           const requestedSets = parseInt(cs.sets, 10) || 0;
           if (requestedSets <= 0) continue; // Skip items with 0 sets (e.g. mix pieces only)
@@ -327,11 +360,6 @@ export async function POST(request: NextRequest) {
 
     // GST calculation: 0% if Without GST, inclusive for Cash Customer, else 5%
     const effectiveBusinessType = (body.businessType || (customer as any).businessType || "RETAILER").trim().toUpperCase();
-    const isExplicitBillWithoutGst = Boolean(
-      body.isBillWithoutGst === true ||
-      body.billType === "NON_GST" ||
-      body.billType === "BILL_WITHOUT_GST"
-    );
 
     const isExplicitTaxInvoiceWithGst = Boolean(
       body.isBillWithoutGst === false ||
@@ -412,15 +440,11 @@ export async function POST(request: NextRequest) {
       effectiveTaxInvoiceDate = new Date();
     }
 
-    // Check past-dated bills & miscellaneous transport products
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-    const orderDateObj = new Date(body.orderDate || body.taxInvoiceDate || Date.now());
-    const isPastDated = !isNaN(orderDateObj.getTime()) && orderDateObj.getTime() < todayMidnight.getTime();
+    // Check miscellaneous transport products
     const isImportedTrousersMix = validatedItems.some((it) =>
       (it.productName || "").toUpperCase().includes("IMPORTED TROUSER")
     );
-    const shouldDeductStock = !isPastDated && !isImportedTrousersMix && !body.skipStockDeduction;
+    const finalShouldDeductStock = shouldDeductStock && !isImportedTrousersMix;
 
     const newlySoldOutColors: Array<{
       productName: string;
@@ -429,8 +453,8 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     const createdOrder = await prisma.$transaction(async (tx) => {
-      // Deduct stock only for real-time present orders (skip past-dated bills and IMPORTED TROUSERS MIX)
-      if (shouldDeductStock) {
+      // Deduct stock only for real-time present orders (skip past-dated bills, post-dated bills without GST, and IMPORTED TROUSERS MIX)
+      if (finalShouldDeductStock) {
         for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
           if (
             product.setsColorwise &&
@@ -476,7 +500,7 @@ export async function POST(request: NextRequest) {
           customerAddress: customer.address,
           businessType: body.businessType || (customer as any).businessType || "RETAILER",
           creditDays: body.creditDays !== undefined ? (parseInt(body.creditDays, 10) || 0) : ((customer as any).creditDays || 0),
-          orderDate: orderDate ? new Date(orderDate) : new Date(),
+          orderDate: effectiveOrderDate,
           status: initialStatus,
           subtotal: finalSubtotal,
           gstRate: gstRate,
@@ -490,7 +514,7 @@ export async function POST(request: NextRequest) {
             isExplicitBillWithoutGst ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null
           ].filter(Boolean).join(" | ") || null,
           taxInvoiceNumber: effectiveTaxInvoiceNumber,
-          taxInvoiceDate: effectiveTaxInvoiceDate,
+          taxInvoiceDate: effectiveTaxInvoiceDate || effectiveOrderDate,
           items: {
             create: validatedItems,
           },

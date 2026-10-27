@@ -56,6 +56,19 @@ export default function NewOrderPage() {
   // Option to move Customer Without GST to Bill (Without GST) vs Tax Invoice (with 5% GST)
   const [moveToBillWithoutGst, setMoveToBillWithoutGst] = useState<boolean>(true);
   const [manualBillNumber, setManualBillNumber] = useState<string>("");
+  const [isBillMode, setIsBillMode] = useState<boolean>(false);
+  const [skipStockDeduction, setSkipStockDeduction] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const isBill = p.get("billType") === "non_gst" || p.get("type") === "bill_without_gst";
+      if (isBill) {
+        setIsBillMode(true);
+        setMoveToBillWithoutGst(true);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -218,6 +231,7 @@ export default function NewOrderPage() {
   const orderTotalPcs = orderItems.reduce((acc, it) => acc + getItemTotalPcs(it), 0);
   const rawSubtotal = Math.round(orderItems.reduce((acc, it) => acc + getItemSubtotal(it), 0));
   const isWithoutGst =
+    isBillMode ||
     (activeCustomer?.businessType || "").toUpperCase().includes("WITHOUT GST") ||
     (activeCustomer?.businessType || "").toUpperCase().includes("NO GST");
   const isCashCustomer = Boolean(
@@ -298,8 +312,9 @@ export default function NewOrderPage() {
           manualBillNumber: effectiveIsBillWithoutGst ? manualBillNumber.trim() : undefined,
           isBillWithoutGst: effectiveIsBillWithoutGst,
           billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
-          taxInvoiceDate: customTaxInvoiceDate || undefined,
+          taxInvoiceDate: customTaxInvoiceDate || orderDate || undefined,
           orderDate,
+          skipStockDeduction,
           placedBy,
           notes: orderNotes,
           items: itemsPayload,
@@ -313,8 +328,13 @@ export default function NewOrderPage() {
 
       if (res.ok) {
         const data = await res.json();
-        toast(`Wholesale order ${data.orderNumber} booked successfully!`, "success");
-        router.push("/admin/employee/orders");
+        if (effectiveIsBillWithoutGst) {
+          toast(`Wholesale Bill (Without GST) #${manualBillNumber.trim() || data.orderNumber} generated successfully!`, "success");
+          router.push("/admin/employee/bills");
+        } else {
+          toast(`Wholesale order ${data.orderNumber} booked successfully!`, "success");
+          router.push("/admin/employee/orders");
+        }
       } else {
         const err = await res.json();
         toast(err.error || "Failed to book order", "error");
@@ -341,24 +361,26 @@ export default function NewOrderPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
           <Link
-            href="/admin/employee/orders"
+            href={isBillMode ? "/admin/employee/bills" : "/admin/employee/orders"}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-black transition-colors mb-1.5"
           >
             <ArrowLeft size={14} />
-            <span>Back to Orders</span>
+            <span>{isBillMode ? "Back to Bills (Without GST)" : "Back to Orders"}</span>
           </Link>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-gray-700" />
-            <span>Book New Wholesale Garment Order</span>
+            <span>{isBillMode ? "Generate Bill (Wholesale Without GST)" : "Book New Wholesale Garment Order"}</span>
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Select retailer shop, allocate color-wise sets (e.g. A-2, B-3), mandatory sizes, rate per pc, and generate 5% GST invoice.
+            {isBillMode
+              ? "Direct billing without 5% GST. Supports past-dated and post-dated bills with manual bill numbering."
+              : "Select retailer shop, allocate color-wise sets (e.g. A-2, B-3), mandatory sizes, rate per pc, and generate 5% GST invoice."}
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <Link
-            href="/admin/employee/orders"
+            href={isBillMode ? "/admin/employee/bills" : "/admin/employee/orders"}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
           >
             Cancel
@@ -373,7 +395,7 @@ export default function NewOrderPage() {
             ) : (
               <Save className="w-4 h-4" />
             )}
-            <span>Book & Confirm Order</span>
+            <span>{isBillMode ? "Save & Generate Bill" : "Book & Confirm Order"}</span>
           </button>
         </div>
       </div>
@@ -409,7 +431,7 @@ export default function NewOrderPage() {
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <Calendar size={13} className="text-gray-500" /> Order Date *
+              <Calendar size={13} className="text-gray-500" /> {effectiveIsBillWithoutGst ? "Bill Date (Past / Post-Dated) *" : "Order Date *"}
             </label>
             <input
               type="date"
@@ -476,17 +498,46 @@ export default function NewOrderPage() {
             </div>
 
             {moveToBillWithoutGst ? (
-              <div className="space-y-1 pt-2 border-t border-amber-200">
-                <label className="block text-[11px] font-bold text-emerald-900">
-                  Manual Bill Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualBillNumber}
-                  onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
-                  placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
-                  className="w-full px-3.5 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
-                />
+              <div className="space-y-3 pt-2 border-t border-amber-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-900 mb-1">
+                      Manual Bill Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={manualBillNumber}
+                      onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
+                      placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
+                      className="w-full px-3.5 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-900 mb-1 flex items-center gap-1">
+                      <Calendar size={12} className="text-emerald-700" /> Bill Date (Past / Post-Dated)
+                    </label>
+                    <input
+                      type="date"
+                      value={orderDate}
+                      onChange={(e) => setOrderDate(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-2.5 bg-white/80 rounded-xl border border-emerald-200">
+                  <input
+                    type="checkbox"
+                    id="skipStockCheck"
+                    checked={skipStockDeduction}
+                    onChange={(e) => setSkipStockDeduction(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <label htmlFor="skipStockCheck" className="text-[11px] font-medium text-emerald-950 cursor-pointer">
+                    Do not deduct from live inventory stock (Recommended for past-dated & post-dated bills)
+                  </label>
+                </div>
+
                 <p className="text-[10px] text-emerald-800 font-medium">
                   0% GST applied. This bill will be saved with this manual bill number in "Bill (Without GST)".
                 </p>

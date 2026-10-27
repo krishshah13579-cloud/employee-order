@@ -31,6 +31,7 @@ import {
   Upload,
   Loader2,
   Truck,
+  Calendar,
   Image as ImageIcon,
   MessageCircle,
 } from "lucide-react";
@@ -178,6 +179,7 @@ function OrderFormContent() {
   // T.L. / Admin option to move Customer Without GST to Bill (Without GST) vs Tax Invoice (with 5% GST)
   const [moveToBillWithoutGst, setMoveToBillWithoutGst] = useState<boolean>(true);
   const [manualBillNumber, setManualBillNumber] = useState<string>("");
+  const [orderDateInput, setOrderDateInput] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // Confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
@@ -996,6 +998,7 @@ function OrderFormContent() {
         creditDays: orderCreditDays,
         isBillWithoutGst: effectiveIsBillWithoutGst,
         manualBillNumber: effectiveIsBillWithoutGst ? manualBillNumber.trim() : undefined,
+        orderDate: orderDateInput,
         gstRate,
         billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
         notes: finalNotes || undefined,
@@ -2236,17 +2239,32 @@ function OrderFormContent() {
               </div>
 
               {moveToBillWithoutGst ? (
-                <div className="space-y-1 pt-2 border-t border-amber-200">
-                  <label className="block text-[11px] font-bold text-emerald-900">
-                    Manual Bill Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={manualBillNumber}
-                    onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
-                    placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
-                    className="w-full px-3 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
-                  />
+                <div className="space-y-2.5 pt-2 border-t border-amber-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-900 mb-1">
+                        Manual Bill Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualBillNumber}
+                        onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
+                        placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
+                        className="w-full px-3 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-900 mb-1 flex items-center gap-1">
+                        <Calendar size={12} className="text-emerald-700" /> Bill Date (Past / Post-Dated)
+                      </label>
+                      <input
+                        type="date"
+                        value={orderDateInput}
+                        onChange={(e) => setOrderDateInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
                   <p className="text-[10px] text-emerald-800 font-medium">
                     0% GST applied. This bill will be moved directly to "Bill (Without GST)" with this manual bill number.
                   </p>

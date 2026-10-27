@@ -258,8 +258,12 @@ export default function OrdersView({
         <div className="flex items-center gap-2 self-start md:self-auto">
           {isSuperAdmin && (
             <Link
-              href={activeTab === "BILLS" ? "/orders/new?billType=non_gst" : "/orders/new"}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              href={activeTab === "BILLS" ? "/admin/employee/orders/new?billType=non_gst" : "/admin/employee/orders/new"}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer ${
+                activeTab === "BILLS"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "bg-zinc-950 hover:bg-black text-white"
+              }`}
             >
               <Plus size={16} />
               <span>{activeTab === "BILLS" ? "+ Generate Bill (Without GST)" : "Book New Order"}</span>
@@ -452,7 +456,20 @@ export default function OrdersView({
                       ? "No order forms found. Click 'Book New Order' to create a client order."
                       : activeTab === "INVOICES"
                       ? "No final tax invoices found. Once orders are ready or tax invoices are generated, they appear here."
-                      : "No bills found for Wholesale (Without GST) customers. Click '+ Generate New Bill' to create one."}
+                      : (
+                        <div className="flex flex-col items-center justify-center gap-2 py-2">
+                          <p>No bills found for Wholesale (Without GST) customers.</p>
+                          {isSuperAdmin && (
+                            <Link
+                              href="/admin/employee/orders/new?billType=non_gst"
+                              className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                            >
+                              <Plus size={14} />
+                              <span>+ Generate Bill (Without GST)</span>
+                            </Link>
+                          )}
+                        </div>
+                      )}
                   </td>
                 </tr>
               ) : (
