@@ -53,6 +53,10 @@ export default function NewOrderPage() {
   const [orderItems, setOrderItems] = useState<NewOrderItem[]>([]);
   const [customShadeInputs, setCustomShadeInputs] = useState<Record<number, string>>({});
 
+  // Option to move Customer Without GST to Bill (Without GST) vs Tax Invoice (with 5% GST)
+  const [moveToBillWithoutGst, setMoveToBillWithoutGst] = useState<boolean>(true);
+  const [manualBillNumber, setManualBillNumber] = useState<string>("");
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -221,6 +225,8 @@ export default function NewOrderPage() {
     (activeCustomer?.businessType || "").toUpperCase().includes("CASH")
   );
 
+  const effectiveIsBillWithoutGst = isWithoutGst ? moveToBillWithoutGst : false;
+
   let orderSubtotal = rawSubtotal;
   let orderGst = 0;
   let orderGrandTotal = rawSubtotal;
@@ -230,10 +236,16 @@ export default function NewOrderPage() {
     orderSubtotal = Math.round(rawSubtotal / 1.05);
     orderGst = rawSubtotal - orderSubtotal;
     orderGrandTotal = rawSubtotal;
-  } else if (!isWithoutGst) {
+  } else if (!effectiveIsBillWithoutGst) {
+    // Standard GST or Customer Without GST where Admin chose NO (Add 5% GST to invoice)
     orderSubtotal = rawSubtotal;
     orderGst = Math.round(orderSubtotal * 0.05);
     orderGrandTotal = orderSubtotal + orderGst;
+  } else {
+    // Without GST (Moved to Bill Without GST)
+    orderSubtotal = rawSubtotal;
+    orderGst = 0;
+    orderGrandTotal = rawSubtotal;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -251,6 +263,11 @@ export default function NewOrderPage() {
 
     if (orderTotalSets === 0 || orderTotalPcs === 0) {
       toast("Total sets cannot be 0. Please specify sets against color variants.", "error");
+      return;
+    }
+
+    if (isWithoutGst && moveToBillWithoutGst && !manualBillNumber.trim()) {
+      toast("Mandatory: Please enter the Manual Bill Number for Bill (Without GST)", "error");
       return;
     }
 
@@ -275,17 +292,22 @@ export default function NewOrderPage() {
         body: JSON.stringify({
           customerId: selectedCustomerId,
           orderNumber: customOrderNumber.trim() || undefined,
-          taxInvoiceNumber: customTaxInvoiceNumber.trim() || undefined,
+          taxInvoiceNumber: effectiveIsBillWithoutGst
+            ? (manualBillNumber.trim() || undefined)
+            : (customTaxInvoiceNumber.trim() || undefined),
+          manualBillNumber: effectiveIsBillWithoutGst ? manualBillNumber.trim() : undefined,
+          isBillWithoutGst: effectiveIsBillWithoutGst,
+          billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
           taxInvoiceDate: customTaxInvoiceDate || undefined,
           orderDate,
           placedBy,
           notes: orderNotes,
           items: itemsPayload,
           subtotal: orderSubtotal,
-          gstRate: 5.0,
-          gstAmount: orderGst,
+          gstRate: effectiveIsBillWithoutGst ? 0 : 5.0,
+          gstAmount: effectiveIsBillWithoutGst ? 0 : orderGst,
           totalAmount: orderGrandTotal,
-          status: customTaxInvoiceNumber.trim() ? "Ready" : "Confirmed",
+          status: effectiveIsBillWithoutGst || customTaxInvoiceNumber.trim() ? "Ready" : "Confirmed",
         }),
       });
 
@@ -412,6 +434,70 @@ export default function NewOrderPage() {
             <div className="font-mono bg-white px-2.5 py-1 rounded-lg border border-gray-200 font-bold text-gray-800 shrink-0">
               GST/PAN: {activeCustomer.gstPanNo}
             </div>
+          </div>
+        )}
+
+        {/* Customer Without GST: Move to Bill Without GST vs Add 5% GST to Invoice */}
+        {isWithoutGst && (
+          <div className="p-4 bg-amber-50/80 border border-amber-300 rounded-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-black text-amber-950 uppercase tracking-wide block">
+                  Move to Bill (Without GST)?
+                </span>
+                <span className="text-[11px] text-amber-800">
+                  Customer registered Without GST ({activeCustomer?.businessType})
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setMoveToBillWithoutGst(true)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    moveToBillWithoutGst
+                      ? "bg-emerald-600 text-white shadow-xs font-black"
+                      : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  YES (Bill No GST)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMoveToBillWithoutGst(false)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    !moveToBillWithoutGst
+                      ? "bg-amber-600 text-white shadow-xs font-black"
+                      : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  NO (Add 5% GST)
+                </button>
+              </div>
+            </div>
+
+            {moveToBillWithoutGst ? (
+              <div className="space-y-1 pt-2 border-t border-amber-200">
+                <label className="block text-[11px] font-bold text-emerald-900">
+                  Manual Bill Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualBillNumber}
+                  onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
+                  placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
+                  className="w-full px-3.5 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
+                />
+                <p className="text-[10px] text-emerald-800 font-medium">
+                  0% GST applied. This bill will be saved with this manual bill number in "Bill (Without GST)".
+                </p>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-amber-200">
+                <p className="text-[11px] text-amber-900 font-semibold">
+                  5% GST (₹{Math.round(rawSubtotal * 0.05).toLocaleString("en-IN")}) will be added to the invoice and routed to the Tax Invoice register.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

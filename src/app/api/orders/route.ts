@@ -327,14 +327,28 @@ export async function POST(request: NextRequest) {
 
     // GST calculation: 0% if Without GST, inclusive for Cash Customer, else 5%
     const effectiveBusinessType = (body.businessType || (customer as any).businessType || "RETAILER").trim().toUpperCase();
+    const isExplicitBillWithoutGst = Boolean(
+      body.isBillWithoutGst === true ||
+      body.billType === "NON_GST" ||
+      body.billType === "BILL_WITHOUT_GST"
+    );
+
+    const isExplicitTaxInvoiceWithGst = Boolean(
+      body.isBillWithoutGst === false ||
+      body.billType === "TAX_INVOICE"
+    );
+
     const isWithoutGst =
-      effectiveBusinessType === "WHOLESALER WITHOUT GST" ||
-      effectiveBusinessType === "WHOLESALE WITHOUT GST" ||
-      effectiveBusinessType === "RETAILER WITHOUT GST" ||
-      effectiveBusinessType === "RETAILER (WITHOUT GST)" ||
-      effectiveBusinessType.includes("WITHOUT GST") ||
-      effectiveBusinessType.includes("NO GST") ||
-      body.gstRate === 0;
+      isExplicitBillWithoutGst ||
+      (!isExplicitTaxInvoiceWithGst && (
+        effectiveBusinessType === "WHOLESALER WITHOUT GST" ||
+        effectiveBusinessType === "WHOLESALE WITHOUT GST" ||
+        effectiveBusinessType === "RETAILER WITHOUT GST" ||
+        effectiveBusinessType === "RETAILER (WITHOUT GST)" ||
+        effectiveBusinessType.includes("WITHOUT GST") ||
+        effectiveBusinessType.includes("NO GST") ||
+        body.gstRate === 0
+      ));
 
     const isCashCustomer = Boolean(
       (customer.shopName || "").toUpperCase().includes("CASH") ||
@@ -353,11 +367,13 @@ export async function POST(request: NextRequest) {
       grandTotal = Math.round(orderSubtotal);
       gstRate = 5.0;
     } else if (!isWithoutGst) {
+      // If customer is Without GST but TL/Admin chose NO (Add GST), add 5% GST to invoice
       finalSubtotal = Math.round(orderSubtotal);
       gstAmount = Math.round(finalSubtotal * 0.05);
       grandTotal = finalSubtotal + gstAmount;
       gstRate = 5.0;
     } else {
+      // Bill (Without GST)
       finalSubtotal = Math.round(orderSubtotal);
       gstAmount = 0;
       grandTotal = finalSubtotal;
@@ -381,18 +397,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine custom Tax Invoice Number from previous accounting software bills or auto-generate if confirmed
-    const customTaxInvoiceNumber = body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null;
+    // Determine custom Tax Invoice Number / Manual Bill Number (Without GST)
+    const manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
+    const customTaxInvoiceNumber = manualBillNumber || (body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null);
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
 
     const initialStatus = body.status || (customTaxInvoiceNumber ? "Ready" : "Pending");
     let effectiveTaxInvoiceNumber = customTaxInvoiceNumber;
     let effectiveTaxInvoiceDate = customTaxInvoiceDate;
 
-    if (initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
+    // Only auto-generate Tax Invoice Number if it is an official GST invoice and NOT a Bill (Without GST)
+    if (!isExplicitBillWithoutGst && initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
       effectiveTaxInvoiceNumber = await getNextTaxInvoiceNumber();
       effectiveTaxInvoiceDate = new Date();
     }
+
+    // Check past-dated bills & miscellaneous transport products
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const orderDateObj = new Date(body.orderDate || body.taxInvoiceDate || Date.now());
+    const isPastDated = !isNaN(orderDateObj.getTime()) && orderDateObj.getTime() < todayMidnight.getTime();
+    const isImportedTrousersMix = validatedItems.some((it) =>
+      (it.productName || "").toUpperCase().includes("IMPORTED TROUSER")
+    );
+    const shouldDeductStock = !isPastDated && !isImportedTrousersMix && !body.skipStockDeduction;
 
     const newlySoldOutColors: Array<{
       productName: string;
@@ -401,32 +429,38 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     const createdOrder = await prisma.$transaction(async (tx) => {
-      // Deduct stock for all products that have setsColorwise
-      for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
-        if (product.setsColorwise && product.setsColorwise.trim() !== "") {
-          const updatedStock = deductSetsFromStock(product.setsColorwise, orderedSets, orderedLoose);
-          await tx.product.update({
-            where: { id: product.id },
-            data: { setsColorwise: updatedStock },
-          });
+      // Deduct stock only for real-time present orders (skip past-dated bills and IMPORTED TROUSERS MIX)
+      if (shouldDeductStock) {
+        for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
+          if (
+            product.setsColorwise &&
+            product.setsColorwise.trim() !== "" &&
+            !product.name.toUpperCase().includes("IMPORTED TROUSER")
+          ) {
+            const updatedStock = deductSetsFromStock(product.setsColorwise, orderedSets, orderedLoose);
+            await tx.product.update({
+              where: { id: product.id },
+              data: { setsColorwise: updatedStock },
+            });
 
-          // Check which color variants became sold out from this order deduction
-          const allColors = getAllProductColors(
-            product.colorsAvailable,
-            product.setsColorwise,
-            product.colorMapping
-          );
-          for (let colIdx = 0; colIdx < allColors.length; colIdx++) {
-            const col = allColors[colIdx];
-            const wasInStock = !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
-            const isNowSoldOut = isColorSoldOut(updatedStock, col, product.colorMapping);
-            if (wasInStock && isNowSoldOut) {
-              const colorAlphabet = getColorShadeLetter(product, col, colIdx);
-              newlySoldOutColors.push({
-                productName: product.name,
-                colorName: col,
-                colorAlphabet,
-              });
+            // Check which color variants became sold out from this order deduction
+            const allColors = getAllProductColors(
+              product.colorsAvailable,
+              product.setsColorwise,
+              product.colorMapping
+            );
+            for (let colIdx = 0; colIdx < allColors.length; colIdx++) {
+              const col = allColors[colIdx];
+              const wasInStock = !isColorSoldOut(product.setsColorwise, col, product.colorMapping);
+              const isNowSoldOut = isColorSoldOut(updatedStock, col, product.colorMapping);
+              if (wasInStock && isNowSoldOut) {
+                const colorAlphabet = getColorShadeLetter(product, col, colIdx);
+                newlySoldOutColors.push({
+                  productName: product.name,
+                  colorName: col,
+                  colorAlphabet,
+                });
+              }
             }
           }
         }
@@ -451,7 +485,10 @@ export async function POST(request: NextRequest) {
           totalPcs: orderTotalPcs,
           totalSets: orderTotalSets,
           placedBy: placedBy || "Admin",
-          notes: notes || null,
+          notes: [
+            notes,
+            isExplicitBillWithoutGst ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null
+          ].filter(Boolean).join(" | ") || null,
           taxInvoiceNumber: effectiveTaxInvoiceNumber,
           taxInvoiceDate: effectiveTaxInvoiceDate,
           items: {

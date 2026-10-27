@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    const products = sortProductsByImpSequence(rawProducts);
+    // Exclude transport-only miscellaneous products (e.g. IMPORTED TROUSERS MIX) from live stock
+    const filteredProducts = rawProducts.filter(
+      (p) => !p.name.toUpperCase().includes("IMPORTED TROUSER")
+    );
+    const products = sortProductsByImpSequence(filteredProducts);
 
     const stockItems = products.map((p) => {
       const colors = getAllProductColors(p.colorsAvailable, p.setsColorwise, p.colorMapping);
@@ -169,6 +173,11 @@ export async function GET(request: NextRequest) {
         let orderCost = 0;
 
         for (const item of order.items) {
+          const prodName = (item.productName || item.product?.name || "").toUpperCase();
+          if (prodName.includes("IMPORTED TROUSER")) {
+            continue; // Skip transport miscellaneous products from profit and sold metrics
+          }
+
           const pcs = item.totalPcs || 0;
           const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
 
@@ -216,17 +225,19 @@ export async function GET(request: NextRequest) {
         const orderProfit = Math.round(orderRev - orderCost);
         const orderMargin = orderRev > 0 ? Math.round((orderProfit / orderRev) * 1000) / 10 : 0;
 
-        billProfitBreakdown.push({
-          billNo: order.taxInvoiceNumber || String(order.id),
-          orderId: order.id,
-          customerName: order.customerName || "Customer",
-          date: (order.orderDate || order.createdAt).toISOString(),
-          totalPcs: orderUnits,
-          revenue: orderRev,
-          cost: orderCost,
-          profit: orderProfit,
-          marginPercent: orderMargin,
-        });
+        if (orderUnits > 0 || orderRev > 0) {
+          billProfitBreakdown.push({
+            billNo: order.taxInvoiceNumber || String(order.id),
+            orderId: order.id,
+            customerName: order.customerName || "Customer",
+            date: (order.orderDate || order.createdAt).toISOString(),
+            totalPcs: orderUnits,
+            revenue: orderRev,
+            cost: orderCost,
+            profit: orderProfit,
+            marginPercent: orderMargin,
+          });
+        }
       }
 
       soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {

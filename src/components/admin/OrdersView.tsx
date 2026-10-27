@@ -189,20 +189,33 @@ export default function OrdersView({
   );
   const orderForms = orderFormSubTab === "PENDING" ? pendingOrders : approvedOrders;
 
+  // A Bill (Without GST) is specifically an order tagged with [BILL_WITHOUT_GST: ...]
+  // or explicitly marked with 0% GST (and not an official tax invoice with 5% GST).
+  const isOrderBillWithoutGst = (o: OrderData) => {
+    if (o.notes && o.notes.includes("[BILL_WITHOUT_GST")) return true;
+    if ((o as any).isBillWithoutGst === true) return true;
+    // Official Tax Invoices have 5% GST and gstAmount > 0
+    if (o.gstRate && o.gstRate > 0 && o.gstAmount && o.gstAmount > 0) return false;
+    // If gstRate is 0 or gstAmount is 0 and customer is Without GST
+    const bt = (o.customer?.businessType || (o as any).businessType || "").toUpperCase();
+    if ((o.gstRate === 0 || o.gstAmount === 0) && (bt.includes("WITHOUT GST") || bt.includes("NO GST"))) {
+      return true;
+    }
+    return false;
+  };
+
   const finalInvoices = orders.filter(
     (o) =>
-      Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim()) ||
-      o.status === "Approved" ||
-      o.status === "Confirmed" ||
-      o.status === "Processing" ||
-      o.status === "Ready" ||
-      o.status === "Dispatched" ||
-      o.status === "Delivered"
+      !isOrderBillWithoutGst(o) &&
+      (Boolean(o.taxInvoiceNumber && o.taxInvoiceNumber.trim()) ||
+        o.status === "Approved" ||
+        o.status === "Confirmed" ||
+        o.status === "Processing" ||
+        o.status === "Ready" ||
+        o.status === "Dispatched" ||
+        o.status === "Delivered")
   );
-  const billsOrders = orders.filter((o) => {
-    const bt = (o.customer?.businessType || (o as any).businessType || "").toUpperCase();
-    return bt.includes("WITHOUT GST") || bt.includes("NO GST");
-  });
+  const billsOrders = orders.filter((o) => isOrderBillWithoutGst(o));
 
   const displayedOrders =
     activeTab === "ORDERS"
@@ -243,13 +256,13 @@ export default function OrdersView({
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
-          {isSuperAdmin && activeTab !== "BILLS" && (
+          {isSuperAdmin && (
             <Link
-              href="/admin/employee/orders/new"
+              href={activeTab === "BILLS" ? "/orders/new?billType=non_gst" : "/orders/new"}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Plus size={16} />
-              <span>Book New Order</span>
+              <span>{activeTab === "BILLS" ? "+ Generate Bill (Without GST)" : "Book New Order"}</span>
             </Link>
           )}
         </div>
@@ -468,7 +481,11 @@ export default function OrdersView({
                         ) : activeTab === "BILLS" ? (
                           <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-emerald-950 text-sm">
-                              {o.orderNumber?.startsWith("#") ? o.orderNumber : `#${o.orderNumber}`}
+                              {(() => {
+                                const match = o.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
+                                const billNo = match ? match[1].trim() : (o.taxInvoiceNumber || o.orderNumber);
+                                return billNo?.startsWith("#") ? billNo : `#${billNo || o.id}`;
+                              })()}
                             </span>
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               Bill (No GST)

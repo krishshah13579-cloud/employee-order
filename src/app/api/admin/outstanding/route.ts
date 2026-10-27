@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
             paymentStatus: true,
             totalSets: true,
             totalPcs: true,
+            items: true,
+            notes: true,
           },
           orderBy: {
             invoiceDate: "asc",
@@ -47,6 +49,12 @@ export async function GET(request: NextRequest) {
             totalPcs: true,
             businessType: true,
             status: true,
+            notes: true,
+            items: {
+              select: {
+                productName: true,
+              },
+            },
           },
           orderBy: {
             orderDate: "asc",
@@ -104,7 +112,14 @@ export async function GET(request: NextRequest) {
         paymentType?: string | null;
         status: string;
       }[] = c.salesInvoices
-        .filter((si) => si.paymentType !== "Cash")
+        .filter((si) => {
+          if (si.paymentType === "Cash") return false;
+          const isMix = Boolean(
+            (si.items && si.items.toUpperCase().includes("IMPORTED TROUSER")) ||
+            (si.notes && si.notes.toUpperCase().includes("IMPORTED TROUSER"))
+          );
+          return !isMix;
+        })
         .map((si) => ({
           id: si.id,
           docNo: si.invoiceNumber || si.orderNumber || `INV-${si.id}`,
@@ -119,15 +134,24 @@ export async function GET(request: NextRequest) {
 
       // Merge all bills: Tax Invoices & Bills Without GST from orders not yet in salesInvoices
       c.orders?.forEach((ord) => {
+        const isMix = Boolean(
+          (ord.notes && ord.notes.toUpperCase().includes("IMPORTED TROUSER")) ||
+          ord.items?.some((it) => (it.productName || "").toUpperCase().includes("IMPORTED TROUSER"))
+        );
+        if (isMix) return;
+
         const isAlreadyInvoiced =
           (ord.id && invoiceOrderIds.has(ord.id)) ||
           (ord.orderNumber && invoiceDocNumbers.has(ord.orderNumber)) ||
           (ord.taxInvoiceNumber && invoiceDocNumbers.has(ord.taxInvoiceNumber));
 
         if (!isAlreadyInvoiced) {
+          const billNoMatch = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
+          const docNo = billNoMatch ? billNoMatch[1].trim() : (ord.taxInvoiceNumber || ord.orderNumber || `ORD-${ord.id}`);
+
           bills.push({
             id: `ORD-${ord.id}`,
-            docNo: ord.taxInvoiceNumber || ord.orderNumber || `ORD-${ord.id}`,
+            docNo,
             orderNumber: ord.orderNumber,
             date: ord.taxInvoiceDate || ord.orderDate || new Date(),
             amount: ord.grandTotal,
@@ -191,7 +215,11 @@ export async function GET(request: NextRequest) {
 
       return {
         id: c.id,
+        customerId: c.id,
         firmName: c.shopName,
+        shopName: c.shopName,
+        businessType: c.businessType,
+        totalOutstanding: netOutstanding,
         city: c.city || "—",
         state: c.state || "—",
         phoneNumber: c.phoneNumber,
