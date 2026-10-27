@@ -257,31 +257,31 @@ export function renderForbiddenPage(clientIp: string, userAgent: string, request
     <div id="requestAlert" class="alert-msg"></div>
 
     <div class="actions">
-      <button class="btn btn-primary" onclick="requestAccess()">
+      <button class="btn btn-primary" onclick="openMasterModal()">
+        🔑 Super Admin / Activation Unlock
+      </button>
+      <button class="btn btn-secondary" onclick="requestAccess()">
         📲 Request Device Approval
       </button>
-      <button class="btn btn-secondary" onclick="openMasterModal()">
-        🔐 Super Admin Master Unlock
-      </button>
       <span class="btn-ghost">
-        If you are an employee, open your official WhatsApp authorization link.
+        Super Admin: Enter passkey • Employee: Enter WhatsApp code
       </span>
     </div>
   </div>
 
-  <!-- Super Admin Master Unlock Modal -->
+  <!-- Device Instant Unlock Modal -->
   <div id="masterModal" class="modal-overlay">
     <div class="modal-box">
-      <h3 style="color:#ffffff;font-size:18px;margin-bottom:8px;">Super Admin Instant Unlock</h3>
+      <h3 style="color:#ffffff;font-size:18px;margin-bottom:8px;">Instant Device Unlock</h3>
       <p style="font-size:13px;color:#9ca3af;margin-bottom:12px;">
-        Authorize this device permanently (365 Days) using your Master Passkey or Admin credentials.
+        Authorize this device for 365 Days using your Super Admin Master Passkey or your WhatsApp Activation Code.
       </p>
 
       <label style="font-size:12px;color:#d1d5db;font-weight:600;">Device Name / Label:</label>
-      <input type="text" id="deviceNameInput" class="input-field" placeholder="e.g. MacBook Pro, iPhone 16 Pro, Office PC" value="Admin Device">
+      <input type="text" id="deviceNameInput" class="input-field" placeholder="e.g. iPhone, MacBook Pro, Office PC" value="Authorized Device">
 
-      <label style="font-size:12px;color:#d1d5db;font-weight:600;">Super Admin Master Passkey:</label>
-      <input type="password" id="masterKeyInput" class="input-field" placeholder="Enter Master Passkey or Admin Password">
+      <label style="font-size:12px;color:#d1d5db;font-weight:600;">Master Passkey or WhatsApp Activation Code:</label>
+      <input type="password" id="masterKeyInput" class="input-field" placeholder="Paste Master Passkey or WhatsApp Code">
 
       <div id="modalAlert" class="alert-msg"></div>
 

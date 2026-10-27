@@ -94,9 +94,13 @@ export async function POST(req: NextRequest) {
       const rawMessageText =
         `*IQ TROUSERS — Device Authorization Link*\n\n` +
         `Hello ${employeeName},\n` +
-        `Here is your official device authorization link for the IQ Trousers Employee Portal:\n\n` +
+        `Here is your official device authorization for the IQ Trousers Portal:\n\n` +
         `👉 ${accessUrl}\n\n` +
-        `⚠️ *Important Note:* Tap this link once from your mobile phone to approve your device for 365 days. Do not forward this link to anyone.`;
+        `🔑 *Activation Code:*\n\`${inviteCode}\`\n\n` +
+        `⚠️ *How to unlock:*\n` +
+        `• Option 1: Tap the link above from your phone.\n` +
+        `• Option 2: If you are seeing the "Access Restricted" screen, tap "Super Admin / Activation Unlock" and enter code: \`${inviteCode}\`\n\n` +
+        `Valid for 365 days. Do not forward this link.`;
 
       // 1. Direct Background Dispatch via logged-in WhatsApp Gateway (Baileys / Meta API)
       let directSent = false;
