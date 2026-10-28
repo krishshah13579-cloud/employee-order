@@ -137,6 +137,7 @@ export interface ProductData {
   mixPcs?: number;          // Mixed / loose pieces in stock
   colorImages?: string | null; // JSON map of color -> image
   setsColorwise?: string | null; // e.g. "Dark Blue: 20, Jet Black: 25, Grey: 15"
+  damageStock?: string | null; // JSON map of color -> { pcs, reason, notes }
   sizeGuide?: string | null;
   imageUrl?: string | null;
   isActive: boolean;

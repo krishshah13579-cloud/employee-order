@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
         costPrice: true,
         mixPcs: true,
         setsColorwise: true,
+        damageStock: true,
         imageUrl: true,
         isActive: true,
       },
@@ -84,6 +85,16 @@ export async function GET(request: NextRequest) {
       const sellingRate = p.retailerPrice || p.price;
       const totalValuation = Math.round(totalPcs * (costPrice || sellingRate));
 
+      let totalDamagePcs = 0;
+      if ((p as any).damageStock) {
+        try {
+          const parsedD = JSON.parse((p as any).damageStock);
+          for (const d of Object.values(parsedD)) {
+            totalDamagePcs += Math.max(0, Number((d as any)?.pcs) || 0);
+          }
+        } catch {}
+      }
+
       return {
         id: p.id,
         name: p.name,
@@ -103,6 +114,8 @@ export async function GET(request: NextRequest) {
         totalSets,
         totalSetPcs,
         totalPcs,
+        totalDamagePcs,
+        damageStock: (p as any).damageStock || null,
         totalValuation,
         setsColorwise: p.setsColorwise,
         detailedRatioSets,
@@ -117,6 +130,7 @@ export async function GET(request: NextRequest) {
     const grandTotalMixPcs = stockItems.reduce((acc, i) => acc + i.mixPcs, 0);
     const grandTotalPcs = stockItems.reduce((acc, i) => acc + i.totalPcs, 0);
     const grandTotalValuation = stockItems.reduce((acc, i) => acc + i.totalValuation, 0);
+    const grandTotalDamagePcs = stockItems.reduce((acc, i) => acc + (i.totalDamagePcs || 0), 0);
 
     let grandTotalSoldUnits = 0;
     let grandTotalSalesRevenue = 0;
@@ -131,8 +145,12 @@ export async function GET(request: NextRequest) {
       // Fetch latest Total Costing for each design from Costing Master
       const costingRecords = await prisma.productCosting.findMany();
       const costingMap = new Map<string, number>();
+      const grDesignSet = new Set<string>();
       for (const c of costingRecords) {
         costingMap.set(c.designNo.trim().toUpperCase(), c.totalCosting);
+        if (c.isGR) {
+          grDesignSet.add(c.designNo.trim().toUpperCase());
+        }
       }
 
       // Query all non-cancelled orders (including Without GST bills), ordered with newest on top
@@ -195,21 +213,25 @@ export async function GET(request: NextRequest) {
           const pcs = item.totalPcs || 0;
           const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
 
+          // Check by extracted sequence number (e.g. "IMP - 015 (1549) HEAVY ARMANI" -> IMP - 015)
+          const seqMatch = prodName.match(/(\d+)/);
+          const candidateDNo = seqMatch ? `IMP - ${seqMatch[1].padStart(3, "0")}` : "";
+
+          // Exclude GR (Goods Return) designs from Profit Page completely
+          if (grDesignSet.has(prodName) || (candidateDNo && grDesignSet.has(candidateDNo))) {
+            continue;
+          }
+
           // Unit costing: dynamically sourced from Costing Page (Total Costing)
           let prodCost = 0;
           if (costingMap.has(prodName)) {
             prodCost = costingMap.get(prodName)!;
+          } else if (candidateDNo && costingMap.has(candidateDNo)) {
+            prodCost = costingMap.get(candidateDNo)!;
+          } else if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
+            prodCost = item.product.costPrice;
           } else {
-            // Check by extracted sequence number (e.g. "IMP - 015 (1549) HEAVY ARMANI" -> IMP - 015)
-            const seqMatch = prodName.match(/(\d+)/);
-            const candidateDNo = seqMatch ? `IMP - ${seqMatch[1].padStart(3, "0")}` : "";
-            if (candidateDNo && costingMap.has(candidateDNo)) {
-              prodCost = costingMap.get(candidateDNo)!;
-            } else if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
-              prodCost = item.product.costPrice;
-            } else {
-              prodCost = Math.round(item.unitPrice * 0.7);
-            }
+            prodCost = Math.round(item.unitPrice * 0.7);
           }
           const cost = Math.round(pcs * prodCost);
           const profit = Math.round(subtotal - cost);
@@ -282,6 +304,7 @@ export async function GET(request: NextRequest) {
         grandTotalSets,
         grandTotalMixPcs,
         grandTotalPcs,
+        grandTotalDamagePcs,
         grandTotalValuation,
         grandTotalSoldUnits,
         grandTotalSalesRevenue,

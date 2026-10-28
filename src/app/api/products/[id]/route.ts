@@ -120,6 +120,7 @@ export async function PUT(
         sizeGuide: body.sizeGuide,
         imageUrl: body.imageUrl,
         colorMapping: body.colorMapping,
+        damageStock: body.damageStock !== undefined ? (body.damageStock || null) : undefined,
         isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
       },
     });

@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function parseSequenceNumber(dNo: string): number {
   const match = dNo.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
+}
+
+function normalizeVendorName(name?: string | null): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  const upper = trimmed.toUpperCase().replace(/\s+/g, " ");
+
+  if (
+    upper === "M. NIKHIL KUMAR" ||
+    upper === "M NIKHIL KUMAR" ||
+    upper === "M.NIKHIL KUMAR" ||
+    upper === "M. NIKHIL KUMAR & CO." ||
+    upper === "M. NIKHIL KUMAR & CO" ||
+    upper === "M NIKHIL KUMAR & CO." ||
+    upper === "M NIKHIL KUMAR & CO"
+  ) {
+    return "M. NIKHIL KUMAR & CO.";
+  }
+
+  if (upper === "MANAN FABRIC" || upper === "MANAN FABRICS") {
+    return "MANAN FABRICS";
+  }
+
+  return trimmed;
 }
 
 export async function GET(req: NextRequest) {
@@ -23,7 +48,7 @@ export async function GET(req: NextRequest) {
     const [costingsRaw, products] = await Promise.all([
       prisma.productCosting.findMany(),
       prisma.product.findMany({
-        select: { id: true, name: true, costPrice: true, price: true, mrp: true },
+        select: { id: true, name: true, costPrice: true, price: true, mrp: true, setsColorwise: true, isActive: true },
         orderBy: { name: "asc" },
       }),
     ]);
@@ -50,7 +75,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Detect missing sequence in the middle
+    // Detect missing sequence in the middle (ignore GR records from blocking sequence)
     const existingSeqNumbers = new Set<number>();
     costings.forEach((c) => {
       const num = parseSequenceNumber(c.designNo);
@@ -73,14 +98,44 @@ export async function GET(req: NextRequest) {
 
     const suggestedNextDesignNo = missingSequence || `IMP - ${String(nextSequenceNumber).padStart(3, "0")}`;
 
-    // Extract unique vendors for the dropdown menu
+    // Extract unique vendors for the dropdown menu with normalization & deduplication
     const vendorSet = new Set<string>();
     costings.forEach((c) => {
-      if (c.purchasedFrom && c.purchasedFrom.trim()) {
-        vendorSet.add(c.purchasedFrom.trim());
+      const normalized = normalizeVendorName(c.purchasedFrom);
+      if (normalized) {
+        vendorSet.add(normalized);
       }
     });
     const vendors = Array.from(vendorSet).sort();
+
+    // Yearly statistics for the emerald banner matching screenshot
+    const currentYear = new Date().getFullYear();
+    const yearlyCostings = costings.filter((c) => {
+      const yr = new Date(c.createdAt).getFullYear();
+      return yr === currentYear;
+    });
+    const totalDesignsYearly = yearlyCostings.length > 0 ? yearlyCostings.length : costings.length;
+    const grCountYearly = costings.filter((c) => c.isGR).length;
+
+    // Check whole designs sold (designs where all inventory has been sold out)
+    let soldWholeDesignsYearly = 0;
+    products.forEach((p) => {
+      try {
+        if (!p.setsColorwise || p.setsColorwise.trim() === "" || p.setsColorwise === "{}") {
+          soldWholeDesignsYearly++;
+        } else {
+          const parsed = JSON.parse(p.setsColorwise);
+          let totalSets = 0;
+          for (const col of Object.values(parsed)) {
+            const ratios = (col as any)?.ratios || {};
+            for (const cnt of Object.values(ratios)) {
+              totalSets += Number(cnt) || 0;
+            }
+          }
+          if (totalSets === 0) soldWholeDesignsYearly++;
+        }
+      } catch {}
+    });
 
     return NextResponse.json({
       success: true,
@@ -90,6 +145,13 @@ export async function GET(req: NextRequest) {
       missingSequence,
       suggestedNextDesignNo,
       duplicateCount: duplicateIds.length,
+      yearlyMetrics: {
+        currentYear,
+        totalDesignsYearly,
+        soldWholeDesignsYearly,
+        grCountYearly,
+        activeDesignsCount: costings.filter((c) => !c.isGR).length,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/admin/costing error:", error);
@@ -108,6 +170,7 @@ export async function POST(req: NextRequest) {
       fabricName,
       purchasedFrom,
       isJobwork = false,
+      isGR = false,
       rateMode = "PER_METER",
       fabricRate = 0,
       mtrPerKg = null,
@@ -121,6 +184,8 @@ export async function POST(req: NextRequest) {
 
     const cleanDesignNo = (designNo || "").trim();
     const cleanFabricName = (fabricName || "").trim();
+    const cleanPurchasedFrom = normalizeVendorName(purchasedFrom);
+    const isGRMode = Boolean(isGR);
 
     if (!cleanDesignNo) {
       return NextResponse.json(
@@ -227,8 +292,9 @@ export async function POST(req: NextRequest) {
       where: { designNo: cleanDesignNo },
       update: {
         fabricName: cleanFabricName,
-        purchasedFrom: (purchasedFrom || "").trim(),
+        purchasedFrom: cleanPurchasedFrom,
         isJobwork: isJobworkMode,
+        isGR: isGRMode,
         rateMode,
         fabricRate: Math.round(numFabricRate),
         mtrPerKg: numMtrPerKg ? Math.round(numMtrPerKg * 100) / 100 : null,
@@ -247,8 +313,9 @@ export async function POST(req: NextRequest) {
       create: {
         designNo: cleanDesignNo,
         fabricName: cleanFabricName,
-        purchasedFrom: (purchasedFrom || "").trim(),
+        purchasedFrom: cleanPurchasedFrom,
         isJobwork: isJobworkMode,
+        isGR: isGRMode,
         rateMode,
         fabricRate: Math.round(numFabricRate),
         mtrPerKg: numMtrPerKg ? Math.round(numMtrPerKg * 100) / 100 : null,
@@ -290,6 +357,7 @@ export async function POST(req: NextRequest) {
           mrp,
           retailerPrice,
           wholesalerPrice,
+          isActive: isGRMode ? false : undefined, // If GR, deactivate product immediately
         },
       });
     }
@@ -298,12 +366,56 @@ export async function POST(req: NextRequest) {
       success: true,
       costing: savedCosting,
       syncedProductsCount: matchingProducts.length,
-      message: `Costing saved for D.No. "${cleanDesignNo}"! Total Costing: ₹${totalCosting}, MRP: ₹${mrp} (Round Off).`,
+      message: `Costing saved for D.No. "${cleanDesignNo}"! Total Costing: ₹${totalCosting}, MRP: ₹${mrp} (Round Off - 1).`,
     });
   } catch (error: any) {
     console.error("POST /api/admin/costing error:", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to save costing" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, isGR } = body;
+    const costingId = parseInt(id, 10);
+    if (!costingId) {
+      return NextResponse.json(
+        { success: false, error: "Costing ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const updated = await prisma.productCosting.update({
+      where: { id: costingId },
+      data: { isGR: Boolean(isGR) },
+    });
+
+    // If marked as GR, also deactivate matching product in catalog
+    if (isGR) {
+      await prisma.product.updateMany({
+        where: {
+          name: {
+            equals: updated.designNo,
+            mode: "insensitive",
+          },
+        },
+        data: { isActive: false },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      costing: updated,
+      message: `Design "${updated.designNo}" ${isGR ? "marked as Goods Return (GR)" : "unmarked from Goods Return"}.`,
+    });
+  } catch (error: any) {
+    console.error("PATCH /api/admin/costing error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update costing status" },
       { status: 500 }
     );
   }
@@ -330,7 +442,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Costing record deleted successfully.",
+      message: `Deleted costing record successfully`,
     });
   } catch (error: any) {
     console.error("DELETE /api/admin/costing error:", error);
