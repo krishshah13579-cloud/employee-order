@@ -27,6 +27,24 @@ export default function StoreLayoutShell({
     }
   }, [isAdminRoute, isLoginPage, loading, employee, router]);
 
+  // Ensure Employee Portal PWA manifest and meta tags are active for "OBEXA"
+  useEffect(() => {
+    if (!isAdminRoute && typeof window !== "undefined") {
+      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+      if (link) {
+        link.href = "/manifest.json";
+      }
+      const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]') as HTMLMetaElement | null;
+      if (appleTitle) {
+        appleTitle.content = "OBEXA";
+      }
+      const appName = document.querySelector('meta[name="application-name"]') as HTMLMetaElement | null;
+      if (appName) {
+        appName.content = "OBEXA";
+      }
+    }
+  }, [isAdminRoute]);
+
   // 1. Admin panel is completely isolated with its own layout/auth
   if (isAdminRoute) {
     return <div className="min-h-screen flex flex-col">{children}</div>;

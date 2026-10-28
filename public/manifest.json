@@ -1,14 +1,14 @@
 {
-  "name": "OBEXA ADMIN",
-  "short_name": "OBEXA ADMIN",
-  "description": "OBEXA Admin & Wholesale Factory Management Portal",
-  "start_url": "/admin/employee",
-  "id": "/admin/employee",
+  "name": "OBEXA",
+  "short_name": "OBEXA",
+  "description": "OBEXA Employee & Wholesale Order Portal",
+  "start_url": "/orders",
+  "id": "/orders",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "theme_color": "#162082",
   "categories": ["business", "productivity"],
   "icons": [
     {

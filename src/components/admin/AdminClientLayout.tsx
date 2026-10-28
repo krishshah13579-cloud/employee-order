@@ -38,6 +38,30 @@ export default function AdminClientLayout({
     };
   }, [mobileMenuOpen]);
 
+  // Ensure Admin PWA manifest and meta tags are active for "OBEXA ADMIN"
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+      if (link) {
+        link.href = "/manifest-admin.json";
+      } else {
+        link = document.createElement("link");
+        link.rel = "manifest";
+        link.href = "/manifest-admin.json";
+        document.head.appendChild(link);
+      }
+
+      const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]') as HTMLMetaElement | null;
+      if (appleTitle) {
+        appleTitle.content = "OBEXA ADMIN";
+      }
+      const appName = document.querySelector('meta[name="application-name"]') as HTMLMetaElement | null;
+      if (appName) {
+        appName.content = "OBEXA ADMIN";
+      }
+    }
+  }, []);
+
   if (pathname === "/admin/login") {
     return <>{children}</>;
   }
