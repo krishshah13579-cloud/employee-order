@@ -58,6 +58,7 @@ const PUBLIC_WHITELIST = [
   /^\/favicon\.ico$/,
   /^\/robots\.txt$/,
   /^\/manifest\.json$/,
+  /^\/manifest-admin\.json$/,
   /^\/sw\.js$/,
   /^\/apple-touch-icon\.png$/,
   /^\/icon-192\.png$/,
