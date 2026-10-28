@@ -454,6 +454,10 @@ export async function POST(request: NextRequest) {
 
     // Determine custom Tax Invoice Number / Manual Bill Number
     let manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
+    if (manualBillNumber) {
+      const numOnly = manualBillNumber.match(/\d+/);
+      if (numOnly) manualBillNumber = numOnly[0];
+    }
     if ((isExplicitBillWithoutGst || isPreviousBill) && (!manualBillNumber || !manualBillNumber.trim())) {
       manualBillNumber = await getNextBillNumber(prisma);
     }

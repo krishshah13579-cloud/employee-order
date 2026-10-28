@@ -86,7 +86,7 @@ export async function getNextBillNumber(tx?: any): Promise<string> {
     select: { taxInvoiceNumber: true, notes: true, isPreviousBill: true, gstRate: true },
   });
 
-  let maxNum = 0;
+  const takenNumbers = new Set<number>();
   for (const ord of orders) {
     const isBill =
       ord.isPreviousBill ||
@@ -105,13 +105,18 @@ export async function getNextBillNumber(tx?: any): Promise<string> {
       const digitsMatch = billStr.match(/\d+/);
       if (digitsMatch) {
         const val = parseInt(digitsMatch[0], 10);
-        if (val > maxNum) maxNum = val;
+        if (val > 0) takenNumbers.add(val);
       }
     }
   }
 
-  const next = maxNum + 1;
-  return String(next);
+  // Find lowest available positive integer starting from 1 (gap-filling: if bill 2 was deleted, returns 2)
+  let candidate = 1;
+  while (takenNumbers.has(candidate)) {
+    candidate++;
+  }
+
+  return String(candidate);
 }
 
 /**

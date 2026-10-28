@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Hash,
+  Lock,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
@@ -498,20 +499,24 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
         {/* Bill No. & Handwritten Order No. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Hash size={13} className="text-emerald-600" />
-              <span>Bill No. (Starts Sequentially from 1) *</span>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Hash size={13} className="text-emerald-600" />
+                <span>Bill No. *</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-semibold px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
+                <Lock size={10} className="text-slate-400" /> Auto-Assigned
+              </span>
             </label>
             <input
               type="text"
-              required
-              value={billNumber}
-              onChange={(e) => setBillNumber(e.target.value.toUpperCase())}
-              placeholder="e.g. 1, 2, 3..."
-              className="w-full px-3.5 py-2.5 bg-emerald-50/50 border border-emerald-300 rounded-xl text-sm font-mono font-black text-emerald-950 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-600"
+              readOnly
+              tabIndex={-1}
+              value={billNumber ? `Bill #${billNumber}` : "Generating Bill #..."}
+              className="w-full px-3.5 py-2.5 bg-slate-100/90 border border-slate-300 rounded-xl text-sm font-mono font-black text-slate-800 cursor-not-allowed select-none focus:outline-none"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Auto-generated sequentially starting from 1.
+              Auto starts from 1 sequentially (re-fills missing numbers if any bill is deleted).
             </p>
           </div>
 
