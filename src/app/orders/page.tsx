@@ -90,9 +90,9 @@ export default function EmployeeOrdersListPage() {
 
   const getOrderBillNumber = (o: OrderData): string => {
     const match = o.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
-    if (match) return match[1].trim();
-    if (o.taxInvoiceNumber) return o.taxInvoiceNumber;
-    return o.orderNumber;
+    const raw = match ? match[1].trim() : (o.taxInvoiceNumber || o.orderNumber);
+    const numMatch = raw?.match(/\d+/);
+    return numMatch ? numMatch[0] : (raw || "1");
   };
 
   const canViewBills = Boolean(
@@ -356,7 +356,7 @@ export default function EmployeeOrdersListPage() {
                             <div className="flex flex-col gap-1">
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-100 text-emerald-950 border border-emerald-300 w-fit">
                                 <FileCheck2 size={12} className="text-emerald-700" />
-                                <span>Bill #{getOrderBillNumber(order)}</span>
+                                <span>Bill {getOrderBillNumber(order)}</span>
                               </span>
                               <span className="text-[11px] text-slate-500 font-mono">
                                 Order #{order.orderNumber}

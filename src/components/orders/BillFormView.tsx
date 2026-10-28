@@ -97,7 +97,8 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
         if (numRes.ok) {
           const numData = await numRes.json();
           if (numData?.nextBillNumber) {
-            setBillNumber(String(numData.nextBillNumber));
+            const numMatch = String(numData.nextBillNumber).match(/\d+/);
+            setBillNumber(numMatch ? numMatch[0] : String(numData.nextBillNumber));
           } else {
             setBillNumber("1");
           }
@@ -368,7 +369,7 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
       });
 
       if (res.ok) {
-        toast(`Bill #${billNumber.trim()} generated successfully!`, "success");
+        toast(`Bill ${billNumber.trim()} generated successfully!`, "success");
         router.push("/orders?tab=bills");
       } else {
         const err = await res.json();
@@ -512,7 +513,7 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
               type="text"
               readOnly
               tabIndex={-1}
-              value={billNumber ? `Bill #${billNumber}` : "Generating Bill #..."}
+              value={billNumber || "1"}
               className="w-full px-3.5 py-2.5 bg-slate-100/90 border border-slate-300 rounded-xl text-sm font-mono font-black text-slate-800 cursor-not-allowed select-none focus:outline-none"
             />
             <p className="text-[11px] text-slate-500 mt-1">
