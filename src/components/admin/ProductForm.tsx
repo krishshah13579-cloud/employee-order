@@ -503,6 +503,30 @@ export default function ProductForm({
     loadCategories();
   }, [initialData]);
 
+  // Available Costing Designs from Costing Master
+  const [costingDesigns, setCostingDesigns] = useState<
+    Array<{
+      id: number;
+      designNo: string;
+      fabricName: string;
+      purchasedFrom?: string | null;
+      totalCosting: number;
+      mrp: number;
+      sellingPrice: number;
+    }>
+  >([]);
+
+  useEffect(() => {
+    fetch("/api/admin/costing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.costings) {
+          setCostingDesigns(data.costings);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Form base state with dual selling prices:
   // Retailer Price = MRP / 2
   // Wholesaler Price = (MRP / 2) - 100
@@ -526,6 +550,16 @@ export default function ProductForm({
     description: "", // Description note
     isActive: initialData?.isActive ?? true,
   });
+
+  // Category-Locked Size Guide: strictly lock size guide to the selected category (e.g. Formal -> Formal Guide; Trouser/Casual -> Trouser Guide)
+  useEffect(() => {
+    const catUpper = (formData.category || "").toUpperCase();
+    const isFormal = catUpper.includes("FORMAL");
+    const targetTemplate: "Formal" | "Trouser" = isFormal ? "Formal" : "Trouser";
+    if (guideTemplate !== targetTemplate) {
+      handleTemplateChange(targetTemplate);
+    }
+  }, [formData.category]);
 
   const handleMrpChange = (val: string) => {
     const num = parseFloat(val);
@@ -1460,17 +1494,67 @@ export default function ProductForm({
         </h2>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
-            Product Name *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g. Slim Fit Stretch Cotton Trouser or IMP-001"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-          />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+              Product Name (Select from Costing Master) *
+            </label>
+            <Link
+              href="/admin/employee/costing"
+              target="_blank"
+              className="text-[11px] text-blue-600 font-bold hover:underline"
+            >
+              + Create D.No. in Costing
+            </Link>
+          </div>
+          {!isEdit ? (
+            <select
+              required
+              value={formData.name}
+              onChange={(e) => {
+                const selectedName = e.target.value;
+                const matched = costingDesigns.find(
+                  (c) => c.designNo.toUpperCase() === selectedName.toUpperCase()
+                );
+                if (matched) {
+                  const mrpVal = Math.round(matched.mrp);
+                  const retPrice = Math.round(mrpVal / 2);
+                  const whoPrice = Math.max(0, retPrice - 100);
+                  setFormData((prev) => ({
+                    ...prev,
+                    name: matched.designNo,
+                    costPrice: Math.round(matched.totalCosting),
+                    mrp: mrpVal,
+                    retailerPrice: retPrice,
+                    wholesalerPrice: whoPrice,
+                    price: retPrice,
+                  }));
+                } else {
+                  setFormData((prev) => ({ ...prev, name: selectedName }));
+                }
+              }}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold font-mono focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all cursor-pointer bg-white"
+            >
+              <option value="" disabled>
+                -- Select Product Name from Costing Master --
+              </option>
+              {costingDesigns.map((c) => (
+                <option key={c.id} value={c.designNo}>
+                  {c.designNo} — {c.fabricName} (Cost: ₹{Math.round(c.totalCosting)}, MRP: ₹{Math.round(c.mrp)})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              readOnly
+              disabled
+              value={formData.name}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-100 text-sm font-bold font-mono text-gray-700 cursor-not-allowed select-none"
+            />
+          )}
+          <p className="text-[11px] text-gray-500 mt-1">
+            Product name is selected from Costing Master. Costing, MRP, and selling rates are auto-pulled and locked.
+          </p>
         </div>
 
         {/* 1. Product Description (Collapsible Hamburger - OPEN by default) */}
@@ -1620,44 +1704,14 @@ export default function ProductForm({
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-                    <label
-                      htmlFor="guideTemplateSelect"
-                      className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1 shrink-0"
-                    >
-                      <span>Select Guide Template:</span>
-                      <span className="text-red-500 font-black text-sm">*</span>
-                    </label>
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1 shrink-0">
+                      <span>Category Size Guide:</span>
+                    </span>
 
-                    <div className="relative inline-block">
-                      <select
-                        id="guideTemplateSelect"
-                        value={guideTemplate}
-                        onChange={(e) => handleTemplateChange(e.target.value)}
-                        required
-                        className={`w-48 pl-3 pr-8 py-2 bg-white border rounded-lg text-xs font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer appearance-none ${
-                          templateError
-                            ? "border-red-400 focus:ring-red-400 text-red-900"
-                            : "border-slate-300 focus:ring-slate-900 focus:border-slate-900"
-                        }`}
-                      >
-                        <option value="" disabled className="text-slate-400">
-                          -- Select Guide Template --
-                        </option>
-                        <option value="Trouser">Trouser</option>
-                        <option value="Formal">Formal</option>
-                      </select>
-                      <ChevronDown
-                        size={14}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
-                      />
-                    </div>
-
-                    {guideTemplate && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-900 text-white shadow-2xs">
-                        <Check size={12} className="text-emerald-400" />
-                        {guideTemplate} Guide Selected
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-2xs">
+                      <Check size={12} className="text-emerald-400" />
+                      <span>{guideTemplate === "Formal" ? "👔 Formal Size Guide" : "👖 Trouser Size Guide"} (Locked to Category: {formData.category})</span>
+                    </span>
                   </div>
 
                   <div className="text-[11px] text-slate-500">
@@ -1665,14 +1719,9 @@ export default function ProductForm({
                       <span className="text-slate-700 font-medium">
                         👔 <strong>Formal Guide:</strong> Executive tailored drape (Sizes 30 to 44 with tapered waist).
                       </span>
-                    ) : guideTemplate === "Trouser" ? (
+                    ) : (
                       <span className="text-slate-700 font-medium">
                         👖 <strong>Trouser Guide:</strong> Standard comfortable stretch fit (Sizes 28 to 44).
-                      </span>
-                    ) : (
-                      <span className="text-amber-700 font-semibold flex items-center gap-1">
-                        <AlertCircle size={12} className="shrink-0" />
-                        Mandatory: Select Formal or Trouser to load measurements.
                       </span>
                     )}
                   </div>
@@ -1910,28 +1959,25 @@ export default function ProductForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50/80 p-4 rounded-2xl border border-gray-200">
-              {/* 1. MRP Input */}
+              {/* 1. MRP Input (Locked from Costing Master) */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  MRP (Maximum Retail Price) (₹) *
+                  MRP (From Costing Master) (₹) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-gray-400 font-bold">₹</span>
                   <input
                     type="number"
-                    step="1"
-                    min="0"
-                    required
+                    readOnly
+                    disabled
                     value={formData.mrp}
-                    onChange={(e) => handleMrpChange(e.target.value)}
-                    placeholder="1000"
-                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-black font-mono font-bold text-gray-900"
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-100 text-sm font-mono font-bold text-gray-800 cursor-not-allowed select-none"
                   />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1">Base printed retail price tag</p>
+                <p className="text-[10px] text-gray-500 mt-1">From Costing Page (Not Changeable)</p>
               </div>
 
-              {/* 2. Retailer Type Selling Price: MRP / 2 */}
+              {/* 2. Retailer Type Selling Price: MRP / 2 (Not Changeable) */}
               <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/80">
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-900">
@@ -1945,25 +1991,16 @@ export default function ProductForm({
                   <span className="absolute left-3 top-2 text-blue-400 font-bold text-xs">₹</span>
                   <input
                     type="number"
-                    step="1"
-                    min="0"
+                    readOnly
+                    disabled
                     value={formData.retailerPrice}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setFormData({
-                        ...formData,
-                        retailerPrice: val,
-                        wholesalerPrice: Math.max(0, val - 100),
-                        price: val,
-                      });
-                    }}
-                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-blue-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-600 font-mono font-bold text-blue-950"
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/50 text-sm font-mono font-bold text-blue-950 cursor-not-allowed select-none"
                   />
                 </div>
-                <p className="text-[10px] text-blue-700 mt-1">Calculated as {formData.mrp ? Math.round(Number(formData.mrp) / 2) : 0} (MRP ÷ 2)</p>
+                <p className="text-[10px] text-blue-700 mt-1">Calculated as {formData.mrp ? Math.round(Number(formData.mrp) / 2) : 0} (MRP ÷ 2) (Not Changeable)</p>
               </div>
 
-              {/* 3. Wholesaler Type Selling Price: MRP / 2 - 100 */}
+              {/* 3. Wholesaler Type Selling Price: MRP / 2 - 100 (Not Changeable) */}
               <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/80">
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-purple-900">
@@ -1977,19 +2014,13 @@ export default function ProductForm({
                   <span className="absolute left-3 top-2 text-purple-400 font-bold text-xs">₹</span>
                   <input
                     type="number"
-                    step="1"
-                    min="0"
+                    readOnly
+                    disabled
                     value={formData.wholesalerPrice}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        wholesalerPrice: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-purple-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-600 font-mono font-bold text-purple-950"
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50/50 text-sm font-mono font-bold text-purple-950 cursor-not-allowed select-none"
                   />
                 </div>
-                <p className="text-[10px] text-purple-700 mt-1">Calculated as Retailer Price - ₹100 / piece</p>
+                <p className="text-[10px] text-purple-700 mt-1">Calculated as Retailer Price - ₹100 (Not Changeable)</p>
               </div>
             </div>
 
