@@ -20,6 +20,7 @@ import {
   Boxes,
   Smartphone,
   Bell,
+  FileCheck2,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -50,9 +51,15 @@ export default function Navbar() {
     (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
+  const canAddPreviousBills = Boolean(
+    employee?.canAddPreviousBills === true ||
+    (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
+  );
+
   const navLinks = [
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/orders/new", label: "Order Form", icon: FilePlus },
+    ...(canAddPreviousBills ? [{ href: "/orders/new?tab=bill", label: "Bill", icon: FileCheck2 }] : []),
     { href: "/orders", label: "Order Page", icon: Package },
     { href: "/visiting-customers", label: "Visiting Customer", icon: MapPin },
     ...(canUpdateStock ? [{ href: "/update-stock", label: "Update Stock", icon: Boxes }] : []),
@@ -86,11 +93,18 @@ export default function Navbar() {
           {/* Desktop Navigation Links */}
           <div className="hidden lg:flex items-center space-x-8">
             {navLinks.map((link) => {
+              const isBillLink = link.href === "/orders/new?tab=bill";
+              const isOrderFormLink = link.href === "/orders/new";
+              const isClient = typeof window !== "undefined";
+              const hasBillParam = isClient && window.location.search.includes("tab=bill");
+
               const isActive =
                 link.href === "/"
                   ? pathname === "/"
-                  : link.href === "/orders/new"
-                  ? pathname === "/orders/new"
+                  : isBillLink
+                  ? pathname === "/orders/new" && hasBillParam
+                  : isOrderFormLink
+                  ? pathname === "/orders/new" && !hasBillParam
                   : link.href === "/orders"
                   ? pathname === "/orders" ||
                     (pathname.startsWith("/orders/") && pathname !== "/orders/new")
@@ -339,7 +353,48 @@ export default function Navbar() {
             </div>
           )}
 
-            {/* Mobile WebApp Install Guide Button */}
+          {/* Navigation Links inside Mobile Drawer */}
+          <div className="space-y-1 py-1">
+            {navLinks.map((link) => {
+              const isBillLink = link.href === "/orders/new?tab=bill";
+              const isOrderFormLink = link.href === "/orders/new";
+              const isClient = typeof window !== "undefined";
+              const hasBillParam = isClient && window.location.search.includes("tab=bill");
+
+              const isActive =
+                link.href === "/"
+                  ? pathname === "/"
+                  : isBillLink
+                  ? pathname === "/orders/new" && hasBillParam
+                  : isOrderFormLink
+                  ? pathname === "/orders/new" && !hasBillParam
+                  : link.href === "/orders"
+                  ? pathname === "/orders" ||
+                    (pathname.startsWith("/orders/") && pathname !== "/orders/new")
+                  : link.href === "/visiting-customers"
+                  ? pathname.startsWith("/visiting-customers")
+                  : pathname.startsWith(link.href);
+
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                    isActive
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Mobile WebApp Install Guide Button */}
             <div className="pt-2">
               <button
                 type="button"

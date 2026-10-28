@@ -34,7 +34,9 @@ import {
   Calendar,
   Image as ImageIcon,
   MessageCircle,
+  FileCheck2,
 } from "lucide-react";
+import BillFormView from "@/components/orders/BillFormView";
 import { UserHeader } from "@/components/user/UserHeader";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
@@ -203,6 +205,17 @@ function OrderFormContent() {
 
   const isTL = isEmployeeTeamLeader(employee);
   const canAdjustSpecialDiscount = isAdmin || isTL;
+  const canAddBills = Boolean(isAdmin || isTL || employee?.canAddPreviousBills);
+  const [activeFormTab, setActiveFormTab] = useState<"ORDER_FORM" | "BILL">("ORDER_FORM");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") || searchParams.get("billType");
+    if (tabParam === "bill" || tabParam === "non_gst" || tabParam === "bill_without_gst") {
+      setActiveFormTab("BILL");
+    } else {
+      setActiveFormTab("ORDER_FORM");
+    }
+  }, [searchParams]);
 
   // React to URL customerId query parameter changes (e.g. clicking Book on dashboard)
   useEffect(() => {
@@ -1246,6 +1259,73 @@ function OrderFormContent() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {/* TABS ON ORDER FORM: Order Form vs Bill */}
+        <div className="flex items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-fit">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveFormTab("ORDER_FORM");
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("tab");
+                url.searchParams.delete("billType");
+                window.history.replaceState({}, "", url.toString());
+              }
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+              activeFormTab === "ORDER_FORM"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <FilePlus size={15} className={activeFormTab === "ORDER_FORM" ? "text-orange-600" : "text-slate-400"} />
+            <span>Order Form</span>
+          </button>
+
+          {canAddBills && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveFormTab("BILL");
+                if (typeof window !== "undefined") {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("tab", "bill");
+                  window.history.replaceState({}, "", url.toString());
+                }
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                activeFormTab === "BILL"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileCheck2 size={15} className={activeFormTab === "BILL" ? "text-emerald-400" : "text-slate-400"} />
+              <span>Bill</span>
+            </button>
+          )}
+        </div>
+
+        {activeFormTab === "BILL" ? (
+          canAddBills ? (
+            <BillFormView employee={employee} isAdmin={isAdmin} />
+          ) : (
+            <div className="p-8 bg-white border border-slate-200 rounded-3xl text-center space-y-3">
+              <AlertCircle size={32} className="text-amber-500 mx-auto" />
+              <h2 className="text-base font-black text-slate-900">Access Restricted</h2>
+              <p className="text-xs text-slate-500">
+                You do not have permission from Admin to generate bills. Please contact Admin for access.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveFormTab("ORDER_FORM")}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Return to Order Form
+              </button>
+            </div>
+          )
+        ) : (
+          <>
         {/* Loading existing order for editing indicator */}
         {loadingOrderToEdit && (
           <div className="p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-center gap-3 text-slate-700 font-bold text-sm shadow-sm">
@@ -2142,6 +2222,8 @@ function OrderFormContent() {
             </button>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       {/* ═══════════════════════════════════════════

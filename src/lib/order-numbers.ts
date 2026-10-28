@@ -76,6 +76,45 @@ export async function getNextOrderNumber(tx?: any): Promise<string> {
 }
 
 /**
+ * Returns the next sequential Bill number starting from 1
+ * by scanning all past bills without GST / manual bill numbers.
+ */
+export async function getNextBillNumber(tx?: any): Promise<string> {
+  const db = tx || prisma;
+
+  const orders = await db.order.findMany({
+    select: { taxInvoiceNumber: true, notes: true, isPreviousBill: true, gstRate: true },
+  });
+
+  let maxNum = 0;
+  for (const ord of orders) {
+    const isBill =
+      ord.isPreviousBill ||
+      (ord.notes && ord.notes.includes("[BILL_WITHOUT_GST")) ||
+      ord.gstRate === 0;
+
+    if (isBill) {
+      let billStr = "";
+      const match = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
+      if (match) {
+        billStr = match[1].trim();
+      } else if (ord.taxInvoiceNumber) {
+        billStr = ord.taxInvoiceNumber.trim();
+      }
+
+      const digitsMatch = billStr.match(/\d+/);
+      if (digitsMatch) {
+        const val = parseInt(digitsMatch[0], 10);
+        if (val > maxNum) maxNum = val;
+      }
+    }
+  }
+
+  const next = maxNum + 1;
+  return String(next);
+}
+
+/**
  * Ensures all existing orders in the system have their sequence number starting from 1
  * in chronological order (createdAt: asc, id: asc).
  * Safely renumbers orders without unique key collisions.

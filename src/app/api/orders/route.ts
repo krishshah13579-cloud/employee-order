@@ -11,7 +11,7 @@ import {
 import { sendNewOrderNotification, sendColorSoldOutNotification } from "@/lib/email";
 import { generateOrderWhatsAppMessage, dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { requireAdmin, getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
-import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber } from "@/lib/order-numbers";
+import { getNextTaxInvoiceNumber, syncSequentialOrderNumbers, getNextOrderNumber, getNextBillNumber } from "@/lib/order-numbers";
 import { releaseReservations } from "@/lib/reservations";
 import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { sendWebPushNotification } from "@/lib/web-push";
@@ -180,6 +180,17 @@ export async function POST(request: NextRequest) {
     const isPreviousBill = Boolean(body.isPreviousBill);
     const previousBillDate = body.previousBillDate ? new Date(body.previousBillDate) : (isPreviousBill ? effectiveOrderDate : null);
 
+    // Permission check: only admin or employees granted canAddPreviousBills can generate bills / previous bills
+    if ((isExplicitBillWithoutGst || isPreviousBill) && !admin) {
+      const isAllowed = Boolean(employee?.canAddPreviousBills || (employee && isSpecialTeamLeaderKrishShah(employee)));
+      if (!isAllowed) {
+        return NextResponse.json(
+          { error: "Forbidden: You do not have permission from Admin to generate bills." },
+          { status: 403 }
+        );
+      }
+    }
+
     // Skip live stock deduction for:
     // 1. Past-dated bills or previous historical bills (warehouse stock is already present physical stock)
     // 2. Post-dated bills without GST (future-dated accounting bills)
@@ -315,29 +326,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Accurately calculate pieces by allocating sets across the color's ratio packs
+      // Accurately calculate pieces
       let itemTotalPcs = 0;
-      for (const cs of colorSetsArray) {
-        const requested = parseInt(cs.sets, 10) || 0;
-        if (requested <= 0) continue;
-        const pcsCalc = calculateOrderedColorSetsPieces(
-          product.setsColorwise,
-          cs.color,
-          requested,
-          pcsPerSet
-        );
-        itemTotalPcs += pcsCalc.totalPcs;
+      const isPastOrExplicitBill = isPreviousBill || isExplicitBillWithoutGst || !shouldDeductStock;
+
+      if (isPastOrExplicitBill && it.totalPcs && parseInt(it.totalPcs, 10) > 0) {
+        // Strictly preserve exact quantity submitted for past/explicit bills without GST
+        itemTotalPcs = parseInt(it.totalPcs, 10);
+      } else if (isPastOrExplicitBill) {
+        // If sets were entered, calculate directly as sets * pcsPerSet without color ratio fragmentation
+        itemTotalPcs = (itemTotalSets * pcsPerSet) + itemMixPcs;
+      } else {
+        // Live stock order: allocate sets across color ratio packs in warehouse inventory
+        for (const cs of colorSetsArray) {
+          const requested = parseInt(cs.sets, 10) || 0;
+          if (requested <= 0) continue;
+          const pcsCalc = calculateOrderedColorSetsPieces(
+            product.setsColorwise,
+            cs.color,
+            requested,
+            pcsPerSet
+          );
+          itemTotalPcs += pcsCalc.totalPcs;
+        }
+        itemTotalPcs += itemMixPcs;
       }
 
-      // Add mix single pieces
-      itemTotalPcs += itemMixPcs;
-
       if (itemTotalPcs === 0) {
-        itemTotalPcs = it.totalPcs || (itemTotalSets * pcsPerSet) + itemMixPcs;
+        itemTotalPcs = parseInt(it.totalPcs, 10) || (itemTotalSets * pcsPerSet) + itemMixPcs;
       }
 
       const unitPrice = parseFloat(it.unitPrice) || product.price || 0;
-      const itemSubtotal = itemTotalPcs * unitPrice;
+      const itemSubtotal = isPastOrExplicitBill && it.subtotal !== undefined && !isNaN(parseFloat(it.subtotal))
+        ? Math.round(parseFloat(it.subtotal))
+        : itemTotalPcs * unitPrice;
 
       orderSubtotal += itemSubtotal;
       orderTotalPcs += itemTotalPcs;
@@ -430,8 +452,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine custom Tax Invoice Number / Manual Bill Number (Without GST)
-    const manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
+    // Determine custom Tax Invoice Number / Manual Bill Number
+    let manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
+    if ((isExplicitBillWithoutGst || isPreviousBill) && (!manualBillNumber || !manualBillNumber.trim())) {
+      manualBillNumber = await getNextBillNumber(prisma);
+    }
     const customTaxInvoiceNumber = manualBillNumber || (body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null);
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
 
@@ -439,8 +464,8 @@ export async function POST(request: NextRequest) {
     let effectiveTaxInvoiceNumber = customTaxInvoiceNumber;
     let effectiveTaxInvoiceDate = customTaxInvoiceDate;
 
-    // Only auto-generate Tax Invoice Number if it is an official GST invoice and NOT a Bill (Without GST)
-    if (!isExplicitBillWithoutGst && initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
+    // Only auto-generate Tax Invoice Number if it is an official GST invoice and NOT a Bill
+    if (!isExplicitBillWithoutGst && !isPreviousBill && initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
       effectiveTaxInvoiceNumber = await getNextTaxInvoiceNumber();
       effectiveTaxInvoiceDate = new Date();
     }
@@ -516,7 +541,7 @@ export async function POST(request: NextRequest) {
           placedBy: placedBy || "Admin",
           notes: [
             notes,
-            isExplicitBillWithoutGst ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null
+            (isExplicitBillWithoutGst || isPreviousBill) ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null
           ].filter(Boolean).join(" | ") || null,
           taxInvoiceNumber: effectiveTaxInvoiceNumber,
           taxInvoiceDate: effectiveTaxInvoiceDate || effectiveOrderDate,

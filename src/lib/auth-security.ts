@@ -166,6 +166,7 @@ export async function getEmployeeSession(req: NextRequest) {
         isTeamLeader: true,
         canEditOrders: true,
         canUpdateStock: true,
+        canAddPreviousBills: true,
         isActive: true,
       },
     });

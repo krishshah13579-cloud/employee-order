@@ -31,6 +31,8 @@ interface NewOrderItem {
   sizesList: string;
   pcsPerSet: number;
   unitPrice: number;
+  customSets?: number;
+  customPcs?: number;
   notes?: string;
 }
 
@@ -84,12 +86,15 @@ export default function NewOrderPage() {
           const prods: ProductData[] = await pRes.json();
           setProducts(prods);
 
-          // Fetch next order form number starting from 1
+          // Fetch next order form number and bill number starting from 1
           fetch("/api/order-numbers")
             .then((r) => r.json())
             .then((numData) => {
               if (numData?.nextOrderNumber) {
                 setCustomOrderNumber(numData.nextOrderNumber);
+              }
+              if (numData?.nextBillNumber) {
+                setManualBillNumber(String(numData.nextBillNumber));
               }
             })
             .catch(() => {});
@@ -278,11 +283,39 @@ export default function NewOrderPage() {
     });
   };
 
-  const getItemTotalSets = (item: NewOrderItem): number =>
-    item.colorSets.reduce((sum, cs) => sum + (cs.sets || 0), 0);
+  // Sync item prices automatically when Customer changes
+  useEffect(() => {
+    if (!activeCustomer || products.length === 0) return;
+    const isWholesaler = (activeCustomer.businessType || "").toUpperCase().includes("WHOLESAL");
+    const splDisc = Number(activeCustomer.specialDiscount) || 0;
+    const isSpecialDiscount = splDisc > 0 || activeCustomer.businessType === "RETAILER WITH SPECIAL DISCOUNT";
 
-  const getItemTotalPcs = (item: NewOrderItem): number =>
-    getItemTotalSets(item) * item.pcsPerSet;
+    setOrderItems((prev) =>
+      prev.map((item) => {
+        const prod = products.find((p) => p.id === item.productId);
+        if (!prod) return item;
+        const baseRetail = prod.retailerPrice || prod.price;
+        const baseWhole = prod.wholesalerPrice || Math.max(0, baseRetail - 100);
+        const newRate = isWholesaler
+          ? (isSpecialDiscount ? Math.max(0, baseWhole - splDisc) : baseWhole)
+          : (isSpecialDiscount ? Math.max(0, baseRetail - splDisc) : baseRetail);
+        return {
+          ...item,
+          unitPrice: newRate,
+        };
+      })
+    );
+  }, [selectedCustomerId]);
+
+  const getItemTotalSets = (item: NewOrderItem): number => {
+    if (item.customSets !== undefined) return item.customSets;
+    return item.colorSets.reduce((sum, cs) => sum + (cs.sets || 0), 0);
+  };
+
+  const getItemTotalPcs = (item: NewOrderItem): number => {
+    if (item.customPcs !== undefined) return item.customPcs;
+    return getItemTotalSets(item) * item.pcsPerSet;
+  };
 
   const getItemSubtotal = (item: NewOrderItem): number =>
     getItemTotalPcs(item) * item.unitPrice;
@@ -341,7 +374,7 @@ export default function NewOrderPage() {
     }
 
     if (isWithoutGst && moveToBillWithoutGst && !manualBillNumber.trim()) {
-      toast("Mandatory: Please enter the Manual Bill Number for Bill (Without GST)", "error");
+      toast("Mandatory: Please enter the Bill Number for Bill", "error");
       return;
     }
 
@@ -395,7 +428,7 @@ export default function NewOrderPage() {
         } catch {}
         const data = await res.json();
         if (effectiveIsBillWithoutGst) {
-          toast(`Wholesale Bill (Without GST) #${manualBillNumber.trim() || data.orderNumber} generated successfully!`, "success");
+          toast(`Bill #${manualBillNumber.trim() || data.orderNumber} generated successfully!`, "success");
           router.push("/admin/employee/bills");
         } else {
           toast(`Wholesale order ${data.orderNumber} booked successfully!`, "success");
@@ -431,15 +464,15 @@ export default function NewOrderPage() {
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-black transition-colors mb-1.5"
           >
             <ArrowLeft size={14} />
-            <span>{isBillMode ? "Back to Bills (Without GST)" : "Back to Orders"}</span>
+            <span>{isBillMode ? "Back to Bills" : "Back to Orders"}</span>
           </Link>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-gray-700" />
-            <span>{isBillMode ? "Generate Bill (Wholesale Without GST)" : "Book New Wholesale Garment Order"}</span>
+            <span>{isBillMode ? "Generate Bill" : "Book New Wholesale Garment Order"}</span>
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {isBillMode
-              ? "Direct billing without 5% GST. Supports past-dated and post-dated bills with manual bill numbering."
+              ? "Direct billing with sequential numbering and direct piece quantity."
               : "Select retailer shop, allocate color-wise sets (e.g. A-2, B-3), mandatory sizes, rate per pc, and generate 5% GST invoice."}
           </p>
         </div>
@@ -525,16 +558,16 @@ export default function NewOrderPage() {
           </div>
         )}
 
-        {/* Customer Without GST: Move to Bill Without GST vs Add 5% GST to Invoice */}
+        {/* Move to Bill vs Add 5% GST to Invoice */}
         {isWithoutGst && (
           <div className="p-4 bg-amber-50/80 border border-amber-300 rounded-2xl space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <span className="text-xs font-black text-amber-950 uppercase tracking-wide block">
-                  Move to Bill (Without GST)?
+                  Move to Bill?
                 </span>
                 <span className="text-[11px] text-amber-800">
-                  Customer registered Without GST ({activeCustomer?.businessType})
+                  Customer Type: {activeCustomer?.businessType}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -547,7 +580,7 @@ export default function NewOrderPage() {
                       : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  YES (Bill No GST)
+                  YES (Bill)
                 </button>
                 <button
                   type="button"
@@ -574,7 +607,7 @@ export default function NewOrderPage() {
                       type="text"
                       value={manualBillNumber}
                       onChange={(e) => setManualBillNumber(e.target.value.toUpperCase())}
-                      placeholder="Enter manual bill number (e.g. B-01, 101, etc.)..."
+                      placeholder="Enter manual bill number (e.g. 1, 2, B-01)..."
                       className="w-full px-3.5 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bold font-mono text-emerald-950 focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case placeholder:font-normal"
                     />
                   </div>
@@ -616,12 +649,12 @@ export default function NewOrderPage() {
                     className="w-4 h-4 text-purple-600 rounded border-purple-300 focus:ring-purple-500 cursor-pointer"
                   />
                   <label htmlFor="isPreviousBillCheck" className="text-[11px] font-bold text-purple-950 cursor-pointer">
-                    Previous Bill (Without GST) — Mark as historical past bill (bypasses live inventory deduction)
+                    Previous Bill — Mark as historical past bill (bypasses live inventory deduction)
                   </label>
                 </div>
 
                 <p className="text-[10px] text-emerald-800 font-medium">
-                  0% GST applied. This bill will be saved with this manual bill number in "Bill (Without GST)".
+                  This bill will be saved with this manual bill number in "Bill".
                 </p>
               </div>
             ) : (
@@ -844,6 +877,58 @@ export default function NewOrderPage() {
                     1 Set = {item.pcsPerSet} Pieces
                   </div>
                 </div>
+
+                {/* Direct Sets & Pieces Override for Bill Mode */}
+                {isBillMode && (
+                  <div className="grid grid-cols-2 gap-3 bg-white p-3 rounded-xl border border-emerald-300">
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                        Sets Count
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.customSets !== undefined ? item.customSets : itemSets}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setOrderItems((prev) => {
+                            const copy = [...prev];
+                            copy[itemIdx] = {
+                              ...copy[itemIdx],
+                              customSets: val,
+                              customPcs: val * copy[itemIdx].pcsPerSet,
+                            };
+                            return copy;
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                        Direct Total Pieces (PCS) *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.customPcs !== undefined ? item.customPcs : itemPcs}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setOrderItems((prev) => {
+                            const copy = [...prev];
+                            copy[itemIdx] = {
+                              ...copy[itemIdx],
+                              customPcs: val,
+                              customSets: Math.max(1, Math.round(val / copy[itemIdx].pcsPerSet)),
+                            };
+                            return copy;
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-emerald-50 border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-950"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Colorwise Sets Inputs (A-2, B-3, C-2) */}
                 <div>

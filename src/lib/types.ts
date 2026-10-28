@@ -188,6 +188,8 @@ export interface OrderData {
   taxInvoiceNumber?: string | null;
   taxInvoiceDate?: string | null;
   taxInvoiceItems?: string | null;
+  isPreviousBill?: boolean;
+  previousBillDate?: string | null;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;

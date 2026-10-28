@@ -244,14 +244,14 @@ export default function OrdersView({
               ? "Order Forms"
               : activeTab === "INVOICES"
               ? "Final Tax Invoices"
-              : "Bill (Wholesale Without GST)"}
+              : "Bill"}
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {activeTab === "ORDERS"
               ? "Manage client booked order forms, color-wise set ratios, mix sizes, transport details, and order booking."
               : activeTab === "INVOICES"
               ? "Official finalized tax invoices generated for deliveries, billing, and accounting with 5% GST."
-              : "Dedicated billing section for Wholesale (Without GST) customers. Direct billing without 5% GST and zero GST/PAN requirement."}
+              : "Dedicated billing section with direct billing and manual sequential bill numbering."}
           </p>
         </div>
 
@@ -266,7 +266,7 @@ export default function OrdersView({
               }`}
             >
               <Plus size={16} />
-              <span>{activeTab === "BILLS" ? "Generate Bill (Without GST)" : "Book New Order"}</span>
+              <span>{activeTab === "BILLS" ? "Generate Bill" : "Book New Order"}</span>
             </Link>
           )}
         </div>
@@ -341,7 +341,7 @@ export default function OrdersView({
             }`}
           >
             <FileCheck2 size={15} className={activeTab === "BILLS" ? "text-white" : "text-gray-400"} />
-            <span>Bill (Without GST) ({billsOrders.length})</span>
+            <span>Bill ({billsOrders.length})</span>
           </button>
         </div>
 
@@ -350,7 +350,7 @@ export default function OrdersView({
             ? "Showing all Booked Client Order Forms (Ratios & Sets)"
             : activeTab === "INVOICES"
             ? "Showing official Final Tax Invoices with GST"
-            : "Direct non-GST bills for Wholesale & Retailer Without GST clients"}
+            : "Direct bills with custom numbering"}
         </div>
       </div>
 
@@ -433,7 +433,7 @@ export default function OrdersView({
                 {activeTab !== "BILLS" && <th className="py-3.5 px-6">Outstanding</th>}
                 <th className="py-3.5 px-6">Sets / Pcs</th>
                 <th className="py-3.5 px-6">
-                  {activeTab === "BILLS" ? "Bill Amount (0% GST)" : "Total Amount & Status"}
+                  {activeTab === "BILLS" ? "Bill Amount" : "Total Amount & Status"}
                 </th>
                 <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
@@ -446,7 +446,7 @@ export default function OrdersView({
                       ? "Loading order forms..."
                       : activeTab === "INVOICES"
                       ? "Loading final tax invoices..."
-                      : "Loading wholesale bills..."}
+                      : "Loading bills..."}
                   </td>
                 </tr>
               ) : displayedOrders.length === 0 ? (
@@ -458,14 +458,14 @@ export default function OrdersView({
                       ? "No final tax invoices found. Once orders are ready or tax invoices are generated, they appear here."
                       : (
                         <div className="flex flex-col items-center justify-center gap-2 py-2">
-                          <p>No bills found for Wholesale (Without GST) customers.</p>
+                          <p>No bills found.</p>
                           {isSuperAdmin && (
                             <Link
                               href="/admin/employee/orders/new?billType=non_gst"
                               className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
                             >
                               <Plus size={14} />
-                              <span>Generate Bill (Without GST)</span>
+                              <span>Generate Bill</span>
                             </Link>
                           )}
                         </div>
@@ -505,7 +505,7 @@ export default function OrdersView({
                               })()}
                             </span>
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Bill (No GST)
+                              Bill
                             </span>
                           </div>
                         ) : (
@@ -598,11 +598,6 @@ export default function OrdersView({
                       <td className="py-4 px-6">
                         <div className="font-bold text-gray-900 font-mono text-sm">
                           {formatCurrency(o.grandTotal)}
-                          {isBillTab && (
-                            <span className="text-[10px] font-bold text-emerald-600 ml-1.5 font-sans">
-                              (0% GST)
-                            </span>
-                          )}
                         </div>
                         <div className="mt-1">
                           <span
