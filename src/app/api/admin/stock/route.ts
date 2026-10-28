@@ -199,10 +199,17 @@ export async function GET(request: NextRequest) {
           let prodCost = 0;
           if (costingMap.has(prodName)) {
             prodCost = costingMap.get(prodName)!;
-          } else if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
-            prodCost = item.product.costPrice;
           } else {
-            prodCost = Math.round(item.unitPrice * 0.7);
+            // Check by extracted sequence number (e.g. "IMP - 015 (1549) HEAVY ARMANI" -> IMP - 015)
+            const seqMatch = prodName.match(/(\d+)/);
+            const candidateDNo = seqMatch ? `IMP - ${seqMatch[1].padStart(3, "0")}` : "";
+            if (candidateDNo && costingMap.has(candidateDNo)) {
+              prodCost = costingMap.get(candidateDNo)!;
+            } else if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
+              prodCost = item.product.costPrice;
+            } else {
+              prodCost = Math.round(item.unitPrice * 0.7);
+            }
           }
           const cost = Math.round(pcs * prodCost);
           const profit = Math.round(subtotal - cost);

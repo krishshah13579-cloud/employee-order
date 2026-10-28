@@ -212,11 +212,12 @@ export async function POST(req: NextRequest) {
     // Price = Total Costing + Margin (Round Off)
     const sellingPrice = Math.round(totalCosting + numMargin);
 
-    // MRP = Price * 2 (Round Off)
-    const mrp = Math.round(sellingPrice * 2);
+    // MRP = (Price * 2) - 1 (Strict Round Off: e.g. 1400 -> 1399, 1450 -> 1449)
+    const rawMrp = Math.round(sellingPrice * 2);
+    const mrp = rawMrp > 0 ? Math.max(0, rawMrp - 1) : 0;
 
-    // Retailer Price = MRP / 2 (Round Off)
-    const retailerPrice = Math.round(mrp / 2);
+    // Retailer Price = Selling Price (or Math.round(mrp / 2))
+    const retailerPrice = sellingPrice;
 
     // Wholesaler Price = Retailer Price - 100 (Round Off)
     const wholesalerPrice = Math.max(0, retailerPrice - 100);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -503,7 +503,7 @@ export default function ProductForm({
     loadCategories();
   }, [initialData]);
 
-  // Available Costing Designs from Costing Master
+  // Available Costing Designs from Costing Master & Existing Products
   const [costingDesigns, setCostingDesigns] = useState<
     Array<{
       id: number;
@@ -515,17 +515,52 @@ export default function ProductForm({
       sellingPrice: number;
     }>
   >([]);
+  const [existingProducts, setExistingProducts] = useState<
+    Array<{ id: number; name: string }>
+  >([]);
 
   useEffect(() => {
-    fetch("/api/admin/costing")
+    fetch("/api/admin/costing?_t=" + Date.now())
       .then((res) => res.json())
       .then((data) => {
         if (data.costings) {
           setCostingDesigns(data.costings);
         }
+        if (data.products) {
+          setExistingProducts(data.products);
+        }
       })
       .catch(() => {});
   }, []);
+
+  // Helper to parse sequence number from design name (e.g. "IMP - 015 (1549)" -> 15)
+  const parseImpSeqNumber = (str: string) => {
+    const match = str.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  // Check if a costing design is already added to products
+  const isCostingAlreadyAdded = (
+    designNo: string,
+    prods: Array<{ id: number; name: string }>,
+    currentProdId?: number | string
+  ) => {
+    const seq = parseImpSeqNumber(designNo);
+    const cleanDesign = designNo.trim().toUpperCase().replace(/\s+/g, "");
+    const numericCurrentId = currentProdId ? parseInt(String(currentProdId), 10) : undefined;
+
+    return prods.some((p) => {
+      if (numericCurrentId && p.id === numericCurrentId) return false;
+      const cleanP = p.name.trim().toUpperCase().replace(/\s+/g, "");
+      if (cleanP === cleanDesign) return true;
+
+      const pSeq = parseImpSeqNumber(p.name);
+      if (seq > 0 && pSeq === seq && (cleanP.startsWith("IMP") || cleanP.includes("IMP"))) {
+        return true;
+      }
+      return false;
+    });
+  };
 
   // Form base state with dual selling prices:
   // Retailer Price = MRP / 2
@@ -550,6 +585,34 @@ export default function ProductForm({
     description: "", // Description note
     isActive: initialData?.isActive ?? true,
   });
+
+  // In New Product mode (!isEdit): ONLY show costing designs that are NOT YET ADDED (e.g. IMP - 029)
+  // In Edit mode (isEdit): Show matching design, current name, and any unadded designs
+  const availableCostingDesigns = useMemo(() => {
+    if (!isEdit) {
+      return costingDesigns.filter((c) => !isCostingAlreadyAdded(c.designNo, existingProducts));
+    }
+    // Edit mode: include matching sequence design + unadded designs
+    const currentSeq = parseImpSeqNumber(formData?.name || initialData?.name || "");
+    return costingDesigns.filter(
+      (c) =>
+        parseImpSeqNumber(c.designNo) === currentSeq ||
+        c.designNo.toUpperCase() === (formData?.name || initialData?.name || "").toUpperCase() ||
+        !isCostingAlreadyAdded(c.designNo, existingProducts, productId)
+    );
+  }, [costingDesigns, existingProducts, isEdit, productId, formData?.name, initialData?.name]);
+
+  // Find matching costing design for current product when in Edit mode
+  const matchedCostingForEdit = useMemo(() => {
+    if (!isEdit) return null;
+    const currentName = formData?.name || initialData?.name || "";
+    const currentSeq = parseImpSeqNumber(currentName);
+    return costingDesigns.find(
+      (c) =>
+        (currentSeq > 0 && parseImpSeqNumber(c.designNo) === currentSeq) ||
+        c.designNo.toUpperCase() === currentName.toUpperCase()
+    );
+  }, [isEdit, formData?.name, initialData?.name, costingDesigns]);
 
   // Category-Locked Size Guide: strictly lock size guide to the selected category (e.g. Formal -> Formal Guide; Trouser/Casual -> Trouser Guide)
   useEffect(() => {
@@ -1507,54 +1570,139 @@ export default function ProductForm({
               + Create D.No. in Costing
             </Link>
           </div>
-          {!isEdit ? (
-            <select
-              required
-              value={formData.name}
-              onChange={(e) => {
-                const selectedName = e.target.value;
-                const matched = costingDesigns.find(
-                  (c) => c.designNo.toUpperCase() === selectedName.toUpperCase()
-                );
-                if (matched) {
-                  const mrpVal = Math.round(matched.mrp);
-                  const retPrice = Math.round(mrpVal / 2);
+          {/* Match with Costing Banner for Edit Mode */}
+          {isEdit && matchedCostingForEdit && formData.name.trim().toUpperCase() !== matchedCostingForEdit.designNo.toUpperCase() && (
+            <div className="p-3.5 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 mb-3 shadow-2xs">
+              <div>
+                <p className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                  <Sparkles size={15} className="text-amber-600 shrink-0" />
+                  <span>Match with Costing Master: <strong className="font-mono text-emerald-800 font-black">{matchedCostingForEdit.designNo}</strong></span>
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Current name is <span className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded">{formData.name}</span>. Click to standardize to <span className="font-mono font-bold text-emerald-900 bg-emerald-100 px-1 py-0.5 rounded">{matchedCostingForEdit.designNo}</span>. This will automatically update all existing Invoices, Bills, Stock records, and Profit pages.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const mrpVal = Math.round(matchedCostingForEdit.mrp);
+                  const retPrice = Math.round(matchedCostingForEdit.sellingPrice) || Math.round(mrpVal / 2);
                   const whoPrice = Math.max(0, retPrice - 100);
                   setFormData((prev) => ({
                     ...prev,
-                    name: matched.designNo,
-                    costPrice: Math.round(matched.totalCosting),
+                    name: matchedCostingForEdit.designNo,
+                    costPrice: Math.round(matchedCostingForEdit.totalCosting),
                     mrp: mrpVal,
                     retailerPrice: retPrice,
                     wholesalerPrice: whoPrice,
                     price: retPrice,
                   }));
-                } else {
-                  setFormData((prev) => ({ ...prev, name: selectedName }));
-                }
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold font-mono focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all cursor-pointer bg-white"
-            >
-              <option value="" disabled>
-                -- Select Product Name from Costing Master --
-              </option>
-              {costingDesigns.map((c) => (
-                <option key={c.id} value={c.designNo}>
-                  {c.designNo} — {c.fabricName} (Cost: ₹{Math.round(c.totalCosting)}, MRP: ₹{Math.round(c.mrp)})
+                  toast(`Matched name to "${matchedCostingForEdit.designNo}" and pulled costing prices!`, "success");
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shrink-0 shadow-xs transition cursor-pointer"
+              >
+                Match to {matchedCostingForEdit.designNo} Now
+              </button>
+            </div>
+          )}
+
+          {!isEdit ? (
+            availableCostingDesigns.length === 0 ? (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+                <span>All Costing Master designs are already added to Wholesale Products.</span>
+                <Link
+                  href="/admin/employee/costing"
+                  className="font-bold underline text-amber-900 ml-2"
+                >
+                  Create New D.No. in Costing &rarr;
+                </Link>
+              </div>
+            ) : (
+              <select
+                required
+                value={formData.name}
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  const matched = costingDesigns.find(
+                    (c) => c.designNo.toUpperCase() === selectedName.toUpperCase()
+                  );
+                  if (matched) {
+                    const mrpVal = Math.round(matched.mrp);
+                    const retPrice = Math.round(matched.sellingPrice) || Math.round(mrpVal / 2);
+                    const whoPrice = Math.max(0, retPrice - 100);
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: matched.designNo,
+                      costPrice: Math.round(matched.totalCosting),
+                      mrp: mrpVal,
+                      retailerPrice: retPrice,
+                      wholesalerPrice: whoPrice,
+                      price: retPrice,
+                    }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, name: selectedName }));
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold font-mono focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all cursor-pointer bg-white"
+              >
+                <option value="" disabled>
+                  -- Select Unadded Product Name from Costing Master --
                 </option>
-              ))}
-            </select>
+                {availableCostingDesigns.map((c) => (
+                  <option key={c.id} value={c.designNo}>
+                    {c.designNo} — {c.fabricName} (Cost: ₹{Math.round(c.totalCosting)}, MRP: ₹{Math.round(c.mrp)})
+                  </option>
+                ))}
+              </select>
+            )
           ) : (
-            <input
-              type="text"
-              readOnly
-              disabled
-              value={formData.name}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-100 text-sm font-bold font-mono text-gray-700 cursor-not-allowed select-none"
-            />
+            <div className="space-y-2">
+              <select
+                required
+                value={formData.name}
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  const matched = costingDesigns.find(
+                    (c) => c.designNo.toUpperCase() === selectedName.toUpperCase()
+                  );
+                  if (matched) {
+                    const mrpVal = Math.round(matched.mrp);
+                    const retPrice = Math.round(matched.sellingPrice) || Math.round(mrpVal / 2);
+                    const whoPrice = Math.max(0, retPrice - 100);
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: matched.designNo,
+                      costPrice: Math.round(matched.totalCosting),
+                      mrp: mrpVal,
+                      retailerPrice: retPrice,
+                      wholesalerPrice: whoPrice,
+                      price: retPrice,
+                    }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, name: selectedName }));
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold font-mono focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all cursor-pointer bg-white"
+              >
+                {/* Include current name if non-standard or not in costing */}
+                {!costingDesigns.some((c) => c.designNo.toUpperCase() === formData.name.toUpperCase()) && (
+                  <option value={formData.name}>
+                    {formData.name} (Current Non-Standard Name)
+                  </option>
+                )}
+                {availableCostingDesigns.map((c) => (
+                  <option key={c.id} value={c.designNo}>
+                    {c.designNo} — {c.fabricName} (Cost: ₹{Math.round(c.totalCosting)}, MRP: ₹{Math.round(c.mrp)})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-amber-700 font-medium">
+                ⚠️ Note: Changing the product name will automatically update this product's name across all existing Invoices, Bills, Orders, Stock, and Profit calculations upon saving.
+              </p>
+            </div>
           )}
           <p className="text-[11px] text-gray-500 mt-1">
-            Product name is selected from Costing Master. Costing, MRP, and selling rates are auto-pulled and locked.
+            Product name is matched with Costing Master. Costing, MRP, and selling rates are auto-pulled and locked.
           </p>
         </div>
 
