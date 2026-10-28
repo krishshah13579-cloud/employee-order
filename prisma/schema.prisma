@@ -143,6 +143,7 @@ model ProductCosting {
   designNo          String   @unique
   fabricName        String
   purchasedFrom     String?  // Mill / Vendor / Supplier
+  isJobwork         Boolean  @default(false) // If true, only basic product details required
   rateMode          String   @default("PER_METER") // PER_METER or PER_KG
   fabricRate        Float    @default(0) // Rate per Meter or Rate per KG
   mtrPerKg          Float?   // Only if rateMode is PER_KG
