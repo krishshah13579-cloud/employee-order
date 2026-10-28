@@ -28,6 +28,7 @@ interface CostingItem {
   fabricName: string;
   purchasedFrom?: string | null;
   isJobwork?: boolean;
+  isGR?: boolean;
   rateMode: string;
   fabricRate: number;
   mtrPerKg?: number | null;
@@ -43,6 +44,14 @@ interface CostingItem {
   mrp: number;
   notes?: string | null;
   updatedAt: string;
+}
+
+interface YearlyMetrics {
+  currentYear: number;
+  totalDesignsYearly: number;
+  soldWholeDesignsYearly: number;
+  grCountYearly: number;
+  activeDesignsCount: number;
 }
 
 interface ProductSummary {
@@ -69,9 +78,11 @@ export default function CostingPage() {
   const [vendors, setVendors] = useState<string[]>([]);
   const [missingSequence, setMissingSequence] = useState<string | null>(null);
   const [suggestedNextDesignNo, setSuggestedNextDesignNo] = useState<string>("IMP - 001");
+  const [yearlyMetrics, setYearlyMetrics] = useState<YearlyMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [togglingGRId, setTogglingGRId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [recentlySavedDesignNo, setRecentlySavedDesignNo] = useState<string | null>(null);
@@ -83,6 +94,7 @@ export default function CostingPage() {
   const [selectedVendorOption, setSelectedVendorOption] = useState("SELECT_EXISTING");
   const [customVendor, setCustomVendor] = useState("");
   const [isJobwork, setIsJobwork] = useState(false);
+  const [isGR, setIsGR] = useState(false);
   const [rateMode, setRateMode] = useState<"PER_METER" | "PER_KG">("PER_METER");
   const [fabricRate, setFabricRate] = useState<string>("");
   const [mtrPerKg, setMtrPerKg] = useState<string>("");
@@ -102,6 +114,9 @@ export default function CostingPage() {
         setProducts(data.products || []);
         setVendors(data.vendors || []);
         setMissingSequence(data.missingSequence || null);
+        if (data.yearlyMetrics) {
+          setYearlyMetrics(data.yearlyMetrics);
+        }
         const nextDNo = data.suggestedNextDesignNo || "IMP - 001";
         setSuggestedNextDesignNo(nextDNo);
 
@@ -176,6 +191,7 @@ export default function CostingPage() {
     setDesignNo(item.designNo);
     setFabricName(item.fabricName);
     setIsJobwork(Boolean(item.isJobwork));
+    setIsGR(Boolean(item.isGR));
 
     const vendor = item.purchasedFrom || "";
     setPurchasedFrom(vendor);
@@ -212,6 +228,7 @@ export default function CostingPage() {
     setSelectedVendorOption("");
     setCustomVendor("");
     setIsJobwork(false);
+    setIsGR(false);
     setRateMode("PER_METER");
     setFabricRate("");
     setMtrPerKg("");
@@ -220,6 +237,33 @@ export default function CostingPage() {
     setOtherCost("");
     setPressCost("");
     setMargin("");
+  };
+
+  // Toggle Goods Return (GR) Status
+  const handleToggleGR = async (item: CostingItem) => {
+    const newStatus = !item.isGR;
+    const confirmMsg = newStatus
+      ? `Mark "${item.designNo}" as Goods Return (GR)?\n\nThis marks the fabric as returned to vendor/mill. This D.No. will be strictly hidden from New Product Page, Wholesale/Retail Catalog, and Profit tabs.`
+      : `Unmark "${item.designNo}" from Goods Return (GR)?\n\nThis design will become active again in master costing.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setTogglingGRId(item.id);
+    try {
+      const res = await fetch("/api/admin/costing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, isGR: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to update GR status");
+      toast(data.message || `GR status updated for ${item.designNo}`, "success");
+      await fetchData();
+    } catch (err: any) {
+      toast("Error updating GR: " + err.message, "error");
+    } finally {
+      setTogglingGRId(null);
+    }
   };
 
   // Delete duplicate or repeating costing
@@ -278,6 +322,7 @@ export default function CostingPage() {
           fabricName: fabricName.trim(),
           purchasedFrom: finalPurchasedFrom,
           isJobwork,
+          isGR,
           rateMode,
           fabricRate: Math.round(numFabricRate),
           mtrPerKg: rateMode === "PER_KG" ? numMtrPerKg : null,
@@ -372,6 +417,48 @@ export default function CostingPage() {
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             <span>Refresh</span>
           </button>
+        </div>
+      </div>
+
+      {/* Yearly Designs Summary Banner (Matching User's Specified Design) */}
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-6 rounded-3xl text-white shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase tracking-wider font-bold text-emerald-100">
+              TOTAL DESIGNS YEARLY ({yearlyMetrics?.currentYear || new Date().getFullYear()})
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black mt-1 font-mono">
+              {yearlyMetrics?.totalDesignsYearly ?? costings.length} Designs
+            </h2>
+            <p className="text-xs text-emerald-100 mt-1 max-w-xl">
+              Catalog &amp; production designs overview for the year {yearlyMetrics?.currentYear || new Date().getFullYear()} including active, sold whole designs, and goods returns (GR).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white/10 backdrop-blur-xs p-4 rounded-2xl border border-white/20">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-emerald-200 block">TOTAL DESIGNS</span>
+              <span className="text-xl font-black font-mono">{yearlyMetrics?.totalDesignsYearly ?? costings.length}</span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-emerald-200 block">ACTIVE IN PRODUCTS</span>
+              <span className="text-xl font-black font-mono text-emerald-300">
+                {yearlyMetrics?.activeDesignsCount ?? costings.filter((c) => !c.isGR).length}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-emerald-200 block">SOLD WHOLE DESIGNS</span>
+              <span className="text-xl font-black font-mono text-cyan-200">
+                {yearlyMetrics?.soldWholeDesignsYearly ?? 0}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-emerald-200 block">GOODS RETURN (GR)</span>
+              <span className="text-xl font-black font-mono text-amber-300">
+                {yearlyMetrics?.grCountYearly ?? costings.filter((c) => c.isGR).length}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -533,6 +620,47 @@ export default function CostingPage() {
               }`}
             >
               {isJobwork ? "Jobwork: YES" : "Jobwork: NO"}
+            </span>
+          </div>
+
+          {/* GOODS RETURN (GR) CHECKBOX */}
+          <div
+            className={`p-4 border rounded-2xl flex items-center justify-between transition ${
+              isGR ? "bg-red-50/90 border-red-300" : "bg-slate-50 border-slate-200"
+            }`}
+          >
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isGR}
+                onChange={(e) => setIsGR(e.target.checked)}
+                className="w-5 h-5 text-red-600 rounded-md border-slate-300 focus:ring-red-500 cursor-pointer"
+              />
+              <div>
+                <span className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                  <span>Goods Return (GR)</span>
+                  {isGR && (
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-red-600 text-white font-bold">
+                      RETURNED
+                    </span>
+                  )}
+                </span>
+                <p className="text-xs text-slate-500">
+                  {isGR
+                    ? "⚠️ MARKED AS GR: Fabric/product returned to vendor/mill. Strictly hidden from New Product Page, Wholesale/Retail Catalog, and Profit tabs."
+                    : "Active in catalog. Check this if fabric or product is returned (GR)."}
+                </p>
+              </div>
+            </label>
+
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                isGR
+                  ? "bg-red-100 text-red-800 border border-red-200"
+                  : "bg-slate-200 text-slate-700"
+              }`}
+            >
+              {isGR ? "GR: YES (RETURNED)" : "GR: NO"}
             </span>
           </div>
 
@@ -1038,8 +1166,13 @@ export default function CostingPage() {
                         }`}
                       >
                         <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                          <div className="flex items-center gap-1.5">
-                            <span>{c.designNo}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={c.isGR ? "line-through text-slate-400" : ""}>{c.designNo}</span>
+                            {c.isGR && (
+                              <span className="text-[10px] text-red-700 font-bold bg-red-100 border border-red-300 px-1.5 py-0.2 rounded-md">
+                                GR (Returned)
+                              </span>
+                            )}
                             {isRecentlySaved && (
                               <span className="text-[10px] text-emerald-800 font-bold bg-emerald-200 px-1.5 py-0.2 rounded-md">
                                 Just Saved
@@ -1082,7 +1215,24 @@ export default function CostingPage() {
                           {formatCurrency(c.mrp)}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGR(c)}
+                              disabled={togglingGRId === c.id}
+                              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                                c.isGR
+                                  ? "bg-red-600 text-white hover:bg-red-700 shadow-xs"
+                                  : "bg-slate-100 text-slate-700 hover:bg-red-50 hover:text-red-700 border border-slate-200"
+                              }`}
+                              title={
+                                c.isGR
+                                  ? "Marked as GR (Returned to Vendor). Click to Unmark."
+                                  : "Mark this design as GR (Goods Return to Vendor). Will hide from Product Page."
+                              }
+                            >
+                              <span>{togglingGRId === c.id ? "..." : c.isGR ? "GR: Return" : "GR"}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleSelectCosting(c)}

@@ -129,10 +129,12 @@ model Product {
   setsColorwise   String?     // Stock/Default Sets colorwise, supporting multi-ratio sets
   sizeGuide       String?     // Size guide instructions / dimensions / image link
   imageUrl        String?
+  damageStock     String?     // JSON mapping: { [color: string]: { pcs: number, reason: string, notes?: string } }
   isActive        Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
+  damageSales     DamageSale[]
 
   @@schema("wholesale")
 }
@@ -144,6 +146,7 @@ model ProductCosting {
   fabricName        String
   purchasedFrom     String?  // Mill / Vendor / Supplier
   isJobwork         Boolean  @default(false) // If true, only basic product details required
+  isGR              Boolean  @default(false) // Goods Return: fabric/product returned to vendor, excluded everywhere
   rateMode          String   @default("PER_METER") // PER_METER or PER_KG
   fabricRate        Float    @default(0) // Rate per Meter or Rate per KG
   mtrPerKg          Float?   // Only if rateMode is PER_KG
@@ -160,6 +163,26 @@ model ProductCosting {
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  @@schema("wholesale")
+}
+
+// Damage Pieces Sales Record (Admin-only cash sales)
+model DamageSale {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  productName String
+  color       String
+  pcs         Int
+  ratePerPc   Float
+  totalAmount Float
+  reason      String?  // "Dagi", "Attari", "Wear and Tear"
+  buyerName   String?
+  notes       String?
+  paymentMode String   @default("Cash")
+  soldBy      String   @default("Admin")
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@schema("wholesale")
 }

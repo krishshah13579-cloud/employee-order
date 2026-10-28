@@ -47,6 +47,8 @@ interface StockItem {
   totalSets: number;
   totalSetPcs: number;
   totalPcs: number;
+  totalDamagePcs?: number;
+  damageStock?: string | null;
   totalValuation: number;
   setsColorwise?: string | null;
   detailedRatioSets?: Record<string, Record<string, number>>;
@@ -84,6 +86,7 @@ interface StockMetrics {
   grandTotalSets: number;
   grandTotalMixPcs: number;
   grandTotalPcs: number;
+  grandTotalDamagePcs?: number;
   grandTotalValuation: number;
   grandTotalSoldUnits?: number;
   grandTotalSalesRevenue?: number;
@@ -147,6 +150,97 @@ export default function AdminStockPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [syncingStore, setSyncingStore] = useState(false);
   const [modalCustomRatio, setModalCustomRatio] = useState("");
+
+  // Admin Damage Cash Sale Modal
+  const [isDamageSaleOpen, setIsDamageSaleOpen] = useState(false);
+  const [damageSaleProduct, setDamageSaleProduct] = useState<StockItem | null>(null);
+  const [damageSaleColor, setDamageSaleColor] = useState<string>("");
+  const [damageSalePcs, setDamageSalePcs] = useState<string>("");
+  const [damageSaleRate, setDamageSaleRate] = useState<string>("");
+  const [damageSaleBuyer, setDamageSaleBuyer] = useState<string>("");
+  const [damageSaleNotes, setDamageSaleNotes] = useState<string>("");
+  const [sellingDamage, setSellingDamage] = useState(false);
+
+  const handleOpenDamageSale = (item?: StockItem) => {
+    if (item) {
+      setDamageSaleProduct(item);
+      let firstColor = "";
+      if (item.damageStock) {
+        try {
+          const parsed = JSON.parse(item.damageStock);
+          const cols = Object.keys(parsed).filter((c) => (parsed[c]?.pcs || 0) > 0);
+          if (cols.length > 0) firstColor = cols[0];
+        } catch {}
+      }
+      setDamageSaleColor(firstColor);
+    } else {
+      const withDamage = stockItems.find((p) => (p.totalDamagePcs || 0) > 0);
+      setDamageSaleProduct(withDamage || stockItems[0] || null);
+      setDamageSaleColor("");
+    }
+    setDamageSalePcs("");
+    setDamageSaleRate("");
+    setDamageSaleBuyer("");
+    setDamageSaleNotes("");
+    setIsDamageSaleOpen(true);
+  };
+
+  const handleConfirmDamageCashSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!damageSaleProduct) {
+      toast("Please select a product", "error");
+      return;
+    }
+    if (!damageSaleColor) {
+      toast("Please select a color", "error");
+      return;
+    }
+    const numPcs = parseInt(damageSalePcs, 10);
+    const numRate = parseFloat(damageSaleRate);
+    if (!numPcs || numPcs <= 0) {
+      toast("Please enter a valid pieces count (> 0)", "error");
+      return;
+    }
+    if (isNaN(numRate) || numRate <= 0) {
+      toast("Please enter a valid cash rate per piece (₹/pc)", "error");
+      return;
+    }
+
+    try {
+      setSellingDamage(true);
+      const res = await fetch("/api/admin/damage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secret": "krish_clothing_admin_2026",
+        },
+        body: JSON.stringify({
+          productId: damageSaleProduct.id,
+          color: damageSaleColor,
+          pcs: numPcs,
+          ratePerPc: numRate,
+          buyerName: damageSaleBuyer.trim() || "Cash Buyer",
+          notes: damageSaleNotes.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to record damage cash sale");
+      }
+
+      toast(
+        `Sold ${numPcs} damage pcs of ${damageSaleProduct.name} (${damageSaleColor}) for ₹${data.damageSale?.totalAmount || Math.round(numPcs * numRate)} Cash!`,
+        "success"
+      );
+      setIsDamageSaleOpen(false);
+      fetchStock();
+    } catch (err: any) {
+      toast(err.message || "Failed to record cash sale", "error");
+    } finally {
+      setSellingDamage(false);
+    }
+  };
 
   // Accessories state
   const [accessories, setAccessories] = useState<AccessoryItemData[]>([]);
@@ -467,6 +561,16 @@ export default function AdminStockPage() {
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <button
             type="button"
+            onClick={() => handleOpenDamageSale()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            title="Admin Only: Sell damaged pieces in cash at custom rate"
+          >
+            <AlertTriangle size={13} />
+            <span>Sell Damage (Cash)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleSyncStore}
             disabled={syncingStore}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
@@ -492,9 +596,9 @@ export default function AdminStockPage() {
       </div>
 
       {/* ═══════════════════════════════════════════
-          4 METRIC KPI CARDS (RESPONSIVE & PADDED — NO OVERFLOW)
+          5 METRIC KPI CARDS (RESPONSIVE & PADDED — NO OVERFLOW)
           ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
         {/* 1. Total Styles */}
         <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
@@ -540,9 +644,28 @@ export default function AdminStockPage() {
           </div>
         </div>
 
-        {/* 4. Inventory Valuation */}
+        {/* 4. Total Damage Pieces (Cash Pool Only) */}
+        <div
+          onClick={() => handleOpenDamageSale()}
+          className="bg-amber-50/60 p-4 sm:p-5 rounded-3xl border border-amber-300/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-amber-400 hover:bg-amber-50 transition-all min-w-0 cursor-pointer"
+          title="Click to sell damage pieces in Cash (Admin Only)"
+        >
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-xs">
+            <AlertTriangle size={20} className="sm:w-[22px] sm:h-[22px]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800 block truncate">
+              Damage Pcs (Cash)
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono tracking-tight block truncate">
+              {metrics?.grandTotalDamagePcs ?? 0} Pcs
+            </span>
+          </div>
+        </div>
+
+        {/* 5. Inventory Valuation */}
         <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
             <DollarSign size={20} className="sm:w-[22px] sm:h-[22px]" />
           </div>
           <div className="min-w-0 flex-1">
@@ -550,7 +673,7 @@ export default function AdminStockPage() {
               Valuation
             </span>
             <span
-              className="text-base sm:text-lg lg:text-xl xl:text-2xl font-black text-amber-700 font-mono tracking-tight block truncate"
+              className="text-base sm:text-lg lg:text-xl xl:text-2xl font-black text-emerald-700 font-mono tracking-tight block truncate"
               title={formatCurrency(metrics?.grandTotalValuation ?? 0)}
             >
               {formatCurrency(metrics?.grandTotalValuation ?? 0)}
@@ -690,13 +813,18 @@ export default function AdminStockPage() {
                                 <span className="font-bold text-slate-900 block text-sm">
                                   {item.name}
                                 </span>
-                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-medium">
+                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-medium flex-wrap">
                                   <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-700">
                                     {item.category}
                                   </span>
                                   {item.mrp && (
                                     <span className="line-through text-slate-400 font-mono text-[10px]">
                                       MRP {formatCurrency(item.mrp)}
+                                    </span>
+                                  )}
+                                  {(item.totalDamagePcs || 0) > 0 && (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                      ⚠️ {item.totalDamagePcs} Damage Pcs
                                     </span>
                                   )}
                                 </div>
@@ -784,14 +912,27 @@ export default function AdminStockPage() {
 
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1 mx-auto cursor-pointer"
-                            >
-                              <Edit size={12} />
-                              <span>Edit Stock</span>
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(item)}
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit size={12} />
+                                <span>Edit</span>
+                              </button>
+                              {(item.totalDamagePcs || 0) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDamageSale(item)}
+                                  className="px-2 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                                  title="Admin Cash Sale for Damage Pieces"
+                                >
+                                  <AlertTriangle size={11} />
+                                  <span>Sell Damage ({item.totalDamagePcs})</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1420,6 +1561,222 @@ export default function AdminStockPage() {
                 >
                   <Save size={13} />
                   <span>{savingAccessory ? "Saving..." : editingAccessory ? "Update Trim" : "Add to Stock"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          ADMIN DAMAGE CASH SALE MODAL
+          ═══════════════════════════════════════════ */}
+      {isDamageSaleOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Sell Damage Pieces (Cash Only)
+                  </h3>
+                  <span className="text-[11px] text-amber-700 font-bold">
+                    Admin Exclusive • Instant Cash Transaction
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsDamageSaleOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmDamageCashSale} className="space-y-4">
+              {/* Product Selection */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  1. Product Style *
+                </label>
+                <select
+                  value={damageSaleProduct?.id || ""}
+                  onChange={(e) => {
+                    const selected = stockItems.find((p) => p.id === parseInt(e.target.value, 10));
+                    setDamageSaleProduct(selected || null);
+                    if (selected?.damageStock) {
+                      try {
+                        const parsed = JSON.parse(selected.damageStock);
+                        const cols = Object.keys(parsed).filter((c) => (parsed[c]?.pcs || 0) > 0);
+                        setDamageSaleColor(cols[0] || "");
+                      } catch {
+                        setDamageSaleColor("");
+                      }
+                    } else {
+                      setDamageSaleColor("");
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                >
+                  <option value="">-- Select Product --</option>
+                  {stockItems.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.totalDamagePcs ? `(${p.totalDamagePcs} damage pcs available)` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Color & Available Damage Breakdown */}
+              {damageSaleProduct && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    2. Damaged Color Shade *
+                  </label>
+                  {(() => {
+                    let damageOptions: Array<{ color: string; pcs: number; reason: string }> = [];
+                    if (damageSaleProduct.damageStock) {
+                      try {
+                        const parsed = JSON.parse(damageSaleProduct.damageStock);
+                        for (const [col, info] of Object.entries(parsed)) {
+                          const pcs = Number((info as any)?.pcs) || 0;
+                          if (pcs > 0) {
+                            damageOptions.push({
+                              color: col,
+                              pcs,
+                              reason: (info as any)?.reason || "Damage",
+                            });
+                          }
+                        }
+                      } catch {}
+                    }
+
+                    if (damageOptions.length === 0) {
+                      return (
+                        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
+                          No damaged pieces recorded for this product yet. You can add them in <strong>Edit Product</strong>.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        <select
+                          value={damageSaleColor}
+                          onChange={(e) => setDamageSaleColor(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                        >
+                          <option value="">-- Select Color --</option>
+                          {damageOptions.map((opt) => (
+                            <option key={opt.color} value={opt.color}>
+                              {opt.color} — {opt.pcs} pcs ({opt.reason})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Pieces & Cash Rate */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    3. Pieces to Sell *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    placeholder="e.g. 10 or 100"
+                    value={damageSalePcs}
+                    onChange={(e) => setDamageSalePcs(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    4. Cash Rate (₹/Piece) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      required
+                      placeholder="e.g. 250"
+                      value={damageSaleRate}
+                      onChange={(e) => setDamageSaleRate(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time Total Calculation */}
+              {parseInt(damageSalePcs, 10) > 0 && parseFloat(damageSaleRate) > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900 uppercase">
+                    Total Cash Received:
+                  </span>
+                  <span className="text-lg font-black font-mono text-amber-950">
+                    ₹{(parseInt(damageSalePcs, 10) * parseFloat(damageSaleRate)).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
+
+              {/* Buyer & Notes */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Buyer Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Local Scrap / Cash Buyer"
+                    value={damageSaleBuyer}
+                    onChange={(e) => setDamageSaleBuyer(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Notes (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Full color clearance"
+                    value={damageSaleNotes}
+                    onChange={(e) => setDamageSaleNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsDamageSaleOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sellingDamage}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  <DollarSign size={13} />
+                  <span>{sellingDamage ? "Recording..." : "Confirm Cash Sale & Deduct"}</span>
                 </button>
               </div>
             </form>

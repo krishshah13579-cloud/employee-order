@@ -67,8 +67,26 @@ export async function GET(request: NextRequest) {
       ...(selectFields ? { select: selectFields } : {}),
     });
 
+    // Exclude designs marked as Goods Return (GR) in Costing Master
+    const grCostings = await prisma.productCosting.findMany({
+      where: { isGR: true },
+      select: { designNo: true },
+    });
+    const grSet = new Set(grCostings.map((c) => c.designNo.trim().toUpperCase()));
+
+    const nonGrProducts = rawProducts.filter((p) => {
+      const pName = p.name.trim().toUpperCase();
+      if (grSet.has(pName)) return false;
+      const seqMatch = pName.match(/(\d+)/);
+      if (seqMatch) {
+        const dNo = `IMP - ${seqMatch[1].padStart(3, "0")}`;
+        if (grSet.has(dNo)) return false;
+      }
+      return true;
+    });
+
     // Sort strictly in numerical sequence starting from IMP - 001 upwards
-    const products = sortProductsByImpSequence(rawProducts);
+    const products = sortProductsByImpSequence(nonGrProducts);
 
     const { getTotalAvailableSets } = await import("@/lib/stock");
 
@@ -175,6 +193,7 @@ export async function POST(request: NextRequest) {
         sizeGuide: sizeGuide || null,
         imageUrl: imageUrl || null,
         colorMapping: colorMapping || null,
+        damageStock: body.damageStock || null,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });

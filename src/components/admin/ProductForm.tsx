@@ -510,6 +510,7 @@ export default function ProductForm({
       designNo: string;
       fabricName: string;
       purchasedFrom?: string | null;
+      isGR?: boolean;
       totalCosting: number;
       mrp: number;
       sellingPrice: number;
@@ -586,15 +587,16 @@ export default function ProductForm({
     isActive: initialData?.isActive ?? true,
   });
 
-  // In New Product mode (!isEdit): ONLY show costing designs that are NOT YET ADDED (e.g. IMP - 029)
-  // In Edit mode (isEdit): Show matching design, current name, and any unadded designs
+  // In New Product mode (!isEdit): ONLY show costing designs that are NOT YET ADDED (e.g. IMP - 029) and NOT MARKED AS GR
+  // In Edit mode (isEdit): Show matching design, current name, and any unadded non-GR designs
   const availableCostingDesigns = useMemo(() => {
+    const nonGRCostings = costingDesigns.filter((c) => !c.isGR);
     if (!isEdit) {
-      return costingDesigns.filter((c) => !isCostingAlreadyAdded(c.designNo, existingProducts));
+      return nonGRCostings.filter((c) => !isCostingAlreadyAdded(c.designNo, existingProducts));
     }
-    // Edit mode: include matching sequence design + unadded designs
+    // Edit mode: include matching sequence design + unadded non-GR designs
     const currentSeq = parseImpSeqNumber(formData?.name || initialData?.name || "");
-    return costingDesigns.filter(
+    return nonGRCostings.filter(
       (c) =>
         parseImpSeqNumber(c.designNo) === currentSeq ||
         c.designNo.toUpperCase() === (formData?.name || initialData?.name || "").toUpperCase() ||
@@ -700,6 +702,46 @@ export default function ProductForm({
     }
     return result;
   });
+
+  // Damage Stock per color: { [color]: { pcs: number, reason: string, notes?: string } }
+  const [colorDamageStockMap, setColorDamageStockMap] = useState<
+    Record<string, { pcs: number; reason: "Dagi" | "Attari" | "Wear and Tear" | "Other"; notes?: string }>
+  >(() => {
+    const result: Record<string, { pcs: number; reason: "Dagi" | "Attari" | "Wear and Tear" | "Other"; notes?: string }> = {};
+    if (initialData?.damageStock) {
+      try {
+        const parsed = JSON.parse(initialData.damageStock);
+        for (const [col, info] of Object.entries(parsed)) {
+          const clean = cleanColorName(col);
+          result[clean] = {
+            pcs: Math.max(0, Number((info as any)?.pcs) || 0),
+            reason: ((info as any)?.reason as any) || "Dagi",
+            notes: (info as any)?.notes || "",
+          };
+        }
+      } catch {}
+    }
+    return result;
+  });
+
+  const handleColorDamageChange = (
+    color: string,
+    field: "pcs" | "reason" | "notes",
+    val: any
+  ) => {
+    const clean = cleanColorName(color);
+    setColorDamageStockMap((prev) => {
+      const current = prev[clean] || { pcs: 0, reason: "Dagi", notes: "" };
+      const updated = {
+        ...current,
+        [field]: field === "pcs" ? Math.max(0, parseInt(String(val), 10) || 0) : val,
+      };
+      return {
+        ...prev,
+        [clean]: updated,
+      };
+    });
+  };
 
   const [bulkSetsInput, setBulkSetsInput] = useState<number>(20);
 
@@ -1434,6 +1476,19 @@ export default function ProductForm({
       }
       const serializedStock = JSON.stringify(finalStockMap);
 
+      // Serialize colorDamageStockMap
+      const damagePayloadMap: Record<string, { pcs: number; reason: string; notes?: string }> = {};
+      for (const [col, entry] of Object.entries(colorDamageStockMap)) {
+        if (entry && entry.pcs > 0) {
+          damagePayloadMap[col] = {
+            pcs: entry.pcs,
+            reason: entry.reason || "Dagi",
+            notes: entry.notes || "",
+          };
+        }
+      }
+      const serializedDamageStock = Object.keys(damagePayloadMap).length > 0 ? JSON.stringify(damagePayloadMap) : null;
+
       const numMrp = formData.mrp ? parseFloat(String(formData.mrp)) : null;
       const retPrice = formData.retailerPrice !== undefined && !isNaN(Number(formData.retailerPrice))
         ? parseFloat(String(formData.retailerPrice))
@@ -1467,6 +1522,7 @@ export default function ProductForm({
         mixPcs: totalLoosePcs,
         colorImages: Object.keys(colorImages).length > 0 ? JSON.stringify(colorImages) : null,
         setsColorwise: serializedStock || null,
+        damageStock: serializedDamageStock,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
         imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
         colorMapping: JSON.stringify(colorAlphabetMap),
@@ -3410,6 +3466,124 @@ export default function ProductForm({
                   </tfoot>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Color-Wise Damage Pieces Tracking (Dagi, Attari, Wear and Tear) */}
+        {selectedColors.length > 0 && (
+          <div className="p-4 sm:p-5 bg-amber-50/60 rounded-2xl border border-amber-200/90 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-amber-950 uppercase tracking-wider block">
+                    Color-Wise Damage Pieces (Admin Cash Sale Pool)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200/80 text-amber-900 rounded-md">
+                    Admin Cash Only
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800/90 mt-0.5">
+                  Track defect units per color (can be individual pieces or whole lots, e.g. 100 pcs). Tag defect as <strong>Dagi</strong> (दागी), <strong>Attari</strong> (अतारी), or <strong>Wear and Tear</strong>. Strictly excluded from wholesale sets and sellable only in Cash by Admin.
+                </p>
+              </div>
+
+              {(() => {
+                const totalDamagePcs = Object.values(colorDamageStockMap).reduce(
+                  (sum, e) => sum + (e?.pcs || 0),
+                  0
+                );
+                return (
+                  <div className="px-3 py-1.5 bg-amber-200/70 border border-amber-300 rounded-xl text-xs font-bold text-amber-950 shrink-0 flex items-center gap-1.5">
+                    <span>Total Damage:</span>
+                    <strong className="font-mono text-sm">{totalDamagePcs} Pcs</strong>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {sortColorsByAlphabet(selectedColors, colorAlphabetMap).map((color) => {
+                const clean = cleanColorName(color);
+                const damageEntry = colorDamageStockMap[clean] || { pcs: 0, reason: "Dagi", notes: "" };
+                const colorPreset = PRESET_COLORS.find(
+                  (c) => c.name.toLowerCase() === color.toLowerCase()
+                );
+                const colorInfo = colorPreset
+                  ? { hex: colorPreset.hex, isLight: colorPreset.border || false }
+                  : getColorHex(color);
+
+                return (
+                  <div
+                    key={color}
+                    className="p-3 bg-white rounded-xl border border-amber-200/80 shadow-2xs space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border shrink-0"
+                          style={{
+                            backgroundColor: colorInfo.hex,
+                            borderColor: colorInfo.isLight ? "#cbd5e1" : "rgba(0,0,0,0.15)",
+                          }}
+                        />
+                        <span className="text-xs font-bold text-gray-900">{color}</span>
+                      </div>
+                      {damageEntry.pcs > 0 && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 font-mono text-[11px] font-black rounded-md">
+                          {damageEntry.pcs} pcs damaged
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">
+                          Damaged Pcs
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="e.g. 5 or 100"
+                          value={damageEntry.pcs || ""}
+                          onChange={(e) => handleColorDamageChange(color, "pcs", e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-amber-50/40 border border-gray-300 rounded-lg focus:bg-white focus:ring-1 focus:ring-amber-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">
+                          Defect Tag
+                        </label>
+                        <select
+                          value={damageEntry.reason || "Dagi"}
+                          onChange={(e) => handleColorDamageChange(color, "reason", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-amber-500 outline-none"
+                        >
+                          <option value="Dagi">Dagi (दागी / Stain)</option>
+                          <option value="Attari">Attari (अतारी / Weave flaw)</option>
+                          <option value="Wear and Tear">Wear and Tear (Cut / Stitch)</option>
+                          <option value="Other">Other Defect</option>
+                        </select>
+                      </div>
+
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">
+                          Notes / Details
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Whole roll defect"
+                          value={damageEntry.notes || ""}
+                          onChange={(e) => handleColorDamageChange(color, "notes", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-amber-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
