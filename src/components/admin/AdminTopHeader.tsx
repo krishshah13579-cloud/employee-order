@@ -122,29 +122,15 @@ export default function AdminTopHeader({
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200/90 shadow-2xs">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
-        {/* Left: Mobile hamburger & Breadcrumbs */}
-        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-          {onToggleMobileMenu && (
-            <button
-              type="button"
-              onClick={onToggleMobileMenu}
-              className="md:hidden p-2.5 -ml-1.5 text-gray-700 hover:text-black hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors cursor-pointer touch-manipulation shrink-0"
-              aria-label="Toggle navigation menu"
-              title="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <span>Admin Panel</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-            </span>
-            <h1 className="text-sm sm:text-base font-bold text-gray-900 tracking-tight">
-              {getPageTitle()}
-            </h1>
-          </div>
+        {/* Left: Breadcrumbs & Page Title (Toggle button removed for cleaner mobile layout) */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider shrink-0">
+            <span>Admin Panel</span>
+            <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+          </span>
+          <h1 className="text-sm sm:text-base font-bold text-gray-900 tracking-tight truncate">
+            {getPageTitle()}
+          </h1>
         </div>
 
         {/* Right: Install App, Security Badge, Admin User Pill, Sign Out */}

@@ -4,7 +4,7 @@
   "description": "OBEXA Admin & Wholesale Factory Management Portal",
   "start_url": "/admin/employee",
   "id": "/admin/employee",
-  "scope": "/admin",
+  "scope": "/admin/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",

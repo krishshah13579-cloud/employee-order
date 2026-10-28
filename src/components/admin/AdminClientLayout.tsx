@@ -9,6 +9,7 @@ import {
   Boxes,
   FileText,
   Menu,
+  X,
 } from "lucide-react";
 import AdminSidebarNav from "./AdminSidebarNav";
 import AdminTopHeader from "./AdminTopHeader";
@@ -73,33 +74,23 @@ export default function AdminClientLayout({
         <AdminSidebarNav />
       </aside>
 
-      {/* Mobile Drawer Backdrop */}
+      {/* Mobile Full-Screen Menu Overlay (< 768px) */}
       {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity duration-300 print:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        <div className="fixed inset-0 z-50 bg-white md:hidden flex flex-col w-full h-full overflow-hidden print:hidden animate-in fade-in duration-150">
+          <AdminSidebarNav onItemClick={() => setMobileMenuOpen(false)} />
+        </div>
       )}
 
-      {/* Mobile Sidebar Drawer */}
-      <aside
-        className={`fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white z-50 md:hidden shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col print:hidden ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <AdminSidebarNav onItemClick={() => setMobileMenuOpen(false)} />
-      </aside>
-
       {/* Main Admin View Area (Pure Admin Content) */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen print:min-h-0 print:block">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen print:min-h-0 print:block overflow-x-hidden">
         <div className="print:hidden">
           <AdminTopHeader
             onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
             mobileMenuOpen={mobileMenuOpen}
           />
         </div>
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto pb-20 md:pb-6 print:p-0 print:m-0 print:overflow-visible">
-          <div className="max-w-7xl mx-auto print:max-w-none print:m-0 print:p-0">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden min-w-0 max-w-full pb-20 md:pb-6 print:p-0 print:m-0 print:overflow-visible">
+          <div className="max-w-7xl mx-auto w-full min-w-0 print:max-w-none print:m-0 print:p-0">
             {children}
           </div>
         </main>

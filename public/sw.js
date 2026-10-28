@@ -9,6 +9,16 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Pass-through fetch handler required by Chromium WebAPK criteria
+self.addEventListener("fetch", (event) => {
+  // Let the browser handle standard requests natively; fallback to cache if available
+  if (event.request.method === "GET") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+  }
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || "/";

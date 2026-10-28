@@ -174,31 +174,32 @@ export async function middleware(request: NextRequest) {
     return new NextResponse("Bad Request: Malformed URI sequence", { status: 400 });
   }
 
-  // 4. Block Automated Bots, Crawlers, and Scrapers (Total Bot Blackout)
-  // Allow browser navigation, but reject known scrapers / bots unless it's sw or favicon
-  if (rawPath !== "/favicon.ico" && rawPath !== "/robots.txt") {
-    if (isBotOrCrawler(userAgent)) {
-      return new NextResponse(
-        JSON.stringify({
-          error: "Forbidden",
-          message: "403 Forbidden: Automated crawlers, scrapers, and bot agents are strictly blocked on employee.iqtrousers.in.",
-          statusCode: 403,
-        }),
-        {
-          status: 403,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
-          },
-        }
-      );
-    }
-  }
-
-  // 5. Check Public Whitelist (Assets & Device Authentication Endpoints)
+  // 4. Check Public Whitelist (Assets & Device Authentication Endpoints)
+  // Evaluated before bot blocking so Chrome WebAPK minting and PWA service workers can fetch assets without 403
   const isWhitelisted = PUBLIC_WHITELIST.some((pattern) => pattern.test(rawPath));
   if (isWhitelisted) {
+    if (rawPath === "/manifest.json" && request.headers.get("referer")?.includes("/admin")) {
+      return applySecurityHeaders(NextResponse.rewrite(new URL("/manifest-admin.json", request.url)), request);
+    }
     return applySecurityHeaders(NextResponse.next(), request);
+  }
+
+  // 5. Block Automated Bots, Crawlers, and Scrapers (Total Bot Blackout)
+  if (isBotOrCrawler(userAgent)) {
+    return new NextResponse(
+      JSON.stringify({
+        error: "Forbidden",
+        message: "403 Forbidden: Automated crawlers, scrapers, and bot agents are strictly blocked on employee.iqtrousers.in.",
+        statusCode: 403,
+      }),
+      {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
+        },
+      }
+    );
   }
 
   // 6. Device Authorization Gate Check

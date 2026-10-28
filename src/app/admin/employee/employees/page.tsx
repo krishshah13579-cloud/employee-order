@@ -827,7 +827,7 @@ export default function EmployeesPage() {
   }, [perfData, modalFilterType, modalCustomerFilter]);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 w-full max-w-full overflow-x-hidden min-w-0">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
@@ -867,11 +867,11 @@ export default function EmployeesPage() {
       </div>
 
       {/* Top Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200">
+      <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto no-scrollbar scroll-smooth pb-0.5 max-w-full">
         <button
           type="button"
           onClick={() => setActiveTab("access")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === "access"
               ? "border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl"
               : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
@@ -889,7 +889,7 @@ export default function EmployeesPage() {
         <button
           type="button"
           onClick={() => setActiveTab("directory")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === "directory"
               ? "border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl"
               : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
@@ -905,7 +905,7 @@ export default function EmployeesPage() {
         <button
           type="button"
           onClick={() => setActiveTab("devices")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === "devices"
               ? "border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl"
               : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"

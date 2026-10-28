@@ -139,20 +139,20 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full max-w-full overflow-x-hidden min-w-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200 min-w-0">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
             <span>Wholesale Control Center</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Overview Dashboard</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 truncate">Overview Dashboard</h1>
+          <p className="text-xs text-gray-500 mt-0.5 break-words">
             Real-time wholesale sales performance, garment catalog ratios, orders, and field employees.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           <button
             onClick={() => {
               fetchStats();
@@ -217,14 +217,14 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Live Notification Center: New Customers & Orders Received */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-orange-50/50 to-amber-50/30">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden w-full max-w-full">
+        <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-orange-50/50 to-amber-50/30">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm shrink-0">
               <Bell size={18} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                   Live Notifications
                 </h2>
@@ -232,14 +232,14 @@ export default function AdminDashboardPage() {
                   {notifications.length} Recent Alerts
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5 break-words">
                 Instant alerts for newly registered customer retail shops and wholesale orders received.
               </p>
             </div>
           </div>
           <button
             onClick={fetchNotifications}
-            className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto shrink-0"
           >
             <RefreshCw size={12} className={loadingNotifications ? "animate-spin" : ""} />
             <span>Check Updates</span>
@@ -258,11 +258,11 @@ export default function AdminDashboardPage() {
               <Link
                 key={notif.id}
                 href={notif.link}
-                className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group block"
+                className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors group block min-w-0"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
                       notif.type === "order"
                         ? "bg-blue-50 text-blue-600 border border-blue-200"
                         : "bg-emerald-50 text-emerald-600 border border-emerald-200"
@@ -270,14 +270,14 @@ export default function AdminDashboardPage() {
                   >
                     {notif.type === "order" ? <ShoppingCart size={15} /> : <Store size={15} />}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-gray-900 group-hover:text-orange-600 transition-colors">
+                      <span className="font-bold text-xs text-gray-900 group-hover:text-orange-600 transition-colors truncate">
                         {notif.title}
                       </span>
                       {notif.status && (
                         <span
-                          className={`px-2 py-0.2 rounded-full text-[9px] font-bold ${
+                          className={`shrink-0 px-2 py-0.2 rounded-full text-[9px] font-bold ${
                             STATUS_COLORS[notif.status] || "bg-gray-100 text-gray-700"
                           }`}
                         >
@@ -285,15 +285,15 @@ export default function AdminDashboardPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{notif.subtitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{notif.subtitle}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-right">
-                  <span className="text-[11px] text-gray-400">
+                <div className="flex items-center gap-2 sm:gap-3 text-right shrink-0">
+                  <span className="text-[11px] text-gray-400 whitespace-nowrap">
                     {formatDate(notif.timestamp)}
                   </span>
-                  <ExternalLink size={14} className="text-gray-300 group-hover:text-gray-600 transition-colors" />
+                  <ExternalLink size={14} className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0" />
                 </div>
               </Link>
             ))
@@ -302,8 +302,8 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Recent Orders Table Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden w-full max-w-full">
+        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
               Recent Wholesale Orders
@@ -314,14 +314,14 @@ export default function AdminDashboardPage() {
           </div>
           <Link
             href="/admin/employee/orders"
-            className="text-xs font-semibold text-zinc-900 hover:underline flex items-center gap-1"
+            className="text-xs font-semibold text-zinc-900 hover:underline flex items-center gap-1 shrink-0"
           >
-            <span>View all orders</span>
+            <span>View all</span>
             <ArrowRight size={14} />
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-w-full">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
