@@ -155,9 +155,11 @@ export default function CostingPage() {
     return Math.round(calculatedTotalCosting + numMargin);
   }, [calculatedTotalCosting, numMargin]);
 
-  // MRP = Price * 2 (Round Off)
+  // MRP = Price * 2 - 1 (Strict Round Off: e.g. 1400 -> 1399, 1450 -> 1449)
   const calculatedMrp = useMemo(() => {
-    return Math.round(calculatedSellingPrice * 2);
+    if (calculatedSellingPrice <= 0) return 0;
+    const doublePrice = Math.round(calculatedSellingPrice * 2);
+    return Math.max(0, doublePrice - 1);
   }, [calculatedSellingPrice]);
 
   // Check if current D.No. has repeating/duplicate sequence in records
@@ -821,7 +823,7 @@ export default function CostingPage() {
                 <Sparkles size={14} /> Total Costing &amp; Pricing (Round Off)
               </span>
               <span className="text-[10px] text-slate-400">
-                Total Costing = Fabric + Jobwork + Other + Press | MRP = Price × 2
+                Total Costing = Fabric + Jobwork + Other + Press | MRP = (Price × 2) - 1
               </span>
             </div>
 
@@ -871,16 +873,16 @@ export default function CostingPage() {
                 </span>
               </div>
 
-              {/* MRP = PRICE * 2 */}
+              {/* MRP = (PRICE * 2) - 1 */}
               <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 block mb-1">
-                  MRP (Price × 2)
+                  MRP ((Price × 2) - 1)
                 </span>
                 <span className="text-xl sm:text-2xl font-black text-purple-300 font-mono tracking-tight block">
                   {formatCurrency(calculatedMrp)}
                 </span>
                 <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Maximum Retail Price
+                  MRP - 1 (e.g. 1399, 1449)
                 </span>
               </div>
             </div>

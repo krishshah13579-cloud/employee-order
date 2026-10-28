@@ -81,21 +81,39 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    const oldName = existing.name.trim();
+    const newName = (body.name || "").trim() || oldName;
+
+    // Check if newName matches a Costing Master entry (e.g. "IMP - 015")
+    const matchingCosting = await prisma.productCosting.findUnique({
+      where: { designNo: newName },
+    });
+
+    const costPriceToSet = matchingCosting
+      ? matchingCosting.totalCosting
+      : body.costPrice !== undefined && body.costPrice !== null && String(body.costPrice).trim() !== ""
+      ? parseFloat(String(body.costPrice))
+      : existing.costPrice;
+
+    const mrpToSet = matchingCosting ? matchingCosting.mrp : numMrp;
+    const sellingPriceToSet = matchingCosting ? matchingCosting.sellingPrice : retailerPrice;
+    const retailerPriceToSet = sellingPriceToSet;
+    const wholesalerPriceToSet = Math.max(0, retailerPriceToSet - 100);
+
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
-        name: body.name,
+        name: newName,
         category: body.category,
         colorsAvailable: body.colorsAvailable,
         sizesRatio: body.sizesRatio,
         sizesList: body.sizesList,
         pcsPerSet: pcs,
-        mrp: numMrp,
-        retailerPrice: retailerPrice,
-        wholesalerPrice: wholesalerPrice,
-        price: retailerPrice,
-        // Costing is strictly locked and managed via the Costing Master Engine (/admin/employee/costing)
-        costPrice: existing.costPrice,
+        mrp: mrpToSet,
+        retailerPrice: retailerPriceToSet,
+        wholesalerPrice: wholesalerPriceToSet,
+        price: retailerPriceToSet,
+        costPrice: costPriceToSet,
         mixPcs: body.mixPcs !== undefined ? (body.mixPcs !== null ? parseInt(body.mixPcs, 10) || 0 : 0) : undefined,
         colorImages: body.colorImages !== undefined ? (body.colorImages ? (typeof body.colorImages === "string" ? body.colorImages : JSON.stringify(body.colorImages)) : null) : undefined,
         setsColorwise: body.setsColorwise,
@@ -105,6 +123,63 @@ export async function PUT(
         isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
       },
     });
+
+    // If Product Name changed, propagate across all Invoices, Bills, Orders, Sales, Stock, and Profit records
+    if (newName && newName !== oldName) {
+      // 1. Propagate name to all OrderItems (All Invoices / Bills, Orders, Sales, Profit)
+      await prisma.orderItem.updateMany({
+        where: {
+          OR: [
+            { productId },
+            { productName: oldName },
+          ],
+        },
+        data: {
+          productName: newName,
+        },
+      });
+
+      // 2. Propagate name to SalesReturn items JSON
+      const salesReturns = await prisma.salesReturn.findMany({
+        where: {
+          items: { contains: oldName },
+        },
+      });
+      for (const sr of salesReturns) {
+        try {
+          const parsed = JSON.parse(sr.items);
+          let changed = false;
+          for (const it of parsed) {
+            if (it.productName === oldName) {
+              it.productName = newName;
+              changed = true;
+            }
+          }
+          if (changed) {
+            await prisma.salesReturn.update({
+              where: { id: sr.id },
+              data: { items: JSON.stringify(parsed) },
+            });
+          }
+        } catch (e) {
+          console.error("Failed to update sales return item name:", e);
+        }
+      }
+
+      // 3. Create AuditLog entry
+      try {
+        await prisma.auditLog.create({
+          data: {
+            action: "PRODUCT_NAME_CHANGE",
+            actorType: "ADMIN",
+            actorName: "Admin",
+            entityType: "Product",
+            entityId: String(productId),
+            details: `Updated product #${productId} name from "${oldName}" to "${newName}". Propagated across all OrderItems (Invoices/Bills), Stock, and Profit records.`,
+          },
+        });
+      } catch {}
+    }
 
     // Check if any color variant became sold out from this update
     if (body.setsColorwise !== undefined && existing.setsColorwise) {
