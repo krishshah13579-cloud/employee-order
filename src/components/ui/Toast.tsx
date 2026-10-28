@@ -25,13 +25,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const toast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
+    // On mobile screens (< 768px), suppress toasts completely (mobile shows native-style notifications only)
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      return;
+    }
+
     const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : Math.random().toString(36).substring(2) + Date.now().toString(36);
-    setToasts((prev) => [...prev, { id, message, type }]);
+
+    // Keep only 1 notification/toast at a time — replace previous rather than stacking multiple
+    setToasts([{ id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 3500);
   }, []);
 
   const dismiss = (id: string) => {
@@ -41,8 +48,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      {/* Toast Container */}
-      <div className="fixed top-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
+      {/* Toast Container - Hidden on mobile view (< 768px/sm); desktop only */}
+      <div className="hidden sm:flex fixed top-5 right-5 z-[100] flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}

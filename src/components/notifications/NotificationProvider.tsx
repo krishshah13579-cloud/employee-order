@@ -473,11 +473,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             playSynthesizedChime();
           }
 
-          // 3. Fallback toast - Skip in mobile view (send only notification on mobile)
-          const isMobileView = typeof window !== "undefined" && window.innerWidth < 768;
-          if (!isMobileView) {
-            toast(topItem.title, "info");
-          }
+          // 3. Only 1 notification shown (in-app banner above), no duplicate toast triggered
 
           // 4. Trigger system push notification with strict tag deduplication
           if (
