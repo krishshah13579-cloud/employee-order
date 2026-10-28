@@ -35,10 +35,13 @@ self.addEventListener("push", (event) => {
     try {
       const payload = event.data.json();
       const title = payload.title || "OBEXA Wholesale";
+      const notifTag = payload.tag || payload.id || `iq_${title.replace(/\s+/g, '_').toLowerCase()}`;
       const options = {
         body: payload.body || "New update from administration",
         icon: payload.icon || "/apple-touch-icon.png",
         badge: "/apple-touch-icon.png",
+        tag: notifTag,
+        renotify: false,
         vibrate: [120, 60, 120],
         data: {
           url: payload.url || "/",

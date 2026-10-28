@@ -249,7 +249,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         playSynthesizedChime();
       }
 
-      // Trigger system push notification if enabled
+      // Trigger system push notification if enabled (deduplicated by tag)
       if (
         typeof window !== "undefined" &&
         "Notification" in window &&
@@ -262,14 +262,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 body: subtitle,
                 icon: "/apple-touch-icon.png",
                 badge: "/apple-touch-icon.png",
+                tag: newItem.id,
+                renotify: false,
                 data: { url: link || "/notification" },
-              });
+              } as any);
             });
           } else {
             new Notification(title, {
               body: subtitle,
               icon: "/apple-touch-icon.png",
-            });
+              tag: newItem.id,
+            } as any);
           }
         } catch (e) {
           console.warn("Push trigger skipped:", e);
@@ -470,10 +473,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             playSynthesizedChime();
           }
 
-          // 3. Fallback toast
-          toast(topItem.title, "info");
+          // 3. Fallback toast - Skip in mobile view (send only notification on mobile)
+          const isMobileView = typeof window !== "undefined" && window.innerWidth < 768;
+          if (!isMobileView) {
+            toast(topItem.title, "info");
+          }
 
-          // 4. Trigger system push notification if granted
+          // 4. Trigger system push notification with strict tag deduplication
           if (
             typeof window !== "undefined" &&
             "Notification" in window &&
@@ -486,13 +492,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                   body: topItem.subtitle,
                   icon: "/apple-touch-icon.png",
                   badge: "/apple-touch-icon.png",
+                  tag: topItem.id,
+                  renotify: false,
                   data: { url: topItem.link },
-                });
+                } as any);
               } else {
                 new Notification(topItem.title, {
                   body: topItem.subtitle,
                   icon: "/apple-touch-icon.png",
-                });
+                  tag: topItem.id,
+                } as any);
               }
             } catch (err) {
               console.warn("Push trigger skipped:", err);

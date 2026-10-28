@@ -266,7 +266,7 @@ export default function OrdersView({
               }`}
             >
               <Plus size={16} />
-              <span>{activeTab === "BILLS" ? "+ Generate Bill (Without GST)" : "Book New Order"}</span>
+              <span>{activeTab === "BILLS" ? "Generate Bill (Without GST)" : "Book New Order"}</span>
             </Link>
           )}
         </div>
@@ -465,7 +465,7 @@ export default function OrdersView({
                               className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
                             >
                               <Plus size={14} />
-                              <span>+ Generate Bill (Without GST)</span>
+                              <span>Generate Bill (Without GST)</span>
                             </Link>
                           )}
                         </div>

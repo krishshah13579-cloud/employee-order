@@ -26,6 +26,8 @@ interface ProductItem {
 
 export default function ProductTable({ products }: { products: ProductItem[] }) {
   const router = useRouter();
+  // Filter out any out-of-stock products
+  const inStockProducts = products.filter((p) => (p.stock || 0) > 0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<ProductItem | null>(null);
   const [viewingInventoryProduct, setViewingInventoryProduct] = useState<ProductItem | null>(null);
@@ -122,7 +124,7 @@ export default function ProductTable({ products }: { products: ProductItem[] }) 
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          {products.length === 0 ? (
+          {inStockProducts.length === 0 ? (
             <div className="py-16 px-6 text-center">
               <div className="w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center mx-auto mb-4 text-neutral-400">
                 <Package className="w-8 h-8" />
@@ -154,7 +156,7 @@ export default function ProductTable({ products }: { products: ProductItem[] }) 
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {products.map((product) => {
+                {inStockProducts.map((product) => {
                   const imageSrc = getFirstImage(product.images);
                   const photoCount = getImageCount(product.images);
                   const hasValidImage = isValidImageSrc(imageSrc) && !imageErrors[product.id];

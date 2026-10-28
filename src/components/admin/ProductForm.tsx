@@ -1993,35 +1993,27 @@ export default function ProductForm({
               </div>
             </div>
 
-            {/* Costing & Loose Stock (Mix Pcs) for Admin Stock Tab */}
+            {/* Costing (Locked & Managed exclusively via Costing Master) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200/60">
-              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/80">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
                     Costing / Piece (₹)
                   </label>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded">
-                    Inventory Valuation
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                    Locked
                   </span>
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3 top-2 text-emerald-600 font-bold text-xs">₹</span>
+                  <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">₹</span>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.costPrice ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        costPrice: e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    placeholder="e.g. 450"
-                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-emerald-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-600 font-mono font-bold text-emerald-950"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formData.costPrice !== null && formData.costPrice !== undefined && formData.costPrice !== "" ? formData.costPrice : "—"}
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-sm font-mono font-bold text-slate-700 cursor-not-allowed select-none"
                   />
                 </div>
-                <p className="text-[10px] text-emerald-700 mt-1">Costing basis shown on Admin Stock tab to calculate total valuation</p>
               </div>
             </div>
           </div>

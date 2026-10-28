@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, hashPassword } from "@/lib/auth-security";
 import { recordAuditLog } from "@/lib/audit";
+import { sendWebPushNotification } from "@/lib/web-push";
 
 const SAFE_EMPLOYEE_SELECT = {
   id: true,
@@ -144,6 +145,20 @@ export async function PATCH(
       data: updateData,
       select: SAFE_EMPLOYEE_SELECT,
     });
+
+    // If access was granted or revoked, send background Web Push Notification
+    if (body.isActive !== undefined) {
+      sendWebPushNotification({
+        title: body.isActive
+          ? "IQ TROUSERS — Account Access Approved"
+          : "IQ TROUSERS — Account Access Suspended",
+        body: body.isActive
+          ? `Welcome ${employee.name}! Your portal account is active.`
+          : `Hello ${employee.name}, your portal access has been revoked by administration.`,
+        url: body.isActive ? "/" : "/auth/access",
+        tag: `emp_active_${employee.id}_${body.isActive ? '1' : '0'}`,
+      }).catch(() => {});
+    }
 
     await recordAuditLog({
       action: "EMPLOYEE_PATCHED",

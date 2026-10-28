@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { generateRandomCode } from "@/lib/device-gate";
 import { dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { recordAuditLog } from "@/lib/audit";
+import { sendWebPushNotification } from "@/lib/web-push";
 
 export async function GET(req: NextRequest) {
   try {
@@ -191,10 +192,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
       }
 
-      await prisma.authorizedDevice.update({
+      const updatedDev = await prisma.authorizedDevice.update({
         where: { deviceId },
         data: { isActive: false },
       });
+
+      // Dispatch Web Push to background / closed installed Chrome PWA
+      sendWebPushNotification({
+        title: "IQ TROUSERS — Device Access Revoked",
+        body: `Access for device (${updatedDev.employeeName || "Employee"}) was revoked by Admin.`,
+        url: "/auth/access",
+        tag: `device_revoked_${deviceId}`,
+      }).catch(() => {});
 
       await recordAuditLog({
         action: "DEVICE_REVOKED",
@@ -218,10 +227,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
       }
 
-      await prisma.authorizedDevice.update({
+      const updatedDev = await prisma.authorizedDevice.update({
         where: { deviceId },
         data: { isActive: true },
       });
+
+      // Dispatch Web Push to background / closed installed Chrome PWA
+      sendWebPushNotification({
+        title: "IQ TROUSERS — Device Access Approved",
+        body: `Admin has approved your device access! You can now use the portal.`,
+        url: "/",
+        tag: `device_active_${deviceId}`,
+      }).catch(() => {});
 
       return NextResponse.json({
         success: true,

@@ -119,6 +119,38 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // 4. Access & Security Notifications (Device Allowed/Revoked, Access Updates)
+    const recentAuditLogs = await prisma.auditLog.findMany({
+      where: {
+        action: {
+          in: [
+            "DEVICE_REVOKED",
+            "DEVICE_INVITE_SENT_WHATSAPP",
+            "DEVICE_INVITE_GENERATED",
+            "EMPLOYEE_PATCHED",
+          ],
+        },
+      },
+      take: 15,
+      orderBy: { createdAt: "desc" },
+    }).catch(() => []);
+
+    for (const a of recentAuditLogs) {
+      notifications.push({
+        id: `audit-${a.id}`,
+        type: "ORDER_STATUS",
+        title: a.action.includes("REVOKED")
+          ? "🔒 Security Update: Device Access Revoked"
+          : "🔑 Access Update: Device Authorized",
+        subtitle: a.details || "Authorization status updated by administration",
+        timestamp: a.createdAt,
+        link: "/notification",
+        badgeColor: a.action.includes("REVOKED")
+          ? "bg-red-100 text-red-800 border-red-300"
+          : "bg-emerald-100 text-emerald-800 border-emerald-300",
+      });
+    }
+
     // Sort newest first
     notifications.sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()

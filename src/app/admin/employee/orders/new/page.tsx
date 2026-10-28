@@ -14,6 +14,7 @@ import {
   Percent,
   Save,
   Loader2,
+  ShoppingBag,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
@@ -92,8 +93,49 @@ export default function NewOrderPage() {
             })
             .catch(() => {});
 
-          // Pre-populate with first product if available
-          if (prods.length > 0) {
+          // Check if there is an active draft with items
+          let loadedFromDraft = false;
+          try {
+            const rawDraft = localStorage.getItem("garmentpro_order_draft");
+            if (rawDraft) {
+              const draft = JSON.parse(rawDraft);
+              if (draft) {
+                if (draft.customerId) {
+                  setSelectedCustomerId(Number(draft.customerId));
+                }
+                if (Array.isArray(draft.items) && draft.items.length > 0) {
+                  const converted = draft.items.map((it: any) => {
+                    const prod = prods.find((p) => p.id === it.productId || p.name === it.productName);
+                    const colors = prod
+                      ? getAllProductColors(prod.colorsAvailable, prod.setsColorwise, prod.colorMapping)
+                      : [];
+                    let cSets = it.colorSets || [];
+                    if (typeof cSets === "string") {
+                      try { cSets = JSON.parse(cSets); } catch { cSets = []; }
+                    }
+                    return {
+                      productId: it.productId || prod?.id || 0,
+                      productName: it.productName || prod?.name || "Garment",
+                      colorsAvailable: colors.length > 0 ? colors : (Array.isArray(cSets) ? cSets.map((c: any) => c.color) : []),
+                      colorSets: Array.isArray(cSets) && cSets.length > 0 ? cSets : colors.map((col, idx) => ({ color: col, sets: idx === 0 ? 2 : 1 })),
+                      sizesRatio: it.sizeRatio || it.sizesRatio || prod?.sizesRatio || "30 to 38",
+                      sizesList: it.sizesList || prod?.sizesList || "30, 32, 34, 36, 38",
+                      pcsPerSet: it.pcsPerSet || prod?.pcsPerSet || 5,
+                      unitPrice: it.unitPrice || prod?.price || 490,
+                      notes: it.notes || "",
+                    };
+                  });
+                  if (converted.length > 0) {
+                    setOrderItems(converted);
+                    loadedFromDraft = true;
+                  }
+                }
+              }
+            }
+          } catch {}
+
+          // Pre-populate with first product if no draft items available
+          if (!loadedFromDraft && prods.length > 0) {
             const first = prods[0];
             const colors = getAllProductColors(
               first.colorsAvailable,
@@ -159,6 +201,23 @@ export default function NewOrderPage() {
         notes: "",
       },
     ]);
+  };
+
+  const handleRedirectToProductsCatalog = () => {
+    try {
+      const draftToSave = {
+        customerId: selectedCustomerId,
+        customerName: activeCustomer?.shopName,
+        items: orderItems,
+      };
+      localStorage.setItem("garmentpro_order_draft", JSON.stringify(draftToSave));
+      window.dispatchEvent(new Event("garmentpro_draft_updated"));
+    } catch {}
+
+    const returnUrl = isBillMode
+      ? "/admin/employee/orders/new?billType=non_gst"
+      : "/admin/employee/orders/new";
+    router.push(`/products?returnTo=${encodeURIComponent(returnUrl)}`);
   };
 
   const handleRemoveOrderItem = (index: number) => {
@@ -327,6 +386,10 @@ export default function NewOrderPage() {
       });
 
       if (res.ok) {
+        try {
+          localStorage.removeItem("garmentpro_order_draft");
+          window.dispatchEvent(new Event("garmentpro_draft_updated"));
+        } catch {}
         const data = await res.json();
         if (effectiveIsBillWithoutGst) {
           toast(`Wholesale Bill (Without GST) #${manualBillNumber.trim() || data.orderNumber} generated successfully!`, "success");
@@ -643,14 +706,24 @@ export default function NewOrderPage() {
               Select garments, allocate sets color-wise (A-2, B-3), and verify piece calculations.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleAddProductToOrder}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-950 text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Add Item</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRedirectToProductsCatalog}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+            >
+              <ShoppingBag size={14} />
+              <span>Add Products (/products)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAddProductToOrder}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-950 text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Add Item</span>
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">

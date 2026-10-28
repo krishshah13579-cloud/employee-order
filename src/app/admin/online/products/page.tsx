@@ -9,7 +9,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminProductsPage() {
   let products: any[] = [];
   try {
+    // Strictly filter out any out-of-stock products (stock > 0 only)
     products = await prisma.ecommerceProduct.findMany({
+      where: {
+        stock: { gt: 0 },
+      },
       include: {
         category: {
           select: {

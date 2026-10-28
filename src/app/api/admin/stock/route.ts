@@ -126,8 +126,16 @@ export async function GET(request: NextRequest) {
     let soldProfitBreakdown: any[] = [];
     let billProfitBreakdown: any[] = [];
 
-    // Calculate aggregated sold units & profit from all non-cancelled orders only when requested (e.g. /admin/profit)
+    // Calculate aggregated sold units & profit as per PRODUCT SOLD (unit costing sourced from Costing Master)
     if (includeProfit) {
+      // Fetch latest Total Costing for each design from Costing Master
+      const costingRecords = await prisma.productCosting.findMany();
+      const costingMap = new Map<string, number>();
+      for (const c of costingRecords) {
+        costingMap.set(c.designNo.trim().toUpperCase(), c.totalCosting);
+      }
+
+      // Query all non-cancelled orders (including Without GST bills), ordered with newest on top
       const soldOrders = await prisma.order.findMany({
         where: {
           status: { not: "Cancelled" },
@@ -148,7 +156,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: { id: "asc" },
+        orderBy: { id: "desc" }, // Newer bills on top, older bills at bottom
       });
 
       const soldPerProductMap = new Map<
@@ -168,23 +176,30 @@ export async function GET(request: NextRequest) {
       >();
 
       for (const order of soldOrders) {
+        // Exclude any bill containing "Imported Trousers Mix" from profit calculation
+        const hasImportedTrouserMix = order.items.some((it) => {
+          const name = (it.productName || it.product?.name || "").toUpperCase();
+          return name.includes("IMPORTED TROUSER") || name.includes("IMPORTED TROUSERS MIX");
+        });
+        if (hasImportedTrouserMix) {
+          continue; // Skip bill containing Imported Trousers Mix
+        }
+
         let orderUnits = 0;
         let orderRev = 0;
         let orderCost = 0;
 
         for (const item of order.items) {
-          const prodName = (item.productName || item.product?.name || "").toUpperCase();
-          if (prodName.includes("IMPORTED TROUSER")) {
-            continue; // Skip transport miscellaneous products from profit and sold metrics
-          }
+          const prodName = (item.productName || item.product?.name || "").trim().toUpperCase();
 
           const pcs = item.totalPcs || 0;
           const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
 
-          // Accurate unit costing:
-          // If product costPrice is explicitly configured, use it; otherwise default to 70% of actual selling rate
+          // Unit costing: dynamically sourced from Costing Page (Total Costing)
           let prodCost = 0;
-          if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
+          if (costingMap.has(prodName)) {
+            prodCost = costingMap.get(prodName)!;
+          } else if (item.product?.costPrice !== null && item.product?.costPrice !== undefined) {
             prodCost = item.product.costPrice;
           } else {
             prodCost = Math.round(item.unitPrice * 0.7);
