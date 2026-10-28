@@ -1424,6 +1424,7 @@ export default function ProductForm({
           isEdit ? "Garment updated successfully!" : "New wholesale garment added!",
           "success"
         );
+        router.refresh();
         router.push("/admin/employee/products");
       } else {
         const err = await res.json();

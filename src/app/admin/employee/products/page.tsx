@@ -125,9 +125,10 @@ export default function ProductsPage() {
       if (categoryFilter !== "All" && categoryFilter !== "__deleted__") {
         url += `category=${encodeURIComponent(categoryFilter)}&`;
       }
-      if (search) url += `search=${encodeURIComponent(search)}`;
+      if (search) url += `search=${encodeURIComponent(search)}&`;
+      url += `_t=${Date.now()}`;
 
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {
         let data: ProductData[] = await res.json();
         if (categoryFilter === "__deleted__") {
