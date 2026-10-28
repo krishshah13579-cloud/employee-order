@@ -59,6 +59,7 @@ model Employee {
   isTeamLeader  Boolean  @default(false) // T.L. has unrestricted 24*7 access to employee panel
   canEditOrders Boolean  @default(false) // Admin approval to edit pending order forms
   canUpdateStock Boolean @default(false) // Admin approval to update inventory stock
+  canAddPreviousBills Boolean @default(false) // Checkbox to allow T.L. / employee to add previous bills (Without GST)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -71,6 +72,7 @@ model AccessoryItem {
   id          Int      @id @default(autoincrement())
   name        String
   category    String   // "Buttons", "Tags", "Size Label", "Flag Label", "Zippers", "Thread", "Packaging", "Other"
+  imageUrl    String?  // Photo of the trim/button/tag
   quantity    Int      @default(0)
   unit        String   @default("Pcs") // "Pcs", "Gross", "Meters", "Rolls", "Boxes"
   minAlertQty Int      @default(100)
@@ -78,6 +80,14 @@ model AccessoryItem {
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@schema("wholesale")
+}
+
+model AccessoryType {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
 
   @@schema("wholesale")
 }
@@ -211,6 +221,8 @@ model Order {
   taxInvoiceDate   DateTime?   // Tax Invoice date set by admin
   taxInvoiceItems  String?     // JSON string of updated items with modified quantities/amounts for tax invoice
   templateOverrides String?    // JSON string of order-specific template overrides (e.g. customized company name, terms, bank details)
+  isPreviousBill   Boolean     @default(false) // Historical / Previous Bill (Without GST)
+  previousBillDate DateTime?   // Custom past date for previous bill
   notes            String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

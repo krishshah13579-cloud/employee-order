@@ -12,6 +12,7 @@ export interface EmployeeSession {
   isTeamLeader?: boolean;
   canEditOrders?: boolean;
   canUpdateStock?: boolean;
+  canAddPreviousBills?: boolean;
   mobileNumber?: string;
   email?: string;
   address?: string;

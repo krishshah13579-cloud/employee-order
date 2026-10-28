@@ -22,6 +22,9 @@ import {
   ArrowUpRight,
   ShieldAlert,
   FileText,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -101,6 +104,7 @@ interface AccessoryItemData {
   id: number;
   name: string;
   category: string;
+  imageUrl?: string | null;
   quantity: number;
   unit: string;
   minAlertQty: number;
@@ -254,12 +258,21 @@ export default function AdminStockPage() {
   const [accessoryForm, setAccessoryForm] = useState({
     name: "",
     category: "Buttons",
+    imageUrl: "",
     quantity: "1000",
     unit: "Pcs",
     minAlertQty: "200",
     costPerUnit: "1.00",
     notes: "",
   });
+  const [accessoryTypes, setAccessoryTypes] = useState<string[]>([
+    "Buttons", "Tags", "Size Label", "Flag Label", "Zippers", "Pocketing", "Care Label", "Others"
+  ]);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [isAddingType, setIsAddingType] = useState(false);
+  const [isManagingTypes, setIsManagingTypes] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
 
   const handleSyncStore = async () => {
     try {
@@ -307,6 +320,9 @@ export default function AdminStockPage() {
       const data = await res.json();
       setAccessories(data.items || []);
       setAccessorySummary(data.summary || null);
+      if (Array.isArray(data.types) && data.types.length > 0) {
+        setAccessoryTypes(data.types);
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -442,13 +458,15 @@ export default function AdminStockPage() {
     setEditingAccessory(null);
     setAccessoryForm({
       name: "",
-      category: "Buttons",
+      category: accessoryTypes[0] || "Buttons",
+      imageUrl: "",
       quantity: "1000",
       unit: "Pcs",
       minAlertQty: "200",
       costPerUnit: "1.00",
       notes: "",
     });
+    setIsManagingTypes(false);
     setIsAddAccessoryOpen(true);
   };
 
@@ -457,13 +475,77 @@ export default function AdminStockPage() {
     setAccessoryForm({
       name: item.name,
       category: item.category,
+      imageUrl: item.imageUrl || "",
       quantity: String(item.quantity),
       unit: item.unit,
       minAlertQty: String(item.minAlertQty),
       costPerUnit: String(item.costPerUnit),
       notes: item.notes || "",
     });
+    setIsManagingTypes(false);
     setIsAddAccessoryOpen(true);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setAccessoryForm((prev) => ({ ...prev, imageUrl: data.url }));
+      toast("Trim photo uploaded successfully!", "success");
+    } catch (err: any) {
+      toast(err.message || "Failed to upload photo", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleAddAccessoryType = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newTypeName.trim();
+    if (!trimmed) return;
+    try {
+      const res = await fetch("/api/admin/stock/accessories/types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to add trim type");
+      setAccessoryTypes(data.types || [...accessoryTypes, trimmed]);
+      setAccessoryForm((prev) => ({ ...prev, category: trimmed }));
+      setNewTypeName("");
+      setIsAddingType(false);
+      toast(`Added trim type: "${trimmed}"`, "success");
+    } catch (err: any) {
+      toast(err.message || "Failed to add trim type", "error");
+    }
+  };
+
+  const handleDeleteAccessoryType = async (typeName: string) => {
+    if (!confirm(`Are you sure you want to delete trim type "${typeName}"?`)) return;
+    try {
+      const res = await fetch(`/api/admin/stock/accessories/types?name=${encodeURIComponent(typeName)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete trim type");
+      setAccessoryTypes(data.types || accessoryTypes.filter((t) => t !== typeName));
+      if (accessoryForm.category === typeName) {
+        setAccessoryForm((prev) => ({ ...prev, category: data.types?.[0] || "Buttons" }));
+      }
+      toast(`Deleted trim type "${typeName}"`, "success");
+    } catch (err: any) {
+      toast(err.message || "Failed to delete trim type", "error");
+    }
   };
 
   const handleSaveAccessory = async (e: React.FormEvent) => {
@@ -476,6 +558,7 @@ export default function AdminStockPage() {
       const payload: any = {
         name: accessoryForm.name.trim(),
         category: accessoryForm.category.trim(),
+        imageUrl: accessoryForm.imageUrl.trim() || null,
         quantity: parseInt(accessoryForm.quantity, 10) || 0,
         unit: accessoryForm.unit.trim() || "Pcs",
         minAlertQty: parseInt(accessoryForm.minAlertQty, 10) || 0,
@@ -997,7 +1080,7 @@ export default function AdminStockPage() {
 
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 overflow-x-auto">
-                {ACCESSORY_CATEGORIES.map((cat) => (
+                {["All", ...accessoryTypes].map((cat) => (
                   <button
                     key={cat}
                     type="button"
@@ -1030,6 +1113,7 @@ export default function AdminStockPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                   <tr>
+                    <th className="py-3 px-3 w-14 text-center">Photo</th>
                     <th className="py-3 px-4">Trim / Accessory Name</th>
                     <th className="py-3 px-4">Category</th>
                     <th className="py-3 px-4 text-center">Current Stock</th>
@@ -1044,14 +1128,14 @@ export default function AdminStockPage() {
                 <tbody className="divide-y divide-slate-100">
                   {accessoriesLoading ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-slate-300" />
                         <span>Loading accessories stock...</span>
                       </td>
                     </tr>
                   ) : filteredAccessories.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <Tag size={32} className="mx-auto mb-2 text-slate-300" />
                         <span>No trims or accessories found. Click &quot;Add Trim / Accessory&quot; above to add buttons, labels, tags, etc.</span>
                       </td>
@@ -1063,6 +1147,22 @@ export default function AdminStockPage() {
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-2.5 px-3 text-center">
+                            {item.imageUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewingImage({ url: item.imageUrl!, title: item.name })}
+                                className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-2xs block"
+                                title="Click to view full photo"
+                              >
+                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                              </button>
+                            ) : (
+                              <div className="w-10 h-10 mx-auto rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300">
+                                <ImageIcon size={16} />
+                              </div>
+                            )}
+                          </td>
                           <td className="py-3 px-4">
                             <span className="font-bold text-slate-900 block text-xs">
                               {item.name}
@@ -1443,6 +1543,52 @@ export default function AdminStockPage() {
             </div>
 
             <form onSubmit={handleSaveAccessory} className="space-y-4">
+              {/* Photo Upload & Preview */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Trim Photo
+                </label>
+                <div className="flex items-center gap-3">
+                  {accessoryForm.imageUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl border border-slate-300 overflow-hidden bg-slate-100 shrink-0 shadow-2xs group">
+                      <img src={accessoryForm.imageUrl} alt="Trim Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setAccessoryForm({ ...accessoryForm, imageUrl: "" })}
+                        className="absolute top-0 right-0 p-1 bg-red-600 text-white rounded-bl-lg hover:bg-red-700 transition cursor-pointer"
+                        title="Remove photo"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 flex flex-col items-center justify-center cursor-pointer transition text-slate-400 hover:text-blue-600 shrink-0">
+                      {uploadingImage ? (
+                        <Loader2 size={18} className="animate-spin text-blue-600" />
+                      ) : (
+                        <>
+                          <Upload size={18} />
+                          <span className="text-[9px] font-bold mt-0.5">Upload</span>
+                        </>
+                      )}
+                      <input type="file" accept="image/*" disabled={uploadingImage} onChange={handlePhotoUpload} className="hidden" />
+                    </label>
+                  )}
+                  <div className="text-xs text-slate-500">
+                    {uploadingImage ? (
+                      <span className="text-blue-600 font-bold flex items-center gap-1">
+                        <Loader2 size={13} className="animate-spin" /> Uploading image...
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-medium text-slate-700 block">Photo of Button, Tag, or Trim Piece</span>
+                        <span className="text-[11px] text-slate-400">JPG, PNG, or WEBP (Max 10MB)</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Item Name *
@@ -1450,45 +1596,124 @@ export default function AdminStockPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. IQ Shank Button 24L, Trouser Hangtag, Woven Size Label"
+                  placeholder="e.g. IQ Shank Button 24L, Trouser Hangtag, Woven Size Label, ID"
                   value={accessoryForm.name}
                   onChange={(e) => setAccessoryForm({ ...accessoryForm, name: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    value={accessoryForm.category}
-                    onChange={(e) => setAccessoryForm({ ...accessoryForm, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
-                  >
-                    <option value="Buttons">Buttons</option>
-                    <option value="Tags">Tags</option>
-                    <option value="Size Label">Size Label</option>
-                    <option value="Flag Label">Flag Label</option>
-                    <option value="Zippers">Zippers</option>
-                    <option value="Pocketing">Pocketing</option>
-                    <option value="Care Label">Care Label</option>
-                    <option value="Others">Others</option>
-                  </select>
+              {/* Category / Type Selector & Management */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Type / Category *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsManagingTypes(!isManagingTypes)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      >
+                        {isManagingTypes ? "Done" : "+ Add / Manage Types"}
+                      </button>
+                    </div>
+                    <select
+                      value={accessoryForm.category}
+                      onChange={(e) => {
+                        if (e.target.value === "__NEW__") {
+                          setIsManagingTypes(true);
+                          setIsAddingType(true);
+                        } else {
+                          setAccessoryForm({ ...accessoryForm, category: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                    >
+                      {accessoryTypes.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                      <option value="__NEW__">+ Add New Type...</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Unit (e.g. Pcs, Meters)
+                    </label>
+                    <input
+                      type="text"
+                      value={accessoryForm.unit}
+                      onChange={(e) => setAccessoryForm({ ...accessoryForm, unit: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Unit (e.g. Pcs, Meters)
-                  </label>
-                  <input
-                    type="text"
-                    value={accessoryForm.unit}
-                    onChange={(e) => setAccessoryForm({ ...accessoryForm, unit: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-600 outline-none"
-                  />
-                </div>
+                {/* Manage / Add Types Drawer inside Modal */}
+                {isManagingTypes && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-950 uppercase tracking-wider">
+                        Manage Trim Types (Button, Tag, ID, etc.)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsManagingTypes(false)}
+                        className="text-[11px] text-blue-600 font-bold hover:underline"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    {/* Inline Add Type Input */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type name (e.g. ID, Rivet, Patch)..."
+                        value={newTypeName}
+                        onChange={(e) => setNewTypeName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddAccessoryType();
+                          }
+                        }}
+                        className="flex-1 px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddAccessoryType()}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
+                      >
+                        + Add Type
+                      </button>
+                    </div>
+
+                    {/* List of existing types with delete */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-blue-200">
+                      {accessoryTypes.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-white text-slate-800 border border-blue-200 shadow-2xs"
+                        >
+                          <span>{t}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAccessoryType(t)}
+                            className="text-slate-400 hover:text-red-600 transition cursor-pointer p-0.5 rounded hover:bg-red-50"
+                            title={`Delete type "${t}"`}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -1780,6 +2005,41 @@ export default function AdminStockPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          TRIM PHOTO VIEWER MODAL
+          ═══════════════════════════════════════════ */}
+      {viewingImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setViewingImage(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl space-y-3 animate-in fade-in duration-150 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <span className="text-sm font-bold text-slate-900 truncate">
+                {viewingImage.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewingImage(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="w-full max-h-[70vh] flex items-center justify-center bg-slate-50 rounded-xl overflow-hidden">
+              <img
+                src={viewingImage.url}
+                alt={viewingImage.title}
+                className="w-full h-auto max-h-[68vh] object-contain"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ const SAFE_EMPLOYEE_SELECT = {
   isTeamLeader: true,
   canEditOrders: true,
   canUpdateStock: true,
+  canAddPreviousBills: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -76,6 +77,7 @@ export async function PUT(
         isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
         canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
         canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
+        canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,
@@ -135,6 +137,9 @@ export async function PATCH(
     }
     if (body.canUpdateStock !== undefined) {
       updateData.canUpdateStock = Boolean(body.canUpdateStock);
+    }
+    if (body.canAddPreviousBills !== undefined) {
+      updateData.canAddPreviousBills = Boolean(body.canAddPreviousBills);
     }
     if (body.pin !== undefined && body.pin.trim()) {
       updateData.pin = hashPassword(body.pin.trim());

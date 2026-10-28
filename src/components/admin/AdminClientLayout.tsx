@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Calculator,
+  Boxes,
+  FileText,
+  Menu,
+} from "lucide-react";
 import AdminSidebarNav from "./AdminSidebarNav";
 import AdminTopHeader from "./AdminTopHeader";
 
@@ -66,12 +74,74 @@ export default function AdminClientLayout({
             mobileMenuOpen={mobileMenuOpen}
           />
         </div>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto print:p-0 print:m-0 print:overflow-visible">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto pb-20 md:pb-6 print:p-0 print:m-0 print:overflow-visible">
           <div className="max-w-7xl mx-auto print:max-w-none print:m-0 print:p-0">
             {children}
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation Bar (< 768px) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg px-2 py-1.5 flex items-center justify-around print:hidden">
+        <Link
+          href="/admin/employee"
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            pathname === "/admin/employee" || pathname === "/admin"
+              ? "text-blue-600 font-bold bg-blue-50"
+              : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <LayoutDashboard size={18} />
+          <span className="text-[10px] mt-0.5">Overview</span>
+        </Link>
+
+        <Link
+          href="/admin/employee/costing"
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            pathname.includes("/costing")
+              ? "text-blue-600 font-bold bg-blue-50"
+              : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <Calculator size={18} />
+          <span className="text-[10px] mt-0.5">Costing</span>
+        </Link>
+
+        <Link
+          href="/admin/employee/stock"
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            pathname.includes("/stock")
+              ? "text-blue-600 font-bold bg-blue-50"
+              : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <Boxes size={18} />
+          <span className="text-[10px] mt-0.5">Stock</span>
+        </Link>
+
+        <Link
+          href="/admin/employee/orders"
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            pathname.includes("/orders")
+              ? "text-blue-600 font-bold bg-blue-50"
+              : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <FileText size={18} />
+          <span className="text-[10px] mt-0.5">Orders</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(true)}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer ${
+            mobileMenuOpen ? "text-blue-600 font-bold bg-blue-50" : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <Menu size={18} />
+          <span className="text-[10px] mt-0.5">Menu</span>
+        </button>
+      </nav>
     </div>
   );
 }

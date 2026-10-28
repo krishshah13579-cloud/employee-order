@@ -28,10 +28,17 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const items = await prisma.accessoryItem.findMany({
-      where,
-      orderBy: [{ category: "asc" }, { name: "asc" }],
-    });
+    const [items, typesRaw] = await Promise.all([
+      prisma.accessoryItem.findMany({
+        where,
+        orderBy: [{ category: "asc" }, { name: "asc" }],
+      }),
+      (prisma as any).accessoryType.findMany({
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    const types = typesRaw.map((t: any) => t.name);
 
     const totalItems = items.length;
     const totalQuantity = items.reduce((acc, it) => acc + it.quantity, 0);
@@ -40,6 +47,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       items,
+      types,
       metrics: {
         totalItems,
         totalQuantity,
@@ -62,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, category, quantity, unit, minAlertQty, costPerUnit, notes } = body;
+    const { name, category, imageUrl, quantity, unit, minAlertQty, costPerUnit, notes } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "Item name is required" }, { status: 400 });
@@ -72,6 +80,7 @@ export async function POST(req: NextRequest) {
       data: {
         name: name.trim(),
         category: category || "Other",
+        imageUrl: imageUrl ? String(imageUrl).trim() : null,
         quantity: Math.max(0, parseInt(String(quantity), 10) || 0),
         unit: unit || "Pcs",
         minAlertQty: Math.max(0, parseInt(String(minAlertQty), 10) || 100),
@@ -96,7 +105,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, category, quantity, adjustQty, unit, minAlertQty, costPerUnit, notes } = body;
+    const { id, name, category, imageUrl, quantity, adjustQty, unit, minAlertQty, costPerUnit, notes } = body;
 
     const itemId = parseInt(String(id), 10);
     if (isNaN(itemId)) {
@@ -111,6 +120,7 @@ export async function PUT(req: NextRequest) {
     const data: any = {};
     if (name !== undefined) data.name = String(name).trim();
     if (category !== undefined) data.category = String(category).trim();
+    if (imageUrl !== undefined) data.imageUrl = imageUrl ? String(imageUrl).trim() : null;
     if (unit !== undefined) data.unit = String(unit).trim();
     if (minAlertQty !== undefined) data.minAlertQty = Math.max(0, parseInt(String(minAlertQty), 10) || 0);
     if (costPerUnit !== undefined) data.costPerUnit = Math.max(0, parseFloat(String(costPerUnit)) || 0);

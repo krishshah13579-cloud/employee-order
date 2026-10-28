@@ -75,6 +75,7 @@ interface EmployeePerformanceProfile {
   isTeamLeader: boolean;
   canEditOrders?: boolean;
   canUpdateStock?: boolean;
+  canAddPreviousBills?: boolean;
   isActive: boolean;
   createdAt?: string;
   stats: {
@@ -575,6 +576,67 @@ export default function EmployeesPage() {
       } else {
         const err = await res.json();
         toast(err.error || "Failed to update stock update permissions", "error");
+        fetchPerformanceData();
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+      fetchPerformanceData();
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // Handle Previous Bills (Without GST) permission toggle
+  const handleTogglePreviousBills = async (id: number, name: string, allowPreviousBills: boolean) => {
+    // Optimistically update perfData and employees
+    setPerfData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        employees: prev.employees.map((e) =>
+          e.id === id ? { ...e, canAddPreviousBills: allowPreviousBills } : e
+        ),
+      };
+    });
+    setEmployees((prev) =>
+      prev.map((e) =>
+        e.id === id ? { ...e, canAddPreviousBills: allowPreviousBills } : e
+      )
+    );
+
+    try {
+      setTogglingId(id);
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          canAddPreviousBills: allowPreviousBills,
+        }),
+      });
+
+      if (res.ok) {
+        toast(
+          allowPreviousBills
+            ? `✅ Previous Bills (Without GST) permission APPROVED for "${name}"!`
+            : `🔒 Previous Bills (Without GST) permission REVOKED for "${name}".`,
+          "success"
+        );
+
+        // Broadcast permission change immediately to all open employee tabs & windows
+        try {
+          const ch = new BroadcastChannel("garmentpro_perm_channel");
+          ch.postMessage({ type: "PERMISSIONS_UPDATED", employeeId: id, canAddPreviousBills: allowPreviousBills });
+          ch.close();
+        } catch {}
+        try {
+          localStorage.setItem("garmentpro_perm_sync", Date.now().toString());
+        } catch {}
+
+        fetchEmployees();
+        fetchPerformanceData();
+      } else {
+        const err = await res.json();
+        toast(err.error || "Failed to update previous bills permissions", "error");
         fetchPerformanceData();
       }
     } catch (err: any) {
@@ -1156,6 +1218,28 @@ export default function EmployeesPage() {
                           <span>Stock Update Access</span>
                         </button>
 
+                        {/* 3. Previous Bills (Without GST) Access Checkbox */}
+                        <button
+                          type="button"
+                          disabled={togglingId === selectedProfile.id}
+                          onClick={() =>
+                            handleTogglePreviousBills(selectedProfile.id, selectedProfile.name, !selectedProfile.canAddPreviousBills)
+                          }
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none shadow-2xs ${
+                            selectedProfile.canAddPreviousBills
+                              ? "bg-purple-50 border-purple-400 text-purple-900 shadow-xs"
+                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                          } ${togglingId === selectedProfile.id ? "opacity-50 pointer-events-none" : ""}`}
+                          title={selectedProfile.canAddPreviousBills ? "Click to un-tick and revoke previous bills permission" : "Click to tick and grant permission to add previous bills (without GST)"}
+                        >
+                          {selectedProfile.canAddPreviousBills ? (
+                            <CheckSquare size={16} className="text-purple-600 fill-purple-100 shrink-0" />
+                          ) : (
+                            <Square size={16} className="text-gray-400 shrink-0" />
+                          )}
+                          <span>Add Previous Bills (No GST)</span>
+                        </button>
+
                         {/* 3. Edit Employee Button */}
                         <button
                           type="button"
@@ -1492,6 +1576,7 @@ export default function EmployeesPage() {
                     <th className="py-3.5 px-6">T.L. Status (24*7 Access)</th>
                     <th className="py-3.5 px-6">Order Edit Access</th>
                     <th className="py-3.5 px-6">Stock Update Access</th>
+                    <th className="py-3.5 px-6">Previous Bills (No GST)</th>
                     <th className="py-3.5 px-6">Email Address</th>
                     <th className="py-3.5 px-6">Mobile Number</th>
                     <th className="py-3.5 px-6">Residential Address</th>
@@ -1643,6 +1728,27 @@ export default function EmployeesPage() {
                             />
                             <span className="text-xs font-bold whitespace-nowrap">
                               {emp.canUpdateStock ? "Access Allowed" : "Allow Access"}
+                            </span>
+                          </label>
+                        </td>
+                        <td className="py-4 px-6">
+                          <label
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none shadow-2xs ${
+                              emp.canAddPreviousBills
+                                ? "bg-purple-50 border-purple-300 text-purple-900 hover:bg-purple-100"
+                                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:border-gray-300"
+                            } ${togglingId === emp.id ? "opacity-50 pointer-events-none" : ""}`}
+                            title={emp.canAddPreviousBills ? "Uncheck to revoke previous bills permission" : "Check to grant permission to add previous bills (Without GST)"}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(emp.canAddPreviousBills)}
+                              disabled={togglingId === emp.id}
+                              onChange={(e) => handleTogglePreviousBills(emp.id, emp.name, e.target.checked)}
+                              className="w-4 h-4 text-purple-600 bg-white border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                            />
+                            <span className="text-xs font-bold whitespace-nowrap">
+                              {emp.canAddPreviousBills ? "Access Allowed" : "Allow Access"}
                             </span>
                           </label>
                         </td>

@@ -177,12 +177,16 @@ export async function POST(request: NextRequest) {
       body.billType === "BILL_WITHOUT_GST"
     );
 
+    const isPreviousBill = Boolean(body.isPreviousBill);
+    const previousBillDate = body.previousBillDate ? new Date(body.previousBillDate) : (isPreviousBill ? effectiveOrderDate : null);
+
     // Skip live stock deduction for:
-    // 1. Past-dated bills (warehouse stock is already present physical stock)
+    // 1. Past-dated bills or previous historical bills (warehouse stock is already present physical stock)
     // 2. Post-dated bills without GST (future-dated accounting bills)
     // 3. When explicitly requested via skipStockDeduction
     const shouldDeductStock =
       !isPastDated &&
+      !isPreviousBill &&
       !(isPostDated && isExplicitBillWithoutGst) &&
       !body.skipStockDeduction;
 
@@ -516,6 +520,8 @@ export async function POST(request: NextRequest) {
           ].filter(Boolean).join(" | ") || null,
           taxInvoiceNumber: effectiveTaxInvoiceNumber,
           taxInvoiceDate: effectiveTaxInvoiceDate || effectiveOrderDate,
+          isPreviousBill,
+          previousBillDate: isPreviousBill ? (previousBillDate || effectiveOrderDate) : null,
           items: {
             create: validatedItems,
           },

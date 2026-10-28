@@ -1,11 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Menu,
   X,
   ChevronRight,
   LogOut,
+  Download,
+  Smartphone,
+  Share,
 } from "lucide-react";
 
 interface AdminTopHeaderProps {
@@ -19,6 +23,54 @@ export default function AdminTopHeader({
 }: AdminTopHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showIOSModal, setShowIOSModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true
+      ) {
+        setIsStandalone(true);
+      }
+
+      const ua = window.navigator.userAgent.toLowerCase();
+      const isIosDevice = /iphone|ipad|ipod/.test(ua);
+      setIsIOS(isIosDevice);
+
+      const handleBeforeInstall = (e: any) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setIsInstallable(true);
+      };
+
+      window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+      return () => {
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      };
+    }
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice && choice.outcome === "accepted") {
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+      }
+    } else if (isIOS) {
+      setShowIOSModal(true);
+    } else {
+      alert("To install OBEXA ADMIN on your device: open browser options (⋮ or share menu) and tap 'Add to Home Screen' or 'Install App'.");
+    }
+  };
 
   const getPageTitle = () => {
     if (pathname === "/admin" || pathname === "/admin/employee") return "Wholesale Overview Dashboard";
@@ -95,8 +147,22 @@ export default function AdminTopHeader({
           </div>
         </div>
 
-        {/* Right: Security Badge, Admin User Pill, Sign Out */}
+        {/* Right: Install App, Security Badge, Admin User Pill, Sign Out */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Install OBEXA ADMIN Web App Button */}
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-xs transition cursor-pointer shrink-0"
+              title="Install OBEXA ADMIN app on your phone or PC"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Install OBEXA ADMIN</span>
+              <span className="sm:hidden">Install App</span>
+            </button>
+          )}
+
           {/* Security Status Badge */}
           <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -132,6 +198,56 @@ export default function AdminTopHeader({
           </button>
         </div>
       </div>
+
+      {/* iOS Safari PWA Installation Instructions Modal */}
+      {showIOSModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowIOSModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-orange-600" />
+                <h3 className="text-sm font-bold text-gray-900">Install OBEXA ADMIN</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIOSModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-gray-600">
+              <p>Install the OBEXA ADMIN Web App on your iPhone or iPad for quick 1-tap full-screen access:</p>
+              <ol className="list-decimal pl-5 space-y-2 font-medium">
+                <li>
+                  Tap the <span className="font-bold text-gray-900 inline-flex items-center gap-1"><Share className="w-3.5 h-3.5 text-blue-600 inline" /> Share</span> icon in Safari&apos;s bottom toolbar.
+                </li>
+                <li>
+                  Scroll down the menu and tap <span className="font-bold text-gray-900">&quot;Add to Home Screen&quot;</span>.
+                </li>
+                <li>
+                  Tap <span className="font-bold text-orange-600">&quot;Add&quot;</span> in the top-right corner.
+                </li>
+              </ol>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowIOSModal(false)}
+              className="w-full py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

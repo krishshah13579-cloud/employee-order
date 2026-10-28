@@ -59,6 +59,7 @@ export default function NewOrderPage() {
   const [manualBillNumber, setManualBillNumber] = useState<string>("");
   const [isBillMode, setIsBillMode] = useState<boolean>(false);
   const [skipStockDeduction, setSkipStockDeduction] = useState<boolean>(true);
+  const [isPreviousBill, setIsPreviousBill] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -371,6 +372,8 @@ export default function NewOrderPage() {
           manualBillNumber: effectiveIsBillWithoutGst ? manualBillNumber.trim() : undefined,
           isBillWithoutGst: effectiveIsBillWithoutGst,
           billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
+          isPreviousBill: effectiveIsBillWithoutGst ? isPreviousBill : false,
+          previousBillDate: effectiveIsBillWithoutGst && isPreviousBill ? (orderDate || undefined) : undefined,
           taxInvoiceDate: customTaxInvoiceDate || orderDate || undefined,
           orderDate,
           skipStockDeduction,
@@ -598,6 +601,22 @@ export default function NewOrderPage() {
                   />
                   <label htmlFor="skipStockCheck" className="text-[11px] font-medium text-emerald-950 cursor-pointer">
                     Do not deduct from live inventory stock (Recommended for past-dated & post-dated bills)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2 p-2.5 bg-purple-50/80 rounded-xl border border-purple-200">
+                  <input
+                    type="checkbox"
+                    id="isPreviousBillCheck"
+                    checked={isPreviousBill}
+                    onChange={(e) => {
+                      setIsPreviousBill(e.target.checked);
+                      if (e.target.checked) setSkipStockDeduction(true);
+                    }}
+                    className="w-4 h-4 text-purple-600 rounded border-purple-300 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <label htmlFor="isPreviousBillCheck" className="text-[11px] font-bold text-purple-950 cursor-pointer">
+                    Previous Bill (Without GST) — Mark as historical past bill (bypasses live inventory deduction)
                   </label>
                 </div>
 

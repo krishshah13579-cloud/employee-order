@@ -48,6 +48,7 @@ export async function GET(_req: NextRequest) {
           isTeamLeader: true,
           canEditOrders: true,
           canUpdateStock: true,
+          canAddPreviousBills: true,
           mobileNumber: "",
           isActive: true,
         },
@@ -66,6 +67,7 @@ export async function GET(_req: NextRequest) {
         isTeamLeader: true,
         canEditOrders: true,
         canUpdateStock: true,
+        canAddPreviousBills: true,
         mobileNumber: true,
         isActive: true,
       },
@@ -94,6 +96,7 @@ export async function GET(_req: NextRequest) {
       employee: {
         ...employee,
         isTeamLeader: isTL,
+        canAddPreviousBills: Boolean(employee.canAddPreviousBills || isTL),
       },
     });
   } catch (error: any) {

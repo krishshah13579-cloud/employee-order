@@ -63,20 +63,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send an immediate test welcome push
-    try {
-      await sendWebPushNotification(
-        {
-          title: "🎉 IQ TROUSERS Push Active!",
-          body: "You will now receive instant lock-screen alerts for new articles, orders, and status updates even when the app is closed.",
-          url: "/notification",
-        },
-        { employeeId: employeeId ? Number(employeeId) : undefined }
-      );
-    } catch (e) {
-      // Non-blocking
-    }
-
+    // Subscription saved silently without sending annoying push notification on every app launch
     return NextResponse.json({
       success: true,
       message: "Push subscription saved successfully.",

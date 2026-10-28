@@ -180,6 +180,7 @@ function OrderFormContent() {
   const [moveToBillWithoutGst, setMoveToBillWithoutGst] = useState<boolean>(true);
   const [manualBillNumber, setManualBillNumber] = useState<string>("");
   const [orderDateInput, setOrderDateInput] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [isPreviousBill, setIsPreviousBill] = useState<boolean>(false);
 
   // Confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
@@ -1001,6 +1002,8 @@ function OrderFormContent() {
         orderDate: orderDateInput,
         gstRate,
         billType: effectiveIsBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
+        isPreviousBill: effectiveIsBillWithoutGst ? isPreviousBill : false,
+        previousBillDate: effectiveIsBillWithoutGst && isPreviousBill ? orderDateInput : undefined,
         notes: finalNotes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -2268,6 +2271,31 @@ function OrderFormContent() {
                   <p className="text-[10px] text-emerald-800 font-medium">
                     0% GST applied. This bill will be moved directly to "Bill (Without GST)" with this manual bill number.
                   </p>
+
+                  {/* T.L. / Authorized Staff Previous Bills Option */}
+                  {(isAdmin || isEmployeeTeamLeader(employee) || Boolean(employee?.canAddPreviousBills)) && (
+                    <div className="p-3 bg-purple-50/90 border border-purple-200 rounded-xl space-y-2 mt-2">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isPreviousBill}
+                          onChange={(e) => setIsPreviousBill(e.target.checked)}
+                          className="w-4 h-4 text-purple-600 bg-white border-purple-300 rounded focus:ring-purple-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                            <span>Add as Previous Bill (Without GST)</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900 font-bold uppercase tracking-wider">
+                              T.L. / Authorized
+                            </span>
+                          </span>
+                          <span className="text-[10px] text-purple-700 block mt-0.5">
+                            Historical past bill recording. Order date will be set to the previous bill date and inventory deduction bypassed.
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="pt-2 border-t border-amber-200">
