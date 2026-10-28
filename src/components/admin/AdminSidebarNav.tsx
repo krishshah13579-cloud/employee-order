@@ -29,6 +29,7 @@ import {
   Users,
   Globe,
   Briefcase,
+  Calculator,
 } from "lucide-react";
 
 interface AdminSidebarNavProps {
@@ -121,6 +122,12 @@ const employeeNavItems = [
     icon: Boxes,
     exact: false,
     isCommon: true,
+  },
+  {
+    name: "Costing",
+    href: "/admin/employee/costing",
+    icon: Calculator,
+    exact: false,
   },
   {
     name: "Profit",

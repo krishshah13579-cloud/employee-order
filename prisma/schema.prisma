@@ -137,6 +137,32 @@ model Product {
   @@schema("wholesale")
 }
 
+// Product Costing Calculator (D.No., Fabric, Yield, Jobwork, Other, Press, Total Costing, Margin, MRP)
+model ProductCosting {
+  id                Int      @id @default(autoincrement())
+  designNo          String   @unique
+  fabricName        String
+  purchasedFrom     String?  // Mill / Vendor / Supplier
+  rateMode          String   @default("PER_METER") // PER_METER or PER_KG
+  fabricRate        Float    @default(0) // Rate per Meter or Rate per KG
+  mtrPerKg          Float?   // Only if rateMode is PER_KG
+  ratePerMeter      Float    @default(0) // Effective rate per meter
+  avgFabricPerPiece Float    @default(0) // Avg Fabric per Piece (mtrs)
+  fabricCost        Float    @default(0) // Direct calculation: avgFabricPerPiece * ratePerMeter
+  jobworkCost       Float    @default(0) // Stitching / tailoring cost
+  otherCost         Float    @default(0) // Accessories, trims, packing
+  pressCost         Float    @default(0) // Ironing / pressing
+  totalCosting      Float    @default(0) // fabricCost + jobworkCost + otherCost + pressCost
+  margin            Float    @default(0) // Manual added margin
+  sellingPrice      Float    @default(0) // totalCosting + margin
+  mrp               Float    @default(0) // sellingPrice * 2
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@schema("wholesale")
+}
+
 // 4. Order Page (Order Details: Customer Name, Customer GST/PAN No., Order Date, Product Name, Sets, Sizes, Price, Total Price, GST)
 model Order {
   id              Int         @id @default(autoincrement())

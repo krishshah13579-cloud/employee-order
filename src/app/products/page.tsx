@@ -213,7 +213,7 @@ function ProductsContent() {
                   href={returnTo}
                   className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5 shrink-0 self-stretch sm:self-auto text-center"
                 >
-                  <span>Return to Order Form</span>
+                  <span>Return to Order Book</span>
                   <ArrowRight size={14} />
                 </Link>
               </div>
@@ -221,6 +221,19 @@ function ProductsContent() {
           </div>
         </div>
       </div>
+
+      {/* Floating Return to Order Book Button */}
+      {returnTo && returnTo.includes("/admin/employee/orders/new") && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Link
+            href={returnTo}
+            className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-black text-xs shadow-2xl flex items-center gap-2 transition hover:scale-105 border-2 border-white/20 cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+            <span>Return to Order Book</span>
+          </Link>
+        </div>
+      )}
 
       {/* Adding to Order Notification Banner */}
       {orderId && (

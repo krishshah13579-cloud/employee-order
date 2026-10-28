@@ -94,7 +94,8 @@ export async function PUT(
         retailerPrice: retailerPrice,
         wholesalerPrice: wholesalerPrice,
         price: retailerPrice,
-        costPrice: body.costPrice !== undefined ? (body.costPrice !== null ? parseFloat(body.costPrice) : null) : undefined,
+        // Costing is strictly locked and managed via the Costing Master Engine (/admin/employee/costing)
+        costPrice: existing.costPrice,
         mixPcs: body.mixPcs !== undefined ? (body.mixPcs !== null ? parseInt(body.mixPcs, 10) || 0 : 0) : undefined,
         colorImages: body.colorImages !== undefined ? (body.colorImages ? (typeof body.colorImages === "string" ? body.colorImages : JSON.stringify(body.colorImages)) : null) : undefined,
         setsColorwise: body.setsColorwise,

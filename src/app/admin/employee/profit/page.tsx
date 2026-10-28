@@ -61,7 +61,8 @@ export default function AdminProfitPage() {
   const [metrics, setMetrics] = useState<StockMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [profitSearch, setProfitSearch] = useState("");
-  const [profitSubView, setProfitSubView] = useState<"BILLS" | "STYLES">("BILLS");
+  // Default to Product Sold Profit calculation
+  const [profitSubView, setProfitSubView] = useState<"STYLES" | "BILLS">("STYLES");
 
   const fetchStockMetrics = async () => {
     setLoading(true);
@@ -115,10 +116,10 @@ export default function AdminProfitPage() {
             <TrendingUp size={14} /> Wholesale Sold Profit Analysis
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Profit &amp; Margins Report
+            Profit &amp; Margins Report (Per Product Sold)
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Realized gross profit on fulfilled wholesale orders, bill-wise margins, and product profitability.
+            Profit calculated strictly per product sold using Total Costing from Master Costing Engine (bills with Imported Trousers Mix excluded).
           </p>
         </div>
 
