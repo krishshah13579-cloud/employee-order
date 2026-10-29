@@ -45,7 +45,7 @@ function ProductsContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const rawReturnTo = searchParams.get(PARAM_RETURN_TO);
-  const defaultReturnTo = orderId ? `/admin/orders/${orderId}` : APP_ROUTES.ORDERS_NEW;
+  const defaultReturnTo = orderId ? `/orders/${orderId}` : APP_ROUTES.ORDERS_NEW;
   const returnTo = sanitizeInternalReturnTo(rawReturnTo, defaultReturnTo);
 
   const getProductDetailUrl = (pId: number) => {
@@ -245,7 +245,7 @@ function ProductsContent() {
             </span>
           </div>
           <Link
-            href={returnTo || `/admin/orders/${orderId}`}
+            href={returnTo || `/orders/${orderId}`}
             className="px-3 py-1 bg-black/25 hover:bg-black/40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
           >
             <ArrowLeft size={13} />

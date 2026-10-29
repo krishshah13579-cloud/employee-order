@@ -443,7 +443,7 @@ export default function HomePage() {
                     return (
                       <tr
                         key={order.id}
-                        onClick={() => router.push(`/orders/${order.id}`)}
+                        onClick={() => router.push(`/orders/${order.orderNumber || order.id}`)}
                         className="hover:bg-orange-50/50 cursor-pointer transition-colors group"
                         title="Click to open and edit Order Form"
                       >

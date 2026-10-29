@@ -106,7 +106,7 @@ export default function OrderEditPage() {
     try {
       setSendingWhatsApp(true);
       const isTax = type === "TAX_INVOICE" || (type === "ORDER_CONFIRMATION" && formatType === "TAX_INVOICE");
-      const res = await fetch(`/api/orders/${orderId}/whatsapp`, {
+      const res = await fetch(`/api/orders/${orderNumber || orderId}/whatsapp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -388,7 +388,7 @@ export default function OrderEditPage() {
               {status === "Pending" && (
                 isAdmin || Boolean(employee?.canEditOrders) || employee?.name?.trim().toLowerCase() === "krish shah" ? (
                   <Link
-                    href={`/orders/new?orderId=${orderId}`}
+                    href={`/orders/new?orderId=${orderNumber || orderId}`}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-blue-900/20 cursor-pointer"
                     title="Edit items, products, size ratios, sets and prices on order form"
                   >
@@ -606,7 +606,7 @@ export default function OrderEditPage() {
 
             {status === "Pending" && (
               <Link
-                href={`/products?orderId=${orderId}&returnTo=${encodeURIComponent(`/orders/${orderId}`)}`}
+                href={`/products?orderId=${orderNumber || orderId}&returnTo=${encodeURIComponent(`/orders/${orderNumber || orderId}`)}`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs cursor-pointer print:hidden"
                 title="Browse store to add another product or mix sizes to this order"
               >
@@ -653,7 +653,7 @@ export default function OrderEditPage() {
                           <span>Ratio: {item.sizeRatio} ({item.pcsPerSet || 5} pcs/set)</span>
                           {status === "Pending" && (
                             <Link
-                              href={`/products/${item.productId || item.product?.id || 1}?orderId=${orderId}&returnTo=${encodeURIComponent(`/orders/${orderId}`)}`}
+                              href={`/products/${item.productId || item.product?.id || 1}?orderId=${orderNumber || orderId}&returnTo=${encodeURIComponent(`/orders/${orderNumber || orderId}`)}`}
                               className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline print:hidden cursor-pointer"
                               title="Edit this product or add mix sizes on product page"
                             >

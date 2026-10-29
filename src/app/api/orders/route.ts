@@ -638,7 +638,7 @@ export async function POST(request: NextRequest) {
     sendWebPushNotification({
       title: `📦 New Order Placed: #${createdOrder.orderNumber}`,
       body: `${createdOrder.customerName} • ₹${createdOrder.grandTotal.toLocaleString("en-IN")}${createdOrder.placedBy ? ` • By ${createdOrder.placedBy}` : ""}`,
-      url: `/orders/${createdOrder.id}`,
+      url: `/orders/${createdOrder.orderNumber || createdOrder.id}`,
     }).catch((err) => console.warn("[WEB-PUSH] Order notify error:", err));
 
     return NextResponse.json(

@@ -432,7 +432,7 @@ export default function AdminReportsPage() {
                     <tr key={ord.id} className="hover:bg-gray-50/70 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
                         <Link
-                          href={`/admin/employee/orders/${ord.id}`}
+                          href={`/admin/employee/orders/${ord.orderNumber || ord.id}`}
                           className="hover:text-orange-600 transition-colors flex items-center gap-1"
                         >
                           <span>{ord.orderNumber}</span>
@@ -486,7 +486,7 @@ export default function AdminReportsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
-                          href={`/admin/employee/orders/${ord.id}`}
+                          href={`/admin/employee/orders/${ord.orderNumber || ord.id}`}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                         >
                           <Eye size={12} />

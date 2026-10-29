@@ -85,6 +85,7 @@ export default function EmployeeOrdersListPage() {
     if ((o as any).isBillWithoutGst === true) return true;
     if (o.isPreviousBill === true) return true;
     if (o.gstRate === 0 && o.taxInvoiceNumber) return true;
+    if (o.orderNumber?.toUpperCase().startsWith("BILL-")) return true;
     return false;
   };
 
@@ -346,7 +347,7 @@ export default function EmployeeOrdersListPage() {
                     return (
                       <tr
                         key={order.id}
-                        onClick={() => router.push(`/orders/${order.id}`)}
+                        onClick={() => router.push(`/orders/${order.orderNumber || order.id}`)}
                         className="hover:bg-orange-50/60 cursor-pointer transition-colors group"
                         title="Click to view details"
                       >

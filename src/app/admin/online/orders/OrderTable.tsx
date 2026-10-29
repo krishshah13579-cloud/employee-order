@@ -410,7 +410,7 @@ export default function OrderTable({ initialOrders }: { initialOrders: OrderData
                                 {/* Order Deletion & Customer Page Actions */}
                                 <div className="pt-2 border-t border-gray-200/80 flex items-center justify-between">
                                   <Link
-                                    href={`/orders/${order.id}`}
+                                    href={`/orders/${(order as any).orderNumber || order.id}`}
                                     target="_blank"
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-black hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors cursor-pointer"
                                   >

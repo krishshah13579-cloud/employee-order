@@ -739,7 +739,7 @@ export default function OrderInvoicePage() {
             Garment Items ({activeDisplayItems.length} {activeDisplayItems.length === 1 ? "Product" : "Products"})
           </span>
           <Link
-            href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.id}&returnTo=/admin/employee/orders/${order.id}`)}`}
+            href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.orderNumber || order.id}&returnTo=/admin/employee/orders/${order.orderNumber || order.id}`)}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs cursor-pointer print:hidden"
             title="Browse catalogue to add another product or mix sizes to this order as Super Admin"
           >
@@ -832,7 +832,7 @@ export default function OrderInvoicePage() {
                     </td>
                     <td className="p-3 text-center print:hidden">
                       <Link
-                        href={`/products/${it.productId || it.product?.id || 1}?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/employee/orders/${order.id}`)}`}
+                        href={`/products/${it.productId || it.product?.id || 1}?orderId=${order.orderNumber || order.id}&returnTo=${encodeURIComponent(`/admin/employee/orders/${order.orderNumber || order.id}`)}`}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition shadow-2xs border border-blue-200 cursor-pointer"
                         title="Edit this product or configure mix sizes on product page"
                       >

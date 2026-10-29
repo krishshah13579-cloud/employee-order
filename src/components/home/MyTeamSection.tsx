@@ -468,7 +468,7 @@ export default function MyTeamSection() {
                           return (
                             <tr
                               key={ord.id}
-                              onClick={() => router.push(`/orders/${ord.id}`)}
+                              onClick={() => router.push(`/orders/${ord.orderNumber || ord.id}`)}
                               className="hover:bg-orange-50/50 cursor-pointer transition"
                             >
                               <td className="py-2.5 px-3.5 font-mono font-bold text-slate-900">

@@ -141,7 +141,7 @@ export async function POST(
       console.warn("Could not generate in-memory PDF buffer for order WhatsApp:", pdfErr);
     }
 
-    const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${order.id}/pdf?type=${pdfDocType}`;
+    const pdfUrl = `${origin.replace(/\/$/, "")}/api/orders/${order.orderNumber || order.id}/pdf?type=${pdfDocType}`;
 
     if (messageType === "PAYMENT_REMINDER") {
       messageText = generatePaymentReminderWhatsAppMessage(workingOrder as any, origin);

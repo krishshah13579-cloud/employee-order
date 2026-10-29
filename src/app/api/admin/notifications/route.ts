@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         subtitle: `${o.customer?.shopName || "Customer"} placed an order of ₹${o.grandTotal.toLocaleString("en-IN")}`,
         timestamp: o.createdAt,
         status: o.status,
-        link: `/admin/employee/orders/${o.id}`,
+        link: `/admin/employee/orders/${o.orderNumber || o.id}`,
       })),
       ...recentCustomers.map((c) => ({
         id: `customer-${c.id}`,

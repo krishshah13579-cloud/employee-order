@@ -78,7 +78,7 @@ function ProductDetailContent() {
   const productId = params?.id as string;
   const orderIdParam = searchParams.get("orderId");
   const rawReturnTo = searchParams.get(PARAM_RETURN_TO);
-  const defaultReturnTo = orderIdParam ? `/admin/orders/${orderIdParam}` : APP_ROUTES.ORDERS_NEW;
+  const defaultReturnTo = orderIdParam ? `/orders/${orderIdParam}` : APP_ROUTES.ORDERS_NEW;
   const returnTo = sanitizeInternalReturnTo(rawReturnTo, defaultReturnTo);
 
   const [product, setProduct] = useState<ProductData | null>(null);
@@ -946,7 +946,7 @@ function ProductDetailContent() {
           `✅ Saved ${product.name} (${totalSets} sets, ${totalPcs} pcs${totalMixPieces > 0 ? ` incl ${totalMixPieces} mix` : ""}) to Order #${editingOrder.orderNumber || orderIdParam}!`,
           "success"
         );
-        const redirectTarget = returnTo || `/admin/orders/${orderIdParam}`;
+        const redirectTarget = returnTo || `/orders/${orderIdParam}`;
         router.push(redirectTarget);
         return;
       } catch (err: any) {
@@ -1051,7 +1051,7 @@ function ProductDetailContent() {
             </span>
           </div>
           <Link
-            href={returnTo || `/admin/orders/${orderIdParam}`}
+            href={returnTo || `/orders/${orderIdParam}`}
             className="px-3 py-1 bg-black/25 hover:bg-black/40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
           >
             <ArrowLeft size={13} />

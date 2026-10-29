@@ -1195,7 +1195,7 @@ function OrderFormContent() {
                 type="button"
                 onClick={async () => {
                   try {
-                    const res = await fetch(`/api/orders/${confirmedOrder.id}/whatsapp`, {
+                    const res = await fetch(`/api/orders/${confirmedOrder.orderNumber || confirmedOrder.id}/whatsapp`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ type: "ORDER_CONFIRMATION" }),
@@ -1243,7 +1243,7 @@ function OrderFormContent() {
               </button>
 
               <Link
-                href={`/orders/${confirmedOrder.id}`}
+                href={`/orders/${confirmedOrder.orderNumber || confirmedOrder.id}`}
                 className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs border border-slate-300 transition flex items-center justify-center gap-2"
               >
                 <FileText size={16} />

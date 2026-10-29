@@ -372,7 +372,7 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="py-3.5 px-6 text-right">
                       <Link
-                        href={`/admin/employee/orders/${o.id}`}
+                        href={`/admin/employee/orders/${o.orderNumber || o.id}`}
                         className="text-xs font-semibold text-zinc-900 hover:underline"
                       >
                         View Invoice →

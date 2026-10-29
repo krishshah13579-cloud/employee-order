@@ -271,8 +271,8 @@ export async function GET(request: NextRequest) {
 
         if (orderUnits > 0 || orderRev > 0) {
           billProfitBreakdown.push({
-            billNo: order.taxInvoiceNumber || String(order.id),
-            orderId: order.id,
+            billNo: order.taxInvoiceNumber || order.orderNumber || String(order.id),
+            orderId: order.orderNumber || order.id,
             customerName: order.customerName || "Customer",
             date: (order.orderDate || order.createdAt).toISOString(),
             totalPcs: orderUnits,
