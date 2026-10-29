@@ -128,7 +128,7 @@ export default function OrdersView({
     if (!statusModalOrder) return;
     setUpdatingStatus(true);
     try {
-      const res = await fetch(`/api/orders/${statusModalOrder.id}/status`, {
+      const res = await fetch(`/api/orders/${statusModalOrder.orderNumber || statusModalOrder.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -622,7 +622,7 @@ export default function OrdersView({
                             {/* Edit Button (if order status is converted back to Pending) */}
                             {o.status === "Pending" && (
                               <Link
-                                href={`/admin/employee/orders/${o.id}`}
+                                href={`/admin/employee/orders/${o.orderNumber || o.id}`}
                                 className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                                 title="Edit Order Form"
                               >
@@ -636,7 +636,7 @@ export default function OrdersView({
                               onClick={async () => {
                                 try {
                                   const isTax = activeTab === "INVOICES";
-                                  const res = await fetch(`/api/orders/${o.id}/whatsapp`, {
+                                  const res = await fetch(`/api/orders/${o.orderNumber || o.id}/whatsapp`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
@@ -706,7 +706,7 @@ export default function OrdersView({
                                 onClick={async () => {
                                   if (!confirm(`Approve order #${o.orderNumber} and generate Final Tax Invoice?`)) return;
                                   try {
-                                    const res = await fetch(`/api/orders/${o.id}/status`, {
+                                    const res = await fetch(`/api/orders/${o.orderNumber || o.id}/status`, {
                                       method: "PUT",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({ status: "Approved" }),
@@ -736,7 +736,7 @@ export default function OrdersView({
                               type="button"
                               onClick={async () => {
                                 try {
-                                  const res = await fetch(`/api/orders/${o.id}/whatsapp`, {
+                                  const res = await fetch(`/api/orders/${o.orderNumber || o.id}/whatsapp`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
@@ -770,7 +770,7 @@ export default function OrdersView({
 
                             {/* Edit Order */}
                             <Link
-                              href={`/admin/employee/orders/${o.id}`}
+                              href={`/admin/employee/orders/${o.orderNumber || o.id}`}
                               className="p-1.5 inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                               title="Edit Order Form items & quantities"
                             >
@@ -779,7 +779,7 @@ export default function OrdersView({
 
                             {/* View Dedicated Page */}
                             <Link
-                              href={`/admin/employee/orders/${o.id}?format=order-form`}
+                              href={`/admin/employee/orders/${o.orderNumber || o.id}?format=order-form`}
                               className="p-1.5 inline-flex text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
                               title="View Order Form"
                             >

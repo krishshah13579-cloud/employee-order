@@ -31,11 +31,17 @@ export async function POST(
     const formatType = body.formatType || (messageType === "TAX_INVOICE" ? "tax_invoice" : "order_form");
 
     const orderId = sanitizePositiveInt(id);
-    const order = await prisma.order.findFirst({
+    const isExplicitBillId = id.toUpperCase().startsWith("BILL-");
+    const rawBillNum = id.replace(/^BILL-/i, "").trim();
+
+    // 1. Look up by official document number first
+    let order = await prisma.order.findFirst({
       where: {
         OR: [
-          ...(orderId ? [{ id: orderId }] : []),
           { orderNumber: id },
+          { taxInvoiceNumber: id },
+          ...(isExplicitBillId ? [{ orderNumber: id }] : []),
+          ...(rawBillNum ? [{ orderNumber: `BILL-${rawBillNum}` }, { taxInvoiceNumber: rawBillNum }] : []),
         ],
       },
       include: {
@@ -43,6 +49,17 @@ export async function POST(
         items: true,
       },
     });
+
+    // 2. Fallback to internal database primary key if not found by document number
+    if (!order && orderId) {
+      order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          customer: true,
+          items: true,
+        },
+      });
+    }
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });

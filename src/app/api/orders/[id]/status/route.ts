@@ -7,6 +7,7 @@ import { createOrUpdateSalesInvoiceFromOrder } from "@/lib/sales";
 import { recordAuditLog } from "@/lib/audit";
 import { getNextTaxInvoiceNumber } from "@/lib/order-numbers";
 import { sendWebPushNotification } from "@/lib/web-push";
+import { sanitizePositiveInt } from "@/lib/navigation";
 
 export async function PUT(
   request: NextRequest,
@@ -24,11 +25,9 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const orderId = parseInt(id, 10);
-
-    if (isNaN(orderId)) {
-      return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
-    }
+    const rawOrderId = sanitizePositiveInt(id);
+    const isExplicitBillId = id.toUpperCase().startsWith("BILL-");
+    const rawBillNum = id.replace(/^BILL-/i, "").trim();
 
     const body = await request.json();
     const { status } = body;
@@ -55,14 +54,30 @@ export async function PUT(
     }
 
     // Fetch existing order with items to handle stock adjustment
-    const existingOrder = await prisma.order.findUnique({
-      where: { id: orderId },
+    let existingOrder = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderNumber: id },
+          { taxInvoiceNumber: id },
+          ...(isExplicitBillId ? [{ orderNumber: id }] : []),
+          ...(rawBillNum ? [{ orderNumber: `BILL-${rawBillNum}` }, { taxInvoiceNumber: rawBillNum }] : []),
+        ],
+      },
       include: { items: true },
     });
+
+    if (!existingOrder && rawOrderId) {
+      existingOrder = await prisma.order.findUnique({
+        where: { id: rawOrderId },
+        include: { items: true },
+      });
+    }
 
     if (!existingOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    const orderId = existingOrder.id;
 
     // 1. If cancelling order, restore stock sets back to inventory
     const isCancelling = (status === "Cancelled" || status === "Cancelled by Customer") &&

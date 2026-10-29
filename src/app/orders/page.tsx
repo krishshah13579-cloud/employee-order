@@ -445,7 +445,7 @@ export default function EmployeeOrdersListPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/orders/${order.id}`);
+                                router.push(`/orders/${order.orderNumber || order.id}`);
                               }}
                               className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-black px-3.5 py-1.5 rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
                               title="View details"
@@ -455,7 +455,7 @@ export default function EmployeeOrdersListPage() {
                             </button>
                             {activeCategoryTab === "BILLS" && (
                               <a
-                                href={`/api/orders/${order.id}/pdf`}
+                                href={`/api/orders/${order.orderNumber || order.id}/pdf`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}

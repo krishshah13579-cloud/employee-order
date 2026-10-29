@@ -569,7 +569,7 @@ export default function OrderInvoicePage() {
 
           {/* Download PDF File directly */}
           <a
-            href={`/api/orders/${order.id}/pdf?type=${isTaxInvoiceActive ? "tax_invoice" : "order_form"}`}
+            href={`/api/orders/${order.orderNumber || order.id}/pdf?type=${isTaxInvoiceActive ? "tax_invoice" : "order_form"}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl shadow-xs transition-colors"
