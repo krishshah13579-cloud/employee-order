@@ -464,7 +464,7 @@ export default function EditOrderPage() {
         };
       });
 
-      const res = await fetch(`/api/orders/${order.id}`, {
+      const res = await fetch(`/api/orders/${order.orderNumber || order.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -513,7 +513,7 @@ export default function EditOrderPage() {
       }
 
       // Navigate back to the order page
-      router.push(`/admin/employee/orders/${order.id}`);
+      router.push(`/admin/employee/orders/${order.orderNumber || order.id}`);
     } catch (err: any) {
       toast(err.message || "Failed to update order", "error");
     } finally {
@@ -662,7 +662,7 @@ export default function EditOrderPage() {
             )}
 
             <Link
-              href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.id}&returnTo=/admin/employee/orders/${order.id}/edit`)}`}
+              href={`/api/admin/open-store?target=${encodeURIComponent(`/products?orderId=${order.orderNumber || order.id}&returnTo=/admin/employee/orders/${order.orderNumber || order.id}/edit`)}`}
               className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition shadow-xs"
               title="Browse store to select products, colors, and mix sizes as Super Admin"
             >
@@ -713,7 +713,7 @@ export default function EditOrderPage() {
                   </div>
 
                   <Link
-                    href={`/products/${item.productId}?orderId=${order.id}&returnTo=${encodeURIComponent(`/admin/employee/orders/${order.id}/edit`)}`}
+                    href={`/products/${item.productId}?orderId=${order.orderNumber || order.id}&returnTo=${encodeURIComponent(`/admin/employee/orders/${order.orderNumber || order.id}/edit`)}`}
                     className="px-2.5 py-1.5 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center gap-1 font-bold text-xs border border-blue-200 shadow-2xs"
                     title="Edit sets and mix sizes on product page"
                   >

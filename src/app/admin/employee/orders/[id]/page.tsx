@@ -199,7 +199,7 @@ export default function OrderInvoicePage() {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("edit") === "true") {
-        router.replace(`/admin/employee/orders/${id}/edit`);
+        router.replace(`/admin/employee/orders/${order?.orderNumber || id}/edit`);
       }
     }
   }, []);
@@ -268,7 +268,7 @@ export default function OrderInvoicePage() {
 
     try {
       setSavingTaxInvoice(true);
-      const res = await fetch(`/api/orders/${order.id}`, {
+      const res = await fetch(`/api/orders/${order.orderNumber || order.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -322,7 +322,7 @@ export default function OrderInvoicePage() {
     if (!order || newStatus === order.status) return;
     setUpdatingStatus(true);
     try {
-      const res = await fetch(`/api/orders/${order.id}/status`, {
+      const res = await fetch(`/api/orders/${order.orderNumber || order.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -367,7 +367,7 @@ export default function OrderInvoicePage() {
     try {
       setSendingWhatsApp(true);
       const isTax = type === "TAX_INVOICE" || (type === "ORDER_CONFIRMATION" && formatType === "TAX_INVOICE");
-      const res = await fetch(`/api/orders/${id}/whatsapp`, {
+      const res = await fetch(`/api/orders/${order?.orderNumber || id}/whatsapp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -519,7 +519,7 @@ export default function OrderInvoicePage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Edit Order & Products Page Button */}
           <Link
-            href={`/admin/employee/orders/${order.id}/edit`}
+            href={`/admin/employee/orders/${order.orderNumber || order.id}/edit`}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
             title="Edit customer order items, products, size ratios, sets, prices, notes on dedicated page"
           >
@@ -1253,7 +1253,7 @@ export default function OrderInvoicePage() {
                     })),
                   }}
                   onSaveOverrides={async (overrides) => {
-                    const res = await fetch(`/api/orders/${order.id}`, {
+                    const res = await fetch(`/api/orders/${order.orderNumber || order.id}`, {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ templateOverrides: overrides }),

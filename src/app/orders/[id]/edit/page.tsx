@@ -479,7 +479,7 @@ export default function EmployeeEditOrderPage() {
         };
       });
 
-      const res = await fetch(`/api/orders/${order.id}`, {
+      const res = await fetch(`/api/orders/${order.orderNumber || order.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -524,7 +524,7 @@ export default function EmployeeEditOrderPage() {
         }).catch((err) => console.error("Auto WhatsApp edit error:", err));
       }
 
-      router.push(`/orders/${order.id}`);
+      router.push(`/orders/${order.orderNumber || order.id}`);
     } catch (err: any) {
       toast(err.message || "Failed to update order", "error");
     } finally {

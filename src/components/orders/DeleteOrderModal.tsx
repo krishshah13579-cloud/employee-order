@@ -86,7 +86,7 @@ export default function DeleteOrderModal({
 
       setLoadingAction(restoreStock ? "restore" : "no-restore");
 
-      const res = await fetch(`/api/orders/${order.id}?restoreStock=${restoreStock}`, {
+      const res = await fetch(`/api/orders/${order.orderNumber || order.id}?restoreStock=${restoreStock}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
