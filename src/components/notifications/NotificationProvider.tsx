@@ -190,6 +190,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [activeBanner, setActiveBanner] = useState<LiveNotification | null>(null);
 
   const lastSeenIdRef = useRef<string | null>(null);
+  const dispatchedIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef<boolean>(false);
   const bannerTimerRef = useRef<NodeJS.Timeout | null>(null);
   const soundEnabledRef = useRef<boolean>(true);
@@ -460,7 +461,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // If initialized, check if a brand-new notification arrived
       if (initializedRef.current && storedLastSeen && list.length > 0) {
         const topItem = list[0];
-        if (topItem.id !== storedLastSeen) {
+        if (topItem.id !== storedLastSeen && !dispatchedIdsRef.current.has(topItem.id)) {
+          // Immediately mark as seen and dispatched to prevent interval/focus repeat spam
+          dispatchedIdsRef.current.add(topItem.id);
+          lastSeenIdRef.current = topItem.id;
+          try {
+            localStorage.setItem("iq_last_seen_notification_id", topItem.id);
+          } catch {}
+
           // 1. Show floating in-app banner
           setActiveBanner(topItem);
           if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
@@ -503,6 +511,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               console.warn("Push trigger skipped:", err);
             }
           }
+        }
+      } else if (!initializedRef.current && list.length > 0) {
+        // First run on page load: record current top item so it doesn't trigger on first poll
+        const topItem = list[0];
+        dispatchedIdsRef.current.add(topItem.id);
+        if (!storedLastSeen) {
+          lastSeenIdRef.current = topItem.id;
+          try {
+            localStorage.setItem("iq_last_seen_notification_id", topItem.id);
+          } catch {}
         }
       }
 

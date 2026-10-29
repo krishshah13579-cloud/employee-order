@@ -530,6 +530,26 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Pre-align sequence counters in PostgreSQL above max existing IDs to eliminate primary key `id` collisions
+      try {
+        await tx.$executeRawUnsafe(`
+          DO $$
+          BEGIN
+            BEGIN
+              PERFORM setval(pg_get_serial_sequence('wholesale."Order"', 'id'), COALESCE((SELECT MAX(id) FROM wholesale."Order"), 0) + 1, false);
+              PERFORM setval(pg_get_serial_sequence('wholesale."OrderItem"', 'id'), COALESCE((SELECT MAX(id) FROM wholesale."OrderItem"), 0) + 1, false);
+            EXCEPTION WHEN OTHERS THEN
+              PERFORM setval(pg_get_serial_sequence('"Order"', 'id'), COALESCE((SELECT MAX(id) FROM "Order"), 0) + 1, false);
+              PERFORM setval(pg_get_serial_sequence('"OrderItem"', 'id'), COALESCE((SELECT MAX(id) FROM "OrderItem"), 0) + 1, false);
+            END;
+          EXCEPTION WHEN OTHERS THEN
+            NULL;
+          END $$;
+        `);
+      } catch (seqSyncErr) {
+        console.warn("[ORDERS] Sequence pre-sync warning:", seqSyncErr);
+      }
+
       return await tx.order.create({
         data: {
           orderNumber,

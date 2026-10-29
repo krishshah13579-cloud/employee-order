@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/sync-sequences.js && next build",
     "db:sync": "node scripts/db-sync.js",
     "start": "next start",
     "lint": "next lint",
