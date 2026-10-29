@@ -684,7 +684,7 @@ export default function OrdersView({
 
                             {/* 3. View the PDF Button */}
                             <a
-                              href={`/api/orders/${o.id}/pdf`}
+                              href={`/api/orders/${o.taxInvoiceNumber || o.orderNumber || o.id}/pdf?type=tax_invoice`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-1.5 inline-flex text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"

@@ -83,7 +83,7 @@ export async function getNextBillNumber(tx?: any): Promise<string> {
   const db = tx || prisma;
 
   const orders = await db.order.findMany({
-    select: { taxInvoiceNumber: true, notes: true, isPreviousBill: true, gstRate: true },
+    select: { orderNumber: true, taxInvoiceNumber: true, notes: true, isPreviousBill: true, gstRate: true },
   });
 
   const takenNumbers = new Set<number>();
@@ -91,6 +91,7 @@ export async function getNextBillNumber(tx?: any): Promise<string> {
     const isBill =
       ord.isPreviousBill ||
       (ord.notes && ord.notes.includes("[BILL_WITHOUT_GST")) ||
+      ord.orderNumber?.toUpperCase().startsWith("BILL-") ||
       ord.gstRate === 0;
 
     if (isBill) {
@@ -98,6 +99,8 @@ export async function getNextBillNumber(tx?: any): Promise<string> {
       const match = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
       if (match) {
         billStr = match[1].trim();
+      } else if (ord.orderNumber?.toUpperCase().startsWith("BILL-")) {
+        billStr = ord.orderNumber.replace(/^BILL-/i, "").trim();
       } else if (ord.taxInvoiceNumber) {
         billStr = ord.taxInvoiceNumber.trim();
       }

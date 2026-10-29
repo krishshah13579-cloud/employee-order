@@ -645,7 +645,7 @@ export async function generateCustomerLedgerPdfBuffer(
   drawRect(margin, thBottomY, contentWidth, thH, rgb(0.92, 0.92, 0.92), 1);
   drawText("Sr", cSr + 6, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Bill Date", cDate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
-  drawText("Bill / Invoice No.", cBillNo + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
+  drawText("Order No. (Book #)", cBillNo + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Due Date", cDueDate + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Bill Total (Rs.)", cTotal + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
   drawText("Amount Received (Rs.)", cPaid + 4, thBottomY + 4, { font: fontBold, size: 7.5 });
@@ -672,7 +672,7 @@ export async function generateCustomerLedgerPdfBuffer(
 
       drawText(String(idx + 1), cSr + 8, rowBottomY + 4, { size: 7.5 });
       drawText(formatDate(b.billDate), cDate + 4, rowBottomY + 4, { size: 7.5 });
-      drawText(`Bill #${b.billNo}`, cBillNo + 4, rowBottomY + 4, { font: fontBold, size: 7.5 });
+      drawText(`#${b.billNo}`, cBillNo + 4, rowBottomY + 4, { font: fontBold, size: 7.5 });
       drawText(formatDate(b.dueDate), cDueDate + 4, rowBottomY + 4, { size: 7.5 });
 
       drawText(b.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 }), cTotal + 4, rowBottomY + 4, {

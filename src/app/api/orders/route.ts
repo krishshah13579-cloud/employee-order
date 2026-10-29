@@ -435,22 +435,9 @@ export async function POST(request: NextRequest) {
       gstRate = 0;
     }
 
-    // Determine Order Number: use custom Order No. from previous written form, or auto-generate
+    // Determine Order Number & Bill Number
     const customOrderNumber = body.orderNumber ? String(body.orderNumber).trim() : "";
     let orderNumber = customOrderNumber;
-
-    if (!orderNumber) {
-      orderNumber = await getNextOrderNumber(prisma);
-    } else {
-      // Validate unique custom orderNumber
-      const existing = await prisma.order.findUnique({ where: { orderNumber } });
-      if (existing) {
-        return NextResponse.json(
-          { error: `Order Number "${orderNumber}" already exists in the system. Please use a unique Order No. (e.g. ${orderNumber}-A) or leave blank to auto-generate.` },
-          { status: 400 }
-        );
-      }
-    }
 
     // Determine custom Tax Invoice Number / Manual Bill Number
     let manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
@@ -458,9 +445,28 @@ export async function POST(request: NextRequest) {
       const numOnly = manualBillNumber.match(/\d+/);
       if (numOnly) manualBillNumber = numOnly[0];
     }
-    if ((isExplicitBillWithoutGst || isPreviousBill) && (!manualBillNumber || !manualBillNumber.trim())) {
-      manualBillNumber = await getNextBillNumber(prisma);
+
+    if (isExplicitBillWithoutGst || isPreviousBill) {
+      if (!manualBillNumber || !manualBillNumber.trim()) {
+        manualBillNumber = await getNextBillNumber(prisma);
+      }
+      // Isolated Bill sequence with zero clash against Tax Invoices
+      orderNumber = `BILL-${manualBillNumber}`;
+    } else {
+      if (!orderNumber) {
+        orderNumber = await getNextOrderNumber(prisma);
+      } else {
+        // Validate unique custom orderNumber
+        const existing = await prisma.order.findUnique({ where: { orderNumber } });
+        if (existing) {
+          return NextResponse.json(
+            { error: `Order Number "${orderNumber}" already exists in the system. Please use a unique Order No. (e.g. ${orderNumber}-A) or leave blank to auto-generate.` },
+            { status: 400 }
+          );
+        }
+      }
     }
+
     const customTaxInvoiceNumber = manualBillNumber || (body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null);
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
 
@@ -468,9 +474,9 @@ export async function POST(request: NextRequest) {
     let effectiveTaxInvoiceNumber = customTaxInvoiceNumber;
     let effectiveTaxInvoiceDate = customTaxInvoiceDate;
 
-    // Only auto-generate Tax Invoice Number if it is an official GST invoice and NOT a Bill
+    // For standard orders, keep effectiveTaxInvoiceNumber aligned with orderNumber when confirmed
     if (!isExplicitBillWithoutGst && !isPreviousBill && initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
-      effectiveTaxInvoiceNumber = await getNextTaxInvoiceNumber();
+      effectiveTaxInvoiceNumber = orderNumber;
       effectiveTaxInvoiceDate = new Date();
     }
 
@@ -545,7 +551,8 @@ export async function POST(request: NextRequest) {
           placedBy: placedBy || "Admin",
           notes: [
             notes,
-            (isExplicitBillWithoutGst || isPreviousBill) ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null
+            (isExplicitBillWithoutGst || isPreviousBill) ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null,
+            (customOrderNumber) ? `[HANDWRITTEN_BOOK_NO: ${customOrderNumber}]` : null,
           ].filter(Boolean).join(" | ") || null,
           taxInvoiceNumber: effectiveTaxInvoiceNumber,
           taxInvoiceDate: effectiveTaxInvoiceDate || effectiveOrderDate,

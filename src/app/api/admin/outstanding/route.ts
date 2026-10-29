@@ -101,6 +101,8 @@ export async function GET(request: NextRequest) {
         c.salesInvoices.flatMap((si) => [si.invoiceNumber, si.orderNumber]).filter(Boolean)
       );
 
+      const isWithoutGstCustomer = (c.businessType || "").toUpperCase().includes("WITHOUT GST");
+
       const bills: {
         id: number | string;
         docNo: string;
@@ -114,31 +116,42 @@ export async function GET(request: NextRequest) {
       }[] = c.salesInvoices
         .filter((si) => {
           if (si.paymentType === "Cash") return false;
-          const isMix = Boolean(
-            (si.items && si.items.toUpperCase().includes("IMPORTED TROUSER")) ||
-            (si.notes && si.notes.toUpperCase().includes("IMPORTED TROUSER"))
-          );
-          return !isMix;
+          // Exclude IMPORTED TROUSER MIX only and only for Retailers / Wholesalers (Without GST)
+          if (isWithoutGstCustomer) {
+            const isMix = Boolean(
+              (si.items && si.items.toUpperCase().includes("IMPORTED TROUSER")) ||
+              (si.notes && si.notes.toUpperCase().includes("IMPORTED TROUSER"))
+            );
+            if (isMix) return false;
+          }
+          return true;
         })
-        .map((si) => ({
-          id: si.id,
-          docNo: si.invoiceNumber || si.orderNumber || `INV-${si.id}`,
-          orderNumber: si.orderNumber,
-          date: si.invoiceDate,
-          amount: si.grandTotal,
-          totalSets: si.totalSets || 0,
-          totalPcs: si.totalPcs || 0,
-          paymentType: si.paymentType,
-          status: "Confirmed",
-        }));
+        .map((si) => {
+          const bookNoMatch = si.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+          const docNo = bookNoMatch ? bookNoMatch[1].trim() : (si.orderNumber || si.invoiceNumber || `INV-${si.id}`);
+          return {
+            id: si.id,
+            docNo,
+            orderNumber: si.orderNumber,
+            date: si.invoiceDate,
+            amount: si.grandTotal,
+            totalSets: si.totalSets || 0,
+            totalPcs: si.totalPcs || 0,
+            paymentType: si.paymentType,
+            status: "Confirmed",
+          };
+        });
 
       // Merge all bills: Tax Invoices & Bills Without GST from orders not yet in salesInvoices
       c.orders?.forEach((ord) => {
-        const isMix = Boolean(
-          (ord.notes && ord.notes.toUpperCase().includes("IMPORTED TROUSER")) ||
-          ord.items?.some((it) => (it.productName || "").toUpperCase().includes("IMPORTED TROUSER"))
-        );
-        if (isMix) return;
+        // Exclude IMPORTED TROUSER MIX only and only for Retailers / Wholesalers (Without GST)
+        if (isWithoutGstCustomer) {
+          const isMix = Boolean(
+            (ord.notes && ord.notes.toUpperCase().includes("IMPORTED TROUSER")) ||
+            ord.items?.some((it) => (it.productName || "").toUpperCase().includes("IMPORTED TROUSER"))
+          );
+          if (isMix) return;
+        }
 
         const isAlreadyInvoiced =
           (ord.id && invoiceOrderIds.has(ord.id)) ||
@@ -146,8 +159,9 @@ export async function GET(request: NextRequest) {
           (ord.taxInvoiceNumber && invoiceDocNumbers.has(ord.taxInvoiceNumber));
 
         if (!isAlreadyInvoiced) {
-          const billNoMatch = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
-          const docNo = billNoMatch ? billNoMatch[1].trim() : (ord.taxInvoiceNumber || ord.orderNumber || `ORD-${ord.id}`);
+          const billNoMatch = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+          const bookNoMatch = ord.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+          const docNo = bookNoMatch ? bookNoMatch[1].trim() : (billNoMatch ? billNoMatch[1].trim() : (ord.orderNumber || ord.taxInvoiceNumber || `ORD-${ord.id}`));
 
           bills.push({
             id: `ORD-${ord.id}`,

@@ -624,7 +624,7 @@ function LedgerContent() {
                         <tr className="bg-zinc-100 print:bg-zinc-200 border-b border-black font-bold text-black">
                           <th className="p-2 border-r border-black w-10 text-center">#</th>
                           <th className="p-2 border-r border-black">Bill Date</th>
-                          <th className="p-2 border-r border-black">Bill / Invoice No.</th>
+                          <th className="p-2 border-r border-black">Order No. (Book #)</th>
                           <th className="p-2 border-r border-black">Due Date</th>
                           <th className="p-2 border-r border-black text-right">Bill Total (₹)</th>
                           <th className="p-2 border-r border-black text-right">Amount Received (₹)</th>
@@ -647,8 +647,8 @@ function LedgerContent() {
                               <td className="p-2 border-r border-zinc-300 font-medium">
                                 {formatDate(bill.billDate)}
                               </td>
-                              <td className="p-2 border-r border-zinc-300 font-bold text-black">
-                                Bill #{bill.billNo}
+                              <td className="p-2 border-r border-zinc-300 font-bold text-black font-mono">
+                                #{bill.billNo}
                               </td>
                               <td className="p-2 border-r border-zinc-300 font-medium">
                                 {formatDate(bill.dueDate)}

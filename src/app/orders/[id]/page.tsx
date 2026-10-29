@@ -145,14 +145,15 @@ export default function OrderEditPage() {
       setError(null);
       setAccessDenied(null);
 
-      const safeId = sanitizePositiveInt(orderId);
+      const rawParam = String(orderId || "").trim();
+      const safeId = sanitizePositiveInt(rawParam) ? String(sanitizePositiveInt(rawParam)) : rawParam;
       if (!safeId) {
-        setError("Invalid order ID. Only valid positive numbers are accepted.");
+        setError("Invalid order ID or document number.");
         setLoading(false);
         return;
       }
 
-      const res = await fetch(`/api/orders/${safeId}`);
+      const res = await fetch(`/api/orders/${encodeURIComponent(safeId)}`);
       if (res.status === 401) {
         router.push("/login");
         return;

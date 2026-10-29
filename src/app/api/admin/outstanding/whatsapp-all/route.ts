@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
           where: {
             status: { not: "Cancelled" },
           },
+          include: {
+            items: {
+              select: {
+                productName: true,
+              },
+            },
+          },
           orderBy: {
             orderDate: "asc",
           },
@@ -53,26 +60,44 @@ export async function POST(request: NextRequest) {
     for (const customer of customers) {
       if (!customer.phoneNumber) continue;
 
+      const isWithoutGstCustomer = (customer.businessType || "").toUpperCase().includes("WITHOUT GST");
+
       // Calculate bills
-      const bills = customer.orders.map((o) => {
-        let billTotal = o.grandTotal;
-        if (o.taxInvoiceItems) {
-          try {
-            const parsed = JSON.parse(o.taxInvoiceItems);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const subtotal = parsed.reduce((sum, it) => sum + (Number(it.itemSubtotal) || 0), 0);
-              const gst = Math.round(subtotal * 0.05 * 100) / 100;
-              billTotal = Math.round(subtotal + gst);
-            }
-          } catch {}
-        }
-        return {
-          id: o.id,
-          invoiceNo: o.taxInvoiceNumber || o.orderNumber,
-          invoiceDate: o.taxInvoiceDate || o.orderDate,
-          totalAmount: billTotal,
-        };
-      });
+      const bills = customer.orders
+        .filter((o) => {
+          if (isWithoutGstCustomer) {
+            const isMix = Boolean(
+              (o.notes && o.notes.toUpperCase().includes("IMPORTED TROUSER")) ||
+              o.items?.some((it: any) => (it.productName || "").toUpperCase().includes("IMPORTED TROUSER"))
+            );
+            if (isMix) return false;
+          }
+          return true;
+        })
+        .map((o) => {
+          let billTotal = o.grandTotal;
+          if (o.taxInvoiceItems) {
+            try {
+              const parsed = JSON.parse(o.taxInvoiceItems);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const subtotal = parsed.reduce((sum, it) => sum + (Number(it.itemSubtotal) || 0), 0);
+                const gst = Math.round(subtotal * 0.05 * 100) / 100;
+                billTotal = Math.round(subtotal + gst);
+              }
+            } catch {}
+          }
+
+          const bookNoMatch = o.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+          const billNoMatch = o.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+          const handwrittenOrderNo = (bookNoMatch ? bookNoMatch[1].trim() : (o.orderNumber || (billNoMatch ? billNoMatch[1].trim() : o.taxInvoiceNumber || `ORD-${o.id}`)));
+
+          return {
+            id: o.id,
+            invoiceNo: handwrittenOrderNo,
+            invoiceDate: o.taxInvoiceDate || o.orderDate,
+            totalAmount: billTotal,
+          };
+        });
 
       const totalBilled = bills.reduce((sum, b) => sum + b.totalAmount, 0);
       const totalPaid = customer.payments.reduce((sum, p) => sum + p.amount, 0);

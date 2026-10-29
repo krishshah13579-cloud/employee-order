@@ -26,6 +26,7 @@ import {
   Pencil,
   Trash2,
   Printer,
+  FileText,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { openWhatsAppDirectly, shareOrOpenWhatsAppWithPdf } from "@/lib/whatsapp-client";
@@ -873,7 +874,7 @@ export default function AdminOutstandingPage() {
                         <tr className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
                           <th className="py-2.5 px-3">#</th>
                           <th className="py-2.5 px-3">Invoice Date</th>
-                          <th className="py-2.5 px-3">Invoice / Order No</th>
+                          <th className="py-2.5 px-3">Order No. (Book #)</th>
                           <th className="py-2.5 px-3 text-center">Quantity</th>
                           <th className="py-2.5 px-3 text-right">Total Amount</th>
                           <th className="py-2.5 px-3 text-right">Paid (FIFO)</th>
@@ -896,14 +897,25 @@ export default function AdminOutstandingPage() {
                                 {formatDate(bill.invoiceDate)}
                               </td>
                               <td className="py-3 px-3">
-                                <Link
-                                  href={`/orders/${bill.orderNumber}`}
-                                  target="_blank"
-                                  className="font-mono font-bold text-blue-600 hover:underline"
-                                  title="View order / invoice details in new tab"
-                                >
-                                  #{bill.displayDocNo}
-                                </Link>
+                                <div className="flex items-center gap-1.5">
+                                  <Link
+                                    href={`/orders/${(bill as any).systemBillNo || bill.orderNumber}`}
+                                    target="_blank"
+                                    className="font-mono font-bold text-blue-600 hover:underline"
+                                    title="View order / bill details in new tab"
+                                  >
+                                    #{(bill as any).handwrittenOrderNo || bill.displayDocNo}
+                                  </Link>
+                                  <a
+                                    href={`/api/orders/${(bill as any).systemBillNo || bill.orderNumber}/pdf?type=${(bill as any).isBillWithoutGst ? "order_form" : "tax_invoice"}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                    title="View the PDF"
+                                  >
+                                    <FileText size={14} />
+                                  </a>
+                                </div>
                               </td>
                               <td className="py-3 px-3 text-center text-slate-600">
                                 {bill.totalSets ? `${bill.totalSets}s / ${bill.totalPcs}p` : "—"}

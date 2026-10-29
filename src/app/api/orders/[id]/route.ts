@@ -38,13 +38,19 @@ export async function GET(
 
     const { id } = await params;
     const orderId = sanitizePositiveInt(id);
+    const isExplicitBillId = id.toUpperCase().startsWith("BILL-");
+    const rawBillNum = id.replace(/^BILL-/i, "").trim();
 
-    if (!orderId) {
-      return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
-    }
-
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    // 1. First priority: look up by official document number (orderNumber or taxInvoiceNumber)
+    let order = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderNumber: id },
+          { taxInvoiceNumber: id },
+          ...(isExplicitBillId ? [{ orderNumber: id }] : []),
+          ...(rawBillNum ? [{ orderNumber: `BILL-${rawBillNum}` }, { taxInvoiceNumber: rawBillNum }] : []),
+        ],
+      },
       include: {
         customer: true,
         items: {
@@ -54,6 +60,21 @@ export async function GET(
         },
       },
     });
+
+    // 2. Secondary fallback: lookup by internal database primary key if not found by document number
+    if (!order && orderId) {
+      order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          customer: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -101,20 +122,34 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const orderId = sanitizePositiveInt(id);
+    const rawOrderId = sanitizePositiveInt(id);
+    const isExplicitBillId = id.toUpperCase().startsWith("BILL-");
+    const rawBillNum = id.replace(/^BILL-/i, "").trim();
 
-    if (!orderId) {
-      return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
-    }
-
-    const existingOrder = await prisma.order.findUnique({
-      where: { id: orderId },
+    let existingOrder = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderNumber: id },
+          { taxInvoiceNumber: id },
+          ...(isExplicitBillId ? [{ orderNumber: id }] : []),
+          ...(rawBillNum ? [{ orderNumber: `BILL-${rawBillNum}` }, { taxInvoiceNumber: rawBillNum }] : []),
+        ],
+      },
       include: { items: true, customer: true },
     });
+
+    if (!existingOrder && rawOrderId) {
+      existingOrder = await prisma.order.findUnique({
+        where: { id: rawOrderId },
+        include: { items: true, customer: true },
+      });
+    }
 
     if (!existingOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    const orderId = existingOrder.id;
 
     const isTLKrishShah = isSpecialTeamLeaderKrishShah(employee);
     if (!admin && !isTLKrishShah) {
@@ -645,11 +680,9 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const orderId = parseInt(id, 10);
-
-    if (isNaN(orderId)) {
-      return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
-    }
+    const rawOrderId = sanitizePositiveInt(id);
+    const isExplicitBillId = id.toUpperCase().startsWith("BILL-");
+    const rawBillNum = id.replace(/^BILL-/i, "").trim();
 
     // Determine whether to restore stock:
     // Support URL param ?restoreStock=true/false
@@ -670,16 +703,34 @@ export async function DELETE(
       restoreStock = url.searchParams.get("restoreStock") !== "false";
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    let order = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderNumber: id },
+          { taxInvoiceNumber: id },
+          ...(isExplicitBillId ? [{ orderNumber: id }] : []),
+          ...(rawBillNum ? [{ orderNumber: `BILL-${rawBillNum}` }, { taxInvoiceNumber: rawBillNum }] : []),
+        ],
+      },
       include: {
         items: true,
       },
     });
 
+    if (!order && rawOrderId) {
+      order = await prisma.order.findUnique({
+        where: { id: rawOrderId },
+        include: {
+          items: true,
+        },
+      });
+    }
+
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    const orderId = order.id;
 
     if (order.status === "Dispatched") {
       return NextResponse.json(

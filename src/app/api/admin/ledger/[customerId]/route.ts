@@ -37,6 +37,13 @@ export async function GET(
           where: {
             status: { in: ["Confirmed", "In Production", "Ready", "Dispatched", "Delivered"] },
           },
+          include: {
+            items: {
+              select: {
+                productName: true,
+              },
+            },
+          },
           orderBy: { orderDate: "asc" },
         },
       },
@@ -45,6 +52,8 @@ export async function GET(
     if (!customer) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
+
+    const isWithoutGstCustomer = (customer.businessType || "").toUpperCase().includes("WITHOUT GST");
 
     // 2. Fetch Company Template Details (bank info, letterhead)
     let companyTemplate = DEFAULT_INVOICE_TEMPLATE;
@@ -61,6 +70,7 @@ export async function GET(
     interface RawBill {
       id: string;
       billNo: string;
+      systemBillNo: string;
       billDate: Date;
       dueDate: Date;
       totalAmount: number;
@@ -74,14 +84,25 @@ export async function GET(
 
     // Process all salesInvoices for this customer
     for (const si of customer.salesInvoices) {
+      if (isWithoutGstCustomer) {
+        const isMix = Boolean(
+          (si.items && si.items.toUpperCase().includes("IMPORTED TROUSER")) ||
+          (si.notes && si.notes.toUpperCase().includes("IMPORTED TROUSER"))
+        );
+        if (isMix) continue;
+      }
+
       const bDate = new Date(si.invoiceDate);
       const dDate = new Date(bDate.getTime() + creditDays * 24 * 60 * 60 * 1000);
-      const docNo = (si.invoiceNumber || si.orderNumber || String(si.id)).trim();
+      const bookNoMatch = si.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+      const handwrittenOrderNo = (bookNoMatch ? bookNoMatch[1].trim() : (si.orderNumber || si.invoiceNumber || String(si.id))).trim();
+      const systemBillNo = (si.invoiceNumber || si.orderNumber || String(si.id)).trim();
       const key = (si.orderId ? `order-${si.orderId}` : `si-${si.id}`).toLowerCase();
 
       billsMap.set(key, {
         id: `si-${si.id}`,
-        billNo: docNo,
+        billNo: handwrittenOrderNo,
+        systemBillNo,
         billDate: bDate,
         dueDate: dDate,
         totalAmount: Number(si.grandTotal) || 0,
@@ -93,17 +114,30 @@ export async function GET(
 
     // Also include any confirmed orders not yet synced in salesInvoices
     for (const ord of customer.orders) {
+      if (isWithoutGstCustomer) {
+        const isMix = Boolean(
+          (ord.notes && ord.notes.toUpperCase().includes("IMPORTED TROUSER")) ||
+          ord.items?.some((it: any) => (it.productName || "").toUpperCase().includes("IMPORTED TROUSER"))
+        );
+        if (isMix) continue;
+      }
+
       const key = `order-${ord.id}`.toLowerCase();
       if (billsMap.has(key)) continue;
 
-      const docNo = (ord.taxInvoiceNumber || ord.orderNumber || String(ord.id)).trim();
+      const bookNoMatch = ord.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+      const billNoMatch = ord.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+      const handwrittenOrderNo = (bookNoMatch ? bookNoMatch[1].trim() : (ord.orderNumber || ord.taxInvoiceNumber || String(ord.id))).trim();
+      const systemBillNo = (billNoMatch ? billNoMatch[1].trim() : (ord.taxInvoiceNumber || ord.orderNumber || String(ord.id))).trim();
+
       const bDate = new Date(ord.taxInvoiceDate || ord.orderDate);
       const dDays = Number(ord.creditDays) || creditDays;
       const dDate = new Date(bDate.getTime() + dDays * 24 * 60 * 60 * 1000);
 
       billsMap.set(key, {
         id: `ord-${ord.id}`,
-        billNo: docNo,
+        billNo: handwrittenOrderNo,
+        systemBillNo,
         billDate: bDate,
         dueDate: dDate,
         totalAmount: Number(ord.grandTotal) || 0,
