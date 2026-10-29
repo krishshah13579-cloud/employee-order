@@ -18,6 +18,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "IQ TROUSERS — Premium Garment Manufacturers & Wholesalers",
   description: "IQ TROUSERS B2B Wholesale Order Collection & Factory Management System",
+  applicationName: "OBEXA",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -48,8 +49,6 @@ export default function RootLayout({
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="OBEXA" />
-        <meta name="application-name" content="OBEXA" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans bg-white text-gray-900 antialiased min-h-screen">

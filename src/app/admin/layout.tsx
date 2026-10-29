@@ -4,6 +4,7 @@ import AdminClientLayout from "@/components/admin/AdminClientLayout";
 
 export const metadata: Metadata = {
   title: "OBEXA ADMIN — Control Center",
+  applicationName: "OBEXA ADMIN",
   manifest: "/manifest-admin.json",
   appleWebApp: {
     capable: true,
