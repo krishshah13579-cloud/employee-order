@@ -26,6 +26,8 @@ import {
   Tag,
   RefreshCw,
   Trash2,
+  FolderPlus,
+  Settings,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { useToast } from "@/components/ui/Toast";
@@ -63,6 +65,17 @@ interface StockProduct {
   isActive: boolean;
 }
 
+interface DbCategory {
+  id: number;
+  name: string;
+  slug?: string;
+  description?: string | null;
+  image?: string | null;
+  _count?: {
+    products?: number;
+  };
+}
+
 interface AccessoryItemData {
   id: number;
   name: string;
@@ -76,18 +89,6 @@ interface AccessoryItemData {
   createdAt?: string;
   updatedAt?: string;
 }
-
-const ACCESSORY_TARGET_CATEGORIES = [
-  "All Trims",
-  "Buttons",
-  "Tags",
-  "Size Label",
-  "Flag Label",
-  "Zippers",
-  "Pocketing",
-  "Care Label",
-  "Others",
-];
 
 export default function UpdateStockPage() {
   const router = useRouter();
@@ -103,8 +104,18 @@ export default function UpdateStockPage() {
   const [search, setSearch] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
+  // Garment Database Categories state (from Category table)
+  const [dbCategories, setDbCategories] = useState<DbCategory[]>([]);
+  const [dbCategoriesLoading, setDbCategoriesLoading] = useState<boolean>(false);
+  const [isAddCatModalOpen, setIsAddCatModalOpen] = useState<boolean>(false);
+  const [isManageCatModalOpen, setIsManageCatModalOpen] = useState<boolean>(false);
+  const [newCatName, setNewCatName] = useState<string>("");
+  const [submittingCat, setSubmittingCat] = useState<boolean>(false);
+  const [deletingCatId, setDeletingCatId] = useState<number | null>(null);
+
   // Accessories state (Buttons, Tags, Size & Flag Labels)
   const [accessories, setAccessories] = useState<AccessoryItemData[]>([]);
+  const [accessoryTypes, setAccessoryTypes] = useState<string[]>([]);
   const [accessoriesLoading, setAccessoriesLoading] = useState<boolean>(false);
   const [selectedAccessoryCategory, setSelectedAccessoryCategory] = useState<string>("All Trims");
   const [accessorySearch, setAccessorySearch] = useState<string>("");
@@ -112,6 +123,12 @@ export default function UpdateStockPage() {
   const [isAddAccessoryOpen, setIsAddAccessoryOpen] = useState<boolean>(false);
   const [savingAccessory, setSavingAccessory] = useState<boolean>(false);
   const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Trim category add/remove state
+  const [isAddTrimTypeOpen, setIsAddTrimTypeOpen] = useState<boolean>(false);
+  const [isManageTrimTypeOpen, setIsManageTrimTypeOpen] = useState<boolean>(false);
+  const [newTrimTypeName, setNewTrimTypeName] = useState<string>("");
+  const [submittingTrimType, setSubmittingTrimType] = useState<boolean>(false);
 
   const [accessoryForm, setAccessoryForm] = useState({
     name: "",
@@ -139,6 +156,7 @@ export default function UpdateStockPage() {
     (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
+  // Fetch garment products
   const fetchStockProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -160,13 +178,42 @@ export default function UpdateStockPage() {
     }
   }, [router, toast]);
 
+  // Fetch database garment categories
+  const fetchCategories = useCallback(async () => {
+    try {
+      setDbCategoriesLoading(true);
+      const res = await fetch("/api/categories", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load categories from database");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setDbCategories(data);
+      }
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setDbCategoriesLoading(false);
+    }
+  }, []);
+
+  // Fetch accessories and accessory types directly from database
   const fetchAccessories = useCallback(async () => {
     try {
       setAccessoriesLoading(true);
-      const res = await fetch("/api/admin/stock/accessories", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load accessories");
-      const data = await res.json();
-      setAccessories(data.items || []);
+      const [accRes, typesRes] = await Promise.all([
+        fetch("/api/admin/stock/accessories", { cache: "no-store" }),
+        fetch("/api/admin/stock/accessories/types", { cache: "no-store" }),
+      ]);
+
+      if (accRes.ok) {
+        const data = await accRes.json();
+        setAccessories(data.items || []);
+      }
+
+      if (typesRes.ok) {
+        const typesData = await typesRes.json();
+        const names = (typesData.types || []).map((t: any) => typeof t === "string" ? t : t.name);
+        setAccessoryTypes(names);
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -204,6 +251,7 @@ export default function UpdateStockPage() {
         return;
       }
       fetchStockProducts();
+      fetchCategories();
       fetchAccessories();
     }
 
@@ -214,18 +262,37 @@ export default function UpdateStockPage() {
       active = false;
       clearInterval(interval);
     };
-  }, [sessionLoading, isAuthorized, fetchStockProducts, fetchAccessories, router, toast]);
+  }, [sessionLoading, isAuthorized, fetchStockProducts, fetchCategories, fetchAccessories, router, toast]);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>(["All"]);
-    products.forEach((p) => {
-      if (p.category && p.category.trim()) {
-        set.add(p.category.trim().toUpperCase());
+  // Combined Garment Categories: All database categories, preserving any legacy active categories
+  const categoriesList = useMemo(() => {
+    const list: string[] = ["All"];
+    const seen = new Set<string>(["ALL"]);
+
+    // 1. Database categories from Category table
+    dbCategories.forEach((c) => {
+      const up = c.name.trim().toUpperCase();
+      if (!seen.has(up)) {
+        seen.add(up);
+        list.push(c.name.trim());
       }
     });
-    return Array.from(set);
-  }, [products]);
 
+    // 2. Fallback for any product whose category might not yet be in Category table
+    products.forEach((p) => {
+      if (p.category && p.category.trim()) {
+        const up = p.category.trim().toUpperCase();
+        if (!seen.has(up)) {
+          seen.add(up);
+          list.push(p.category.trim());
+        }
+      }
+    });
+
+    return list;
+  }, [dbCategories, products]);
+
+  // Filtered products by search and selected category
   const filteredProducts = useMemo(() => {
     const list = products.filter((p) => {
       const matchCat =
@@ -243,6 +310,33 @@ export default function UpdateStockPage() {
     return sortProductsByImpSequence(list);
   }, [products, selectedCategory, search]);
 
+  // Combined Trim / Accessory Categories: All trims + DB types
+  const trimCategoriesList = useMemo(() => {
+    const list: string[] = ["All Trims"];
+    const seen = new Set<string>(["ALL TRIMS"]);
+
+    accessoryTypes.forEach((t) => {
+      const up = t.trim().toUpperCase();
+      if (!seen.has(up)) {
+        seen.add(up);
+        list.push(t.trim());
+      }
+    });
+
+    // Fallback for any accessory items with other categories
+    accessories.forEach((a) => {
+      if (a.category && a.category.trim()) {
+        const up = a.category.trim().toUpperCase();
+        if (!seen.has(up)) {
+          seen.add(up);
+          list.push(a.category.trim());
+        }
+      }
+    });
+
+    return list;
+  }, [accessoryTypes, accessories]);
+
   // Filtered accessories: Buttons, Tags, Size Label, Flag Label, etc.
   const filteredAccessories = useMemo(() => {
     return accessories.filter((item) => {
@@ -259,13 +353,134 @@ export default function UpdateStockPage() {
     });
   }, [accessories, selectedAccessoryCategory, accessorySearch]);
 
+  // ----------------------------------------------------
+  // GARMENT CATEGORY ADD / DELETE HANDLERS
+  // ----------------------------------------------------
+  const handleAddGarmentCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newCatName.trim().toUpperCase();
+    if (!clean) return;
+
+    try {
+      setSubmittingCat(true);
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add category");
+      }
+
+      toast(`✅ Category "${clean}" added to database successfully!`, "success");
+      setNewCatName("");
+      setIsAddCatModalOpen(false);
+      setSelectedCategory(clean);
+      fetchCategories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setSubmittingCat(false);
+    }
+  };
+
+  const handleDeleteGarmentCategory = async (cat: DbCategory) => {
+    if (!confirm(`Are you sure you want to remove category "${cat.name}" from database?`)) {
+      return;
+    }
+
+    try {
+      setDeletingCatId(cat.id);
+      const res = await fetch(`/api/categories?id=${cat.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete category");
+      }
+
+      toast(`🗑️ Category "${cat.name}" removed from database.`, "success");
+      if (selectedCategory.toUpperCase() === cat.name.toUpperCase()) {
+        setSelectedCategory("All");
+      }
+      fetchCategories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setDeletingCatId(null);
+    }
+  };
+
+  // ----------------------------------------------------
+  // TRIM / ACCESSORY TYPE ADD / DELETE HANDLERS
+  // ----------------------------------------------------
+  const handleAddTrimType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newTrimTypeName.trim();
+    if (!clean) return;
+
+    try {
+      setSubmittingTrimType(true);
+      const res = await fetch("/api/admin/stock/accessories/types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add trim category");
+      }
+
+      toast(`✅ Trim category "${clean}" added to database!`, "success");
+      setNewTrimTypeName("");
+      setIsAddTrimTypeOpen(false);
+      setSelectedAccessoryCategory(clean);
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setSubmittingTrimType(false);
+    }
+  };
+
+  const handleDeleteTrimType = async (typeName: string) => {
+    if (!confirm(`Are you sure you want to remove trim category "${typeName}" from database?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/stock/accessories/types?name=${encodeURIComponent(typeName)}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to remove trim category");
+      }
+
+      toast(`🗑️ Trim category "${typeName}" removed.`, "success");
+      if (selectedAccessoryCategory.toLowerCase() === typeName.toLowerCase()) {
+        setSelectedAccessoryCategory("All Trims");
+      }
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  };
+
+  // ----------------------------------------------------
+  // PRODUCT STOCK EDIT MODAL HANDLERS
+  // ----------------------------------------------------
   const handleOpenEdit = (p: StockProduct) => {
     setEditingProduct(p);
     setModalRatio(p.sizesRatio || "30 to 38");
     setModalCostPrice(p.costPrice !== null && p.costPrice !== undefined ? String(p.costPrice) : "");
     setModalImageUrl(p.imageUrl || "");
 
-    // Pre-populate color sets from detailedRatioSets or setsColorwise
     const colorCounts: Record<string, number> = {};
     const primaryRatio = p.sizesRatio || "30 to 38";
 
@@ -277,7 +492,6 @@ export default function UpdateStockPage() {
       }
     }
 
-    // Ensure all product colors have an entry
     p.colors.forEach((col) => {
       const clean = cleanColorName(col);
       if (colorCounts[clean] === undefined) {
@@ -362,7 +576,6 @@ export default function UpdateStockPage() {
     try {
       setSaving(true);
 
-      // Structure setsColorwise JSON mapping
       const nextStockMap: Record<string, { ratios: Record<string, number>; loosePcs: Record<string, number> }> = {};
       for (const [col, count] of Object.entries(modalColorSets)) {
         const clean = cleanColorName(col);
@@ -401,7 +614,9 @@ export default function UpdateStockPage() {
     }
   };
 
-  // Quick adjust accessory quantity (+100, -100, +500)
+  // ----------------------------------------------------
+  // ACCESSORY ADJUST & FORM HANDLERS
+  // ----------------------------------------------------
   const handleAdjustAccessoryQty = async (id: number, delta: number) => {
     try {
       const it = accessories.find((a) => a.id === id);
@@ -428,7 +643,7 @@ export default function UpdateStockPage() {
     setEditingAccessory(null);
     setAccessoryForm({
       name: "",
-      category: "Buttons",
+      category: accessoryTypes[0] || "Buttons",
       imageUrl: "",
       quantity: "1000",
       unit: "Pcs",
@@ -553,7 +768,7 @@ export default function UpdateStockPage() {
                 <span>Stock Management</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-                Update live garment piece counts, size ratios, and trims/accessories (Buttons, Tags, Size &amp; Flag Labels).
+                Update live garment piece counts, database categories, and trims/accessories (Buttons, Tags, Size &amp; Flag Labels).
               </p>
             </div>
 
@@ -597,8 +812,8 @@ export default function UpdateStockPage() {
           <div className="space-y-6">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {ACCESSORY_TARGET_CATEGORIES.map((cat) => {
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none flex-1">
+                  {trimCategoriesList.map((cat) => {
                     const isSelected = selectedAccessoryCategory.toLowerCase() === cat.toLowerCase();
                     return (
                       <button
@@ -617,14 +832,36 @@ export default function UpdateStockPage() {
                   })}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleOpenAddAccessory}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0"
-                >
-                  <Plus size={14} />
-                  <span>Add Trim / Accessory</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddTrimTypeOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
+                    title="Add new trim type / category to database"
+                  >
+                    <FolderPlus size={14} className="text-blue-600" />
+                    <span>Add Trim Category</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsManageTrimTypeOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
+                    title="Manage & remove trim categories"
+                  >
+                    <Settings size={14} className="text-slate-600" />
+                    <span>Manage Categories</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddAccessory}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0"
+                  >
+                    <Plus size={14} />
+                    <span>Add Trim Item</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
@@ -799,28 +1036,52 @@ export default function UpdateStockPage() {
           </div>
         ) : (
           /* ═══════════════════════════════════════════
-              SECTION 2: GARMENT STOCK
+              SECTION 2: GARMENT STOCK (DATABASE-MATCHED CATEGORIES)
               ═══════════════════════════════════════════ */
           <div className="space-y-6">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {categories.map((cat) => {
-                  const isSelected = selectedCategory.toUpperCase() === cat.toUpperCase();
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
-                        isSelected
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none flex-1">
+                  {categoriesList.map((cat) => {
+                    const isSelected = selectedCategory.toUpperCase() === cat.toUpperCase();
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
+                          isSelected
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCatModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-900 text-xs font-bold rounded-xl border border-orange-200 transition cursor-pointer"
+                    title="Add new category to database"
+                  >
+                    <FolderPlus size={14} className="text-orange-600" />
+                    <span>Add Category</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsManageCatModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
+                    title="Manage & remove database categories"
+                  >
+                    <Settings size={14} className="text-slate-600" />
+                    <span>Manage Categories</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
@@ -838,9 +1099,23 @@ export default function UpdateStockPage() {
                   />
                 </div>
 
-                <span className="text-xs text-slate-500 font-medium">
-                  Showing <strong className="text-slate-900 font-bold">{filteredProducts.length}</strong> available trouser style(s)
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchStockProducts();
+                      fetchCategories();
+                    }}
+                    disabled={loading || dbCategoriesLoading}
+                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-200 transition cursor-pointer"
+                    title="Refresh stock and categories"
+                  >
+                    <RefreshCw size={14} className={loading || dbCategoriesLoading ? "animate-spin" : ""} />
+                  </button>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Showing <strong className="text-slate-900 font-bold">{filteredProducts.length}</strong> available trouser style(s)
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -967,6 +1242,288 @@ export default function UpdateStockPage() {
       </main>
 
       {/* ═══════════════════════════════════════════
+          MODAL: ADD GARMENT CATEGORY TO DATABASE
+          ═══════════════════════════════════════════ */}
+      {isAddCatModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                  <FolderPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Add Garment Category</h3>
+                  <p className="text-xs text-slate-300">Creates new category in PostgreSQL</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddCatModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddGarmentCategory} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. COTTON CHINOS, JOGGERS, LINEN..."
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wide focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCatModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingCat}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingCat ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={13} />
+                      <span>Save Category</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          MODAL: MANAGE & REMOVE GARMENT CATEGORIES
+          ═══════════════════════════════════════════ */}
+      {isManageCatModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Manage Database Categories</h3>
+                  <p className="text-xs text-slate-300">View or remove categories from database</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageCatModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {dbCategories.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No categories found in database.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {dbCategories.map((c) => (
+                    <div key={c.id} className="py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">
+                          {c.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block font-mono">
+                          {c._count?.products || 0} product(s) linked
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={deletingCatId === c.id}
+                        onClick={() => handleDeleteGarmentCategory(c)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition cursor-pointer disabled:opacity-50"
+                        title={`Delete ${c.name} from database`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsManageCatModalOpen(false)}
+                className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          MODAL: ADD TRIM CATEGORY TO DATABASE
+          ═══════════════════════════════════════════ */}
+      {isAddTrimTypeOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <FolderPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Add Trim Category</h3>
+                  <p className="text-xs text-slate-300">Creates new trim type in database</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddTrimTypeOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTrimType} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Drawstrings, Elastic Waistband..."
+                  value={newTrimTypeName}
+                  onChange={(e) => setNewTrimTypeName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTrimTypeOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingTrimType}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingTrimType ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={13} />
+                      <span>Save Trim Category</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          MODAL: MANAGE & REMOVE TRIM CATEGORIES
+          ═══════════════════════════════════════════ */}
+      {isManageTrimTypeOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Manage Trim Categories</h3>
+                  <p className="text-xs text-slate-300">View or remove trim types from database</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageTrimTypeOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {accessoryTypes.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No trim categories found.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {accessoryTypes.map((t) => (
+                    <div key={t} className="py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">
+                          {t}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTrimType(t)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition cursor-pointer"
+                        title={`Delete ${t} from database`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsManageTrimTypeOpen(false)}
+                className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
           MODAL: ADD / EDIT TRIM & ACCESSORY STOCK
           ═══════════════════════════════════════════ */}
       {isAddAccessoryOpen && (
@@ -1021,14 +1578,9 @@ export default function UpdateStockPage() {
                     onChange={(e) => setAccessoryForm({ ...accessoryForm, category: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
                   >
-                    <option value="Buttons">Buttons</option>
-                    <option value="Tags">Tags</option>
-                    <option value="Size Label">Size Label</option>
-                    <option value="Flag Label">Flag Label</option>
-                    <option value="Zippers">Zippers</option>
-                    <option value="Pocketing">Pocketing</option>
-                    <option value="Care Label">Care Label</option>
-                    <option value="Others">Others</option>
+                    {trimCategoriesList.filter((c) => c !== "All Trims").map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
 

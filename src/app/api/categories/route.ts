@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-security";
+import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
 const DEFAULT_CATEGORIES = [
   {
@@ -70,9 +70,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.authorized) {
-      return auth.errorResponse!;
+    const admin = await getAdminSession(req);
+    const employee = await getEmployeeSession(req);
+
+    if (!admin && (!employee || !employee.canUpdateStock)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Stock update access required to add category." },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -132,9 +137,14 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.authorized) {
-      return auth.errorResponse!;
+    const admin = await getAdminSession(req);
+    const employee = await getEmployeeSession(req);
+
+    if (!admin && (!employee || !employee.canUpdateStock)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Stock update access required to edit category." },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -218,9 +228,14 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.authorized) {
-      return auth.errorResponse!;
+    const admin = await getAdminSession(req);
+    const employee = await getEmployeeSession(req);
+
+    if (!admin && (!employee || !employee.canUpdateStock)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Stock update access required to remove category." },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
