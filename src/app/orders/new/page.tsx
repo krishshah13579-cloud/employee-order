@@ -205,17 +205,25 @@ function OrderFormContent() {
 
   const isTL = isEmployeeTeamLeader(employee);
   const canAdjustSpecialDiscount = isAdmin || isTL;
-  const canAddBills = Boolean(isAdmin || isTL || employee?.canAddPreviousBills);
+  const canAddBills = Boolean(
+    isAdmin ||
+    employee?.canAddPreviousBills === true ||
+    (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
+  );
   const [activeFormTab, setActiveFormTab] = useState<"ORDER_FORM" | "BILL">("ORDER_FORM");
 
   useEffect(() => {
     const tabParam = searchParams.get("tab") || searchParams.get("billType");
     if (tabParam === "bill" || tabParam === "non_gst" || tabParam === "bill_without_gst") {
-      setActiveFormTab("BILL");
+      if (canAddBills) {
+        setActiveFormTab("BILL");
+      } else {
+        setActiveFormTab("ORDER_FORM");
+      }
     } else {
       setActiveFormTab("ORDER_FORM");
     }
-  }, [searchParams]);
+  }, [searchParams, canAddBills]);
 
   // React to URL customerId query parameter changes (e.g. clicking Book on dashboard)
   useEffect(() => {
@@ -2354,8 +2362,8 @@ function OrderFormContent() {
                     0% GST applied. This bill will be moved directly to "Bill (Without GST)" with this manual bill number.
                   </p>
 
-                  {/* T.L. / Authorized Staff Previous Bills Option */}
-                  {(isAdmin || isEmployeeTeamLeader(employee) || Boolean(employee?.canAddPreviousBills)) && (
+                  {/* Authorized Staff Previous Bills Option */}
+                  {(isAdmin || Boolean(employee?.canAddPreviousBills)) && (
                     <div className="p-3 bg-purple-50/90 border border-purple-200 rounded-xl space-y-2 mt-2">
                       <label className="flex items-center gap-2.5 cursor-pointer select-none">
                         <input
@@ -2368,7 +2376,7 @@ function OrderFormContent() {
                           <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
                             <span>Add as Previous Bill (Without GST)</span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900 font-bold uppercase tracking-wider">
-                              T.L. / Authorized
+                              Authorized Staff
                             </span>
                           </span>
                           <span className="text-[10px] text-purple-700 block mt-0.5">

@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
 
     // Permission check: only admin or employees granted canAddPreviousBills can generate bills / previous bills
     if ((isExplicitBillWithoutGst || isPreviousBill) && !admin) {
-      const isAllowed = Boolean(employee?.canAddPreviousBills || (employee && isSpecialTeamLeaderKrishShah(employee)));
+      const isAllowed = Boolean(employee?.canAddPreviousBills);
       if (!isAllowed) {
         return NextResponse.json(
           { error: "Forbidden: You do not have permission from Admin to generate bills." },

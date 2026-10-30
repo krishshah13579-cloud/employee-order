@@ -96,7 +96,7 @@ export async function GET(_req: NextRequest) {
       employee: {
         ...employee,
         isTeamLeader: isTL,
-        canAddPreviousBills: Boolean(employee.canAddPreviousBills || isTL),
+        canAddPreviousBills: Boolean(employee.canAddPreviousBills),
       },
     });
   } catch (error: any) {

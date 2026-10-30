@@ -117,6 +117,19 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
             } else if (prev.canEditOrders && !current.canEditOrders) {
               toast("🔒 Order Form Editing Access Revoked by Administrator.", "info");
             }
+            if (!prev.canAddPreviousBills && current.canAddPreviousBills) {
+              toast("📄 Bill Access Granted by Administrator.", "success");
+            } else if (prev.canAddPreviousBills && !current.canAddPreviousBills) {
+              toast("🔒 Bill Access Revoked by Administrator.", "error");
+              if (pathnameRef.current === "/orders/new" && typeof window !== "undefined") {
+                const url = new URL(window.location.href);
+                if (url.searchParams.get("tab") === "bill" || url.searchParams.get("billType")) {
+                  url.searchParams.delete("tab");
+                  url.searchParams.delete("billType");
+                  window.history.replaceState({}, "", url.toString());
+                }
+              }
+            }
           }
 
           prevEmployeeRef.current = current;

@@ -107,11 +107,13 @@ export default function EmployeeOrdersListPage() {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search);
       const tabParam = p.get("tab");
-      if (tabParam === "bills" || tabParam === "bill") {
+      if ((tabParam === "bills" || tabParam === "bill") && canViewBills) {
         setActiveCategoryTab("BILLS");
+      } else if (!canViewBills) {
+        setActiveCategoryTab("ORDERS");
       }
     }
-  }, []);
+  }, [canViewBills]);
 
   // Client-side search and strict employee isolation
   const filteredOrders = useMemo(() => {

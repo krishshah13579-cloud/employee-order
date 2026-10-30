@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
         designation: employee.designation,
         isTeamLeader: isTL,
         canEditOrders: employee.canEditOrders,
-        canAddPreviousBills: Boolean(employee.canAddPreviousBills || isTL),
+        canAddPreviousBills: Boolean(employee.canAddPreviousBills),
         mobileNumber: employee.mobileNumber,
       },
       message: `Welcome, ${employee.name}!${isTL ? " (T.L. 24*7 Access Active)" : ""}`,
