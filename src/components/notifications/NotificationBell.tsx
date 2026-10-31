@@ -13,6 +13,7 @@ import {
   X,
   Volume2,
   VolumeX,
+  CheckSquare,
 } from "lucide-react";
 import { useNotifications, LiveNotification } from "./NotificationProvider";
 
@@ -47,7 +48,7 @@ export default function NotificationBell() {
     setIsInstallGuideOpen,
   } = useNotifications();
 
-  const [activeTab, setActiveTab] = useState<"ALL" | "ARTICLE" | "ORDER" | "CUSTOMER">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "ARTICLE" | "ORDER" | "CUSTOMER" | "TASK">("ALL");
   const trayRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -69,6 +70,7 @@ export default function NotificationBell() {
     if (activeTab === "ARTICLE") return n.type === "ARTICLE";
     if (activeTab === "ORDER") return n.type === "ORDER_PLACED" || n.type === "ORDER_STATUS";
     if (activeTab === "CUSTOMER") return n.type === "CUSTOMER";
+    if (activeTab === "TASK") return n.type === "TASK";
     return true;
   });
 
@@ -82,6 +84,8 @@ export default function NotificationBell() {
         return <Truck className="w-4 h-4 text-blue-600" />;
       case "CUSTOMER":
         return <UserPlus className="w-4 h-4 text-purple-600" />;
+      case "TASK":
+        return <CheckSquare className="w-4 h-4 text-purple-600" />;
       default:
         return <Bell className="w-4 h-4 text-gray-600" />;
     }

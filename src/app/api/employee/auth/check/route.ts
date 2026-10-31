@@ -49,6 +49,7 @@ export async function GET(_req: NextRequest) {
           canEditOrders: true,
           canUpdateStock: true,
           canAddPreviousBills: true,
+          canViewOrderForm: true,
           mobileNumber: "",
           isActive: true,
         },
@@ -68,8 +69,18 @@ export async function GET(_req: NextRequest) {
         canEditOrders: true,
         canUpdateStock: true,
         canAddPreviousBills: true,
+        canViewOrderForm: true,
         mobileNumber: true,
         isActive: true,
+        tasks: {
+          select: {
+            id: true,
+            taskTitle: true,
+            isCompleted: true,
+            completedAt: true,
+          },
+          orderBy: { id: "asc" as const },
+        },
       },
     });
 
@@ -97,6 +108,7 @@ export async function GET(_req: NextRequest) {
         ...employee,
         isTeamLeader: isTL,
         canAddPreviousBills: Boolean(employee.canAddPreviousBills),
+        canViewOrderForm: employee.canViewOrderForm !== false,
       },
     });
   } catch (error: any) {

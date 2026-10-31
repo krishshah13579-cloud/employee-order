@@ -17,9 +17,21 @@ const SAFE_EMPLOYEE_SELECT = {
   canEditOrders: true,
   canUpdateStock: true,
   canAddPreviousBills: true,
+  canViewOrderForm: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  tasks: {
+    select: {
+      id: true,
+      taskTitle: true,
+      isCompleted: true,
+      completedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { id: "asc" as const },
+  },
 };
 
 export async function GET(req: NextRequest) {
@@ -82,10 +94,26 @@ export async function POST(req: NextRequest) {
         canEditOrders: Boolean(body.canEditOrders),
         canUpdateStock: Boolean(body.canUpdateStock),
         canAddPreviousBills: Boolean(body.canAddPreviousBills),
+        canViewOrderForm: body.canViewOrderForm !== undefined ? Boolean(body.canViewOrderForm) : true,
         isActive: isActive !== undefined ? isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,
     });
+
+    // Save initial tasks if provided (for Office Employee or any staff)
+    if (Array.isArray(body.tasks) && body.tasks.length > 0) {
+      const taskTitles = body.tasks
+        .map((t: any) => (typeof t === "string" ? t.trim() : (t.taskTitle || "").trim()))
+        .filter(Boolean);
+      if (taskTitles.length > 0) {
+        await prisma.employeeTask.createMany({
+          data: taskTitles.map((title: string) => ({
+            employeeId: employee.id,
+            taskTitle: title,
+          })),
+        });
+      }
+    }
 
     await recordAuditLog({
       action: "EMPLOYEE_CREATED",

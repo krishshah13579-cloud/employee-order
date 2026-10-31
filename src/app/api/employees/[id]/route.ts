@@ -16,9 +16,21 @@ const SAFE_EMPLOYEE_SELECT = {
   canEditOrders: true,
   canUpdateStock: true,
   canAddPreviousBills: true,
+  canViewOrderForm: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  tasks: {
+    select: {
+      id: true,
+      taskTitle: true,
+      isCompleted: true,
+      completedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { id: "asc" as const },
+  },
 };
 
 export async function GET(
@@ -78,10 +90,36 @@ export async function PUT(
         canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
         canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
         canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
+        canViewOrderForm: body.canViewOrderForm !== undefined ? Boolean(body.canViewOrderForm) : undefined,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
       select: SAFE_EMPLOYEE_SELECT,
     });
+
+    // Sync tasks if provided
+    if (Array.isArray(body.tasks)) {
+      await prisma.employeeTask.deleteMany({
+        where: { employeeId: empId },
+      });
+      const taskEntries = body.tasks
+        .map((t: any) => ({
+          taskTitle: typeof t === "string" ? t.trim() : (t.taskTitle || "").trim(),
+          isCompleted: typeof t === "object" ? Boolean(t.isCompleted) : false,
+          completedAt: typeof t === "object" && t.completedAt ? new Date(t.completedAt) : null,
+        }))
+        .filter((t: any) => Boolean(t.taskTitle));
+
+      if (taskEntries.length > 0) {
+        await prisma.employeeTask.createMany({
+          data: taskEntries.map((t: any) => ({
+            employeeId: empId,
+            taskTitle: t.taskTitle,
+            isCompleted: t.isCompleted,
+            completedAt: t.completedAt,
+          })),
+        });
+      }
+    }
 
     await recordAuditLog({
       action: "EMPLOYEE_UPDATED",

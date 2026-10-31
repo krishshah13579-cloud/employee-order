@@ -42,6 +42,33 @@ async function main() {
           ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "description" TEXT;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+        BEGIN
+          ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+          ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+          CREATE TABLE IF NOT EXISTS wholesale."EmployeeTask" (
+            "id" SERIAL PRIMARY KEY,
+            "employeeId" INTEGER NOT NULL,
+            "taskTitle" TEXT NOT NULL,
+            "isCompleted" BOOLEAN DEFAULT false,
+            "completedAt" TIMESTAMP(3),
+            "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "EmployeeTask_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES wholesale."Employee"("id") ON DELETE CASCADE
+          );
+          CREATE TABLE IF NOT EXISTS "EmployeeTask" (
+            "id" SERIAL PRIMARY KEY,
+            "employeeId" INTEGER NOT NULL,
+            "taskTitle" TEXT NOT NULL,
+            "isCompleted" BOOLEAN DEFAULT false,
+            "completedAt" TIMESTAMP(3),
+            "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+          );
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
       END $$;
     `);
     await prisma.$executeRawUnsafe(`

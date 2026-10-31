@@ -38,6 +38,21 @@ export async function GET(req: NextRequest) {
       },
     }).catch(() => []);
 
+    // Fetch latest 10 completed employee tasks
+    const recentCompletedTasks = await prisma.employeeTask.findMany({
+      where: { isCompleted: true, completedAt: { not: null } },
+      take: 10,
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        taskTitle: true,
+        completedAt: true,
+        employee: {
+          select: { name: true, designation: true },
+        },
+      },
+    }).catch(() => []);
+
     // Format into combined notification events
     const notifications = [
       ...recentOrders.map((o) => ({
@@ -56,6 +71,14 @@ export async function GET(req: NextRequest) {
         subtitle: `Registered from ${c.city || "Gujarat"}${c.phoneNumber ? ` • Ph: ${c.phoneNumber}` : ""}`,
         timestamp: c.createdAt,
         link: `/admin/employee/customers`,
+      })),
+      ...recentCompletedTasks.map((t) => ({
+        id: `task-${t.id}`,
+        type: "task" as const,
+        title: `Task Done: ${t.taskTitle}`,
+        subtitle: `Completed by ${t.employee?.name || "Office Employee"} (${t.employee?.designation || "Office Staff"})`,
+        timestamp: t.completedAt || new Date(),
+        link: `/admin/employee/employees`,
       })),
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 

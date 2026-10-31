@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Package, Plus, Boxes, Users } from "lucide-react";
+import { Home, Package, Plus, Boxes, Users, ListTodo } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: any;
+  isActive: boolean;
+  isCenterAction?: boolean;
+}
 
 export default function MobilePhoneNavbar() {
   const pathname = usePathname();
@@ -19,7 +27,36 @@ export default function MobilePhoneNavbar() {
     (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
-  const navItems = [
+  const canViewOrderForm = employee?.canViewOrderForm !== false;
+  const isOfficeEmployee =
+    employee?.designation === "Office Employee" ||
+    (Array.isArray(employee?.tasks) && employee.tasks.length > 0);
+
+  const centerItem = isOfficeEmployee
+    ? {
+        label: "Tasks",
+        href: "/tasks",
+        icon: ListTodo,
+        isCenterAction: true,
+        isActive: pathname === "/tasks",
+      }
+    : canViewOrderForm
+    ? {
+        label: "New Order",
+        href: "/orders/new",
+        icon: Plus,
+        isCenterAction: true,
+        isActive: pathname === "/orders/new",
+      }
+    : {
+        label: "Tasks",
+        href: "/tasks",
+        icon: ListTodo,
+        isCenterAction: true,
+        isActive: pathname === "/tasks",
+      };
+
+  const navItems: NavItem[] = [
     {
       label: "Home",
       href: "/",
@@ -27,18 +64,12 @@ export default function MobilePhoneNavbar() {
       isActive: pathname === "/",
     },
     {
-      label: "Orders",
+      label: isOfficeEmployee && canViewOrderForm ? "Orders" : "Orders",
       href: "/orders",
       icon: Package,
       isActive: pathname === "/orders" || (pathname?.startsWith("/orders/") && pathname !== "/orders/new"),
     },
-    {
-      label: "New Order",
-      href: "/orders/new",
-      icon: Plus,
-      isCenterAction: true,
-      isActive: pathname === "/orders/new",
-    },
+    centerItem,
     {
       label: canUpdateStock ? "Stock" : "Products",
       href: canUpdateStock ? "/update-stock" : "/products",

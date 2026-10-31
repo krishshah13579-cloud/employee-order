@@ -71,6 +71,16 @@ export interface AdminProfileData {
   notes?: string | null;
 }
 
+export interface EmployeeTaskData {
+  id: number;
+  employeeId: number;
+  taskTitle: string;
+  isCompleted: boolean;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EmployeeData {
   id: number;
   name: string;
@@ -84,9 +94,11 @@ export interface EmployeeData {
   canEditOrders?: boolean;
   canUpdateStock?: boolean;
   canAddPreviousBills?: boolean;
+  canViewOrderForm?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  tasks?: EmployeeTaskData[];
 }
 
 export interface CustomerData {

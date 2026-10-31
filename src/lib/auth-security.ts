@@ -167,6 +167,7 @@ export async function getEmployeeSession(req: NextRequest) {
         canEditOrders: true,
         canUpdateStock: true,
         canAddPreviousBills: true,
+        canViewOrderForm: true,
         isActive: true,
       },
     });

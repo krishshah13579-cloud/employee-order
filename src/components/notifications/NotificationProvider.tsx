@@ -14,7 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 
 export interface LiveNotification {
   id: string;
-  type: "ARTICLE" | "ORDER_STATUS" | "ORDER_PLACED" | "CUSTOMER";
+  type: "ARTICLE" | "ORDER_STATUS" | "ORDER_PLACED" | "CUSTOMER" | "TASK";
   title: string;
   subtitle: string;
   timestamp: string | Date;

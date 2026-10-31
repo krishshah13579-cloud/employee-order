@@ -38,6 +38,7 @@ import {
   Pencil,
   ChevronDown,
   ChevronUp,
+  ListTodo,
   MoreVertical,
   CheckSquare,
   Square,
@@ -1635,9 +1636,30 @@ export default function EmployeesPage() {
                           </div>
                         </td>
                         <td className="py-4 px-6">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-800">
-                            {emp.designation}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                                emp.designation === "Office Employee"
+                                  ? "bg-purple-100 text-purple-900 border border-purple-200"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {emp.designation}
+                            </span>
+                            {Array.isArray(emp.tasks) && emp.tasks.length > 0 && (
+                              <span className="text-[10px] text-purple-700 font-bold flex items-center gap-1">
+                                <ListTodo size={11} />
+                                <span>
+                                  {emp.tasks.filter((t: any) => t.isCompleted).length}/{emp.tasks.length} tasks done
+                                </span>
+                              </span>
+                            )}
+                            {emp.canViewOrderForm === false && (
+                              <span className="text-[9px] text-rose-700 font-bold bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                                Order Form Revoked
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 px-6">
                           {isEmployeeTeamLeader(emp) ? (

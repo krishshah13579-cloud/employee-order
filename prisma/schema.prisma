@@ -60,9 +60,27 @@ model Employee {
   canEditOrders Boolean  @default(false) // Admin approval to edit pending order forms
   canUpdateStock Boolean @default(false) // Admin approval to update inventory stock
   canAddPreviousBills Boolean @default(false) // Checkbox to allow T.L. / employee to add previous bills (Without GST)
+  canViewOrderForm Boolean @default(true) // Admin permission to view/access the Order Form
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  tasks         EmployeeTask[]
+
+  @@schema("wholesale")
+}
+
+// Tasks assigned by Admin to Office Employees
+model EmployeeTask {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  taskTitle   String
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@schema("wholesale")
 }

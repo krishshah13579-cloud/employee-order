@@ -1264,6 +1264,41 @@ function OrderFormContent() {
     );
   }
 
+  // Check if Order Form View is revoked by Admin
+  if (employee && employee.canViewOrderForm === false && activeFormTab !== "BILL") {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
+        <main className="max-w-2xl mx-auto px-4 pt-16 text-center space-y-4">
+          <div className="p-8 sm:p-10 bg-white border border-slate-200 rounded-3xl shadow-lg space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertCircle size={32} />
+            </div>
+            <h1 className="text-xl font-black text-slate-900">Order Form Access Revoked</h1>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">
+              Your administrator has revoked Order Form viewing permission for your account ({employee.designation}). You cannot view or submit wholesale orders. Please contact Admin if you require access.
+            </p>
+            <div className="pt-2 flex justify-center gap-3">
+              <Link
+                href="/"
+                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold transition hover:bg-black"
+              >
+                Return to Dashboard
+              </Link>
+              {(employee.designation === "Office Employee" || (Array.isArray(employee.tasks) && employee.tasks.length > 0)) && (
+                <Link
+                  href="/tasks"
+                  className="px-5 py-2.5 bg-purple-700 text-white rounded-xl text-xs font-bold transition hover:bg-purple-800"
+                >
+                  Go to Tasks
+                </Link>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
       <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 space-y-4 sm:space-y-6">

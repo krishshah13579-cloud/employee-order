@@ -21,6 +21,7 @@ import {
   Smartphone,
   Bell,
   FileCheck2,
+  ListTodo,
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { isEmployeeTeamLeader } from "@/lib/time";
@@ -56,9 +57,15 @@ export default function Navbar() {
     (employee?.id === 0 && (employee?.designation === "Administrator" || employee?.designation?.includes("Admin")))
   );
 
+  const canViewOrderForm = employee?.canViewOrderForm !== false;
+  const isOfficeEmployee =
+    employee?.designation === "Office Employee" ||
+    (Array.isArray(employee?.tasks) && employee.tasks.length > 0);
+
   const navLinks = [
     { href: "/", label: "Dashboard", icon: Home },
-    { href: "/orders/new", label: "Order Form", icon: FilePlus },
+    ...(isOfficeEmployee ? [{ href: "/tasks", label: "Tasks", icon: ListTodo }] : []),
+    ...(canViewOrderForm ? [{ href: "/orders/new", label: "Order Form", icon: FilePlus }] : []),
     ...(canAddPreviousBills ? [{ href: "/orders/new?tab=bill", label: "Bill", icon: FileCheck2 }] : []),
     { href: "/orders", label: "Order Page", icon: Package },
     { href: "/visiting-customers", label: "Visiting Customer", icon: MapPin },

@@ -19,6 +19,11 @@ import {
   Edit3,
   Boxes,
   Package,
+  Plus,
+  ListTodo,
+  CheckSquare,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { EmployeeData } from "@/lib/types";
@@ -43,6 +48,12 @@ export default function EmployeeForm({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const initialRole = initialData?.designation || "Sales Representative";
+  const isKnownRole =
+    initialRole === "Sales Representative" ||
+    initialRole === "Office Employee" ||
+    initialRole === "Team Leader (T.L.)";
+
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     email: initialData?.email || "",
@@ -50,12 +61,37 @@ export default function EmployeeForm({
     mobileNumber: initialData?.mobileNumber || "",
     address: initialData?.address || "",
     proofUrl: initialData?.proofUrl || "",
-    designation: initialData?.designation || "Sales Representative",
+    designation: initialRole,
     isTeamLeader: initialData?.isTeamLeader ?? isEmployeeTeamLeader(initialData),
     canEditOrders: initialData?.canEditOrders ?? false,
     canUpdateStock: initialData?.canUpdateStock ?? false,
+    canViewOrderForm: initialData?.canViewOrderForm ?? true,
     isActive: initialData?.isActive ?? true,
   });
+
+  const [isCustomDesignation, setIsCustomDesignation] = useState(!isKnownRole);
+  const [customDesignationText, setCustomDesignationText] = useState(!isKnownRole ? initialRole : "");
+
+  // Multiple tasks for Office Employee
+  const [tasks, setTasks] = useState<string[]>(
+    (initialData?.tasks || []).map((t: any) => (typeof t === "string" ? t : t.taskTitle || ""))
+  );
+  const [newTaskInput, setNewTaskInput] = useState("");
+
+  const handleAddTask = () => {
+    const trimmed = newTaskInput.trim();
+    if (!trimmed) return;
+    if (tasks.includes(trimmed)) {
+      toast("Task already added", "error");
+      return;
+    }
+    setTasks([...tasks, trimmed]);
+    setNewTaskInput("");
+  };
+
+  const handleRemoveTask = (indexToRemove: number) => {
+    setTasks(tasks.filter((_, idx) => idx !== indexToRemove));
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,10 +118,20 @@ export default function EmployeeForm({
       const method = isEdit ? "PUT" : "POST";
       const endpoint = isEdit ? `/api/employees/${employeeId}` : "/api/employees";
 
+      const finalDesignation = isCustomDesignation
+        ? (customDesignationText.trim() || "Employee")
+        : formData.designation;
+
+      const payload = {
+        ...formData,
+        designation: finalDesignation,
+        tasks,
+      };
+
       const res = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -200,17 +246,67 @@ export default function EmployeeForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Designation / Role *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.designation}
-              onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-              placeholder="e.g. Field Sales Representative"
-              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Designation / Role *
+              </label>
+              {isCustomDesignation ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomDesignation(false);
+                    setFormData({ ...formData, designation: "Sales Representative" });
+                  }}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+                >
+                  Choose Standard Role
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomDesignation(true)}
+                  className="text-[11px] text-orange-600 hover:text-orange-800 font-bold cursor-pointer"
+                >
+                  + Add Designation
+                </button>
+              )}
+            </div>
+
+            {!isCustomDesignation ? (
+              <select
+                value={formData.designation}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__CUSTOM__") {
+                    setIsCustomDesignation(true);
+                  } else {
+                    setFormData((prev) => ({
+                      ...prev,
+                      designation: val,
+                      // If Office Employee, default order form view to false unless admin enables it; if Sales Rep default to true
+                      canViewOrderForm: val === "Office Employee" ? false : prev.canViewOrderForm,
+                    }));
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-semibold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900 cursor-pointer"
+              >
+                <option value="Sales Representative">Sales Representative</option>
+                <option value="Office Employee">Office Employee</option>
+                <option value="Team Leader (T.L.)">Team Leader (T.L.)</option>
+                <option value="__CUSTOM__">+ Add Custom Designation...</option>
+              </select>
+            ) : (
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  required
+                  value={customDesignationText}
+                  onChange={(e) => setCustomDesignationText(e.target.value)}
+                  placeholder="Enter custom designation (e.g. Factory Supervisor, Accountant)"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-semibold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -227,6 +323,82 @@ export default function EmployeeForm({
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono font-bold tracking-widest focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
             />
           </div>
+
+          {/* Multiple Tasks Field (Office Employee or any custom assigned tasks) */}
+          {(formData.designation === "Office Employee" || tasks.length > 0) && (
+            <div className="sm:col-span-2 p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <ListTodo size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Assigned Tasks (Office Employee)</span>
+                    </h3>
+                    <p className="text-[11px] text-purple-700">
+                      These task checkboxes appear in the employee&apos;s Tasks tab. When checked, the completion timestamp is recorded and alerted to Admin.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-200 text-purple-900 font-bold text-[11px] font-mono">
+                  {tasks.length} {tasks.length === 1 ? "Task" : "Tasks"}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTaskInput}
+                  onChange={(e) => setNewTaskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTask();
+                    }
+                  }}
+                  placeholder="e.g. Verify courier dispatch slips, Check stock recount, Daily cash book"
+                  className="flex-1 px-3.5 py-2 bg-white border border-purple-300 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTask}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Plus size={14} />
+                  <span>Add Task</span>
+                </button>
+              </div>
+
+              {tasks.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  {tasks.map((task, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2.5 bg-white border border-purple-100 rounded-xl shadow-2xs text-xs text-gray-800"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckSquare size={14} className="text-purple-600 shrink-0" />
+                        <span className="font-semibold truncate">{task}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTask(idx)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer shrink-0"
+                        title="Remove Task"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-purple-600/80 italic">
+                  No tasks added yet. Type a task above and click &quot;Add Task&quot;.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center pt-2 sm:col-span-2">
             <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -349,6 +521,51 @@ export default function EmployeeForm({
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
+
+            {/* Order Form View Access Permission (Allow / Revoke) */}
+            <div className="flex items-center justify-between p-4 bg-amber-50/50 rounded-xl border border-amber-200">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0">
+                  {formData.canViewOrderForm ? (
+                    <Eye className="w-5 h-5 text-amber-700" />
+                  ) : (
+                    <EyeOff className="w-5 h-5 text-slate-500" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <span>Order Form View Access</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                        formData.canViewOrderForm
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      {formData.canViewOrderForm ? "Allowed" : "Revoked"}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    Allow or revoke order form access (/orders/new). If revoked, the Order Form is hidden and disabled for this employee.
+                  </p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.canViewOrderForm)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      canViewOrderForm: e.target.checked,
+                    }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
               </label>
             </div>
           </div>

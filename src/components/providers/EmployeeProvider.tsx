@@ -13,6 +13,8 @@ export interface EmployeeSession {
   canEditOrders?: boolean;
   canUpdateStock?: boolean;
   canAddPreviousBills?: boolean;
+  canViewOrderForm?: boolean;
+  tasks?: any[];
   mobileNumber?: string;
   email?: string;
   address?: string;

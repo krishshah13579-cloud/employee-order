@@ -25,16 +25,60 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const toast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
-    // On mobile screens (< 768px), suppress toasts completely (mobile shows native-style notifications only)
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      return;
+    // Detect mobile, fold device, tablet, or installed WebApp (PWA standalone mode)
+    if (typeof window !== "undefined") {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true;
+
+      const isMobileTabletOrFold =
+        window.innerWidth <= 1024 ||
+        /iphone|ipad|ipod|android|mobile|tablet|fold/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
+
+      if (isStandalone || isMobileTabletOrFold) {
+        // Trigger native device notification instead of web toast
+        if ("Notification" in window) {
+          const sendNativeAlert = () => {
+            try {
+              new Notification("IQ TROUSERS", {
+                body: message,
+                icon: "/icon-192.png",
+                badge: "/icon-192.png",
+              });
+            } catch {
+              if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.ready
+                  .then((reg) => {
+                    reg.showNotification("IQ TROUSERS", {
+                      body: message,
+                      icon: "/icon-192.png",
+                      badge: "/icon-192.png",
+                    });
+                  })
+                  .catch(() => {});
+              }
+            }
+          };
+
+          if (Notification.permission === "granted") {
+            sendNativeAlert();
+          } else if (Notification.permission === "default") {
+            Notification.requestPermission().then((perm) => {
+              if (perm === "granted") sendNativeAlert();
+            });
+          }
+        }
+        // Do NOT show floating in-app toast on mobile, fold devices, tablets, or installed webapp
+        return;
+      }
     }
 
     const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-    // Keep only 1 notification/toast at a time — replace previous rather than stacking multiple
+    // Keep only 1 notification/toast at a time on desktop
     setToasts([{ id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
