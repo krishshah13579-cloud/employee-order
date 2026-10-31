@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FolderTree,
   Plus,
@@ -30,13 +30,26 @@ export interface CategoryItem {
 }
 
 interface CategoriesManagerProps {
-  initialCategories: CategoryItem[];
+  initialCategories?: CategoryItem[];
 }
 
 export default function CategoriesManager({
-  initialCategories,
+  initialCategories = [],
 }: CategoriesManagerProps) {
   const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
+
+  useEffect(() => {
+    if (initialCategories && initialCategories.length > 0) {
+      setCategories(initialCategories);
+    } else {
+      fetch("/api/categories")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) setCategories(data);
+        })
+        .catch((err) => console.error("Failed to load categories:", err));
+    }
+  }, [initialCategories]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);

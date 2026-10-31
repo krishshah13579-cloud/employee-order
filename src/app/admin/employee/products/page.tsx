@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   Layers,
   Ruler,
+  FolderTree,
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES,
@@ -34,9 +36,38 @@ import {
   stringifyColorwiseSets,
   cleanColorName,
 } from "@/lib/stock";
+import CategoriesManager from "../categories/CategoriesManager";
 
-export default function ProductsPage() {
+function ProductsContent() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"PRODUCTS" | "CATEGORIES">(
+    tabParam?.toUpperCase() === "CATEGORIES" ? "CATEGORIES" : "PRODUCTS"
+  );
+
+  useEffect(() => {
+    if (tabParam?.toUpperCase() === "CATEGORIES") {
+      setActiveTab("CATEGORIES");
+    } else if (tabParam?.toUpperCase() === "PRODUCTS") {
+      setActiveTab("PRODUCTS");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: "PRODUCTS" | "CATEGORIES") => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "CATEGORIES") {
+      params.set("tab", "categories");
+    } else {
+      params.delete("tab");
+    }
+    const query = params.toString() ? `?${params.toString()}` : "";
+    router.replace(`${pathname}${query}`, { scroll: false });
+  };
+
   const [products, setProducts] = useState<ProductData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -115,8 +146,10 @@ export default function ProductsPage() {
         }
       } catch {}
     }
-    loadCategories();
-  }, []);
+    if (activeTab === "PRODUCTS") {
+      loadCategories();
+    }
+  }, [activeTab]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -175,8 +208,41 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+      {/* Top Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => handleTabChange("PRODUCTS")}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+            activeTab === "PRODUCTS"
+              ? "border-orange-600 text-orange-700 bg-orange-50/70 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+          }`}
+        >
+          <Package size={16} className={activeTab === "PRODUCTS" ? "text-orange-600" : "text-gray-400"} />
+          <span>Products</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("CATEGORIES")}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+            activeTab === "CATEGORIES"
+              ? "border-orange-600 text-orange-700 bg-orange-50/70 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+          }`}
+        >
+          <FolderTree size={16} className={activeTab === "CATEGORIES" ? "text-orange-600" : "text-gray-400"} />
+          <span>Categories</span>
+        </button>
+      </div>
+
+      {activeTab === "CATEGORIES" ? (
+        <CategoriesManager />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
             <Package size={14} /> Wholesale Garment Catalog
@@ -519,6 +585,8 @@ export default function ProductsPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* Size Guide Preview Modal (2 Tabs: Formal and Trousers) */}
       {previewGuide && (() => {
@@ -837,5 +905,13 @@ export default function ProductsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Loading catalog...</div>}>
+      <ProductsContent />
+    </Suspense>
   );
 }

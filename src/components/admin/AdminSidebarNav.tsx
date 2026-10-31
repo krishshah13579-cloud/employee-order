@@ -75,12 +75,6 @@ const employeeNavItems = [
     exact: false,
   },
   {
-    name: "Categories",
-    href: "/admin/employee/categories",
-    icon: FolderTree,
-    exact: false,
-  },
-  {
     name: "Order Forms",
     href: "/admin/employee/orders",
     icon: ShoppingCart,
