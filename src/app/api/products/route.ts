@@ -68,11 +68,25 @@ export async function GET(request: NextRequest) {
     });
 
     // Exclude designs marked as Goods Return (GR) in Costing Master
-    const grCostings = await prisma.productCosting.findMany({
-      where: { isGR: true },
-      select: { designNo: true },
-    });
-    const grSet = new Set(grCostings.map((c) => c.designNo.trim().toUpperCase()));
+    let grCostings: { designNo: string }[] = [];
+    try {
+      const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
+      await ensureDbSchema();
+      grCostings = await prisma.productCosting.findMany({
+        where: { isGR: true },
+        select: { designNo: true },
+      });
+    } catch (costingErr) {
+      console.warn("[PRODUCTS] Safe fallback for GR product costing check:", costingErr);
+      try {
+        grCostings = (await prisma.$queryRawUnsafe(`
+          SELECT "designNo" FROM wholesale."ProductCosting" WHERE "isGR" = true
+        `)) as any[];
+      } catch {
+        grCostings = [];
+      }
+    }
+    const grSet = new Set((grCostings || []).map((c) => (c.designNo || "").trim().toUpperCase()));
 
     const nonGrProducts = rawProducts.filter((p) => {
       const pName = p.name.trim().toUpperCase();

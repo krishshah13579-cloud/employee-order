@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { useEmployee } from "@/components/providers/EmployeeProvider";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
+import { formatCurrency, formatExactRate, getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { getColorHex, getColorHexCode } from "@/lib/colors";
 import {
   cleanColorName,
@@ -1017,7 +1017,7 @@ export default function UpdateStockPage() {
                             </td>
 
                             <td className="py-3 px-4 text-right font-mono text-xs text-slate-700">
-                              {item.costPerUnit ? formatCurrency(item.costPerUnit) : "—"}
+                              {item.costPerUnit ? formatExactRate(item.costPerUnit) : "—"}
                             </td>
 
                             <td className="py-3 px-4 text-center">

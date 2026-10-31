@@ -3,6 +3,13 @@ export function formatCurrency(amount: number): string {
   return `₹${Math.round(amount || 0).toLocaleString("en-IN")}`;
 }
 
+/** Format a number as Indian Rupee with exact decimals for unit rates/trims (e.g. ₹0.50, ₹1.25, ₹10) */
+export function formatExactRate(amount: number): string {
+  const num = Number(amount) || 0;
+  if (num % 1 === 0) return `₹${num.toLocaleString("en-IN")}`;
+  return `₹${num.toFixed(2)}`;
+}
+
 /** Format a date string to a readable format */
 export function formatDate(date: string | Date): string {
   return new Date(date).toLocaleDateString("en-IN", {

@@ -159,15 +159,36 @@ export async function GET(request: NextRequest) {
     // Calculate aggregated sold units & profit as per PRODUCT SOLD (unit costing sourced from Costing Master)
     if (includeProfit) {
       // 1. Fetch latest Total Costing & Arrival Dates for each design from Costing Master
-      const costingRecords = await prisma.productCosting.findMany();
+      let costingRecords: any[] = [];
+      try {
+        const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
+        await ensureDbSchema();
+        costingRecords = await prisma.productCosting.findMany();
+      } catch (err: any) {
+        console.warn("[STOCK/PROFIT] Failed to fetch productCosting, retrying with schema ensure:", err);
+        try {
+          const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
+          await ensureDbSchema();
+          costingRecords = await prisma.productCosting.findMany();
+        } catch (retryErr) {
+          console.warn("[STOCK/PROFIT] Falling back to raw query for product costing:", retryErr);
+          try {
+            costingRecords = (await prisma.$queryRawUnsafe(`
+              SELECT id, "designNo", "totalCosting", "createdAt", "isGR" FROM wholesale."ProductCosting"
+            `)) as any[];
+          } catch {
+            costingRecords = [];
+          }
+        }
+      }
       const costingMap = new Map<string, number>();
       const costingDateMap = new Map<string, Date>();
       const grDesignSet = new Set<string>();
 
       for (const c of costingRecords) {
-        const dNo = c.designNo.trim().toUpperCase();
-        costingMap.set(dNo, c.totalCosting);
-        costingDateMap.set(dNo, c.createdAt);
+        const dNo = (c.designNo || "").trim().toUpperCase();
+        costingMap.set(dNo, c.totalCosting || 0);
+        costingDateMap.set(dNo, c.arrivalDate || c.createdAt);
         if (c.isGR) {
           grDesignSet.add(dNo);
         }

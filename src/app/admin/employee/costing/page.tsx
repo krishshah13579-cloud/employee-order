@@ -27,7 +27,7 @@ import {
   CheckCircle2,
   Lock,
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatExactRate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 
@@ -311,7 +311,7 @@ export default function AdminCostingPage() {
       const updated = [...itemsUsed];
       const newQty = updated[existingIndex].quantityUsed + qty;
       updated[existingIndex].quantityUsed = newQty;
-      updated[existingIndex].totalCost = Math.round(newQty * item.costPerUnit);
+      updated[existingIndex].totalCost = Number((newQty * item.costPerUnit).toFixed(2));
       setItemsUsed(updated);
     } else {
       setItemsUsed([
@@ -323,7 +323,7 @@ export default function AdminCostingPage() {
           quantityUsed: qty,
           unit: item.unit,
           costPerUnit: item.costPerUnit,
-          totalCost: Math.round(qty * item.costPerUnit),
+          totalCost: Number((qty * item.costPerUnit).toFixed(2)),
           imageUrl: item.imageUrl,
         },
       ]);
@@ -1194,10 +1194,10 @@ export default function AdminCostingPage() {
                           {it.quantityUsed} {it.unit}
                         </td>
                         <td className="p-2 text-right font-mono text-slate-600">
-                          {formatCurrency(it.costPerUnit)}
+                          {formatExactRate(it.costPerUnit)}
                         </td>
                         <td className="p-2 text-right font-mono font-bold text-purple-700">
-                          {formatCurrency(it.totalCost)}
+                          {formatExactRate(it.totalCost)}
                         </td>
                         <td className="p-2 text-center">
                           <button
@@ -1578,10 +1578,10 @@ export default function AdminCostingPage() {
                           {it.quantityUsed} {it.unit}
                         </td>
                         <td className="p-3 text-right font-mono text-slate-600">
-                          {formatCurrency(it.costPerUnit)}
+                          {formatExactRate(it.costPerUnit)}
                         </td>
                         <td className="p-3 text-right font-mono font-bold text-purple-700">
-                          {formatCurrency(it.totalCost)}
+                          {formatExactRate(it.totalCost)}
                         </td>
                         <td className="p-3 text-center">
                           <button

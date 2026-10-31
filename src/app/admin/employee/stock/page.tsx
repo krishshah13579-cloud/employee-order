@@ -26,7 +26,7 @@ import {
   Image as ImageIcon,
   Loader2,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatExactRate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { getColorHex } from "@/lib/colors";
 import { cleanColorName } from "@/lib/stock";
@@ -679,93 +679,6 @@ export default function AdminStockPage() {
       </div>
 
       {/* ═══════════════════════════════════════════
-          5 METRIC KPI CARDS (RESPONSIVE & PADDED — NO OVERFLOW)
-          ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-        {/* 1. Total Styles */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
-            <Package size={20} className="sm:w-[22px] sm:h-[22px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 block truncate">
-              Total Styles
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
-              {metrics?.totalStyles ?? 0}
-            </span>
-          </div>
-        </div>
-
-        {/* 2. Total Sets */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 shadow-xs">
-            <Boxes size={20} className="sm:w-[22px] sm:h-[22px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 block truncate">
-              Total Sets
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
-              {metrics?.grandTotalSets ?? 0}
-            </span>
-          </div>
-        </div>
-
-        {/* 3. Total Pieces */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 shadow-xs">
-            <Layers size={20} className="sm:w-[22px] sm:h-[22px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 block truncate">
-              Total Pieces
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
-              {metrics?.grandTotalPcs ?? 0}
-            </span>
-          </div>
-        </div>
-
-        {/* 4. Total Damage Pieces (Cash Pool Only) */}
-        <div
-          onClick={() => handleOpenDamageSale()}
-          className="bg-amber-50/60 p-4 sm:p-5 rounded-3xl border border-amber-300/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-amber-400 hover:bg-amber-50 transition-all min-w-0 cursor-pointer"
-          title="Click to sell damage pieces in Cash (Admin Only)"
-        >
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-xs">
-            <AlertTriangle size={20} className="sm:w-[22px] sm:h-[22px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800 block truncate">
-              Damage Pcs (Cash)
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono tracking-tight block truncate">
-              {metrics?.grandTotalDamagePcs ?? 0} Pcs
-            </span>
-          </div>
-        </div>
-
-        {/* 5. Inventory Valuation */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3 sm:gap-4 hover:border-slate-300 transition-all min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
-            <DollarSign size={20} className="sm:w-[22px] sm:h-[22px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 block truncate">
-              Valuation
-            </span>
-            <span
-              className="text-base sm:text-lg lg:text-xl xl:text-2xl font-black text-emerald-700 font-mono tracking-tight block truncate"
-              title={formatCurrency(metrics?.grandTotalValuation ?? 0)}
-            >
-              {formatCurrency(metrics?.grandTotalValuation ?? 0)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════
           MAIN TABS SWITCHER
           ═══════════════════════════════════════════ */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
@@ -806,6 +719,92 @@ export default function AdminStockPage() {
           ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === "GARMENT_STOCK" && (
         <div className="space-y-4">
+          {/* ═══════════════════════════════════════════
+              5 METRIC KPI CARDS (INSIDE GARMENT INVENTORY)
+              ═══════════════════════════════════════════ */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            {/* 1. Total Styles */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Package size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                  Total Styles
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                  {metrics?.totalStyles ?? 0}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Total Sets */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <Boxes size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                  Total Sets
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                  {metrics?.grandTotalSets ?? 0}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Total Pieces */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <Layers size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                  Total Pieces
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                  {metrics?.grandTotalPcs ?? 0}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Total Damage Pieces (Cash Pool Only) */}
+            <div
+              onClick={() => handleOpenDamageSale()}
+              className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 shadow-2xs flex items-center gap-3.5 hover:border-amber-300 hover:bg-amber-100/60 transition-all cursor-pointer"
+              title="Click to sell damage pieces in Cash (Admin Only)"
+            >
+              <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block truncate">
+                  Damage Pcs (Cash)
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono tracking-tight block truncate">
+                  {metrics?.grandTotalDamagePcs ?? 0} Pcs
+                </span>
+              </div>
+            </div>
+
+            {/* 5. Inventory Valuation */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all col-span-2 sm:col-span-1">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <DollarSign size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                  Valuation
+                </span>
+                <span
+                  className="text-lg sm:text-xl font-black text-emerald-700 font-mono tracking-tight block truncate"
+                  title={formatCurrency(metrics?.grandTotalValuation ?? 0)}
+                >
+                  {formatCurrency(metrics?.grandTotalValuation ?? 0)}
+                </span>
+              </div>
+            </div>
+          </div>
           {/* Toolbar */}
           <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
@@ -1195,7 +1194,7 @@ export default function AdminStockPage() {
                             )}
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-slate-700">
-                            {formatCurrency(item.costPerUnit)}
+                            {formatExactRate(item.costPerUnit)}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-bold text-amber-700">
                             {formatCurrency(itemValuation)}

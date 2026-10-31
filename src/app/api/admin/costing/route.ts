@@ -35,6 +35,9 @@ function normalizeVendorName(name?: string | null): string {
 
 export async function GET(req: NextRequest) {
   try {
+    const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
+    await ensureDbSchema();
+
     const { searchParams } = new URL(req.url);
     const designNo = searchParams.get("designNo");
 
@@ -45,13 +48,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, costing: entry });
     }
 
-    const [costingsRaw, products] = await Promise.all([
-      prisma.productCosting.findMany(),
-      prisma.product.findMany({
-        select: { id: true, name: true, costPrice: true, price: true, mrp: true, setsColorwise: true, isActive: true },
-        orderBy: { name: "asc" },
-      }),
-    ]);
+    let costingsRaw: any[] = [];
+    try {
+      costingsRaw = await prisma.productCosting.findMany();
+    } catch (fetchErr) {
+      console.warn("[COSTING] Failed to findMany, ensuring schema and retrying:", fetchErr);
+      await ensureDbSchema();
+      try {
+        costingsRaw = await prisma.productCosting.findMany();
+      } catch (retryErr) {
+        console.warn("[COSTING] Raw query fallback for costing records:", retryErr);
+        try {
+          costingsRaw = (await prisma.$queryRawUnsafe(`
+            SELECT id, "designNo", "fabricName", "purchasedFrom", "rateMode", "fabricRate", "mtrPerKg", "ratePerMeter",
+                   "avgFabricPerPiece", "fabricCost", "jobworkCost", "otherCost", "pressCost", "totalCosting", "margin",
+                   "sellingPrice", "mrp", "notes", "createdAt", "updatedAt", "isJobwork", "isGR"
+            FROM wholesale."ProductCosting"
+          `)) as any[];
+        } catch {
+          costingsRaw = [];
+        }
+      }
+    }
+
+    const products = await prisma.product.findMany({
+      select: { id: true, name: true, costPrice: true, price: true, mrp: true, setsColorwise: true, isActive: true },
+      orderBy: { name: "asc" },
+    });
 
     // Sort costings strictly in ascending numerical sequence: IMP - 001, IMP - 002, IMP - 003...
     const costings = [...costingsRaw].sort((a, b) => {
