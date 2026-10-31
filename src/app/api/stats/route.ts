@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
       activeProductsList,
       categoriesRaw,
       revenueAggregation,
+      returnsAggregation,
       recentOrdersRaw,
     ] = await Promise.all([
       prisma.order.count({ where: empOrderScope }).catch(() => 0),
@@ -118,6 +119,11 @@ export async function GET(req: NextRequest) {
           },
         },
       }).catch(() => ({ _sum: { grandTotal: 0 } })),
+      prisma.salesReturn.aggregate({
+        _sum: {
+          totalAmount: true,
+        },
+      }).catch(() => ({ _sum: { totalAmount: 0 } })),
       prisma.order.findMany({
         where: recentOrdersWhere,
         take: 15,
@@ -177,6 +183,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const totalSales = revenueAggregation._sum.grandTotal || 0;
+    const totalReturns = returnsAggregation._sum.totalAmount || 0;
+    const netRevenue = Math.max(0, Math.round((totalSales - totalReturns) * 100) / 100);
+
     const stats = {
       totalOrders,
       todayOrders,
@@ -188,7 +198,9 @@ export async function GET(req: NextRequest) {
       inStockProducts: inStockProductsCount,
       totalCategories: categoriesRaw.length,
       categories: categoriesRaw.map((c) => c.name),
-      totalRevenue: Math.round((revenueAggregation._sum.grandTotal || 0) * 100) / 100,
+      totalRevenue: netRevenue,
+      totalSales: Math.round(totalSales * 100) / 100,
+      totalReturns: Math.round(totalReturns * 100) / 100,
       recentOrders: recentOrdersRaw.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,

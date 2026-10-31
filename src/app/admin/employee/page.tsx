@@ -92,7 +92,7 @@ export default function AdminDashboardPage() {
       title: "Total Revenue",
       value: formatCurrency(stats?.totalRevenue ?? 0),
       icon: IndianRupee,
-      description: "Wholesale invoices billed",
+      description: "Total sales minus returns",
       color: "text-emerald-600 bg-emerald-50 border-emerald-200/80",
       href: "/admin/employee/orders",
     },

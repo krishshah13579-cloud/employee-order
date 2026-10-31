@@ -459,7 +459,7 @@ export default function OrdersView({
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                 <th className="py-3.5 px-6">
-                  {activeTab === "INVOICES" ? "Invoice #" : activeTab === "BILLS" ? "Bill #" : "Order Form #"}
+                  {activeTab === "INVOICES" ? "Invoice #" : activeTab === "BILLS" ? "Bill # & Order #" : "Order Form #"}
                 </th>
                 <th className="py-3.5 px-6">Date</th>
                 <th className="py-3.5 px-6">{activeTab === "BILLS" ? "Customer & Type" : "Customer & City"}</th>
@@ -529,17 +529,28 @@ export default function OrdersView({
                             </span>
                           </div>
                         ) : activeTab === "BILLS" ? (
-                          <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-emerald-950 text-sm">
-                              {(() => {
-                                const match = o.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
-                                const billNo = match ? match[1].trim() : (o.taxInvoiceNumber || o.orderNumber);
-                                return billNo?.startsWith("#") ? billNo : `#${billNo || o.id}`;
-                              })()}
-                            </span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Bill
-                            </span>
+                          <div className="font-mono text-gray-900 text-sm flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-black text-emerald-950 text-sm">
+                                {(() => {
+                                  const match = o.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/);
+                                  const billNo = match ? match[1].trim() : (o.taxInvoiceNumber || o.orderNumber);
+                                  return billNo?.startsWith("#") ? billNo : `#${billNo || o.id}`;
+                                })()}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Bill
+                              </span>
+                            </div>
+
+                            <span className="text-gray-300 font-normal">|</span>
+
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="text-slate-500 font-semibold text-[11px]">Order:</span>
+                              <span className="font-bold text-slate-900">
+                                {o.orderNumber?.startsWith("#") ? o.orderNumber : `#${o.orderNumber || o.id}`}
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <div className="font-mono font-bold text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
