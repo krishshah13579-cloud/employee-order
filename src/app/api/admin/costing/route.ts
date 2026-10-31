@@ -179,6 +179,11 @@ export async function POST(req: NextRequest) {
       otherCost = 0,
       pressCost = 0,
       margin = 0,
+      arrivalDate,
+      totalMeters,
+      totalPcs,
+      itemsUsed,
+      itemCostPerPiece,
       notes = "",
     } = body;
 
@@ -287,6 +292,25 @@ export async function POST(req: NextRequest) {
     // Wholesaler Price = Retailer Price - 100 (Round Off)
     const wholesalerPrice = Math.max(0, retailerPrice - 100);
 
+    const numTotalMeters = Math.max(0, parseFloat(totalMeters) || 0);
+    const numTotalPcs = totalPcs !== undefined && totalPcs !== null
+      ? Math.max(0, parseInt(String(totalPcs), 10) || 0)
+      : (numTotalMeters > 0 && numAvgFabric > 0 ? Math.round(numTotalMeters * numAvgFabric) : 0);
+
+    const numItemCostPerPiece = Math.max(0, parseFloat(itemCostPerPiece) || 0);
+    const parsedArrivalDate = arrivalDate ? new Date(arrivalDate) : new Date();
+
+    // Serialize itemsUsed
+    let itemsUsedList: any[] = [];
+    if (Array.isArray(itemsUsed)) {
+      itemsUsedList = itemsUsed;
+    } else if (typeof itemsUsed === "string" && itemsUsed.trim()) {
+      try {
+        itemsUsedList = JSON.parse(itemsUsed);
+      } catch {}
+    }
+    const itemsUsedJson = itemsUsedList.length > 0 ? JSON.stringify(itemsUsedList) : null;
+
     // Upsert into ProductCosting
     const savedCosting = await prisma.productCosting.upsert({
       where: { designNo: cleanDesignNo },
@@ -308,6 +332,11 @@ export async function POST(req: NextRequest) {
         margin: Math.round(numMargin),
         sellingPrice,
         mrp,
+        arrivalDate: parsedArrivalDate,
+        totalMeters: numTotalMeters,
+        totalPcs: numTotalPcs,
+        itemsUsed: itemsUsedJson,
+        itemCostPerPiece: numItemCostPerPiece,
         notes: (notes || "").trim(),
       },
       create: {
@@ -329,9 +358,50 @@ export async function POST(req: NextRequest) {
         margin: Math.round(numMargin),
         sellingPrice,
         mrp,
+        arrivalDate: parsedArrivalDate,
+        totalMeters: numTotalMeters,
+        totalPcs: numTotalPcs,
+        itemsUsed: itemsUsedJson,
+        itemCostPerPiece: numItemCostPerPiece,
         notes: (notes || "").trim(),
       },
     });
+
+    // Deduct stock for items used in this costing
+    try {
+      for (const item of itemsUsedList) {
+        const qtyUsed = Math.max(0, parseInt(String(item.quantityUsed || item.qty), 10) || 0);
+        if (qtyUsed <= 0) continue;
+
+        if (item.itemId) {
+          const accId = parseInt(String(item.itemId), 10);
+          const existingAcc = await prisma.accessoryItem.findUnique({ where: { id: accId } });
+          if (existingAcc) {
+            const updatedQty = Math.max(0, existingAcc.quantity - qtyUsed);
+            await prisma.accessoryItem.update({
+              where: { id: accId },
+              data: { quantity: updatedQty },
+            });
+          }
+        } else if (item.isNewItem && item.name) {
+          // If added on-the-fly, create and set remaining stock
+          const initialStock = Math.max(0, parseInt(String(item.initialStock), 10) || 0);
+          const remaining = Math.max(0, initialStock - qtyUsed);
+          await prisma.accessoryItem.create({
+            data: {
+              name: String(item.name).trim(),
+              category: String(item.category || "Other").trim(),
+              quantity: remaining,
+              unit: String(item.unit || "Pcs").trim(),
+              costPerUnit: Math.max(0, parseFloat(String(item.costPerUnit)) || 0),
+              imageUrl: item.imageUrl ? String(item.imageUrl).trim() : null,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error deducting accessory stock for costing items used:", err);
+    }
 
     // Automatically sync costing, selling price, and MRP with Product & Stock
     const matchingProducts = await prisma.product.findMany({

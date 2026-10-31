@@ -170,6 +170,11 @@ model ProductCosting {
   margin            Float    @default(0) // Manual added margin
   sellingPrice      Float    @default(0) // totalCosting + margin
   mrp               Float    @default(0) // sellingPrice * 2
+  arrivalDate       DateTime? @default(now()) // Date product arrived
+  totalMeters       Float?   @default(0) // Total Fabric Meters purchased
+  totalPcs          Int?     @default(0) // Total pieces calculated via Meters * Avg
+  itemsUsed         String?  // JSON of items used: [{ itemId, name, category, quantityUsed, unit, costPerUnit, totalCost }]
+  itemCostPerPiece  Float?   @default(0) // Total items cost / Total pcs (Round off)
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
