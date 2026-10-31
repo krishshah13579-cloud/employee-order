@@ -722,47 +722,47 @@ export default function AdminStockPage() {
           {/* ═══════════════════════════════════════════
               5 METRIC KPI CARDS (INSIDE GARMENT INVENTORY)
               ═══════════════════════════════════════════ */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
             {/* 1. Total Styles */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
-              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Package size={20} />
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3 sm:gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Package size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
                   Total Styles
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                <span className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
                   {metrics?.totalStyles ?? 0}
                 </span>
               </div>
             </div>
 
             {/* 2. Total Sets */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
-              <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Boxes size={20} />
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3 sm:gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <Boxes size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
                   Total Sets
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                <span className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
                   {metrics?.grandTotalSets ?? 0}
                 </span>
               </div>
             </div>
 
             {/* 3. Total Pieces */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                <Layers size={20} />
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3 sm:gap-3.5 hover:border-slate-300 transition-all">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <Layers size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
                   Total Pieces
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
+                <span className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight block truncate">
                   {metrics?.grandTotalPcs ?? 0}
                 </span>
               </div>
@@ -771,33 +771,33 @@ export default function AdminStockPage() {
             {/* 4. Total Damage Pieces (Cash Pool Only) */}
             <div
               onClick={() => handleOpenDamageSale()}
-              className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 shadow-2xs flex items-center gap-3.5 hover:border-amber-300 hover:bg-amber-100/60 transition-all cursor-pointer"
+              className="bg-amber-50/70 p-3.5 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs flex items-center gap-3 sm:gap-3.5 hover:border-amber-300 hover:bg-amber-100/60 transition-all cursor-pointer"
               title="Click to sell damage pieces in Cash (Admin Only)"
             >
-              <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                <AlertTriangle size={20} />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block truncate">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-800 block truncate">
                   Damage Pcs (Cash)
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono tracking-tight block truncate">
+                <span className="text-lg sm:text-2xl font-black text-amber-950 font-mono tracking-tight block truncate">
                   {metrics?.grandTotalDamagePcs ?? 0} Pcs
                 </span>
               </div>
             </div>
 
             {/* 5. Inventory Valuation */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3.5 hover:border-slate-300 transition-all col-span-2 sm:col-span-1">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <DollarSign size={20} />
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3 sm:gap-3.5 hover:border-slate-300 transition-all col-span-1 min-[420px]:col-span-2 sm:col-span-1">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <DollarSign size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block truncate">
                   Valuation
                 </span>
                 <span
-                  className="text-lg sm:text-xl font-black text-emerald-700 font-mono tracking-tight block truncate"
+                  className="text-base sm:text-xl font-black text-emerald-700 font-mono tracking-tight block truncate"
                   title={formatCurrency(metrics?.grandTotalValuation ?? 0)}
                 >
                   {formatCurrency(metrics?.grandTotalValuation ?? 0)}

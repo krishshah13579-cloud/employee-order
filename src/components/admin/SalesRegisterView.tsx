@@ -533,26 +533,26 @@ export default function SalesRegisterView() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => handleOpenNewInvoice("Cash")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <Banknote size={15} />
-              <span>+ New Cash Sale</span>
+              <span>+ Cash Sale</span>
             </button>
 
             <button
               onClick={() => handleOpenNewInvoice("Credit")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 sm:py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <Plus size={15} />
-              <span>+ New Credit Invoice</span>
+              <span>+ Credit Invoice</span>
             </button>
 
             <button
               onClick={loadInvoices}
-              className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 rounded-xl transition cursor-pointer"
+              className="p-2 sm:p-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 rounded-xl transition cursor-pointer shrink-0"
               title="Refresh Sales"
             >
               <RefreshCw size={15} className={loading ? "animate-spin text-orange-600" : ""} />
@@ -561,7 +561,7 @@ export default function SalesRegisterView() {
         </div>
 
         {/* Financial KPI Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">Total Sales Revenue</span>

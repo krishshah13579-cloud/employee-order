@@ -201,13 +201,13 @@ export default function AdminProfitPage() {
       </div>
 
       {/* Summary Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-6 rounded-3xl text-white shadow-lg">
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-4 sm:p-6 rounded-2xl sm:rounded-3xl text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-wider font-bold text-emerald-100">
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold text-emerald-100">
               Total Net Gross Profit (After Returns)
             </span>
-            <h2 className="text-3xl sm:text-4xl font-black mt-1 font-mono">
+            <h2 className="text-2xl sm:text-4xl font-black mt-1 font-mono">
               {formatCurrency(metrics?.grandTotalSoldProfit ?? 0)}
             </h2>
             <p className="text-xs text-emerald-100 mt-1 max-w-xl">
@@ -215,7 +215,7 @@ export default function AdminProfitPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white/10 backdrop-blur-xs p-4 rounded-2xl border border-white/20">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 bg-white/10 backdrop-blur-xs p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-white/20">
             <div>
               <span className="text-[10px] uppercase font-bold text-emerald-200 block">Total Sold Units</span>
               <span className="text-xl font-black font-mono">{metrics?.grandTotalSoldUnits ?? 0} PCS</span>

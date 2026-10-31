@@ -275,32 +275,32 @@ function ProductsContent() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleSyncStock}
             disabled={isSyncingStock}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
             title="Sync all products with stock, photo links, wash guide, size guide, and e-commerce inventory"
           >
-            <RefreshCw size={15} className={`text-orange-600 ${isSyncingStock ? "animate-spin" : ""}`} />
-            <span>{isSyncingStock ? "Syncing Stock..." : "Sync Stock"}</span>
+            <RefreshCw size={14} className={`text-orange-600 ${isSyncingStock ? "animate-spin" : ""}`} />
+            <span>{isSyncingStock ? "Syncing..." : "Sync Stock"}</span>
           </button>
 
           <Link
             href="/admin/employee/products/new"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-5 py-2 sm:py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Plus size={16} />
-            <span>Add New Garment</span>
+            <Plus size={15} />
+            <span className="truncate">Add Garment</span>
           </Link>
         </div>
       </div>
 
       {/* Toolbar & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-1 items-center gap-3 max-w-xl">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1 max-w-xl w-full">
+          <div className="relative flex-1 w-full">
             <Search size={16} className="absolute left-3.5 top-3 text-gray-400" />
             <input
               type="text"
@@ -313,7 +313,7 @@ function ProductsContent() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 outline-none shadow-2xs cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 outline-none shadow-2xs cursor-pointer"
           >
             <option value="All">All Categories</option>
             {categoriesList.map((cat) => (

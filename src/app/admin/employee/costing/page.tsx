@@ -611,14 +611,14 @@ export default function AdminCostingPage() {
   return (
     <div className="space-y-6 pb-20 max-w-7xl mx-auto">
       {/* Top Emerald Yearly Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-6 rounded-3xl text-white shadow-lg">
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 p-4 sm:p-6 rounded-2xl sm:rounded-3xl text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-wider font-bold text-emerald-100 flex items-center gap-1.5">
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold text-emerald-100 flex items-center gap-1.5">
               <Calendar size={14} />
               TOTAL DESIGNS YEARLY ({yearlyMetrics?.currentYear || new Date().getFullYear()})
             </span>
-            <h2 className="text-3xl sm:text-4xl font-black mt-1 font-mono">
+            <h2 className="text-2xl sm:text-4xl font-black mt-1 font-mono">
               {yearlyMetrics?.totalDesignsYearly ?? costings.length} Designs
             </h2>
             <p className="text-xs text-emerald-100 mt-1 max-w-xl">
@@ -626,7 +626,7 @@ export default function AdminCostingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-white/10 backdrop-blur-xs p-4 rounded-2xl border border-white/20">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 bg-white/10 backdrop-blur-xs p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/20">
             <div>
               <span className="text-[10px] uppercase font-bold text-emerald-200 block">Active Designs</span>
               <span className="text-xl font-black font-mono">
@@ -650,13 +650,13 @@ export default function AdminCostingPage() {
       </div>
 
       {/* Tabs Switcher: 1. ADD PRODUCT | 2. ITEMS USED | 3. MASTER RECORDS */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 border-b border-slate-200">
         <button
           type="button"
           onClick={() => setActiveTab("ADD_PRODUCT")}
-          className={`px-5 py-3 text-xs sm:text-sm font-black transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+          className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 cursor-pointer ${
             activeTab === "ADD_PRODUCT"
-              ? "border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-2xl shadow-xs"
+              ? "border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-xl sm:rounded-t-2xl shadow-xs"
               : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
           }`}
         >
@@ -1821,7 +1821,7 @@ export default function AdminCostingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Initial Stock

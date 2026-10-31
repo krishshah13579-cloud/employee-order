@@ -122,31 +122,31 @@ export default function AdminTopHeader({
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200/90 shadow-2xs">
-      <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
-        {/* Left: Breadcrumbs & Page Title (Toggle button removed for cleaner mobile layout) */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center justify-between px-3 sm:px-6 lg:px-8 h-14 sm:h-16 gap-2">
+        {/* Left: Breadcrumbs & Page Title */}
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
           <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider shrink-0">
             <span>Admin Panel</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
           </span>
-          <h1 className="text-sm sm:text-base font-bold text-gray-900 tracking-tight truncate">
+          <h1 className="text-xs sm:text-base font-bold text-gray-900 tracking-tight truncate">
             {getPageTitle()}
           </h1>
         </div>
 
         {/* Right: Install App, Security Badge, Admin User Pill, Sign Out */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Install OBEXA ADMIN Web App Button */}
           {!isStandalone && (
             <button
               type="button"
               onClick={handleInstallClick}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-xs transition cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[11px] sm:text-xs font-bold shadow-xs transition cursor-pointer shrink-0"
               title="Install OBEXA ADMIN app on your phone or PC"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Install OBEXA ADMIN</span>
-              <span className="sm:hidden">Install App</span>
+              <span className="sm:hidden text-[10px]">App</span>
             </button>
           )}
 
@@ -177,7 +177,7 @@ export default function AdminTopHeader({
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors border border-rose-200/80 cursor-pointer"
+            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors border border-rose-200/80 cursor-pointer"
             title="Sign out of Admin Session"
           >
             <LogOut className="w-3.5 h-3.5" />

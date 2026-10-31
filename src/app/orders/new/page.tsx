@@ -1266,9 +1266,9 @@ function OrderFormContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
         {/* TABS ON ORDER FORM: Order Form vs Bill */}
-        <div className="flex items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-fit">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-full sm:w-fit">
           <button
             type="button"
             onClick={() => {
@@ -1280,7 +1280,7 @@ function OrderFormContent() {
                 window.history.replaceState({}, "", url.toString());
               }
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
               activeFormTab === "ORDER_FORM"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -1301,7 +1301,7 @@ function OrderFormContent() {
                   window.history.replaceState({}, "", url.toString());
                 }
               }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
                 activeFormTab === "BILL"
                   ? "bg-slate-900 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900"

@@ -420,8 +420,8 @@ export default function OrdersView({
 
       {/* Toolbar & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-1 items-center gap-3 max-w-xl">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1 max-w-xl w-full">
+          <div className="relative flex-1 w-full">
             <Search size={16} className="absolute left-3.5 top-3 text-gray-400" />
             <input
               type="text"
@@ -440,7 +440,7 @@ export default function OrdersView({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-zinc-900 focus:outline-none shadow-2xs cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-zinc-900 focus:outline-none shadow-2xs cursor-pointer"
           >
             <option value="All">All Statuses</option>
             {ORDER_STATUSES.map((st) => (

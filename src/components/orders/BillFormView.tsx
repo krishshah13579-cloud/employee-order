@@ -407,11 +407,11 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-950 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-slate-950 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -424,7 +424,7 @@ export default function BillFormView({ employee, isAdmin }: BillFormViewProps) {
       </div>
 
       {/* 2. Customer & Bill Info */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-5">
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 p-3.5 sm:p-6 shadow-xs space-y-5">
         <div className="border-b border-slate-100 pb-3">
           <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-600" />
