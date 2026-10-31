@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
     const admin = await getAdminSession(request);
     const employee = await getEmployeeSession(request);
 
-    if (!admin && (!employee || !employee.canUpdateStock)) {
-      return NextResponse.json({ error: "Unauthorized. Stock update permission required." }, { status: 401 });
+    if (!admin && !employee) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -405,7 +405,7 @@ export async function GET(request: NextRequest) {
             customerName: order.customer?.shopName || order.customerName || "Customer",
             customerCity: order.customer?.city || "—",
             customerType: custTypeUpper || "RETAILER",
-            date: (order.taxInvoiceDate || order.orderDate || order.createdAt).toISOString(),
+            date: new Date(order.taxInvoiceDate || order.orderDate || order.createdAt || Date.now()).toISOString(),
             totalPcs: orderUnits,
             revenue: orderRev,
             cost: orderCost,
