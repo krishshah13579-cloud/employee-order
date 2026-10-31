@@ -266,7 +266,7 @@ export default function AdminSidebarNav({ onItemClick }: AdminSidebarNavProps) {
             <button
               type="button"
               onClick={onItemClick}
-              className="md:hidden p-2 text-gray-600 hover:text-black hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors cursor-pointer touch-manipulation ml-1"
+              className="lg:hidden p-2 text-gray-600 hover:text-black hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors cursor-pointer touch-manipulation ml-1"
               aria-label="Close navigation menu"
               title="Close menu"
             >

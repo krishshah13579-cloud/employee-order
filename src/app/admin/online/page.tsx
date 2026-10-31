@@ -30,7 +30,7 @@ export default function OnlineDashboard() {
       </div>
 
       {/* Quick Action Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <Link
           href="/admin/online/orders"
           className="p-5 bg-white rounded-2xl border border-gray-200 shadow-xs hover:border-orange-500 hover:shadow-md transition group"

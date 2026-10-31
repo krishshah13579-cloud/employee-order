@@ -68,16 +68,22 @@ export default function AdminClientLayout({
   }
 
   return (
-    <div className="min-h-screen print:min-h-0 bg-zinc-50/70 flex flex-col md:flex-row antialiased selection:bg-zinc-900 selection:text-white">
-      {/* Desktop Sidebar (Fixed left navigation) */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-gray-200/90 shrink-0 flex-col h-screen sticky top-0 z-20 print:hidden">
+    <div className="min-h-screen print:min-h-0 bg-zinc-50/70 flex flex-col lg:flex-row antialiased selection:bg-zinc-900 selection:text-white">
+      {/* Desktop Sidebar (Fixed left navigation on desktop >= 1024px) */}
+      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200/90 shrink-0 flex-col h-screen sticky top-0 z-20 print:hidden">
         <AdminSidebarNav />
       </aside>
 
-      {/* Mobile Full-Screen Menu Overlay (< 768px) */}
+      {/* Mobile & Tablet Portrait Full-Screen / Slide-over Menu Overlay (< 1024px) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-white md:hidden flex flex-col w-full h-full overflow-hidden print:hidden animate-in fade-in duration-150">
-          <AdminSidebarNav onItemClick={() => setMobileMenuOpen(false)} />
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs lg:hidden flex print:hidden animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="relative w-72 sm:w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+            <AdminSidebarNav onItemClick={() => setMobileMenuOpen(false)} />
+          </div>
         </div>
       )}
 
