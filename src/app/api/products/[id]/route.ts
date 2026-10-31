@@ -85,9 +85,16 @@ export async function PUT(
     const newName = (body.name || "").trim() || oldName;
 
     // Check if newName matches a Costing Master entry (e.g. "IMP - 015")
-    const matchingCosting = await prisma.productCosting.findUnique({
-      where: { designNo: newName },
-    });
+    let matchingCosting: any = null;
+    try {
+      const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
+      await ensureDbSchema();
+      matchingCosting = await prisma.productCosting.findUnique({
+        where: { designNo: newName },
+      });
+    } catch (costingErr) {
+      console.warn("[PRODUCTS/UPDATE] Costing match notice:", costingErr);
+    }
 
     const costPriceToSet = matchingCosting
       ? matchingCosting.totalCosting
