@@ -194,11 +194,23 @@ export async function GET(
         billStatus = "UNPAID";
       }
 
+      const matchingReturns = customer.salesReturns.filter((r) =>
+        (r.orderId && ((bill as any).orderId === r.orderId || bill.id === `ORD-${r.orderId}`)) ||
+        (r.orderNumber && (
+          r.orderNumber === bill.orderNumber ||
+          (bill as any).taxInvoiceNumber === r.orderNumber ||
+          (bill as any).systemBillNo === r.orderNumber ||
+          (bill as any).handwrittenOrderNo === r.orderNumber
+        ))
+      );
+
       return {
         ...bill,
         paidAmount: paid,
         balanceAmount: balance,
         billStatus,
+        returnNumber: matchingReturns.length > 0 ? matchingReturns.map((r) => r.returnNumber).join(", ") : undefined,
+        matchingReturns: matchingReturns.map((r) => ({ returnNumber: r.returnNumber, amount: r.totalAmount })),
       };
     });
 

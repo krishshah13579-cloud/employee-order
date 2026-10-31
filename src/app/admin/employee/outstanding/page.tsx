@@ -46,6 +46,8 @@ interface AllocatedBill {
   balanceAmount: number;
   billStatus: "PAID" | "PARTIALLY_PAID" | "UNPAID";
   status: string;
+  returnNumber?: string;
+  matchingReturns?: Array<{ returnNumber: string; amount: number }>;
 }
 
 interface CustomerSummary {
@@ -65,6 +67,7 @@ interface CustomerSummary {
   billsCount: number;
   unpaidBillsCount: number;
   allocatedBills: AllocatedBill[];
+  returnNumbers?: string[];
 }
 
 interface PaymentRecord {
@@ -638,8 +641,16 @@ export default function AdminOutstandingPage() {
                         <div className="font-black text-slate-900 text-sm uppercase">
                           {c.firmName}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono uppercase">
-                          {c.gstPanNo || "UNREGISTERED"}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-slate-400 font-mono uppercase">
+                            {c.gstPanNo || "UNREGISTERED"}
+                          </span>
+                          {c.returnNumbers && c.returnNumbers.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              <RotateCcw size={10} />
+                              <span>Ret: {c.returnNumbers.join(", ")}</span>
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -916,6 +927,17 @@ export default function AdminOutstandingPage() {
                                     <FileText size={14} />
                                   </a>
                                 </div>
+                                {bill.returnNumber && (
+                                  <div className="mt-0.5">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200"
+                                      title="Return credited for this bill"
+                                    >
+                                      <RotateCcw size={10} />
+                                      <span>Ret: #{bill.returnNumber}</span>
+                                    </span>
+                                  </div>
+                                )}
                               </td>
                               <td className="py-3 px-3 text-center text-slate-600">
                                 {bill.totalSets ? `${bill.totalSets}s / ${bill.totalPcs}p` : "—"}
@@ -1069,8 +1091,17 @@ export default function AdminOutstandingPage() {
                                 <td className="py-2 px-3 text-slate-600 font-medium">
                                   {formatDate(r.returnDate)}
                                 </td>
-                                <td className="py-2 px-3 font-mono font-bold text-purple-700">
-                                  #{r.returnNumber}
+                                <td className="py-2 px-3">
+                                  <div className="flex flex-col">
+                                    <span className="font-mono font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 w-fit text-xs">
+                                      #{r.returnNumber}
+                                    </span>
+                                    {(r as any).orderNumber && (
+                                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                        Bill: #{(r as any).orderNumber}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2 px-3 text-slate-600 truncate max-w-[120px]">
                                   {r.reason || "Product Return"}

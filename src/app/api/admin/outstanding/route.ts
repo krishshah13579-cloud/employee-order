@@ -248,6 +248,13 @@ export async function GET(request: NextRequest) {
         billsCount: bills.length,
         unpaidBillsCount,
         allocatedBills,
+        salesReturns: c.salesReturns.map((r) => ({
+          id: r.id,
+          returnNumber: r.returnNumber,
+          totalAmount: r.totalAmount,
+          returnDate: r.returnDate,
+        })),
+        returnNumbers: c.salesReturns.map((r) => r.returnNumber),
       };
     });
 

@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
             phoneNumber: true,
             city: true,
             gstPanNo: true,
+            businessType: true,
+            specialDiscount: true,
           },
         },
       },
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/admin/returns: Create new Return Invoice
+// POST /api/admin/returns: Create new Return Invoice (Whole bill return or single-piece/item return)
 export async function POST(request: NextRequest) {
   try {
     const admin = await getAdminSession(request);
@@ -53,6 +55,9 @@ export async function POST(request: NextRequest) {
       orderNumber,
       returnDate,
       items,
+      subtotal,
+      gstRate,
+      gstAmount,
       totalAmount,
       totalPcs,
       totalSets,
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     const customer = await prisma.customer.findUnique({
       where: { id: cid },
-      select: { id: true, shopName: true },
+      select: { id: true, shopName: true, businessType: true, specialDiscount: true },
     });
 
     if (!customer) {
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
     });
     const usedSeqs = new Set<number>();
     for (const ret of existingReturns) {
-      const match = (ret.returnNumber || "").match(/^R-(\d+)$/i);
+      const match = (ret.returnNumber || "").match(/(?:R-|RET-?)(\d+)$/i);
       if (match) {
         usedSeqs.add(parseInt(match[1], 10));
       }
@@ -97,7 +102,20 @@ export async function POST(request: NextRequest) {
     }
     const returnNumber = `R-${String(seq).padStart(2, "0")}`;
 
-    const itemsJson = typeof items === "string" ? items : JSON.stringify(items || []);
+    // Structure items payload preserving GST metadata
+    const rawItemsList = Array.isArray(items)
+      ? items
+      : (typeof items === "string" ? JSON.parse(items || "[]") : []);
+
+    const itemsPayload = {
+      subtotal: subtotal !== undefined ? Number(subtotal) : amt,
+      gstRate: gstRate !== undefined ? Number(gstRate) : 0,
+      gstAmount: gstAmount !== undefined ? Number(gstAmount) : 0,
+      totalAmount: amt,
+      items: rawItemsList,
+    };
+
+    const itemsJson = JSON.stringify(itemsPayload);
 
     const salesReturn = await prisma.salesReturn.create({
       data: {
@@ -118,13 +136,7 @@ export async function POST(request: NextRequest) {
 
     // Add returned items back to product stock (mixPcs)
     try {
-      const parsedItems = Array.isArray(items)
-        ? items
-        : typeof items === "string"
-        ? JSON.parse(items || "[]")
-        : [];
-
-      for (const item of parsedItems) {
+      for (const item of rawItemsList) {
         const pcs =
           Number(item.totalPcs || item.pcs || item.quantity) ||
           (Number(item.totalSets || item.sets || 0) * (Number(item.pcsPerSet) || 5));
@@ -171,7 +183,8 @@ export async function DELETE(request: NextRequest) {
 
     if (existingReturn && existingReturn.items) {
       try {
-        const parsedItems = JSON.parse(existingReturn.items);
+        const parsed = JSON.parse(existingReturn.items);
+        const parsedItems = Array.isArray(parsed) ? parsed : (parsed?.items || []);
         if (Array.isArray(parsedItems)) {
           for (const item of parsedItems) {
             const pcs =
