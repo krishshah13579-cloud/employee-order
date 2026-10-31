@@ -26,11 +26,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Find all active employees to match name case-insensitively
-    const employees = await prisma.employee.findMany({
-      where: {
-        isActive: true,
-      },
-    });
+    let employees: any[] = [];
+    try {
+      employees = await prisma.employee.findMany({
+        where: {
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          pin: true,
+          email: true,
+          address: true,
+          designation: true,
+          isTeamLeader: true,
+          canEditOrders: true,
+          canAddPreviousBills: true,
+          mobileNumber: true,
+          isActive: true,
+        },
+      });
+    } catch (err) {
+      console.warn("[EMPLOYEE_LOGIN] Fallback raw query for active employees:", err);
+      try {
+        employees = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, pin, email, address, designation, "isTeamLeader", "canEditOrders", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE "isActive" = true`
+        );
+      } catch {}
+    }
 
     if (employees.length === 0) {
       return NextResponse.json(
@@ -83,6 +106,7 @@ export async function POST(req: NextRequest) {
         await prisma.employee.update({
           where: { id: employee.id },
           data: { pin: hashPassword(pin) },
+          select: { id: true },
         });
       } catch (err) {
         console.warn("Failed to auto-upgrade employee PIN hash:", err);

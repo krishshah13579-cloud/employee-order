@@ -9,18 +9,21 @@ export async function ensureDbSchema(force = false) {
       await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS wholesale;`);
     } catch {}
 
-    // Explicitly ensure canViewOrderForm on wholesale.Employee
-    try {
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
-      `);
-    } catch {}
+    // Explicitly ensure canViewOrderForm on wholesale.Employee and all schema variants
+    const alterStatements = [
+      `ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE wholesale.employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE public."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE public.employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+    ];
 
-    try {
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
-      `);
-    } catch {}
+    for (const sql of alterStatements) {
+      try {
+        await prisma.$executeRawUnsafe(sql);
+      } catch {}
+    }
 
     await prisma.$executeRawUnsafe(`
       DO $$

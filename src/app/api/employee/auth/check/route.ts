@@ -56,38 +56,54 @@ export async function GET(_req: NextRequest) {
       });
     }
 
-    // Verify against DB
-    const employee = await prisma.employee.findUnique({
-      where: { id: session.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        address: true,
-        designation: true,
-        isTeamLeader: true,
-        canEditOrders: true,
-        canUpdateStock: true,
-        canAddPreviousBills: true,
-        canViewOrderForm: true,
-        mobileNumber: true,
-        isActive: true,
-        tasks: {
-          select: {
-            id: true,
-            taskTitle: true,
-            isCompleted: true,
-            completedAt: true,
-          },
-          orderBy: { id: "asc" as const },
+    // Verify against DB with robust fallback
+    let employee: any = null;
+    try {
+      employee = await prisma.employee.findUnique({
+        where: { id: session.id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          address: true,
+          designation: true,
+          isTeamLeader: true,
+          canEditOrders: true,
+          canUpdateStock: true,
+          canAddPreviousBills: true,
+          mobileNumber: true,
+          isActive: true,
         },
-      },
-    });
+      });
+    } catch (err) {
+      console.warn("[AUTH_CHECK] Falling back to raw employee lookup:", err);
+      try {
+        const rows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, email, address, designation, "isTeamLeader", "canEditOrders", "canUpdateStock", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE id = $1`,
+          session.id
+        );
+        employee = rows?.[0];
+      } catch {}
+    }
 
     if (!employee || !employee.isActive) {
       cookieStore.delete("garmentpro_emp_session");
       return NextResponse.json({ authenticated: false });
     }
+
+    let tasks: any[] = [];
+    try {
+      tasks = await (prisma as any).employeeTask.findMany({
+        where: { employeeId: session.id },
+        select: {
+          id: true,
+          taskTitle: true,
+          isCompleted: true,
+          completedAt: true,
+        },
+        orderBy: { id: "asc" as const },
+      });
+    } catch {}
 
     const isTL = isEmployeeTeamLeader(employee);
 
@@ -106,6 +122,7 @@ export async function GET(_req: NextRequest) {
       authenticated: true,
       employee: {
         ...employee,
+        tasks: tasks || [],
         isTeamLeader: isTL,
         canAddPreviousBills: Boolean(employee.canAddPreviousBills),
         canViewOrderForm: employee.canViewOrderForm !== false,

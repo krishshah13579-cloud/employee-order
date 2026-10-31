@@ -16,6 +16,21 @@ async function main() {
 
   try {
     console.log("⚡ [POSTGRES] Pre-syncing all sequence counters to prevent (id) collisions...");
+    const alterStatements = [
+      `CREATE SCHEMA IF NOT EXISTS wholesale;`,
+      `ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE wholesale.employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE public."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE public.employee ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`,
+    ];
+    for (const sql of alterStatements) {
+      try {
+        await prisma.$executeRawUnsafe(sql);
+      } catch {}
+    }
+
     await prisma.$executeRawUnsafe(`
       DO $$
       BEGIN

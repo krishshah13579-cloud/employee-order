@@ -157,24 +157,37 @@ export async function getEmployeeSession(req: NextRequest) {
   if (!decoded || !decoded.id) return null;
 
   try {
-    const employee = await prisma.employee.findUnique({
-      where: { id: decoded.id },
-      select: {
-        id: true,
-        name: true,
-        designation: true,
-        isTeamLeader: true,
-        canEditOrders: true,
-        canUpdateStock: true,
-        canAddPreviousBills: true,
-        canViewOrderForm: true,
-        isActive: true,
-      },
-    });
+    let employee: any = null;
+    try {
+      employee = await prisma.employee.findUnique({
+        where: { id: decoded.id },
+        select: {
+          id: true,
+          name: true,
+          designation: true,
+          isTeamLeader: true,
+          canEditOrders: true,
+          canUpdateStock: true,
+          canAddPreviousBills: true,
+          isActive: true,
+        },
+      });
+    } catch {
+      try {
+        const rows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, designation, "isTeamLeader", "canEditOrders", "canUpdateStock", "canAddPreviousBills", "isActive" FROM wholesale."Employee" WHERE id = $1`,
+          decoded.id
+        );
+        employee = rows?.[0];
+      } catch {}
+    }
 
     if (!employee || !employee.isActive) return null;
 
-    return employee;
+    return {
+      ...employee,
+      canViewOrderForm: (employee as any).canViewOrderForm !== false,
+    };
   } catch {
     return null;
   }

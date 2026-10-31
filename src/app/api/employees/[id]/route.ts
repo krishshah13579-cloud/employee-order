@@ -5,7 +5,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { sendWebPushNotification } from "@/lib/web-push";
 import { ensureDbSchema } from "@/lib/ensure-db-schema";
 
-const SAFE_EMPLOYEE_SELECT = {
+const BASE_SAFE_SELECT = {
   id: true,
   name: true,
   email: true,
@@ -17,21 +17,9 @@ const SAFE_EMPLOYEE_SELECT = {
   canEditOrders: true,
   canUpdateStock: true,
   canAddPreviousBills: true,
-  canViewOrderForm: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
-  tasks: {
-    select: {
-      id: true,
-      taskTitle: true,
-      isCompleted: true,
-      completedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: { id: "asc" as const },
-  },
 };
 
 export async function GET(
@@ -47,57 +35,52 @@ export async function GET(
       return NextResponse.json({ error: "Invalid employee ID" }, { status: 400 });
     }
 
+    let employee: any = null;
     try {
-      const employee = await prisma.employee.findUnique({
+      employee = await prisma.employee.findUnique({
         where: { id: empId },
-        select: SAFE_EMPLOYEE_SELECT,
+        select: BASE_SAFE_SELECT,
       });
-      if (!employee) {
-        return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-      }
-      return NextResponse.json(employee);
     } catch (queryErr) {
       console.warn("[EMPLOYEE_GET] Safe fallback for employee query:", queryErr);
       await ensureDbSchema(true);
-
-      const fallbackEmp = await prisma.employee.findUnique({
-        where: { id: empId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          mobileNumber: true,
-          address: true,
-          proofUrl: true,
-          designation: true,
-          isTeamLeader: true,
-          canEditOrders: true,
-          canUpdateStock: true,
-          canAddPreviousBills: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
-      if (!fallbackEmp) {
-        return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-      }
-
-      let tasks: any[] = [];
       try {
-        tasks = await (prisma as any).employeeTask.findMany({
-          where: { employeeId: empId },
-          orderBy: { id: "asc" },
-        });
+        const rows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, email, "mobileNumber", address, "proofUrl", designation, "isTeamLeader", "canEditOrders", "canUpdateStock", "canAddPreviousBills", "isActive", "createdAt", "updatedAt" FROM wholesale."Employee" WHERE id = $1`,
+          empId
+        );
+        employee = rows?.[0];
       } catch {}
-
-      return NextResponse.json({
-        ...fallbackEmp,
-        canViewOrderForm: (fallbackEmp as any).canViewOrderForm ?? true,
-        tasks: tasks || [],
-      });
     }
+
+    if (!employee) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+
+    let tasks: any[] = [];
+    try {
+      tasks = await (prisma as any).employeeTask.findMany({
+        where: { employeeId: empId },
+        orderBy: { id: "asc" },
+      });
+    } catch {}
+
+    let canViewOrderForm = true;
+    try {
+      const rows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT "canViewOrderForm" FROM wholesale."Employee" WHERE id = $1`,
+        empId
+      );
+      if (rows?.[0] && rows[0].canViewOrderForm !== undefined) {
+        canViewOrderForm = Boolean(rows[0].canViewOrderForm);
+      }
+    } catch {}
+
+    return NextResponse.json({
+      ...employee,
+      canViewOrderForm,
+      tasks: tasks || [],
+    });
   } catch (error: any) {
     console.error("[EMPLOYEE_GET] Fatal error fetching employee:", error);
     return NextResponse.json({ error: error.message || "Failed to load employee" }, { status: 500 });
@@ -141,41 +124,47 @@ export async function PUT(
           canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
           canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
           canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
-          canViewOrderForm: body.canViewOrderForm !== undefined ? Boolean(body.canViewOrderForm) : undefined,
           isActive: body.isActive !== undefined ? body.isActive : true,
         },
-        select: SAFE_EMPLOYEE_SELECT,
+        select: BASE_SAFE_SELECT,
       });
     } catch (updateErr) {
-      console.warn("[EMPLOYEE_PUT] Retrying update with basic schema fallback:", updateErr);
+      console.warn("[EMPLOYEE_PUT] Retrying update with raw SQL fallback:", updateErr);
       await ensureDbSchema(true);
-      employee = await prisma.employee.update({
-        where: { id: empId },
-        data: {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE wholesale."Employee" SET name = $1, "mobileNumber" = $2, address = $3, designation = $4, "isActive" = $5, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $6`,
+          body.name,
+          body.mobileNumber,
+          body.address,
+          body.designation || "Sales Representative",
+          body.isActive !== undefined ? Boolean(body.isActive) : true,
+          empId
+        );
+        employee = {
+          id: empId,
           name: body.name,
-          email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
-          pin: body.pin !== undefined && body.pin.trim() ? hashPassword(body.pin.trim()) : undefined,
           mobileNumber: body.mobileNumber,
           address: body.address,
-          proofUrl: body.proofUrl,
           designation: body.designation,
-          isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
-          canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
-          canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
-          canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
           isActive: body.isActive !== undefined ? body.isActive : true,
-        },
-      });
-
-      if (body.canViewOrderForm !== undefined) {
-        try {
-          await prisma.$executeRawUnsafe(
-            `UPDATE wholesale."Employee" SET "canViewOrderForm" = $1 WHERE id = $2`,
-            Boolean(body.canViewOrderForm),
-            empId
-          );
-        } catch {}
+        };
+      } catch (rawErr) {
+        throw updateErr;
       }
+    }
+
+    if (body.canViewOrderForm !== undefined) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;`
+        );
+        await prisma.$executeRawUnsafe(
+          `UPDATE wholesale."Employee" SET "canViewOrderForm" = $1 WHERE id = $2`,
+          Boolean(body.canViewOrderForm),
+          empId
+        );
+      } catch {}
     }
 
     // Sync tasks if provided
@@ -276,7 +265,7 @@ export async function PATCH(
       employee = await prisma.employee.update({
         where: { id: empId },
         data: updateData,
-        select: SAFE_EMPLOYEE_SELECT,
+        select: BASE_SAFE_SELECT,
       });
     } catch (patchErr) {
       console.warn("[EMPLOYEE_PATCH] Retrying patch with basic select fallback:", patchErr);
@@ -284,6 +273,7 @@ export async function PATCH(
       employee = await prisma.employee.update({
         where: { id: empId },
         data: updateData,
+        select: { id: true, name: true, isActive: true },
       });
     }
 
@@ -343,6 +333,7 @@ export async function DELETE(
 
     await prisma.employee.delete({
       where: { id: empId },
+      select: { id: true },
     });
 
     await recordAuditLog({

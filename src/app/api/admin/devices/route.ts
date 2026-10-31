@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
       let mobileNumber = body.mobileNumber || "";
 
       if (employeeId) {
-        const emp = await prisma.employee.findUnique({ where: { id: employeeId } });
+        const emp = await prisma.employee.findUnique({
+          where: { id: employeeId },
+          select: { id: true, name: true, mobileNumber: true },
+        });
         if (emp) {
           employeeName = emp.name;
           mobileNumber = emp.mobileNumber;

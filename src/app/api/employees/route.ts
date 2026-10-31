@@ -5,8 +5,8 @@ import { recordAuditLog } from "@/lib/audit";
 import { sendEmployeeOnboardingEmail } from "@/lib/email";
 import { ensureDbSchema } from "@/lib/ensure-db-schema";
 
-// Safe fields to expose to frontend (never expose secret pin)
-const SAFE_EMPLOYEE_SELECT = {
+// Safe base fields to expose to frontend (never expose secret pin)
+const BASE_SAFE_SELECT = {
   id: true,
   name: true,
   email: true,
@@ -18,21 +18,9 @@ const SAFE_EMPLOYEE_SELECT = {
   canEditOrders: true,
   canUpdateStock: true,
   canAddPreviousBills: true,
-  canViewOrderForm: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
-  tasks: {
-    select: {
-      id: true,
-      taskTitle: true,
-      isCompleted: true,
-      completedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: { id: "asc" as const },
-  },
 };
 
 export async function GET(req: NextRequest) {
@@ -54,47 +42,44 @@ export async function GET(req: NextRequest) {
       };
     }
 
+    let employees: any[] = [];
     try {
-      const employees = await prisma.employee.findMany({
+      employees = await prisma.employee.findMany({
         where,
-        select: SAFE_EMPLOYEE_SELECT,
+        select: {
+          ...BASE_SAFE_SELECT,
+          tasks: {
+            select: {
+              id: true,
+              taskTitle: true,
+              isCompleted: true,
+              completedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { id: "asc" as const },
+          },
+        },
         orderBy: { createdAt: "desc" },
       });
-
-      return NextResponse.json(employees);
     } catch (listErr) {
       console.warn("[EMPLOYEES_GET] Falling back to base employee select:", listErr);
       await ensureDbSchema(true);
 
-      const fallbackEmployees = await prisma.employee.findMany({
+      employees = await prisma.employee.findMany({
         where,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          mobileNumber: true,
-          address: true,
-          proofUrl: true,
-          designation: true,
-          isTeamLeader: true,
-          canEditOrders: true,
-          canUpdateStock: true,
-          canAddPreviousBills: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: BASE_SAFE_SELECT,
         orderBy: { createdAt: "desc" },
       });
-
-      return NextResponse.json(
-        fallbackEmployees.map((e) => ({
-          ...e,
-          canViewOrderForm: (e as any).canViewOrderForm ?? true,
-          tasks: [],
-        }))
-      );
     }
+
+    return NextResponse.json(
+      employees.map((e) => ({
+        ...e,
+        canViewOrderForm: (e as any).canViewOrderForm ?? true,
+        tasks: e.tasks || [],
+      }))
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -135,13 +120,22 @@ export async function POST(req: NextRequest) {
           canEditOrders: Boolean(body.canEditOrders),
           canUpdateStock: Boolean(body.canUpdateStock),
           canAddPreviousBills: Boolean(body.canAddPreviousBills),
-          canViewOrderForm: body.canViewOrderForm !== undefined ? Boolean(body.canViewOrderForm) : true,
           isActive: isActive !== undefined ? isActive : true,
         },
-        select: SAFE_EMPLOYEE_SELECT,
+        select: BASE_SAFE_SELECT,
       });
+
+      if (body.canViewOrderForm !== undefined) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE wholesale."Employee" SET "canViewOrderForm" = $1 WHERE id = $2`,
+            Boolean(body.canViewOrderForm),
+            employee.id
+          );
+        } catch {}
+      }
     } catch (createErr) {
-      console.warn("[EMPLOYEE_POST] Fallback employee creation without canViewOrderForm:", createErr);
+      console.warn("[EMPLOYEE_POST] Fallback employee creation without optional fields:", createErr);
       await ensureDbSchema(true);
       employee = await prisma.employee.create({
         data: {
@@ -158,6 +152,7 @@ export async function POST(req: NextRequest) {
           canAddPreviousBills: Boolean(body.canAddPreviousBills),
           isActive: isActive !== undefined ? isActive : true,
         },
+        select: BASE_SAFE_SELECT,
       });
     }
 
