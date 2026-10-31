@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         damageStock: true,
         imageUrl: true,
         isActive: true,
+        createdAt: true,
       },
       orderBy: { name: "asc" },
     });
@@ -139,26 +140,95 @@ export async function GET(request: NextRequest) {
     let overallMarginPercent = 0;
     let soldProfitBreakdown: any[] = [];
     let billProfitBreakdown: any[] = [];
+    let finalInvoiceProfitBreakdown: any[] = [];
+    let agingStockBreakdown: any[] = [];
+
+    let finalInvoicesTotalProfit = 0;
+    let finalInvoicesTotalRevenue = 0;
+    let billsTotalProfit = 0;
+    let billsTotalRevenue = 0;
+    let agingStockTotalValuation = 0;
+    let agingStockTotalPcs = 0;
+
+    // Helper to extract sequence number (e.g. "IMP - 015" -> 15)
+    const extractDesignSeq = (name: string): number => {
+      const match = name.match(/(\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    };
 
     // Calculate aggregated sold units & profit as per PRODUCT SOLD (unit costing sourced from Costing Master)
     if (includeProfit) {
-      // Fetch latest Total Costing for each design from Costing Master
+      // 1. Fetch latest Total Costing & Arrival Dates for each design from Costing Master
       const costingRecords = await prisma.productCosting.findMany();
       const costingMap = new Map<string, number>();
+      const costingDateMap = new Map<string, Date>();
       const grDesignSet = new Set<string>();
+
       for (const c of costingRecords) {
-        costingMap.set(c.designNo.trim().toUpperCase(), c.totalCosting);
+        const dNo = c.designNo.trim().toUpperCase();
+        costingMap.set(dNo, c.totalCosting);
+        costingDateMap.set(dNo, c.createdAt);
         if (c.isGR) {
-          grDesignSet.add(c.designNo.trim().toUpperCase());
+          grDesignSet.add(dNo);
         }
       }
 
-      // Query all non-cancelled orders (including Without GST bills), ordered with newest on top
+      // 2. Fetch all Sales Returns to deduct returned bills & returned pieces from profit
+      const salesReturns = await prisma.salesReturn.findMany();
+      const returnedWholeBillRefs = new Set<string>();
+      const returnedWholeBillOrderIds = new Set<number>();
+      const returnedPcsPerProduct = new Map<number, number>();
+      const returnedRevenuePerProduct = new Map<number, number>();
+
+      for (const ret of salesReturns) {
+        const orderRef = (ret.orderNumber || "").trim().toUpperCase();
+        const isWholeBill =
+          Boolean(ret.notes && ret.notes.toUpperCase().includes("WHOLE BILL RETURN")) ||
+          Boolean(ret.reason && ret.reason.toUpperCase().includes("WHOLE BILL")) ||
+          Boolean(ret.reason && ret.reason.toUpperCase().includes("FULL BILL"));
+
+        if (orderRef) {
+          if (isWholeBill) {
+            returnedWholeBillRefs.add(orderRef);
+          }
+        }
+        if (ret.orderId && isWholeBill) {
+          returnedWholeBillOrderIds.add(ret.orderId);
+        }
+
+        // Parse returned item rows
+        let retItemsList: any[] = [];
+        try {
+          const parsed = JSON.parse(ret.items);
+          retItemsList = Array.isArray(parsed) ? parsed : (parsed?.items || []);
+        } catch {}
+
+        for (const rItem of retItemsList) {
+          const pId = rItem.productId ? Number(rItem.productId) : null;
+          const pcs = Number(rItem.totalPcs || rItem.pcs) || (Number(rItem.sets || 0) * (Number(rItem.pcsPerSet) || 5));
+          const amt = Number(rItem.amount) || (pcs * (Number(rItem.unitPrice) || 0));
+
+          if (pId && pcs > 0) {
+            returnedPcsPerProduct.set(pId, (returnedPcsPerProduct.get(pId) || 0) + pcs);
+            returnedRevenuePerProduct.set(pId, (returnedRevenuePerProduct.get(pId) || 0) + amt);
+          }
+        }
+      }
+
+      // 3. Query all non-cancelled orders (including Without GST bills), ordered with newest on top
       const soldOrders = await prisma.order.findMany({
         where: {
           status: { not: "Cancelled" },
         },
         include: {
+          customer: {
+            select: {
+              id: true,
+              shopName: true,
+              businessType: true,
+              city: true,
+            },
+          },
           items: {
             include: {
               product: {
@@ -168,6 +238,7 @@ export async function GET(request: NextRequest) {
                   category: true,
                   costPrice: true,
                   retailerPrice: true,
+                  wholesalerPrice: true,
                   price: true,
                 },
               },
@@ -194,14 +265,56 @@ export async function GET(request: NextRequest) {
       >();
 
       for (const order of soldOrders) {
-        // Exclude any bill containing "Imported Trousers Mix" from profit calculation
-        const hasImportedTrouserMix = order.items.some((it) => {
-          const name = (it.productName || it.product?.name || "").toUpperCase();
-          return name.includes("IMPORTED TROUSER") || name.includes("IMPORTED TROUSERS MIX");
-        });
-        if (hasImportedTrouserMix) {
-          continue; // Skip bill containing Imported Trousers Mix
+        const custTypeUpper = (order.customer?.businessType || (order as any).businessType || "").toUpperCase();
+        const isRetailerOrWholesalerWithoutGst =
+          (custTypeUpper.includes("WITHOUT GST") || custTypeUpper.includes("NO GST")) &&
+          (custTypeUpper.includes("RETAIL") || custTypeUpper.includes("WHOLESAL"));
+
+        // Rule 2: "DONT ADD IMPORTED TROUSER MIX BILL OF RETAILER/WHOLESELLER FROM RETAILER/WHOLESELLER (WITHOUT GST)."
+        const hasImportedTrouserMix =
+          order.items.some((it) => {
+            const name = (it.productName || it.product?.name || "").toUpperCase();
+            return name.includes("IMPORTED TROUSER") || name.includes("IMPORTED TROUSERS MIX");
+          }) || Boolean(order.notes && order.notes.toUpperCase().includes("IMPORTED TROUSER"));
+
+        if (isRetailerOrWholesalerWithoutGst && hasImportedTrouserMix) {
+          continue; // Strictly skip Imported Trouser Mix bills from Retailer / Wholesaler (Without GST)
         }
+
+        // Rule 5: Check if this entire bill was returned (e.g. Bill# 32)
+        const billNoMatch = order.notes?.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+        const bookNoMatch = order.notes?.match(/\[HANDWRITTEN_BOOK_NO:\s*([^\]]+)\]/i);
+        const docNo = bookNoMatch
+          ? bookNoMatch[1].trim()
+          : billNoMatch
+          ? billNoMatch[1].trim()
+          : (order.taxInvoiceNumber || order.orderNumber || String(order.id));
+
+        const normDocNo = docNo.toUpperCase().trim();
+        const normOrderNum = (order.orderNumber || "").toUpperCase().trim();
+        const normTaxInv = (order.taxInvoiceNumber || "").toUpperCase().trim();
+
+        const isWholeBillReturned =
+          (order.id && returnedWholeBillOrderIds.has(order.id)) ||
+          returnedWholeBillRefs.has(normDocNo) ||
+          returnedWholeBillRefs.has(normOrderNum) ||
+          (normTaxInv && returnedWholeBillRefs.has(normTaxInv));
+
+        if (isWholeBillReturned) {
+          continue; // Bill was returned: omit this bill and its products from profit!
+        }
+
+        // Rule 1: Distinguish Final Invoice (Tax Invoice With GST) vs Bill (Without GST)
+        const isBillWithoutGst = Boolean(
+          order.isPreviousBill ||
+          billNoMatch ||
+          (order.notes && order.notes.includes("[BILL_WITHOUT_GST")) ||
+          order.gstRate === 0 ||
+          order.gstAmount === 0 ||
+          custTypeUpper.includes("WITHOUT GST") ||
+          custTypeUpper.includes("NO GST")
+        );
+        const isFinalInvoice = !isBillWithoutGst;
 
         let orderUnits = 0;
         let orderRev = 0;
@@ -209,7 +322,6 @@ export async function GET(request: NextRequest) {
 
         for (const item of order.items) {
           const prodName = (item.productName || item.product?.name || "").trim().toUpperCase();
-
           const pcs = item.totalPcs || 0;
           const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
 
@@ -270,30 +382,161 @@ export async function GET(request: NextRequest) {
         const orderMargin = orderRev > 0 ? Math.round((orderProfit / orderRev) * 1000) / 10 : 0;
 
         if (orderUnits > 0 || orderRev > 0) {
-          billProfitBreakdown.push({
-            billNo: order.taxInvoiceNumber || order.orderNumber || String(order.id),
+          const breakdownItem = {
+            billNo: docNo,
             orderId: order.orderNumber || order.id,
-            customerName: order.customerName || "Customer",
-            date: (order.orderDate || order.createdAt).toISOString(),
+            customerName: order.customer?.shopName || order.customerName || "Customer",
+            customerCity: order.customer?.city || "—",
+            customerType: custTypeUpper || "RETAILER",
+            date: (order.taxInvoiceDate || order.orderDate || order.createdAt).toISOString(),
             totalPcs: orderUnits,
             revenue: orderRev,
             cost: orderCost,
             profit: orderProfit,
             marginPercent: orderMargin,
-          });
+            isFinalInvoice,
+          };
+
+          if (isFinalInvoice) {
+            finalInvoiceProfitBreakdown.push(breakdownItem);
+            finalInvoicesTotalRevenue += orderRev;
+            finalInvoicesTotalProfit += orderProfit;
+          } else {
+            billProfitBreakdown.push(breakdownItem);
+            billsTotalRevenue += orderRev;
+            billsTotalProfit += orderProfit;
+          }
         }
       }
 
+      // Rule 5: Deduct partial product returns from soldPerProductMap
       soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {
-        p.avgSellingPrice = p.soldUnits > 0 ? Math.round(p.sellingRevenue / p.soldUnits) : 0;
-        p.marginPercent = p.sellingRevenue > 0 ? Math.round((p.grossProfit / p.sellingRevenue) * 1000) / 10 : 0;
-        return p;
-      }).sort((a, b) => b.grossProfit - a.grossProfit);
+        const retPcs = returnedPcsPerProduct.get(p.productId) || 0;
+        const retRev = returnedRevenuePerProduct.get(p.productId) || 0;
+        const retCost = Math.round(retPcs * p.costPrice);
 
+        // Deduct returned quantities and amounts
+        const netSoldUnits = Math.max(0, p.soldUnits - retPcs);
+        const netRevenue = Math.max(0, p.sellingRevenue - retRev);
+        const netCost = Math.max(0, p.totalCost - retCost);
+        const netGrossProfit = Math.round(netRevenue - netCost);
+
+        p.soldUnits = netSoldUnits;
+        p.sellingRevenue = netRevenue;
+        p.totalCost = netCost;
+        p.grossProfit = netGrossProfit;
+        p.avgSellingPrice = netSoldUnits > 0 ? Math.round(netRevenue / netSoldUnits) : 0;
+        p.marginPercent = netRevenue > 0 ? Math.round((netGrossProfit / netRevenue) * 1000) / 10 : 0;
+        return p;
+      });
+
+      // Also adjust overall totals for partial returns
+      let totalReturnedPcsAll = 0;
+      let totalReturnedRevAll = 0;
+      let totalReturnedCostAll = 0;
+      returnedPcsPerProduct.forEach((pcs, pId) => {
+        const prod = soldPerProductMap.get(pId);
+        const costPrice = prod?.costPrice || 0;
+        totalReturnedPcsAll += pcs;
+        totalReturnedRevAll += (returnedRevenuePerProduct.get(pId) || 0);
+        totalReturnedCostAll += Math.round(pcs * costPrice);
+      });
+
+      grandTotalSoldUnits = Math.max(0, grandTotalSoldUnits - totalReturnedPcsAll);
+      grandTotalSalesRevenue = Math.max(0, grandTotalSalesRevenue - totalReturnedRevAll);
+      grandTotalCostOfSold = Math.max(0, grandTotalCostOfSold - totalReturnedCostAll);
       grandTotalSoldProfit = Math.round(grandTotalSalesRevenue - grandTotalCostOfSold);
       overallMarginPercent = grandTotalSalesRevenue > 0
         ? Math.round((grandTotalSoldProfit / grandTotalSalesRevenue) * 1000) / 10
         : 0;
+
+      // Rule 3: "PRODUCT/STYLE PROFIT TAB: SHOW THE PROFIT OF PRODUCT WISE IN SEQUENCE LIKE IMP - 001 (AT BOTTOM), IMP - 002, AND SO ON."
+      soldProfitBreakdown.sort((a, b) => {
+        const seqA = extractDesignSeq(a.productName);
+        const seqB = extractDesignSeq(b.productName);
+        if (seqA !== seqB) {
+          return seqB - seqA; // Descending so IMP-001 is at the bottom!
+        }
+        return b.productName.localeCompare(a.productName);
+      });
+
+      // Rule 4: "IF ANY STOCK IS FOR MORE THAN 3 MONTHS SHOW IT IN DIFFERENT TAB IN PROFIT (SEQUENTIAL). TAKE THE DATE OF PRODUCT ARRIVED FROM COSTING."
+      for (const p of rawProducts) {
+        const prodName = (p.name || "").trim().toUpperCase();
+        const seqMatch = prodName.match(/(\d+)/);
+        const candidateDNo = seqMatch ? `IMP - ${seqMatch[1].padStart(3, "0")}` : "";
+
+        // Sourced from Costing arrival date (createdAt)
+        let arrivalDate = p.createdAt;
+        if (costingDateMap.has(prodName)) {
+          arrivalDate = costingDateMap.get(prodName)!;
+        } else if (candidateDNo && costingDateMap.has(candidateDNo)) {
+          arrivalDate = costingDateMap.get(candidateDNo)!;
+        }
+
+        const ageInMs = Date.now() - new Date(arrivalDate).getTime();
+        const ageInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
+        const ageInMonths = Math.floor(ageInDays / 30);
+
+        // Older than 3 months (90 days)
+        if (ageInDays >= 90) {
+          let totalSets = 0;
+          try {
+            if (p.setsColorwise) {
+              const parsed = JSON.parse(p.setsColorwise);
+              for (const col of Object.values(parsed)) {
+                const ratios = (col as any)?.ratios || {};
+                for (const cnt of Object.values(ratios)) {
+                  totalSets += Number(cnt) || 0;
+                }
+              }
+            }
+          } catch {}
+
+          const pcsPerSet = p.pcsPerSet || 5;
+          const mixPcs = p.mixPcs || 0;
+          const totalPcs = (totalSets * pcsPerSet) + mixPcs;
+
+          if (totalPcs > 0) {
+            let prodCost = 0;
+            if (costingMap.has(prodName)) {
+              prodCost = costingMap.get(prodName)!;
+            } else if (candidateDNo && costingMap.has(candidateDNo)) {
+              prodCost = costingMap.get(candidateDNo)!;
+            } else if (p.costPrice !== null && p.costPrice !== undefined) {
+              prodCost = p.costPrice;
+            } else {
+              prodCost = Math.round((p.retailerPrice || p.price) * 0.7);
+            }
+
+            const stockValuation = Math.round(totalPcs * prodCost);
+            agingStockTotalValuation += stockValuation;
+            agingStockTotalPcs += totalPcs;
+
+            agingStockBreakdown.push({
+              productId: p.id,
+              productName: p.name,
+              category: p.category || "Trouser",
+              arrivalDate: new Date(arrivalDate).toISOString(),
+              ageInDays,
+              ageInMonths,
+              totalSets,
+              mixPcs,
+              totalPcs,
+              costPrice: prodCost,
+              stockValuation,
+            });
+          }
+        }
+      }
+
+      // Sort aging stock sequentially (IMP - 001, IMP - 002...)
+      agingStockBreakdown.sort((a, b) => {
+        const seqA = extractDesignSeq(a.productName);
+        const seqB = extractDesignSeq(b.productName);
+        if (seqA !== seqB) return seqA - seqB;
+        return a.productName.localeCompare(b.productName);
+      });
     }
 
     return NextResponse.json({
@@ -312,7 +555,15 @@ export async function GET(request: NextRequest) {
         grandTotalSoldProfit,
         overallMarginPercent,
         soldProfitBreakdown,
+        finalInvoiceProfitBreakdown,
         billProfitBreakdown,
+        agingStockBreakdown,
+        finalInvoicesTotalRevenue,
+        finalInvoicesTotalProfit,
+        billsTotalRevenue,
+        billsTotalProfit,
+        agingStockTotalValuation,
+        agingStockTotalPcs,
       },
     }, {
       headers: {
