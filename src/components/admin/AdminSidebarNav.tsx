@@ -81,12 +81,6 @@ const employeeNavItems = [
     exact: false,
   },
   {
-    name: "Sales Register",
-    href: "/admin/employee/sales",
-    icon: BadgePercent,
-    exact: false,
-  },
-  {
     name: "Outstanding",
     href: "/admin/employee/outstanding",
     icon: Receipt,
@@ -102,12 +96,6 @@ const employeeNavItems = [
     name: "Returns",
     href: "/admin/employee/returns",
     icon: RotateCcw,
-    exact: false,
-  },
-  {
-    name: "Invoices",
-    href: "/admin/employee/invoices",
-    icon: FileText,
     exact: false,
   },
   {

@@ -22,6 +22,7 @@ import {
   Lock,
   ExternalLink,
   CheckCircle2,
+  BadgePercent,
 } from "lucide-react";
 import {
   ORDER_STATUSES,
@@ -30,11 +31,12 @@ import {
   type OrderStatus,
 } from "@/lib/types";
 import DeleteOrderModal from "@/components/orders/DeleteOrderModal";
+import SalesRegisterView from "@/components/admin/SalesRegisterView";
 
 export default function OrdersView({
   initialTab = "ORDERS",
 }: {
-  initialTab?: "ORDERS" | "INVOICES" | "BILLS";
+  initialTab?: "ORDERS" | "INVOICES" | "BILLS" | "SALES";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,7 +45,7 @@ export default function OrdersView({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [activeTab, setActiveTab] = useState<"ORDERS" | "INVOICES" | "BILLS">(initialTab);
+  const [activeTab, setActiveTab] = useState<"ORDERS" | "INVOICES" | "BILLS" | "SALES">(initialTab);
   const [orderFormSubTab, setOrderFormSubTab] = useState<"PENDING" | "APPROVED">("PENDING");
 
   // Outstanding data map (customerId -> totalOutstanding)
@@ -175,6 +177,8 @@ export default function OrdersView({
         setActiveTab("INVOICES");
       } else if (tabParam === "bills" || tabParam === "bill") {
         setActiveTab("BILLS");
+      } else if (tabParam === "sales" || tabParam === "sales-register") {
+        setActiveTab("SALES");
       } else if (tabParam === "orders" || tabParam === "order-forms") {
         setActiveTab("ORDERS");
       } else if (initialTab) {
@@ -226,53 +230,7 @@ export default function OrdersView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
-            {activeTab === "ORDERS" ? (
-              <ShoppingCart size={14} />
-            ) : activeTab === "INVOICES" ? (
-              <Receipt size={14} />
-            ) : (
-              <FileCheck2 size={14} />
-            )}{" "}
-            Wholesale Order Fulfillment
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            {activeTab === "ORDERS"
-              ? "Order Forms"
-              : activeTab === "INVOICES"
-              ? "Final Tax Invoices"
-              : "Bill"}
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {activeTab === "ORDERS"
-              ? "Manage client booked order forms, color-wise set ratios, mix sizes, transport details, and order booking."
-              : activeTab === "INVOICES"
-              ? "Official finalized tax invoices generated for deliveries, billing, and accounting with 5% GST."
-              : "Dedicated billing section with direct billing and manual sequential bill numbering."}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          {isSuperAdmin && (
-            <Link
-              href={activeTab === "BILLS" ? "/admin/employee/orders/new?billType=non_gst" : "/admin/employee/orders/new"}
-              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer ${
-                activeTab === "BILLS"
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "bg-zinc-950 hover:bg-black text-white"
-              }`}
-            >
-              <Plus size={16} />
-              <span>{activeTab === "BILLS" ? "Generate Bill" : "Book New Order"}</span>
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {/* SEPARATE TABS: Order Forms vs Final Invoices vs Bill */}
+      {/* SEPARATE TABS: Order Forms vs Final Invoices vs Bill vs Sales Register */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl overflow-x-auto scrollbar-none">
           {/* 1. Order Forms Tab */}
@@ -280,7 +238,7 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("ORDERS");
-              if (pathname.includes("/invoices") || pathname.includes("/bills")) {
+              if (pathname.includes("/invoices") || pathname.includes("/bills") || pathname.includes("/sales")) {
                 router.push("/admin/employee/orders");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
@@ -303,7 +261,7 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("INVOICES");
-              if (pathname.includes("/orders") || pathname.includes("/bills")) {
+              if (pathname.includes("/orders") || pathname.includes("/bills") || pathname.includes("/sales")) {
                 router.push("/admin/employee/invoices");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
@@ -326,7 +284,7 @@ export default function OrdersView({
             type="button"
             onClick={() => {
               setActiveTab("BILLS");
-              if (pathname.includes("/orders") || pathname.includes("/invoices")) {
+              if (pathname.includes("/orders") || pathname.includes("/invoices") || pathname.includes("/sales")) {
                 router.push("/admin/employee/bills");
               } else if (typeof window !== "undefined") {
                 const url = new URL(window.location.href);
@@ -343,6 +301,29 @@ export default function OrdersView({
             <FileCheck2 size={15} className={activeTab === "BILLS" ? "text-white" : "text-gray-400"} />
             <span>Bill ({billsOrders.length})</span>
           </button>
+
+          {/* 4. Sales Register Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("SALES");
+              if (pathname.includes("/orders") || pathname.includes("/invoices") || pathname.includes("/bills")) {
+                router.push("/admin/employee/sales");
+              } else if (typeof window !== "undefined") {
+                const url = new URL(window.location.href);
+                url.searchParams.set("tab", "sales");
+                window.history.replaceState({}, "", url.toString());
+              }
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "SALES"
+                ? "bg-purple-600 text-white shadow-xs font-black"
+                : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            <BadgePercent size={15} className={activeTab === "SALES" ? "text-white" : "text-gray-400"} />
+            <span>Sales Register</span>
+          </button>
         </div>
 
         <div className="text-xs text-gray-500 font-medium px-2">
@@ -350,9 +331,61 @@ export default function OrdersView({
             ? "Showing all Booked Client Order Forms (Ratios & Sets)"
             : activeTab === "INVOICES"
             ? "Showing official Final Tax Invoices with GST"
-            : "Direct bills with custom numbering"}
+            : activeTab === "BILLS"
+            ? "Direct bills with custom numbering"
+            : "Complete Sales Register with Revenue & Invoices"}
         </div>
       </div>
+
+      {activeTab === "SALES" ? (
+        <SalesRegisterView />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
+                {activeTab === "ORDERS" ? (
+                  <ShoppingCart size={14} />
+                ) : activeTab === "INVOICES" ? (
+                  <Receipt size={14} />
+                ) : (
+                  <FileCheck2 size={14} />
+                )}{" "}
+                Wholesale Order Fulfillment
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                {activeTab === "ORDERS"
+                  ? "Order Forms"
+                  : activeTab === "INVOICES"
+                  ? "Final Tax Invoices"
+                  : "Bill"}
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {activeTab === "ORDERS"
+                  ? "Manage client booked order forms, color-wise set ratios, mix sizes, transport details, and order booking."
+                  : activeTab === "INVOICES"
+                  ? "Official finalized tax invoices generated for deliveries, billing, and accounting with 5% GST."
+                  : "Dedicated billing section with direct billing and manual sequential bill numbering."}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              {isSuperAdmin && (
+                <Link
+                  href={activeTab === "BILLS" ? "/admin/employee/orders/new?billType=non_gst" : "/admin/employee/orders/new"}
+                  className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer ${
+                    activeTab === "BILLS"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-zinc-950 hover:bg-black text-white"
+                  }`}
+                >
+                  <Plus size={16} />
+                  <span>{activeTab === "BILLS" ? "Generate Bill" : "Book New Order"}</span>
+                </Link>
+              )}
+            </div>
+          </div>
 
       {/* Sub-Tabs for Order Forms (Pending vs Approved) */}
       {activeTab === "ORDERS" && (
@@ -828,6 +861,8 @@ export default function OrdersView({
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* Quick Status Update Modal */}
       {statusModalOrder && (

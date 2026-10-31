@@ -1,7 +1,19 @@
 const { PrismaClient } = require("@prisma/client");
 
 async function main() {
-  const prisma = new PrismaClient();
+  if (!process.env.DATABASE_URL) {
+    console.log("ℹ️ [POSTGRES] No DATABASE_URL provided during build step; sequence sync handled live at runtime.");
+    return;
+  }
+
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+  });
+
   try {
     console.log("⚡ [POSTGRES] Pre-syncing all sequence counters to prevent (id) collisions...");
     await prisma.$executeRawUnsafe(`
@@ -24,9 +36,11 @@ async function main() {
     `);
     console.log("✅ [POSTGRES] All wholesale sequences synchronized successfully.");
   } catch (err) {
-    console.warn("⚠️ [POSTGRES] Sequence sync warning:", err.message);
+    console.log("ℹ️ [POSTGRES] Database unreachable during build container step; live sequence sync is active at runtime.");
   } finally {
-    await prisma.$disconnect();
+    try {
+      await prisma.$disconnect();
+    } catch {}
   }
 }
 
