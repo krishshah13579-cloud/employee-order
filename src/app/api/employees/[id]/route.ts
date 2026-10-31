@@ -166,6 +166,16 @@ export async function PUT(
           isActive: body.isActive !== undefined ? body.isActive : true,
         },
       });
+
+      if (body.canViewOrderForm !== undefined) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE wholesale."Employee" SET "canViewOrderForm" = $1 WHERE id = $2`,
+            Boolean(body.canViewOrderForm),
+            empId
+          );
+        } catch {}
+      }
     }
 
     // Sync tasks if provided

@@ -5,8 +5,24 @@ let isSchemaEnsured = false;
 export async function ensureDbSchema(force = false) {
   if (isSchemaEnsured && !force) return;
   try {
+    try {
+      await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS wholesale;`);
+    } catch {}
+
+    // Explicitly ensure canViewOrderForm on wholesale.Employee
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+      `);
+    } catch {}
+
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+      `);
+    } catch {}
+
     await prisma.$executeRawUnsafe(`
-      CREATE SCHEMA IF NOT EXISTS wholesale;
       DO $$
       BEGIN
         -- 1. Ensure wholesale."ProductCosting" columns
