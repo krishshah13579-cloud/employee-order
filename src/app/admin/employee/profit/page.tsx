@@ -114,7 +114,9 @@ export default function AdminProfitPage() {
 
   // Filtered style-wise profit breakdown (in sequence with IMP - 001 at bottom)
   const filteredProfitBreakdown = useMemo(() => {
-    const list = metrics?.soldProfitBreakdown || [];
+    const list = (metrics?.soldProfitBreakdown || []).filter(
+      (it) => !it.productName.toUpperCase().includes("IMPORTED TROUSER")
+    );
     if (!profitSearch.trim()) return list;
     const q = profitSearch.toLowerCase();
     return list.filter(

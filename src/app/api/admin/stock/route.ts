@@ -270,15 +270,26 @@ export async function GET(request: NextRequest) {
           (custTypeUpper.includes("WITHOUT GST") || custTypeUpper.includes("NO GST")) &&
           (custTypeUpper.includes("RETAIL") || custTypeUpper.includes("WHOLESAL"));
 
-        // Rule 2: "DONT ADD IMPORTED TROUSER MIX BILL OF RETAILER/WHOLESELLER FROM RETAILER/WHOLESELLER (WITHOUT GST)."
+        // Check for IMPORTED TROUSER MIX
         const hasImportedTrouserMix =
           order.items.some((it) => {
             const name = (it.productName || it.product?.name || "").toUpperCase();
             return name.includes("IMPORTED TROUSER") || name.includes("IMPORTED TROUSERS MIX");
           }) || Boolean(order.notes && order.notes.toUpperCase().includes("IMPORTED TROUSER"));
 
+        const isPureImportedTrouserMixBill =
+          order.items.length > 0 &&
+          order.items.every((it) => {
+            const name = (it.productName || it.product?.name || "").toUpperCase();
+            return name.includes("IMPORTED TROUSER") || name.includes("IMPORTED TROUSERS MIX");
+          });
+
+        // Rule 2: Exclude bills of Imported Trouser Mix for Retailer/Wholesaler (Without GST) and pure mix bills
         if (isRetailerOrWholesalerWithoutGst && hasImportedTrouserMix) {
-          continue; // Strictly skip Imported Trouser Mix bills from Retailer / Wholesaler (Without GST)
+          continue;
+        }
+        if (isPureImportedTrouserMixBill) {
+          continue;
         }
 
         // Rule 5: Check if this entire bill was returned (e.g. Bill# 32)
@@ -322,6 +333,12 @@ export async function GET(request: NextRequest) {
 
         for (const item of order.items) {
           const prodName = (item.productName || item.product?.name || "").trim().toUpperCase();
+
+          // Rule: Never include IMPORTED TROUSER MIX in product/style profit calculation
+          if (prodName.includes("IMPORTED TROUSER") || prodName.includes("IMPORTED TROUSERS MIX")) {
+            continue;
+          }
+
           const pcs = item.totalPcs || 0;
           const subtotal = item.itemSubtotal || (pcs * item.unitPrice) || 0;
 
@@ -410,7 +427,9 @@ export async function GET(request: NextRequest) {
       }
 
       // Rule 5: Deduct partial product returns from soldPerProductMap
-      soldProfitBreakdown = Array.from(soldPerProductMap.values()).map((p) => {
+      soldProfitBreakdown = Array.from(soldPerProductMap.values())
+        .filter((p) => !p.productName.toUpperCase().includes("IMPORTED TROUSER"))
+        .map((p) => {
         const retPcs = returnedPcsPerProduct.get(p.productId) || 0;
         const retRev = returnedRevenuePerProduct.get(p.productId) || 0;
         const retCost = Math.round(retPcs * p.costPrice);
