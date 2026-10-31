@@ -81,6 +81,28 @@ function ProductsContent() {
   const [quickStockProduct, setQuickStockProduct] = useState<ProductData | null>(null);
   const [quickStockMap, setQuickStockMap] = useState<Record<string, number>>({});
   const [savingQuickStock, setSavingQuickStock] = useState(false);
+  const [isSyncingStock, setIsSyncingStock] = useState(false);
+
+  const handleSyncStock = async () => {
+    setIsSyncingStock(true);
+    try {
+      const res = await fetch("/api/admin/products/sync-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast(data.message || "Stock and product details synchronized successfully!", "success");
+        fetchProducts();
+      } else {
+        toast(data.error || "Failed to sync stock", "error");
+      }
+    } catch (err: any) {
+      toast("Sync error: " + err.message, "error");
+    } finally {
+      setIsSyncingStock(false);
+    }
+  };
 
   const openQuickStock = (p: ProductData) => {
     setQuickStockProduct(p);
@@ -253,13 +275,26 @@ function ProductsContent() {
           </p>
         </div>
 
-        <Link
-          href="/admin/employee/products/new"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer self-start md:self-auto"
-        >
-          <Plus size={16} />
-          <span>Add New Garment</span>
-        </Link>
+        <div className="flex items-center gap-2.5 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={handleSyncStock}
+            disabled={isSyncingStock}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Sync all products with stock, photo links, wash guide, size guide, and e-commerce inventory"
+          >
+            <RefreshCw size={15} className={`text-orange-600 ${isSyncingStock ? "animate-spin" : ""}`} />
+            <span>{isSyncingStock ? "Syncing Stock..." : "Sync Stock"}</span>
+          </button>
+
+          <Link
+            href="/admin/employee/products/new"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>Add New Garment</span>
+          </Link>
+        </div>
       </div>
 
       {/* Toolbar & Filters */}

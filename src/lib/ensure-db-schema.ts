@@ -37,6 +37,18 @@ export async function ensureDbSchema() {
           ALTER TABLE "AccessoryItem" ADD COLUMN IF NOT EXISTS "costPerUnit" DOUBLE PRECISION DEFAULT 0;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+
+        -- 4. Ensure wholesale."Product" washGuide and description
+        BEGIN
+          ALTER TABLE wholesale."Product" ADD COLUMN IF NOT EXISTS "washGuide" TEXT;
+          ALTER TABLE wholesale."Product" ADD COLUMN IF NOT EXISTS "description" TEXT;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+          ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "washGuide" TEXT;
+          ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "description" TEXT;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
       END $$;
     `);
     isSchemaEnsured = true;

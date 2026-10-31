@@ -99,6 +99,10 @@ export default function AdminProfitPage() {
     try {
       const res = await fetch("/api/admin/stock?includeProfit=1", { cache: "no-store" });
       if (!res.ok) {
+        if (res.status === 401) {
+          toast("Session expired or unauthorized. Please refresh or re-login.", "error");
+          return;
+        }
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP ${res.status}: Failed to load profit metrics`);
       }

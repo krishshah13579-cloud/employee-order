@@ -12,12 +12,14 @@ import {
 import { sendColorSoldOutNotification } from "@/lib/email";
 import { getProductCoverImage, sortProductsByImpSequence } from "@/lib/utils";
 import { requireAdmin, getAdminSession, getEmployeeSession } from "@/lib/auth-security";
+import { ensureDbSchema } from "@/lib/ensure-db-schema";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbSchema();
     const admin = await getAdminSession(request);
     const employee = await getEmployeeSession(request);
 

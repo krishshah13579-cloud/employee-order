@@ -138,6 +138,8 @@ model Product {
   colorImages     String?     // JSON mapping of color -> photo data URL or image index
   setsColorwise   String?     // Stock/Default Sets colorwise, supporting multi-ratio sets
   sizeGuide       String?     // Size guide instructions / dimensions / image link
+  washGuide       String?     // Standard fabric wash & care instructions
+  description     String?     // Garment overview & product description
   imageUrl        String?
   damageStock     String?     // JSON mapping: { [color: string]: { pcs: number, reason: string, notes?: string } }
   isActive        Boolean     @default(true)

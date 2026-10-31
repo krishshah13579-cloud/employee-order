@@ -1155,14 +1155,6 @@ function ProductDetailContent() {
                       type="button"
                       onClick={() => {
                         setActiveImageIndex(idx);
-                        const matchedColor = availableColors.find(
-                          (col) => getProductColorImage(product, col) === imgUrl
-                        );
-                        if (matchedColor) {
-                          setActiveColor(matchedColor);
-                        } else {
-                          setActiveColor("");
-                        }
                       }}
                       className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
                         activeImageIndex === idx
@@ -2087,14 +2079,6 @@ function ProductDetailContent() {
                     type="button"
                     onClick={() => {
                       setActiveImageIndex(idx);
-                      const matchedColor = availableColors.find(
-                        (col) => getProductColorImage(product, col) === imgUrl
-                      );
-                      if (matchedColor) {
-                        setActiveColor(matchedColor);
-                      } else {
-                        setActiveColor("");
-                      }
                     }}
                     className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                       activeImageIndex === idx

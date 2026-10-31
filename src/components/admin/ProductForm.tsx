@@ -29,6 +29,7 @@ import {
   Scissors,
   Copy,
   Sparkles,
+  Shirt,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -56,7 +57,6 @@ import {
   unpackSetToLoosePieces,
 } from "@/lib/stock";
 import { compressImageFile } from "@/lib/imageCompression";
-import { extractColorsFromImage } from "@/lib/colorExtractor";
 
 // Standard Trouser & Formal Apparel Color Presets
 const PRESET_COLORS = [
@@ -133,12 +133,12 @@ export default function ProductForm({
   const MAX_IMAGES = 10;
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
-  const [detectingColors, setDetectingColors] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Collapsible sections states
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(true);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(true);
+  const [isWashGuideOpen, setIsWashGuideOpen] = useState(false);
 
   // Parse initial colors into array (all colors from colorsAvailable, setsColorwise, and colorMapping)
   const parseInitialColors = (): string[] => {
@@ -583,7 +583,8 @@ export default function ProductForm({
     costPrice: initialData?.costPrice ?? "",
     mixPcs: initialData?.mixPcs ?? 0,
     setsColorwise: initialData?.setsColorwise || "",
-    description: "", // Description note
+    description: (initialData as any)?.description || "Premium quality handcrafted formal & casual trousers tailored for perfection, superior stretch, all-day comfort, and refined silhouette.",
+    washGuide: (initialData as any)?.washGuide || "Machine wash cold (30°C) with like colors. Gentle cycle. Do not bleach. Line dry in shade. Warm iron inside-out.",
     isActive: initialData?.isActive ?? true,
   });
 
@@ -1189,58 +1190,7 @@ export default function ProductForm({
 
       if (uploadedUrls.length > 0) {
         setImagesList((prev) => [...prev, ...uploadedUrls]);
-
-        // Automatically extract all colors present in the uploaded garment photo(s)
-        const extractedSet = new Set<string>();
-        for (const url of uploadedUrls) {
-          const colors = await extractColorsFromImage(url);
-          for (const c of colors) {
-            extractedSet.add(c);
-          }
-        }
-
-        const detected = Array.from(extractedSet);
-        if (detected.length > 0) {
-          setSelectedColors(detected);
-          setActiveStockColor(detected[0]);
-          const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-          const initialMap: Record<string, string> = {};
-          detected.forEach((col, idx) => {
-            initialMap[alphabetLetters[idx] || `C${idx + 1}`] = col;
-          });
-          setColorAlphabetMap(initialMap);
-          setColorRatioStockMap((stockPrev) => {
-            const next = { ...stockPrev };
-            for (const col of detected) {
-              const clean = cleanColorName(col);
-              if (!next[clean] || Object.keys(next[clean]).length === 0) {
-                next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
-              }
-            }
-            return next;
-          });
-
-          // Add any non-standard preset colors to customColorsList
-          setCustomColorsList((prev) => {
-            const next = [...prev];
-            for (const c of detected) {
-              if (
-                !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
-                !next.some((x) => x.toLowerCase() === c.toLowerCase())
-              ) {
-                next.push(c);
-              }
-            }
-            return next;
-          });
-
-          toast(
-            `Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""}! Auto-detected ${detected.length} color${detected.length > 1 ? "s" : ""}: ${detected.join(", ")}`,
-            "success"
-          );
-        } else {
-          toast(`Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""} successfully!`, "success");
-        }
+        toast(`Uploaded ${uploadedUrls.length} photo${uploadedUrls.length > 1 ? "s" : ""} successfully!`, "success");
       }
     } catch (err: any) {
       console.error("Image upload error:", err);
@@ -1251,71 +1201,7 @@ export default function ProductForm({
     }
   };
 
-  const handleDetectColorsFromImages = async () => {
-    if (imagesList.length === 0) {
-      toast("Please upload a product photo first to detect colors", "error");
-      return;
-    }
-    setDetectingColors(true);
-    try {
-      const extractedSet = new Set<string>();
-      for (const url of imagesList) {
-        const colors = await extractColorsFromImage(url);
-        for (const c of colors) {
-          extractedSet.add(c);
-        }
-      }
-      const detected = Array.from(extractedSet);
-      if (detected.length === 0) {
-        toast("No distinct garment colors recognized from photo. You can type colors in the box below.", "info");
-        return;
-      }
-
-      // Set precisely the detected colors from the photo
-      setSelectedColors(detected);
-      setActiveStockColor(detected[0]);
-      const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-      const initialMap: Record<string, string> = {};
-      detected.forEach((col, idx) => {
-        initialMap[alphabetLetters[idx] || `C${idx + 1}`] = col;
-      });
-      setColorAlphabetMap(initialMap);
-      setColorRatioStockMap((stockPrev) => {
-        const next = { ...stockPrev };
-        for (const col of detected) {
-          const clean = cleanColorName(col);
-          if (!next[clean] || Object.keys(next[clean]).length === 0) {
-            next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
-          }
-        }
-        return next;
-      });
-
-      setCustomColorsList((prev) => {
-        const next = [...prev];
-        for (const c of detected) {
-          if (
-            !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
-            !next.some((x) => x.toLowerCase() === c.toLowerCase())
-          ) {
-            next.push(c);
-          }
-        }
-        return next;
-      });
-
-      toast(
-        `Auto-detected ${detected.length} color${detected.length > 1 ? "s" : ""} from photo: ${detected.join(", ")}`,
-        "success"
-      );
-    } catch (err: any) {
-      toast("Color detection error: " + err.message, "error");
-    } finally {
-      setDetectingColors(false);
-    }
-  };
-
-  const handleAddExternalUrl = async () => {
+  const handleAddExternalUrl = () => {
     const url = externalUrlInput.trim();
     if (!url) return;
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
@@ -1329,48 +1215,7 @@ export default function ProductForm({
     setImagesList((prev) => [...prev, url]);
     setExternalUrlInput("");
     setShowUrlInput(false);
-
-    try {
-      const colors = await extractColorsFromImage(url);
-      if (colors.length > 0) {
-        setSelectedColors((prev) => {
-          const combined = prev.length === 0 ? colors : Array.from(new Set([...prev, ...colors]));
-          if (combined.length > 0) {
-            setActiveStockColor(combined[0]);
-            setColorRatioStockMap((stockPrev) => {
-              const next = { ...stockPrev };
-              for (const col of combined) {
-                const clean = cleanColorName(col);
-                if (!next[clean] || Object.keys(next[clean]).length === 0) {
-                  next[clean] = { [formData.sizesRatio || "30 to 38"]: Math.max(4, bulkSetsInput) };
-                }
-              }
-              return next;
-            });
-          }
-          return combined;
-        });
-
-        setCustomColorsList((prev) => {
-          const next = [...prev];
-          for (const c of colors) {
-            if (
-              !PRESET_COLORS.some((p) => p.name.toLowerCase() === c.toLowerCase()) &&
-              !next.some((x) => x.toLowerCase() === c.toLowerCase())
-            ) {
-              next.push(c);
-            }
-          }
-          return next;
-        });
-
-        toast(`Photo URL added! Detected ${colors.length} colors: ${colors.join(", ")}`, "success");
-      } else {
-        toast("Photo URL added to gallery", "success");
-      }
-    } catch {
-      toast("Photo URL added to gallery", "success");
-    }
+    toast("Photo URL added to gallery successfully!", "success");
   };
 
   const handleRemoveImage = (index: number) => {
@@ -1524,6 +1369,8 @@ export default function ProductForm({
         setsColorwise: serializedStock || null,
         damageStock: serializedDamageStock,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
+        washGuide: formData.washGuide,
+        description: formData.description,
         imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
         colorMapping: JSON.stringify(colorAlphabetMap),
         isActive: formData.isActive,
@@ -1813,6 +1660,85 @@ export default function ProductForm({
               <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
                 <span>Markdown or clean text supported</span>
                 <span>{formData.description.length} characters</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 1B. Wash Guide & Care Instructions (Standard Across Products) */}
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-2xs transition-all">
+          <button
+            type="button"
+            onClick={() => setIsWashGuideOpen((prev) => !prev)}
+            className="w-full px-5 py-4 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-left transition-colors hover:bg-gray-100/70 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-white border border-gray-200 text-zinc-900 shadow-2xs">
+                <Shirt className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900 tracking-tight">
+                    Wash Guide &amp; Care Instructions
+                  </h3>
+                  <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
+                    Standard for Every Product
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Washing temperatures, drying instructions &amp; iron settings (same for all products)
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-gray-500">
+              <span className="text-xs font-medium text-gray-400 hidden sm:inline">
+                {isWashGuideOpen ? "Collapse" : "Expand"}
+              </span>
+              <div className="p-1 rounded-lg hover:bg-gray-200/60 text-gray-600 transition-transform">
+                {isWashGuideOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </div>
+            </div>
+          </button>
+
+          {isWashGuideOpen && (
+            <div className="p-5 space-y-3.5 animate-fadeIn">
+              <textarea
+                rows={3}
+                value={formData.washGuide}
+                onChange={(e) => setFormData({ ...formData, washGuide: e.target.value })}
+                placeholder="Machine wash cold (30°C) with like colors. Gentle cycle. Do not bleach. Line dry in shade. Warm iron inside-out."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-black focus:border-transparent transition-all leading-relaxed placeholder:text-gray-400"
+              />
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 pt-1">
+                <span className="font-semibold text-gray-700">Quick Care Presets:</span>
+                {[
+                  "Machine wash cold (30°C)",
+                  "Gentle cycle with like colors",
+                  "Do not bleach",
+                  "Line dry in shade",
+                  "Warm iron inside-out",
+                  "Dry clean compatible",
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      if (!formData.washGuide.includes(preset)) {
+                        setFormData({
+                          ...formData,
+                          washGuide: formData.washGuide ? `${formData.washGuide}. ${preset}` : preset,
+                        });
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-gray-100 hover:bg-zinc-900 hover:text-white rounded-md text-[11px] transition-colors border border-gray-200 cursor-pointer"
+                  >
+                    + {preset}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -2521,18 +2447,6 @@ export default function ProductForm({
             </p>
           </div>
           <div className="flex items-center gap-2.5">
-            {imagesList.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDetectColorsFromImages}
-                disabled={detectingColors}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs hover:scale-102"
-                title="Scan uploaded garment photo and detect all colors automatically"
-              >
-                <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${detectingColors ? "animate-spin" : ""}`} />
-                <span>{detectingColors ? "Detecting Colors..." : "Auto-Detect from Photo"}</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={handleSelectAllPresets}

@@ -125,6 +125,8 @@ export async function PUT(
         colorImages: body.colorImages !== undefined ? (body.colorImages ? (typeof body.colorImages === "string" ? body.colorImages : JSON.stringify(body.colorImages)) : null) : undefined,
         setsColorwise: body.setsColorwise,
         sizeGuide: body.sizeGuide,
+        washGuide: body.washGuide !== undefined ? body.washGuide : undefined,
+        description: body.description !== undefined ? body.description : undefined,
         imageUrl: body.imageUrl,
         colorMapping: body.colorMapping,
         damageStock: body.damageStock !== undefined ? (body.damageStock || null) : undefined,

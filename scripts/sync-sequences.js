@@ -35,6 +35,13 @@ async function main() {
           ALTER TABLE "ProductCosting" ADD COLUMN IF NOT EXISTS "itemCostPerPiece" DOUBLE PRECISION DEFAULT 0;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+        BEGIN
+          ALTER TABLE wholesale."Product" ADD COLUMN IF NOT EXISTS "washGuide" TEXT;
+          ALTER TABLE wholesale."Product" ADD COLUMN IF NOT EXISTS "description" TEXT;
+          ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "washGuide" TEXT;
+          ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "description" TEXT;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
       END $$;
     `);
     await prisma.$executeRawUnsafe(`

@@ -205,6 +205,8 @@ export async function POST(request: NextRequest) {
         colorImages: colorImages ? (typeof colorImages === "string" ? colorImages : JSON.stringify(colorImages)) : null,
         setsColorwise: setsColorwise || null,
         sizeGuide: sizeGuide || null,
+        washGuide: body.washGuide || "Machine wash cold (30°C) with like colors. Gentle cycle. Do not bleach. Line dry in shade. Warm iron inside-out.",
+        description: body.description || "Premium quality handcrafted formal & casual trousers tailored for perfection, superior stretch, all-day comfort, and refined silhouette.",
         imageUrl: imageUrl || null,
         colorMapping: colorMapping || null,
         damageStock: body.damageStock || null,
