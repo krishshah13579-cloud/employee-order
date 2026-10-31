@@ -2,10 +2,11 @@ import prisma from "./prisma";
 
 let isSchemaEnsured = false;
 
-export async function ensureDbSchema() {
-  if (isSchemaEnsured) return;
+export async function ensureDbSchema(force = false) {
+  if (isSchemaEnsured && !force) return;
   try {
     await prisma.$executeRawUnsafe(`
+      CREATE SCHEMA IF NOT EXISTS wholesale;
       DO $$
       BEGIN
         -- 1. Ensure wholesale."ProductCosting" columns
