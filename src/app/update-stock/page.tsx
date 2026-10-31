@@ -1144,10 +1144,10 @@ export default function UpdateStockPage() {
                   return (
                     <div
                       key={p.id}
-                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col group"
+                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col h-full group"
                     >
-                      {/* Product Image Cover */}
-                      <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
+                      {/* Product Image Cover (Uniform 4:5 Aspect Ratio matching products catalogue) */}
+                      <div className="relative w-full aspect-[4/5] bg-slate-100 overflow-hidden shrink-0 block">
                         {coverImage ? (
                           <img
                             src={coverImage}
@@ -1169,50 +1169,54 @@ export default function UpdateStockPage() {
                         </span>
                       </div>
 
-                      {/* Card Content */}
-                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                        <div>
-                          <h3 className="font-black text-slate-900 text-sm tracking-tight line-clamp-1">
+                      {/* Card Content (Uniform layout with guaranteed baseline alignment) */}
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3 min-w-0">
+                        <div className="space-y-1.5 min-w-0">
+                          <h3 className="font-black text-slate-900 text-sm tracking-tight truncate" title={p.name}>
                             {p.name}
                           </h3>
-                          <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
-                            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded truncate">
                               {p.sizesRatio || "30 to 38"}
                             </span>
                             <span>•</span>
-                            <span>{p.pcsPerSet || 5} Pcs / Set</span>
+                            <span className="shrink-0">{p.pcsPerSet || 5} Pcs / Set</span>
+                          </div>
+
+                          {/* Colors Swatches (Fixed height container so cards without colors or with fewer colors stay aligned) */}
+                          <div className="h-6 flex items-center">
+                            {availableColors.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {availableColors.slice(0, 6).map((c) => {
+                                  const hex = getColorHexCode(c);
+                                  return (
+                                    <span
+                                      key={c}
+                                      title={c}
+                                      className="w-4 h-4 rounded-full border border-black/10 shadow-2xs shrink-0"
+                                      style={{ backgroundColor: hex }}
+                                    />
+                                  );
+                                })}
+                                {availableColors.length > 6 && (
+                                  <span className="text-[10px] font-bold text-slate-400 self-center">
+                                    +{availableColors.length - 6}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">No color variants</span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Colors Swatches */}
-                        {availableColors.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {availableColors.slice(0, 6).map((c) => {
-                              const hex = getColorHexCode(c);
-                              return (
-                                <span
-                                  key={c}
-                                  title={c}
-                                  className="w-4 h-4 rounded-full border border-black/10 shadow-2xs"
-                                  style={{ backgroundColor: hex }}
-                                />
-                              );
-                            })}
-                            {availableColors.length > 6 && (
-                              <span className="text-[10px] font-bold text-slate-400 self-center">
-                                +{availableColors.length - 6}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Price & Action Button */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                          <div>
+                        {/* Price & Action Button (Fixed baseline) */}
+                        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 mt-auto">
+                          <div className="min-w-0">
                             <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                               Rate per PC
                             </div>
-                            <div className="flex items-baseline gap-1.5">
+                            <div className="flex items-baseline gap-1.5 truncate">
                               <span className="text-xs font-bold text-slate-400 line-through font-mono">
                                 ₹{displayMrp}
                               </span>
@@ -1225,7 +1229,7 @@ export default function UpdateStockPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(p)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer active:scale-95 shrink-0"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer active:scale-95 shrink-0"
                           >
                             <Edit size={13} />
                             <span>Update Stock</span>
