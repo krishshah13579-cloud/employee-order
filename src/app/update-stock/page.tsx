@@ -122,6 +122,7 @@ export default function UpdateStockPage() {
   const [editingAccessory, setEditingAccessory] = useState<AccessoryItemData | null>(null);
   const [isAddAccessoryOpen, setIsAddAccessoryOpen] = useState<boolean>(false);
   const [savingAccessory, setSavingAccessory] = useState<boolean>(false);
+  const [uploadingTrimPhoto, setUploadingTrimPhoto] = useState<boolean>(false);
   const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
 
   // Trim category add/remove state
@@ -639,6 +640,35 @@ export default function UpdateStockPage() {
     }
   };
 
+  const handleTrimPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingTrimPhoto(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to upload photo");
+      }
+
+      const data = await res.json();
+      setAccessoryForm((prev) => ({ ...prev, imageUrl: data.url }));
+      toast("Trim photo uploaded successfully!", "success");
+    } catch (err: any) {
+      toast("Photo upload failed: " + err.message, "error");
+    } finally {
+      setUploadingTrimPhoto(false);
+    }
+  };
+
   const handleOpenAddAccessory = () => {
     setEditingAccessory(null);
     setAccessoryForm({
@@ -907,6 +937,7 @@ export default function UpdateStockPage() {
                       <th className="py-3 px-4">Category</th>
                       <th className="py-3 px-4 text-center">Current Stock</th>
                       <th className="py-3 px-4 text-center">Min Alert Level</th>
+                      <th className="py-3 px-4 text-right">Cost / Unit</th>
                       <th className="py-3 px-4 text-center">Quick Adjust</th>
                       <th className="py-3 px-4 text-center">Actions</th>
                     </tr>
@@ -915,14 +946,14 @@ export default function UpdateStockPage() {
                   <tbody className="divide-y divide-slate-100">
                     {accessoriesLoading ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
                           <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-slate-300" />
                           <span>Loading accessories &amp; trims stock...</span>
                         </td>
                       </tr>
                     ) : filteredAccessories.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
                           <Tag size={32} className="mx-auto mb-2 text-slate-300" />
                           <span>No buttons, tags or labels found matching your filter.</span>
                         </td>
@@ -983,6 +1014,10 @@ export default function UpdateStockPage() {
                               ) : (
                                 <span className="text-slate-400">&ge; {item.minAlertQty} {item.unit}</span>
                               )}
+                            </td>
+
+                            <td className="py-3 px-4 text-right font-mono text-xs text-slate-700">
+                              {item.costPerUnit ? formatCurrency(item.costPerUnit) : "—"}
                             </td>
 
                             <td className="py-3 px-4 text-center">
@@ -1558,6 +1593,59 @@ export default function UpdateStockPage() {
             </div>
 
             <form onSubmit={handleSaveAccessory} className="p-5 space-y-4">
+              {/* 1. Upload Photo */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Trim Photo
+                </label>
+                <div className="flex items-center gap-3">
+                  {accessoryForm.imageUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl border border-slate-300 overflow-hidden bg-slate-100 shrink-0 shadow-2xs group">
+                      <img src={accessoryForm.imageUrl} alt="Trim Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setAccessoryForm((prev) => ({ ...prev, imageUrl: "" }))}
+                        className="absolute top-0 right-0 p-1 bg-red-600 text-white rounded-bl-lg hover:bg-red-700 transition cursor-pointer"
+                        title="Remove photo"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 flex flex-col items-center justify-center cursor-pointer transition text-slate-400 hover:text-blue-600 shrink-0">
+                      {uploadingTrimPhoto ? (
+                        <Loader2 size={18} className="animate-spin text-blue-600" />
+                      ) : (
+                        <>
+                          <Camera size={18} />
+                          <span className="text-[9px] font-bold mt-0.5">Upload</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingTrimPhoto}
+                        onChange={handleTrimPhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                  <div className="text-xs text-slate-500">
+                    {uploadingTrimPhoto ? (
+                      <span className="text-blue-600 font-bold flex items-center gap-1">
+                        <Loader2 size={13} className="animate-spin" /> Uploading image...
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-semibold text-slate-700 block">Photo of Button, Tag, or Label</span>
+                        <span className="text-[11px] text-slate-400">JPG, PNG, or WEBP (Direct upload from device)</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Item Name */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Item Name *
@@ -1565,17 +1653,18 @@ export default function UpdateStockPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. IQ Metallic Shank Button, Pocket Flag Label..."
+                  placeholder="e.g. IQ Metallic Shank Button 24L, Trouser Hangtag, Woven Size Label..."
                   value={accessoryForm.name}
                   onChange={(e) => setAccessoryForm({ ...accessoryForm, name: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
 
+              {/* 3. Category & Unit */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Category *
+                    Type / Category *
                   </label>
                   <select
                     value={accessoryForm.category}
@@ -1590,26 +1679,23 @@ export default function UpdateStockPage() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Stock Unit
+                    Unit (e.g. Pcs, Meters)
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    placeholder="e.g. Pcs, Meters, Gross, Rolls, Boxes"
                     value={accessoryForm.unit}
                     onChange={(e) => setAccessoryForm({ ...accessoryForm, unit: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="Pcs">Pcs</option>
-                    <option value="Gross">Gross (144 pcs)</option>
-                    <option value="Meters">Meters</option>
-                    <option value="Rolls">Rolls</option>
-                    <option value="Boxes">Boxes</option>
-                  </select>
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* 4. Initial Stock / Current Stock & Min Alert Qty & Cost Per Unit */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Current Quantity in Stock *
+                    Initial Stock *
                   </label>
                   <input
                     type="number"
@@ -1623,7 +1709,7 @@ export default function UpdateStockPage() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Min Alert Level (Pcs)
+                    Min Alert Qty
                   </label>
                   <input
                     type="number"
@@ -1633,18 +1719,34 @@ export default function UpdateStockPage() {
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Cost / Unit (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 1.80"
+                    value={accessoryForm.costPerUnit}
+                    onChange={(e) => setAccessoryForm({ ...accessoryForm, costPerUnit: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
+              {/* 5. Notes / Supplier Specs */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Notes / Shade Specs (Optional)
+                  Notes / Supplier Specs (Optional)
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Copper antique finish for Black & Navy trousers"
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Sourced from TrimEx Mumbai, metallic antique brass finish"
                   value={accessoryForm.notes}
                   onChange={(e) => setAccessoryForm({ ...accessoryForm, notes: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                 />
               </div>
 
