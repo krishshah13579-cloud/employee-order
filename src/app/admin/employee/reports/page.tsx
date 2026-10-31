@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   FileText,
   Mail,
@@ -22,10 +23,12 @@ import {
   AlertCircle,
   Eye,
   Loader2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ORDER_STATUSES, STATUS_COLORS } from "@/lib/types";
+import InvoiceSettingsView from "@/components/admin/InvoiceSettingsView";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -85,8 +88,37 @@ interface ReportSummary {
   month: string;
 }
 
-export default function AdminReportsPage() {
+function ReportsPageContent() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tabParam = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = useState<"REPORTS" | "INVOICE_SETTINGS">(
+    tabParam?.toLowerCase() === "invoice-settings" ? "INVOICE_SETTINGS" : "REPORTS"
+  );
+
+  useEffect(() => {
+    if (tabParam?.toLowerCase() === "invoice-settings") {
+      setActiveTab("INVOICE_SETTINGS");
+    } else if (tabParam?.toLowerCase() === "reports") {
+      setActiveTab("REPORTS");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: "REPORTS" | "INVOICE_SETTINGS") => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "INVOICE_SETTINGS") {
+      params.set("tab", "invoice-settings");
+    } else {
+      params.set("tab", "reports");
+    }
+    const query = params.toString() ? `?${params.toString()}` : "";
+    router.replace(`${pathname}${query}`, { scroll: false });
+  };
+
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState<string>(String(currentDate.getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentDate.getFullYear()));
@@ -173,8 +205,41 @@ export default function AdminReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+      {/* Top Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => handleTabChange("REPORTS")}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+            activeTab === "REPORTS"
+              ? "border-orange-600 text-orange-700 bg-orange-50/70 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+          }`}
+        >
+          <FileText size={16} className={activeTab === "REPORTS" ? "text-orange-600" : "text-gray-400"} />
+          <span>Reports</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("INVOICE_SETTINGS")}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+            activeTab === "INVOICE_SETTINGS"
+              ? "border-orange-600 text-orange-700 bg-orange-50/70 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+          }`}
+        >
+          <SlidersHorizontal size={16} className={activeTab === "INVOICE_SETTINGS" ? "text-orange-600" : "text-gray-400"} />
+          <span>Invoice Settings</span>
+        </button>
+      </div>
+
+      {activeTab === "INVOICE_SETTINGS" ? (
+        <InvoiceSettingsView />
+      ) : (
+        <>
+          {/* Top Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600 mb-1">
             <FileText size={14} /> Wholesale Turnover & Processed Reports
@@ -501,6 +566,16 @@ export default function AdminReportsPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Loading reports...</div>}>
+      <ReportsPageContent />
+    </Suspense>
   );
 }

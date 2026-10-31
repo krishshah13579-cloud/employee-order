@@ -105,6 +105,7 @@ export default function AdminTopHeader({
     if (pathname.includes("/profit")) return "Wholesale Gross Profit Breakdown";
     if (pathname.includes("/reports")) return "Sales & Financial Reports";
     if (pathname.includes("/invoice-settings")) return "Invoice & Company Configuration";
+    if (pathname.includes("/security")) return "Security & WhatsApp Center";
     if (pathname.includes("/whatsapp")) return "WhatsApp Business Gateway";
     if (pathname.includes("/audit")) return "System Audit Logs";
     return "Control Center";

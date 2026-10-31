@@ -124,21 +124,9 @@ const employeeNavItems = [
     exact: false,
   },
   {
-    name: "Invoice Settings",
-    href: "/admin/employee/invoice-settings",
-    icon: SlidersHorizontal,
-    exact: false,
-  },
-  {
-    name: "WhatsApp Gateway",
-    href: "/admin/employee/whatsapp",
-    icon: MessageCircle,
-    exact: false,
-  },
-  {
-    name: "Security Audit",
-    href: "/admin/employee/audit",
-    icon: ShieldAlert,
+    name: "Security",
+    href: "/admin/employee/security",
+    icon: ShieldCheck,
     exact: false,
   },
 ];
