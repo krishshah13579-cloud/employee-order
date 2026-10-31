@@ -62,33 +62,6 @@ async function main() {
         END LOOP;
       END $$;
     `);
-
-    // Ensure testuser@iqtrousers.com exists in wholesale.AdminAccount
-    try {
-      const crypto = require("crypto");
-      const salt = crypto.randomBytes(16).toString("hex");
-      const derivedKey = crypto.scryptSync("Test@1234", salt, 64);
-      const scryptHash = `scrypt:${salt}:${derivedKey.toString("hex")}`;
-      const expiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-
-      const existingTestUser = await prisma.adminAccount.findUnique({
-        where: { username: "testuser@iqtrousers.com" }
-      });
-      if (!existingTestUser) {
-        await prisma.adminAccount.create({
-          data: {
-            username: "testuser@iqtrousers.com",
-            password: scryptHash,
-            lastOtp: "123456",
-            otpExpiresAt: expiry,
-          }
-        });
-        console.log("✅ [AUTH] Seeded testuser@iqtrousers.com in wholesale.AdminAccount");
-      }
-    } catch (testUserErr) {
-      // Non-blocking
-    }
-
     console.log("✅ [POSTGRES] All wholesale sequences synchronized successfully.");
   } catch (err) {
     console.log("ℹ️ [POSTGRES] Database unreachable during build container step; live sequence sync is active at runtime.");

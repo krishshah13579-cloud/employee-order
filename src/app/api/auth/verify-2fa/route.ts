@@ -47,14 +47,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Administrator account not found." }, { status: 404 });
     }
 
-    const isTestAccount = cleanUser === "testuser@iqtrousers.com";
-
-    // STRICT VALIDATION: Code must match the fresh 6-digit OTP sent to email (or static 123456 for test user)
+    // STRICT VALIDATION: Code must match the fresh 6-digit OTP sent to email
     const isOtpMatch =
-      (isTestAccount && cleanCode === "123456") ||
-      (Boolean(admin.lastOtp) &&
-        admin.lastOtp === cleanCode &&
-        (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt));
+      admin.lastOtp &&
+      admin.lastOtp === cleanCode &&
+      (!admin.otpExpiresAt || new Date() <= admin.otpExpiresAt);
 
     if (!isOtpMatch) {
       recordFailedOtpAttempt(cleanUser);

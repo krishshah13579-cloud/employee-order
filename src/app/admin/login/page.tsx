@@ -247,21 +247,9 @@ export default function AdminLoginPage() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
                   Administrator Email / Username
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsername("testuser@iqtrousers.com");
-                      setPassword("Test@1234");
-                    }}
-                    className="text-[10px] bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 font-semibold px-2 py-0.5 rounded-full border border-orange-500/30 cursor-pointer transition-colors"
-                  >
-                    Test User
-                  </button>
-                  <span className="text-[10px] bg-slate-800 text-orange-400 font-semibold px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1">
-                    <Lock size={10} /> Secure Login
-                  </span>
-                </div>
+                <span className="text-[10px] bg-slate-800 text-orange-400 font-semibold px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1">
+                  <Lock size={10} /> Secure Login
+                </span>
               </div>
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-3.5 text-orange-400" />
@@ -360,16 +348,11 @@ export default function AdminLoginPage() {
                   <div className="text-[11px] text-amber-300 font-semibold mb-1">
                     Direct Access 2FA Code (Backup):
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setTwoFactorCode(fallbackCode)}
-                    className="inline-block font-mono text-xl font-black text-amber-400 hover:text-amber-300 bg-slate-950 px-4 py-1.5 rounded-xl border border-amber-500/40 tracking-widest cursor-pointer transition-colors"
-                    title="Click to autofill"
-                  >
+                  <div className="inline-block font-mono text-xl font-black text-amber-400 bg-slate-950 px-4 py-1.5 rounded-xl border border-amber-500/40 tracking-widest select-all">
                     {fallbackCode}
-                  </button>
+                  </div>
                   <div className="text-[10px] text-slate-400 mt-1">
-                    Click code to autofill, or enter manually below.
+                    (Render Free tier blocks outbound SMTP ports. You can enter this code directly.)
                   </div>
                 </div>
               )}
