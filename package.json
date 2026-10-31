@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && node scripts/sync-sequences.js && next build",
     "db:sync": "node scripts/db-sync.js",
-    "start": "next start",
+    "start": "node scripts/sync-sequences.js && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",

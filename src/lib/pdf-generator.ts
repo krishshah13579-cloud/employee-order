@@ -25,6 +25,31 @@ export function sanitizeWinAnsi(text: any): string {
     .replace(/[^\x00-\xFF]/g, " ");
 }
 
+export function extractDeliveryAndDispatchNotes(rawNotes: string | null | undefined): string {
+  if (!rawNotes || typeof rawNotes !== "string") return "";
+
+  const parts = rawNotes.split("|").map((p) => p.trim());
+  const validNotes: string[] = [];
+
+  for (const part of parts) {
+    if (!part) continue;
+    const upper = part.toUpperCase();
+    if (upper.startsWith("[BILL_WITHOUT_GST:") || upper.startsWith("[BILL_WITHOUT_GST]")) continue;
+    if (upper.startsWith("[HANDWRITTEN_BOOK_NO:") || upper.startsWith("[HANDWRITTEN_BOOK_NO]")) continue;
+
+    if (upper.startsWith("[TRANSPORT:")) {
+      const match = part.match(/\[TRANSPORT:\s*([^\]]+)\]/i);
+      if (match && match[1]) {
+        validNotes.push(`Transport: ${match[1].trim()}`);
+      }
+      continue;
+    }
+    validNotes.push(part);
+  }
+
+  return validNotes.join(" • ");
+}
+
 /**
  * 1. Generates an A4 PDF Buffer for an Order Form or Tax Invoice
  */
@@ -243,6 +268,31 @@ export async function generateOrderPdfBuffer(
   drawText(`Place of Supply: 24-Gujarat`, rightX, rightY, { size: 8 });
 
   y = metaBottomY;
+
+  // DELIVERY TO & DISPATCH / PACKAGING NOTES SECTION
+  const deliveryHeight = 22;
+  const deliveryBottomY = y - deliveryHeight;
+  drawRect(margin, deliveryBottomY, contentWidth, deliveryHeight, rgb(0.98, 0.98, 0.98), 1);
+
+  const deliveryNote = extractDeliveryAndDispatchNotes(order.notes);
+  const delivLeftX = margin + 8;
+  const custCityStateStr = `${order.customer?.city || "Ahmedabad"}${order.customer?.state ? `, ${order.customer.state}` : ""}`;
+
+  drawText(
+    `DELIVERY TO : ${order.customerName.toUpperCase()} — ${custCityStateStr}${order.customerPhone ? ` (Mob: ${order.customerPhone})` : ""}`,
+    delivLeftX,
+    y - 9,
+    { font: fontBold, size: 7.5 }
+  );
+  const noteText = deliveryNote || order.customerAddress || "Standard packaging & prompt direct dispatch to destination.";
+  drawText(
+    `Special Packaging / Delivery Note : ${noteText}`.slice(0, 105),
+    delivLeftX,
+    y - 18,
+    { size: 7, color: rgb(0.15, 0.15, 0.15) }
+  );
+
+  y = deliveryBottomY;
 
   // Items Table Header
   const colSr = margin;
@@ -885,6 +935,33 @@ export async function generateSalesInvoicePdfBuffer(
   drawText(`Place of Supply: 24-Gujarat`, rightX, rightY, { size: 7.5 });
 
   y = metaBottomY;
+
+  // DELIVERY TO & DISPATCH / PACKAGING NOTES SECTION
+  const deliveryHeight = 22;
+  const deliveryBottomY = y - deliveryHeight;
+  drawRect(margin, deliveryBottomY, contentWidth, deliveryHeight, rgb(0.98, 0.98, 0.98), 1);
+
+  const deliveryNote = extractDeliveryAndDispatchNotes(inv.notes);
+  const delivLeftX = margin + 8;
+  const custDest = inv.customer
+    ? `${inv.customer.city || "Ahmedabad"}${inv.customer.state ? `, ${inv.customer.state}` : ""}`
+    : inv.customerAddress || "Ahmedabad";
+
+  drawText(
+    `DELIVERY TO : ${inv.customerName.toUpperCase()} — ${custDest}${inv.customerPhone ? ` (Mob: ${inv.customerPhone})` : ""}`,
+    delivLeftX,
+    y - 9,
+    { font: fontBold, size: 7.5 }
+  );
+  const noteText = deliveryNote || inv.customerAddress || "Standard counter delivery & prompt dispatch.";
+  drawText(
+    `Special Packaging / Delivery Note : ${noteText}`.slice(0, 105),
+    delivLeftX,
+    y - 18,
+    { size: 7, color: rgb(0.15, 0.15, 0.15) }
+  );
+
+  y = deliveryBottomY;
 
   // Items Table Header
   const colSr = margin;

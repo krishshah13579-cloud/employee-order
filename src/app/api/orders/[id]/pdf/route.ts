@@ -13,6 +13,31 @@ import path from "path";
 import { getAdminSession, getEmployeeSession, isSpecialTeamLeaderKrishShah } from "@/lib/auth-security";
 import { sanitizePositiveInt } from "@/lib/navigation";
 
+function extractDeliveryAndDispatchNotes(rawNotes: string | null | undefined): string {
+  if (!rawNotes || typeof rawNotes !== "string") return "";
+
+  const parts = rawNotes.split("|").map((p) => p.trim());
+  const validNotes: string[] = [];
+
+  for (const part of parts) {
+    if (!part) continue;
+    const upper = part.toUpperCase();
+    if (upper.startsWith("[BILL_WITHOUT_GST:") || upper.startsWith("[BILL_WITHOUT_GST]")) continue;
+    if (upper.startsWith("[HANDWRITTEN_BOOK_NO:") || upper.startsWith("[HANDWRITTEN_BOOK_NO]")) continue;
+
+    if (upper.startsWith("[TRANSPORT:")) {
+      const match = part.match(/\[TRANSPORT:\s*([^\]]+)\]/i);
+      if (match && match[1]) {
+        validNotes.push(`Transport: ${match[1].trim()}`);
+      }
+      continue;
+    }
+    validNotes.push(part);
+  }
+
+  return validNotes.join(" • ");
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -346,6 +371,32 @@ export async function GET(
     drawLine(colSplit, detailsTopY, colSplit, detailsBottomY, 0.75);
 
     y = detailsBottomY;
+    drawLine(margin, y, width - margin, y, 1);
+
+    // ══════════════════════════════════════════════════════════════════
+    // 3B. DELIVERY TO / DISPATCH INSTRUCTIONS SECTION
+    // ══════════════════════════════════════════════════════════════════
+    const deliveryNote = extractDeliveryAndDispatchNotes(order.notes);
+    const deliveryHeight = 22;
+    const deliveryBottomY = y - deliveryHeight;
+
+    // Subtle background tint for DELIVERY TO block
+    drawRect(margin, deliveryBottomY, contentWidth, deliveryHeight, rgb(0.98, 0.98, 0.98), 0.75);
+
+    const delivX = margin + 6;
+    let delivY = y - 9;
+
+    // Line 1: DELIVERY TO header with customer and city
+    const delivTarget = `DELIVERY TO : ${custName.slice(0, 40)} — ${custCity}${custPhone ? ` (Mob: ${custPhone})` : ""}`;
+    drawText(delivTarget.slice(0, 95), delivX, delivY, { font: fontBold, size: 7.5 });
+
+    // Line 2: Special packaging & dispatch instructions
+    delivY -= 9;
+    const noteContent = deliveryNote || custAddr || "Standard packaging & prompt direct dispatch to destination.";
+    const delivInstructions = `Special Packaging / Delivery Note : ${noteContent}`;
+    drawText(delivInstructions.slice(0, 105), delivX, delivY, { size: 7, color: rgb(0.15, 0.15, 0.15) });
+
+    y = deliveryBottomY;
     drawLine(margin, y, width - margin, y, 1);
 
     // ══════════════════════════════════════════════════════════════════
