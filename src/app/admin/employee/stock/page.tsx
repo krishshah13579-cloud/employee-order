@@ -55,6 +55,7 @@ interface StockItem {
   totalValuation: number;
   setsColorwise?: string | null;
   detailedRatioSets?: Record<string, Record<string, number>>;
+  detailedLooseStock?: Record<string, Record<string, number>>;
   isActive: boolean;
 }
 
@@ -967,15 +968,50 @@ export default function AdminStockPage() {
                             </div>
                           </td>
 
-                          {/* 4. Mix Pcs */}
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-800">
-                            {item.mixPcs > 0 ? (
-                              <span className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
-                                {item.mixPcs} pcs
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">0 pcs</span>
-                            )}
+                          {/* 4. Mix Pcs (Mix Sizes per color) */}
+                          <td className="py-3.5 px-4 font-mono">
+                            {(() => {
+                              const loose = item.detailedLooseStock || {};
+                              const hasLoose = Object.keys(loose).length > 0;
+
+                              if (!hasLoose && item.mixPcs <= 0) {
+                                return <div className="text-center text-slate-400">0 pcs</div>;
+                              }
+
+                              if (hasLoose) {
+                                return (
+                                  <div className="space-y-1.5 min-w-[130px]">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
+                                        {item.mixPcs} Mix Pcs
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col gap-1 text-[11px]">
+                                      {Object.entries(loose).map(([col, sizesMap]) => {
+                                        const entries = Object.entries(sizesMap).filter(([_, cnt]) => cnt > 0);
+                                        if (entries.length === 0) return null;
+                                        return (
+                                          <div key={col} className="bg-purple-50/80 border border-purple-200/70 rounded-md px-1.5 py-0.5 text-purple-950">
+                                            <span className="font-bold text-slate-800">{col}: </span>
+                                            <span className="font-semibold text-purple-900">
+                                              {entries.map(([sz, cnt]) => `${sz} (${cnt})`).join(", ")}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="text-center">
+                                  <span className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 font-bold">
+                                    {item.mixPcs} pcs
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* 5. Costing */}

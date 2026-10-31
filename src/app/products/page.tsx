@@ -458,21 +458,6 @@ function ProductsContent() {
                         </span>
                       </div>
 
-                      {/* Mix Sizes Available */}
-                      <div className="mt-0.5 flex items-center justify-between text-[10px] sm:text-xs">
-                        <span className="text-slate-500 font-medium">Mix:</span>
-                        {mixInfo.totalMixPcs > 0 ? (
-                          <span
-                            className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded text-[8px] sm:text-[10px] font-mono truncate max-w-[80px] sm:max-w-[170px]"
-                            title={mixInfo.sizesSummary}
-                          >
-                            {mixInfo.totalMixPcs} Pcs
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[9px] sm:text-[11px]">0 pcs</span>
-                        )}
-                      </div>
-
                       {/* Colors Palette Preview */}
                       <div className="mt-1 sm:mt-1.5 flex items-center gap-1 flex-wrap">
                         {colorList.slice(0, 4).map((col, idx) => {

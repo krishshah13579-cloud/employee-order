@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import {
   parseColorwiseSets,
   parseDetailedColorRatioSets,
+  parseDetailedColorStockWithLoose,
   getAllProductColors,
   getSizesFromRatio,
   cleanColorName,
@@ -57,6 +58,11 @@ export async function syncWholesaleProductToEcommerce(wholesaleProductId: number
       wholesaleProduct.sizesRatio || "30 to 38"
     );
 
+    const detailedStockWithLoose = parseDetailedColorStockWithLoose(
+      wholesaleProduct.setsColorwise,
+      wholesaleProduct.sizesRatio || "30 to 38"
+    );
+
     // Existing online inventory map: { [color]: { [size]: count } }
     let currentOnlineInventory: Record<string, Record<string, number>> = {};
     try {
@@ -85,16 +91,27 @@ export async function syncWholesaleProductToEcommerce(wholesaleProductId: number
         totalSetsForColor += Math.max(0, count || 0);
       }
 
+      const colorLoose = detailedStockWithLoose[cleanColor]?.loosePcs || {};
+      const hasLoosePieces = Object.values(colorLoose).some((qty) => Number(qty) > 0);
+
       const existingColorBreakdown = currentOnlineInventory[color] || currentOnlineInventory[cleanColor] || {};
       const newBreakdown: Record<string, number> = {};
 
-      if (totalSetsForColor <= 0) {
+      if (hasLoosePieces) {
+        // STRICT REQUIREMENT: If color has mix sizes, DO NOT UNSET ANY SET.
+        // Crossmark unavailable sizes and ONLY show the available mix sizes!
+        for (const sz of standardSizes) {
+          const looseQty = Math.max(0, Number(colorLoose[sz]) || 0);
+          newBreakdown[sz] = looseQty;
+          totalPieces += looseQty;
+        }
+      } else if (totalSetsForColor <= 0) {
         // Wholesale has 0 sets left for this color -> Out of stock online
         for (const sz of standardSizes) {
           newBreakdown[sz] = 0;
         }
       } else {
-        // Wholesale has sets available (> 0)
+        // Wholesale has sets available (> 0) and no loose mix pieces
         // Check if an existing broken set is currently active online
         const hasExistingBrokenSet = Object.keys(existingColorBreakdown).length > 0 &&
           Object.values(existingColorBreakdown).some((qty) => qty > 0);

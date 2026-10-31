@@ -5,6 +5,8 @@ import {
   getTotalAvailableSets,
   getAllProductColors,
   parseDetailedColorRatioSets,
+  parseDetailedColorStockWithLoose,
+  cleanColorName,
   getSizesFromRatio,
   isColorSoldOut,
   getColorShadeLetter,
@@ -82,7 +84,25 @@ export async function GET(request: NextRequest) {
       }
       const pcsPerSet = p.pcsPerSet || 5;
       const totalSetPcs = hasRatioBreakdown ? accurateSetPcs : totalSets * pcsPerSet;
-      const mixPcs = (p as any).mixPcs || 0;
+      const detailedStockWithLoose = parseDetailedColorStockWithLoose(p.setsColorwise, p.sizesRatio || "30 to 38");
+      const detailedLooseStock: Record<string, Record<string, number>> = {};
+      let totalLooseFromBreakdown = 0;
+      for (const [col, info] of Object.entries(detailedStockWithLoose)) {
+        const cleanCol = cleanColorName(col);
+        const nonZeroLoose: Record<string, number> = {};
+        for (const [sz, cnt] of Object.entries(info.loosePcs || {})) {
+          const val = Math.max(0, Number(cnt) || 0);
+          if (val > 0) {
+            nonZeroLoose[sz] = val;
+            totalLooseFromBreakdown += val;
+          }
+        }
+        if (Object.keys(nonZeroLoose).length > 0) {
+          detailedLooseStock[cleanCol] = nonZeroLoose;
+        }
+      }
+
+      const mixPcs = Math.max((p as any).mixPcs || 0, totalLooseFromBreakdown);
       const totalPcs = totalSetPcs + mixPcs;
       const costPrice = (p as any).costPrice !== null && (p as any).costPrice !== undefined ? (p as any).costPrice : Math.round((p.retailerPrice || p.price) * 0.7);
       const sellingRate = p.retailerPrice || p.price;
@@ -122,6 +142,7 @@ export async function GET(request: NextRequest) {
         totalValuation,
         setsColorwise: p.setsColorwise,
         detailedRatioSets,
+        detailedLooseStock,
         isActive: p.isActive,
       };
     });
