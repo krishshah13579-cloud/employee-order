@@ -199,6 +199,7 @@ export async function uploadImageToServer(
     const uploadRes = await fetch("/api/upload", {
       method: "POST",
       body: formData,
+      credentials: "include",
     });
 
     if (uploadRes.ok) {
