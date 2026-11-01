@@ -24,6 +24,7 @@ import {
   Eye,
   Loader2,
   SlidersHorizontal,
+  Receipt,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -39,6 +40,9 @@ interface ReportOrder {
   id: number;
   orderNumber: string;
   taxInvoiceNumber?: string;
+  billNumber?: string;
+  isBillWithoutGst?: boolean;
+  documentType?: "BILL_WITHOUT_GST" | "TAX_INVOICE";
   date?: string;
   taxInvoiceDate?: string;
   orderDate?: string;
@@ -49,6 +53,7 @@ interface ReportOrder {
   creditDays: number;
   totalAmount: number;
   subtotal: number;
+  gstRate?: number;
   gstAmount: number;
   notes?: string;
   totalSets: number;
@@ -84,6 +89,14 @@ interface ReportSummary {
   wholesalerOrdersCount: number;
   retailerRevenue: number;
   wholesalerRevenue: number;
+  taxInvoicesCount?: number;
+  taxInvoicesRevenue?: number;
+  taxInvoicesSets?: number;
+  taxInvoicesPcs?: number;
+  billsWithoutGstCount?: number;
+  billsWithoutGstRevenue?: number;
+  billsWithoutGstSets?: number;
+  billsWithoutGstPcs?: number;
   year: number;
   month: string;
 }
@@ -123,6 +136,7 @@ function ReportsPageContent() {
   const [selectedMonth, setSelectedMonth] = useState<string>(String(currentDate.getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentDate.getFullYear()));
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [docTypeFilter, setDocTypeFilter] = useState<"all" | "invoices" | "bills">("all");
   const [search, setSearch] = useState<string>("");
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -137,6 +151,9 @@ function ReportsPageContent() {
       let url = `/api/admin/reports?month=${selectedMonth}&year=${selectedYear}`;
       if (statusFilter !== "all") {
         url += `&status=${encodeURIComponent(statusFilter)}`;
+      }
+      if (docTypeFilter !== "all") {
+        url += `&docType=${encodeURIComponent(docTypeFilter)}`;
       }
       const res = await fetch(url);
       if (!res.ok) {
@@ -154,7 +171,7 @@ function ReportsPageContent() {
 
   useEffect(() => {
     fetchReports();
-  }, [selectedMonth, selectedYear, statusFilter]);
+  }, [selectedMonth, selectedYear, statusFilter, docTypeFilter]);
 
   // Client-side search filtering
   const filteredOrders = useMemo(() => {
@@ -163,6 +180,8 @@ function ReportsPageContent() {
     return orders.filter(
       (o) =>
         o.orderNumber.toLowerCase().includes(q) ||
+        (o.billNumber && o.billNumber.toLowerCase().includes(q)) ||
+        (o.taxInvoiceNumber && o.taxInvoiceNumber.toLowerCase().includes(q)) ||
         o.customer.shopName.toLowerCase().includes(q) ||
         o.customer.gstPanNo.toLowerCase().includes(q) ||
         o.customer.phoneNumber.includes(q) ||
@@ -288,7 +307,7 @@ function ReportsPageContent() {
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Processed Turnover (₹)
+              Total Processed Turnover
             </span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <TrendingUp size={16} />
@@ -297,44 +316,44 @@ function ReportsPageContent() {
           <div className="text-2xl font-black font-mono text-gray-900">
             {formatCurrency(summary?.totalRevenue || 0)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Total sales value incl. 5% GST across processed orders
+          <p className="text-[11px] text-gray-500 mt-1 font-medium">
+            {summary?.totalOrders || 0} Orders • {summary?.totalSets || 0} sets ({summary?.totalPcs || 0} pcs)
           </p>
         </div>
 
-        {/* Processed Orders Count */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs relative overflow-hidden">
+        {/* Final Tax Invoices (With GST) */}
+        <div className="bg-white rounded-2xl border border-blue-200/80 p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Processed Orders
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              Tax Invoices (With GST)
             </span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Package size={16} />
+              <Receipt size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black font-mono text-gray-900">
-            {summary?.totalOrders || 0}
+          <div className="text-2xl font-black font-mono text-blue-700">
+            {formatCurrency(summary?.taxInvoicesRevenue || 0)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Excludes cancelled bookings
+          <p className="text-[11px] text-blue-600/80 font-medium mt-1">
+            {summary?.taxInvoicesCount || 0} Invoices • {summary?.taxInvoicesSets || 0} sets (incl. 5% GST)
           </p>
         </div>
 
-        {/* Total Wholesale Volume */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs relative overflow-hidden">
+        {/* Bills (Without GST) */}
+        <div className="bg-white rounded-2xl border border-amber-200/90 p-5 shadow-xs relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Volume (Sets & Pcs)
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+              Bills (Without GST)
             </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Layers size={16} />
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <FileText size={16} />
             </div>
           </div>
-          <div className="text-2xl font-black font-mono text-gray-900">
-            {summary?.totalSets || 0} <span className="text-sm font-semibold text-gray-500">sets</span>
+          <div className="text-2xl font-black font-mono text-amber-700">
+            {formatCurrency(summary?.billsWithoutGstRevenue || 0)}
           </div>
-          <p className="text-[11px] text-purple-700 font-semibold mt-1 font-mono">
-            = {summary?.totalPcs || 0} pieces manufactured
+          <p className="text-[11px] text-amber-700/80 font-medium mt-1">
+            {summary?.billsWithoutGstCount || 0} Bills • {summary?.billsWithoutGstSets || 0} sets (0% GST)
           </p>
         </div>
 
@@ -344,7 +363,7 @@ function ReportsPageContent() {
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
               Channel Mix
             </span>
-            <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
               <Store size={16} />
             </div>
           </div>
@@ -407,6 +426,21 @@ function ReportsPageContent() {
             </select>
           </div>
 
+          {/* Document Type Filter */}
+          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-xs">
+            <Receipt size={14} className="text-gray-400" />
+            <span className="font-semibold text-gray-600">Document:</span>
+            <select
+              value={docTypeFilter}
+              onChange={(e) => setDocTypeFilter(e.target.value as any)}
+              className="bg-transparent font-bold text-gray-800 outline-none cursor-pointer"
+            >
+              <option value="all">All (Invoices + Bills)</option>
+              <option value="invoices">Tax Invoices (With GST)</option>
+              <option value="bills">Bills (Without GST)</option>
+            </select>
+          </div>
+
           {/* Status Filter */}
           <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-xs">
             <Filter size={14} className="text-gray-400" />
@@ -432,7 +466,7 @@ function ReportsPageContent() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search order #, customer..."
+            placeholder="Search order #, bill #, customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
@@ -442,21 +476,51 @@ function ReportsPageContent() {
 
       {/* Orders Table */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="text-xs font-bold text-gray-700 flex items-center gap-2">
+        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="text-xs font-bold text-gray-700 flex items-center gap-2 flex-wrap">
             <span>Processed Wholesale Orders List</span>
             <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-mono text-[11px]">
               {filteredOrders.length} records
             </span>
           </div>
 
-          <button
-            onClick={fetchReports}
-            className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg transition-colors cursor-pointer"
-            title="Refresh"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
+          {/* Quick Sub-tabs */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setDocTypeFilter("all")}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                docTypeFilter === "all" ? "bg-white text-gray-900 shadow-2xs" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setDocTypeFilter("invoices")}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                docTypeFilter === "invoices" ? "bg-blue-600 text-white shadow-2xs" : "text-gray-600 hover:text-blue-700"
+              }`}
+            >
+              Tax Invoices
+            </button>
+            <button
+              type="button"
+              onClick={() => setDocTypeFilter("bills")}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                docTypeFilter === "bills" ? "bg-amber-600 text-white shadow-2xs" : "text-gray-600 hover:text-amber-700"
+              }`}
+            >
+              Bills (Without GST)
+            </button>
+            <button
+              onClick={fetchReports}
+              className="p-1 text-gray-400 hover:text-gray-700 rounded-lg transition-colors cursor-pointer ml-1"
+              title="Refresh"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -503,6 +567,16 @@ function ReportsPageContent() {
                           <span>{ord.orderNumber}</span>
                           <ExternalLink size={11} className="text-gray-400" />
                         </Link>
+                        {ord.isBillWithoutGst && ord.billNumber && ord.billNumber !== ord.orderNumber && (
+                          <span className="text-[10px] text-amber-700 font-bold block mt-0.5">
+                            Bill #{ord.billNumber}
+                          </span>
+                        )}
+                        {!ord.isBillWithoutGst && ord.taxInvoiceNumber && (
+                          <span className="text-[10px] text-blue-700 font-medium block mt-0.5">
+                            {ord.taxInvoiceNumber}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap font-medium">
                         {formatDate(ord.date || ord.taxInvoiceDate || ord.orderDate || ord.createdAt)}
@@ -514,15 +588,22 @@ function ReportsPageContent() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        {isWholesaler ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            WHOLESALER
+                        <div className="space-y-1">
+                          {ord.isBillWithoutGst ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-300">
+                              <FileText size={10} className="text-amber-600" />
+                              <span>BILL (NO GST)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <Receipt size={10} className="text-blue-600" />
+                              <span>TAX INVOICE</span>
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-500 block">
+                            {isWholesaler ? "Wholesaler" : "Retailer"}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            RETAILER
-                          </span>
-                        )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
@@ -542,7 +623,14 @@ function ReportsPageContent() {
                         <span className="text-[11px] text-gray-500 block">({ord.totalPcs} pcs)</span>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-gray-900">
-                        {formatCurrency(ord.totalAmount)}
+                        <div>{formatCurrency(ord.totalAmount)}</div>
+                        <div className="text-[10px] font-normal">
+                          {ord.isBillWithoutGst ? (
+                            <span className="text-amber-600">Without GST (0%)</span>
+                          ) : (
+                            <span className="text-gray-400">incl. 5% GST</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor}`}>

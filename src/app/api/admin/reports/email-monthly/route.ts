@@ -62,10 +62,37 @@ export async function POST(request: NextRequest) {
     let retailerOrdersCount = 0;
     let wholesalerOrdersCount = 0;
 
+    let taxInvoicesCount = 0;
+    let taxInvoicesRevenue = 0;
+    let billsWithoutGstCount = 0;
+    let billsWithoutGstRevenue = 0;
+
     const reportOrders = orders.map((o) => {
       const bType = o.businessType || o.customer?.businessType || "RETAILER";
-      const isWholesaler = bType === "WHOLESALER";
-      totalRevenue += o.grandTotal || 0;
+      const isWholesaler = bType === "WHOLESALER" || bType === "WHOLESALER WITHOUT GST";
+      const orderRevenue = o.grandTotal || 0;
+      totalRevenue += orderRevenue;
+
+      // Detect if order is a Bill (Without GST)
+      const notes = o.notes || "";
+      const billNoMatch = notes.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+      const isBillWithoutGst = Boolean(
+        (o as any).isPreviousBill ||
+        billNoMatch ||
+        notes.includes("[BILL_WITHOUT_GST") ||
+        (o.taxInvoiceNumber && o.taxInvoiceNumber.toUpperCase().startsWith("BILL")) ||
+        bType.toUpperCase().includes("WITHOUT GST") ||
+        bType.toUpperCase().includes("NO GST") ||
+        (o.gstRate === 0 && o.gstAmount === 0)
+      );
+
+      if (isBillWithoutGst) {
+        billsWithoutGstCount++;
+        billsWithoutGstRevenue += orderRevenue;
+      } else {
+        taxInvoicesCount++;
+        taxInvoicesRevenue += orderRevenue;
+      }
 
       if (isWholesaler) {
         wholesalerOrdersCount++;
@@ -85,6 +112,8 @@ export async function POST(request: NextRequest) {
         totalPcs += pcs;
       });
 
+      const extractedBillNo = billNoMatch ? billNoMatch[1].trim() : (isBillWithoutGst ? (o.taxInvoiceNumber || o.orderNumber) : undefined);
+
       return {
         orderNumber: o.orderNumber,
         customerName: o.customer?.shopName || "Unknown Customer",
@@ -95,6 +124,8 @@ export async function POST(request: NextRequest) {
         totalPcs: orderPcs,
         grandTotal: o.grandTotal,
         status: o.status,
+        isBillWithoutGst,
+        billNumber: extractedBillNo,
         orderDate: new Date(o.createdAt).toLocaleDateString("en-IN", {
           day: "2-digit",
           month: "short",
@@ -112,6 +143,10 @@ export async function POST(request: NextRequest) {
       totalPcs,
       retailerOrdersCount,
       wholesalerOrdersCount,
+      taxInvoicesCount,
+      taxInvoicesRevenue,
+      billsWithoutGstCount,
+      billsWithoutGstRevenue,
       orders: reportOrders,
       generatedAt: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
     };

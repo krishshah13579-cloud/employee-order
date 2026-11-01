@@ -383,6 +383,10 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
   totalPcs: number;
   retailerOrdersCount: number;
   wholesalerOrdersCount: number;
+  taxInvoicesCount?: number;
+  taxInvoicesRevenue?: number;
+  billsWithoutGstCount?: number;
+  billsWithoutGstRevenue?: number;
   orders: {
     orderNumber: string;
     customerName: string;
@@ -394,6 +398,8 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
     grandTotal: number;
     status: string;
     orderDate: string;
+    isBillWithoutGst?: boolean;
+    billNumber?: string;
   }[];
   generatedAt?: string;
 }, recipientEmail?: string) {
@@ -421,24 +427,34 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
 
       const orderRowsHtml = reportData.orders.slice(0, 50).map((ord) => `
         <tr style="border-bottom: 1px solid #f1f5f9;">
-          <td style="padding: 10px 12px; font-family: monospace; font-weight: bold; color: #0f172a; font-size: 12px;">${ord.orderNumber}</td>
+          <td style="padding: 10px 12px; font-family: monospace; font-weight: bold; color: #0f172a; font-size: 12px;">
+            ${ord.orderNumber}
+            ${ord.billNumber && ord.billNumber !== ord.orderNumber ? `<span style="display:block; font-size: 10px; color: #d97706;">#${ord.billNumber}</span>` : ""}
+          </td>
           <td style="padding: 10px 12px; font-size: 12px; color: #1e293b;">
             <strong>${ord.customerName}</strong>
             ${ord.customerGstPan ? `<span style="display:block; font-size: 10px; color: #64748b; font-family: monospace;">${ord.customerGstPan}</span>` : ""}
           </td>
           <td style="padding: 10px 12px; font-size: 11px;">
-            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: bold; ${ord.businessType === "WHOLESALER" ? "background: #f3e8ff; color: #7e22ce;" : "background: #dbeafe; color: #1d4ed8;"}">
-              ${ord.businessType || "RETAILER"}
-            </span>
+            ${ord.isBillWithoutGst ? `
+              <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: bold; background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
+                BILL (NO GST)
+              </span>
+            ` : `
+              <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: bold; ${ord.businessType === "WHOLESALER" ? "background: #f3e8ff; color: #7e22ce;" : "background: #dbeafe; color: #1d4ed8;"}">
+                ${ord.businessType || "TAX INVOICE"}
+              </span>
+            `}
           </td>
           <td style="padding: 10px 12px; font-size: 11px; text-align: center; color: #475569;">
-            ${ord.creditDays ? `<span style="font-weight: bold; color: #d97706;">${ord.creditDays}d</span>` : "Cash/0d"}
+            ${ord.creditDays ? `<span style="font-weight: bold; color: #d97706;">${ord.creditDays}d</span>` : "Advance"}
           </td>
           <td style="padding: 10px 12px; font-size: 12px; text-align: center; font-family: monospace; color: #334155;">
             ${ord.totalSets}s (${ord.totalPcs}p)
           </td>
           <td style="padding: 10px 12px; font-size: 12px; text-align: right; font-weight: bold; color: #0f172a; font-family: monospace;">
             ₹${ord.grandTotal.toLocaleString("en-IN")}
+            <span style="display:block; font-size: 9px; font-weight: normal; color: #94a3b8;">${ord.isBillWithoutGst ? "0% GST" : "incl. 5%"}</span>
           </td>
           <td style="padding: 10px 12px; font-size: 11px; text-align: center;">
             <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #ecfdf5; color: #047857;">
@@ -449,7 +465,7 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
       `).join("");
 
       const html = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 780px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 820px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
           <!-- Header -->
           <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #0f172a;">
             <h1 style="color: #0f172a; font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
@@ -462,19 +478,23 @@ export async function sendMonthlyOrdersReportEmail(reportData: {
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
               <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Total Revenue</span>
               <strong style="color: #16a34a; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">₹${reportData.totalRevenue.toLocaleString("en-IN")}</strong>
+              <span style="color: #94a3b8; font-size: 10px; display: block; margin-top: 2px;">${reportData.totalOrders} total orders</span>
             </div>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
-              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Orders Processed</span>
-              <strong style="color: #0f172a; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">${reportData.totalOrders}</strong>
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #1e40af; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Tax Invoices (With GST)</span>
+              <strong style="color: #1d4ed8; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">${reportData.taxInvoicesCount ?? 0}</strong>
+              <span style="color: #3b82f6; font-size: 10px; font-weight: 600; display: block; margin-top: 2px;">₹${(reportData.taxInvoicesRevenue ?? 0).toLocaleString("en-IN")}</span>
+            </div>
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; text-align: center;">
+              <span style="color: #92400e; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Bills (Without GST)</span>
+              <strong style="color: #d97706; font-size: 18px; font-family: monospace; display: block; margin-top: 4px;">${reportData.billsWithoutGstCount ?? 0}</strong>
+              <span style="color: #b45309; font-size: 10px; font-weight: 600; display: block; margin-top: 2px;">₹${(reportData.billsWithoutGstRevenue ?? 0).toLocaleString("en-IN")}</span>
             </div>
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
               <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Volume (Sets / Pcs)</span>
-              <strong style="color: #0f172a; font-size: 15px; font-family: monospace; display: block; margin-top: 6px;">${reportData.totalSets}s / ${reportData.totalPcs}p</strong>
-            </div>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;">
-              <span style="color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; display: block;">Channel Mix</span>
-              <span style="font-size: 11px; display: block; margin-top: 6px; color: #334155;">
-                <strong style="color: #1d4ed8;">${reportData.retailerOrdersCount}</strong> Retailer | <strong style="color: #7e22ce;">${reportData.wholesalerOrdersCount}</strong> Wholesaler
+              <strong style="color: #0f172a; font-size: 15px; font-family: monospace; display: block; margin-top: 4px;">${reportData.totalSets}s / ${reportData.totalPcs}p</strong>
+              <span style="font-size: 10px; display: block; margin-top: 2px; color: #475569;">
+                ${reportData.retailerOrdersCount} Retailer | ${reportData.wholesalerOrdersCount} Wholesaler
               </span>
             </div>
           </div>

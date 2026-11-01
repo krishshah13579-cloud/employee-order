@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const monthParam = searchParams.get("month"); // "1" - "12" or "all"
     const yearParam = searchParams.get("year");   // e.g. "2026"
     const statusParam = searchParams.get("status"); // "all" or specific status
+    const docTypeParam = searchParams.get("docType"); // "all", "invoices", "bills"
 
     const now = new Date();
     const currentYear = yearParam ? parseInt(yearParam, 10) : now.getFullYear();
@@ -113,10 +114,43 @@ export async function GET(request: NextRequest) {
     let retailerRevenue = 0;
     let wholesalerRevenue = 0;
 
-    const formattedOrders = filteredByDate.map(({ order: o, effectiveDate }) => {
+    let taxInvoicesCount = 0;
+    let taxInvoicesRevenue = 0;
+    let taxInvoicesSets = 0;
+    let taxInvoicesPcs = 0;
+
+    let billsWithoutGstCount = 0;
+    let billsWithoutGstRevenue = 0;
+    let billsWithoutGstSets = 0;
+    let billsWithoutGstPcs = 0;
+
+    const formattedOrders: any[] = [];
+
+    for (const { order: o, effectiveDate } of filteredByDate) {
       const bType = o.businessType || o.customer?.businessType || "RETAILER";
       const isWholesaler = bType === "WHOLESALER" || bType === "WHOLESALER WITHOUT GST";
       const orderRevenue = o.grandTotal || 0;
+
+      // Detect if order is a Bill (Without GST)
+      const notes = o.notes || "";
+      const billNoMatch = notes.match(/\[BILL_WITHOUT_GST:\s*([^\]]+)\]/i);
+      const isBillWithoutGst = Boolean(
+        (o as any).isPreviousBill ||
+        billNoMatch ||
+        notes.includes("[BILL_WITHOUT_GST") ||
+        (o.taxInvoiceNumber && o.taxInvoiceNumber.toUpperCase().startsWith("BILL")) ||
+        bType.toUpperCase().includes("WITHOUT GST") ||
+        bType.toUpperCase().includes("NO GST") ||
+        (o.gstRate === 0 && o.gstAmount === 0)
+      );
+
+      // Filter by docTypeParam if specified
+      if (docTypeParam === "bills" && !isBillWithoutGst) {
+        continue;
+      }
+      if (docTypeParam === "invoices" && isBillWithoutGst) {
+        continue;
+      }
 
       totalRevenue += orderRevenue;
       if (isWholesaler) {
@@ -140,10 +174,27 @@ export async function GET(request: NextRequest) {
         totalPcs += pcs;
       });
 
-      return {
+      if (isBillWithoutGst) {
+        billsWithoutGstCount++;
+        billsWithoutGstRevenue += orderRevenue;
+        billsWithoutGstSets += orderSets;
+        billsWithoutGstPcs += orderPcs;
+      } else {
+        taxInvoicesCount++;
+        taxInvoicesRevenue += orderRevenue;
+        taxInvoicesSets += orderSets;
+        taxInvoicesPcs += orderPcs;
+      }
+
+      const extractedBillNo = billNoMatch ? billNoMatch[1].trim() : (isBillWithoutGst ? (o.taxInvoiceNumber || o.orderNumber) : null);
+
+      formattedOrders.push({
         id: o.id,
         orderNumber: o.orderNumber,
         taxInvoiceNumber: o.taxInvoiceNumber,
+        billNumber: extractedBillNo,
+        isBillWithoutGst,
+        documentType: isBillWithoutGst ? "BILL_WITHOUT_GST" : "TAX_INVOICE",
         date: effectiveDate.toISOString(),
         createdAt: effectiveDate.toISOString(),
         taxInvoiceDate: o.taxInvoiceDate ? o.taxInvoiceDate.toISOString() : effectiveDate.toISOString(),
@@ -154,7 +205,8 @@ export async function GET(request: NextRequest) {
         creditDays: o.creditDays ?? o.customer?.creditDays ?? 0,
         totalAmount: o.grandTotal,
         subtotal: o.subtotal,
-        gstAmount: o.gstAmount,
+        gstRate: o.gstRate ?? (isBillWithoutGst ? 0 : 5.0),
+        gstAmount: o.gstAmount ?? 0,
         notes: o.notes,
         totalSets: orderSets,
         totalPcs: orderPcs,
@@ -179,12 +231,12 @@ export async function GET(request: NextRequest) {
           totalPrice: it.itemSubtotal,
           colorSets: it.colorSets,
         })),
-      };
-    });
+      });
+    }
 
     return NextResponse.json({
       summary: {
-        totalOrders: filteredByDate.length,
+        totalOrders: formattedOrders.length,
         totalRevenue,
         totalSets,
         totalPcs,
@@ -192,6 +244,14 @@ export async function GET(request: NextRequest) {
         wholesalerOrdersCount,
         retailerRevenue,
         wholesalerRevenue,
+        taxInvoicesCount,
+        taxInvoicesRevenue,
+        taxInvoicesSets,
+        taxInvoicesPcs,
+        billsWithoutGstCount,
+        billsWithoutGstRevenue,
+        billsWithoutGstSets,
+        billsWithoutGstPcs,
         year: currentYear,
         month: monthParam || "all",
       },
