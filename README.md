@@ -18,7 +18,7 @@
 For cloud deployment (Vercel / Render), use a cloud PostgreSQL database. Free instant options include:
 - **[Neon Serverless Postgres](https://neon.tech)** (Recommended for Vercel)
 - **[Supabase](https://supabase.com)**
-- **[Render PostgreSQL](https://render.com)**
+- **PostgreSQL Database**
 
 ### Switch Prisma to PostgreSQL
 Before deploying to Vercel/Render, switch Prisma schema provider to PostgreSQL:
@@ -70,19 +70,12 @@ git push -u origin main
 
 ---
 
-## 🌐 Deployment to Render
+## 🌐 Deployment
 
-1. Log in to **[Render](https://render.com)**.
-2. (Optional) Create a free **PostgreSQL Database** on Render to get an internal/external database URL.
-3. Click **"New +"** → **"Web Service"** → Select your GitHub repository.
-4. Set the configuration:
-   - **Environment**: `Node`
-   - **Build Command**: `npm install && npm run build && npx prisma db push`
+1. Configure your environment variables including `DATABASE_URL`.
+2. Run build and start command:
+   - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm start`
-5. In **Environment Variables**, add:
-   - **`DATABASE_URL`**: Your PostgreSQL connection string.
-   - **`NODE_ENV`**: `production`
-6. Click **"Deploy Web Service"**.
 
 ---
 
