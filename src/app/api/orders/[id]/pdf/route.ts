@@ -367,15 +367,6 @@ export async function GET(
     drawText("TRANSPORT", colSplit + 8, rY2 - 13, { font: fontBold, size: 8 });
     drawText(`: ${transportText.slice(0, 24)}`, colSplit + 68, rY2 - 13, { font: fontBold, size: 8 });
 
-    // Vertical line dividing customer & order meta
-    drawLine(colSplit, detailsTopY, colSplit, detailsBottomY, 0.75);
-
-    y = detailsBottomY;
-    drawLine(margin, y, width - margin, y, 1);
-
-    // ══════════════════════════════════════════════════════════════════
-    // 3B. DELIVERY TO / DISPATCH INSTRUCTIONS SECTION
-    // ══════════════════════════════════════════════════════════════════
     const deliveryNote = extractDeliveryAndDispatchNotes(order.notes);
     const deliveryHeight = 22;
     const deliveryBottomY = y - deliveryHeight;
@@ -399,6 +390,17 @@ export async function GET(
     y = deliveryBottomY;
     drawLine(margin, y, width - margin, y, 1);
 
+
+    // Vertical line dividing customer & order meta
+    drawLine(colSplit, detailsTopY, colSplit, detailsBottomY, 0.75);
+
+    y = detailsBottomY;
+    drawLine(margin, y, width - margin, y, 1);
+
+    // ══════════════════════════════════════════════════════════════════
+    // 3B. DELIVERY TO / DISPATCH INSTRUCTIONS SECTION
+    // ══════════════════════════════════════════════════════════════════
+    
     // ══════════════════════════════════════════════════════════════════
     // 4. ITEMS TABLE (Columns matching physical invoice)
     // ══════════════════════════════════════════════════════════════════
