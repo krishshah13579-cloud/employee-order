@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-security";
+import { ensureDbSchema } from "@/lib/ensure-db-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) {
       return auth.errorResponse!;
     }
+
+    await ensureDbSchema();
 
     // 1. Fetch Employees
     const employees = await prisma.employee.findMany({
@@ -98,9 +101,8 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Group orders by employeeId with placedBy fallback for older orders
+    // Group orders strictly by employeeId (EMP#)
     const employeeOrdersMap = new Map<number, typeof orders>();
-    const legacyNameOrdersMap = new Map<string, typeof orders>();
 
     orders.forEach((ord) => {
       if (ord.employeeId) {
@@ -108,14 +110,6 @@ export async function GET(request: NextRequest) {
           employeeOrdersMap.set(ord.employeeId, []);
         }
         employeeOrdersMap.get(ord.employeeId)!.push(ord);
-      } else {
-        const placed = (ord.placedBy || "").trim().toLowerCase();
-        if (placed && !placed.includes("(archived)")) {
-          if (!legacyNameOrdersMap.has(placed)) {
-            legacyNameOrdersMap.set(placed, []);
-          }
-          legacyNameOrdersMap.get(placed)!.push(ord);
-        }
       }
     });
 
@@ -125,21 +119,16 @@ export async function GET(request: NextRequest) {
     let totalAllocatedOutstandingSum = 0;
 
     const employeeProfiles = employees.map((emp) => {
-      const empCleanName = emp.name.trim().toLowerCase();
-      // Orders linked to this employee's ID, or legacy orders before employeeId was introduced
-      const empOrders = employeeOrdersMap.get(emp.id) || legacyNameOrdersMap.get(empCleanName) || [];
+      // Orders linked strictly to this employee's ID (EMP#)
+      const empOrders = employeeOrdersMap.get(emp.id) || [];
 
       const empTotalRevenue = empOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
       const empTotalSets = empOrders.reduce((sum, o) => sum + (o.totalSets || 0), 0);
       const empTotalPcs = empOrders.reduce((sum, o) => sum + (o.totalPcs || 0), 0);
       totalCompanyTurnover += empTotalRevenue;
 
-      // Find allocated customers strictly by allocatedEmployeeId, falling back to active name
-      const allocated = customers.filter(
-        (c) =>
-          c.allocatedEmployeeId === emp.id ||
-          (!c.allocatedEmployeeId && c.allocatedEmployeeName && c.allocatedEmployeeName.trim().toLowerCase() === empCleanName)
-      );
+      // Find allocated customers strictly by allocatedEmployeeId (EMP#)
+      const allocated = customers.filter((c) => c.allocatedEmployeeId === emp.id);
 
       totalAllocatedCustomersCount += allocated.length;
 

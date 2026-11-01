@@ -122,6 +122,62 @@ export async function ensureDbSchema(force = false) {
           ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "employeeId" INTEGER;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+
+        -- 7. Backfill historical orders where employeeId IS NULL to the original creator (MIN employee.id by name)
+        BEGIN
+          UPDATE wholesale."Order" o
+          SET "employeeId" = e.id
+          FROM (
+            SELECT MIN(id) as id, LOWER(TRIM(name)) as lower_name
+            FROM wholesale."Employee"
+            GROUP BY LOWER(TRIM(name))
+          ) e
+          WHERE o."employeeId" IS NULL
+            AND LOWER(TRIM(o."placedBy")) = e.lower_name
+            AND o."placedBy" NOT ILIKE '%(archived)%';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+          UPDATE "Order" o
+          SET "employeeId" = e.id
+          FROM (
+            SELECT MIN(id) as id, LOWER(TRIM(name)) as lower_name
+            FROM "Employee"
+            GROUP BY LOWER(TRIM(name))
+          ) e
+          WHERE o."employeeId" IS NULL
+            AND LOWER(TRIM(o."placedBy")) = e.lower_name
+            AND o."placedBy" NOT ILIKE '%(archived)%';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+
+        -- 8. Backfill historical customers where allocatedEmployeeId IS NULL to the original assignee (MIN employee.id by name)
+        BEGIN
+          UPDATE wholesale."Customer" c
+          SET "allocatedEmployeeId" = e.id
+          FROM (
+            SELECT MIN(id) as id, LOWER(TRIM(name)) as lower_name
+            FROM wholesale."Employee"
+            GROUP BY LOWER(TRIM(name))
+          ) e
+          WHERE c."allocatedEmployeeId" IS NULL
+            AND c."allocatedEmployeeName" IS NOT NULL
+            AND LOWER(TRIM(c."allocatedEmployeeName")) = e.lower_name;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+          UPDATE "Customer" c
+          SET "allocatedEmployeeId" = e.id
+          FROM (
+            SELECT MIN(id) as id, LOWER(TRIM(name)) as lower_name
+            FROM "Employee"
+            GROUP BY LOWER(TRIM(name))
+          ) e
+          WHERE c."allocatedEmployeeId" IS NULL
+            AND c."allocatedEmployeeName" IS NOT NULL
+            AND LOWER(TRIM(c."allocatedEmployeeName")) = e.lower_name;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
       END $$;
     `);
     isSchemaEnsured = true;

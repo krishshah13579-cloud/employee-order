@@ -56,16 +56,13 @@ export async function GET(request: NextRequest) {
 
     // Role-based Customer Isolation:
     // "ON EMPLOYEE SIDE: DONT SHOW ANY CUSTOMER THAT ARE NOT ALLOCATED TO EMPLOYEE."
-    // Every employee (including Team Leaders) on the employee side can strictly and only view customers allocated to them!
+    // Every employee (including Team Leaders) on the employee side can strictly and only view customers allocated to their EMP ID!
     if (!isAdminRoute || (employee && employee.id > 0)) {
       if (employee && employee.id > 0) {
         where.AND = [
           ...(where.AND || []),
           {
-            OR: [
-              { allocatedEmployeeId: employee.id },
-              { allocatedEmployeeName: { equals: employee.name, mode: "insensitive" } },
-            ],
+            allocatedEmployeeId: employee.id,
           },
         ];
       } else if (employee && employee.id === 0) {
@@ -81,10 +78,7 @@ export async function GET(request: NextRequest) {
       where.AND = [
         ...(where.AND || []),
         {
-          OR: [
-            ...(isNaN(queryEmpId) ? [] : [{ allocatedEmployeeId: queryEmpId }]),
-            { allocatedEmployeeName: { equals: allocatedToQuery.trim(), mode: "insensitive" } },
-          ],
+          allocatedEmployeeId: isNaN(queryEmpId) ? -1 : queryEmpId,
         },
       ];
     }

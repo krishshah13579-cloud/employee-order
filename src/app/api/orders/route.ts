@@ -54,18 +54,12 @@ export async function GET(request: NextRequest) {
         } else if (placedByQuery && placedByQuery.trim() !== "") {
           where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
         } else if (employee?.id) {
-          where.OR = [
-            { employeeId: employee.id },
-            { employeeId: null, placedBy: { equals: employee.name, mode: "insensitive" } },
-          ];
+          where.employeeId = employee.id;
         }
       } else {
         // All standard employees: strictly locked to their own orders by EMP ID
         if (employee?.id) {
-          where.OR = [
-            { employeeId: employee.id },
-            { employeeId: null, placedBy: { equals: employee.name, mode: "insensitive" } },
-          ];
+          where.employeeId = employee.id;
         } else {
           return NextResponse.json([]);
         }
