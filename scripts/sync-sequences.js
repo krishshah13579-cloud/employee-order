@@ -1,6 +1,19 @@
 const { PrismaClient } = require("@prisma/client");
 
 async function main() {
+  const fs = require("fs");
+  const path = require("path");
+  try {
+    const pubUploads = path.join(process.cwd(), "public", "uploads");
+    fs.mkdirSync(pubUploads, { recursive: true });
+    try { fs.chmodSync(pubUploads, 0o777); } catch {}
+  } catch (e) {}
+  try {
+    const tmpUploads = path.join("/tmp", "uploads");
+    fs.mkdirSync(tmpUploads, { recursive: true });
+    try { fs.chmodSync(tmpUploads, 0o777); } catch {}
+  } catch (e) {}
+
   if (!process.env.DATABASE_URL) {
     console.log("ℹ️ [POSTGRES] No DATABASE_URL provided during build step; sequence sync handled live at runtime.");
     return;

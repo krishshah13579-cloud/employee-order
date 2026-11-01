@@ -66,7 +66,15 @@ export async function GET(
       }
     }
 
-    // 3. Fallback: check in public/ or public/images/
+    // 3. Fallback: check in /tmp/uploads/
+    if (!fs.existsSync(targetPath)) {
+      const tmpPath = path.join("/tmp", "uploads", ...safeSegments);
+      if (fs.existsSync(tmpPath)) {
+        targetPath = tmpPath;
+      }
+    }
+
+    // 4. Fallback: check in public/ or public/images/
     if (!fs.existsSync(targetPath)) {
       const directPublic = path.join(process.cwd(), "public", ...safeSegments);
       if (fs.existsSync(directPublic)) {
@@ -79,10 +87,16 @@ export async function GET(
       }
     }
 
-    // 4. Ensure target path is strictly within the public directory
+    // 5. Ensure target path is strictly within the public directory or /tmp/uploads
     const publicRoot = path.resolve(process.cwd(), "public");
+    const tmpRoot = path.resolve("/tmp", "uploads");
     const resolvedTargetPath = path.resolve(targetPath);
-    if (!resolvedTargetPath.startsWith(publicRoot + path.sep) && resolvedTargetPath !== publicRoot) {
+    const isInsidePublic =
+      resolvedTargetPath.startsWith(publicRoot + path.sep) || resolvedTargetPath === publicRoot;
+    const isInsideTmp =
+      resolvedTargetPath.startsWith(tmpRoot + path.sep) || resolvedTargetPath === tmpRoot;
+
+    if (!isInsidePublic && !isInsideTmp) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 

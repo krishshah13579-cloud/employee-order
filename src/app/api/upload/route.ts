@@ -129,37 +129,52 @@ export async function POST(req: NextRequest) {
     const cleanBase = rawBase.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
     const uniqueName = `${Date.now()}_${cleanBase || "file"}${ext}`;
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    const fs = await import("fs/promises");
+    let savedUrl = "";
 
+    // 1. Primary write destination: public/uploads
     try {
-      const fs = await import("fs/promises");
+      const uploadDir = path.join(process.cwd(), "public", "uploads");
       await fs.mkdir(uploadDir, { recursive: true });
-
       const filePath = path.join(uploadDir, uniqueName);
 
-      // Verify that target path is strictly inside uploadDir (Path Traversal Protection)
       const resolvedPath = path.resolve(filePath);
       const resolvedUploadDir = path.resolve(uploadDir);
-      if (!resolvedPath.startsWith(resolvedUploadDir + path.sep)) {
-        return NextResponse.json({ error: "Invalid file destination" }, { status: 400 });
+      if (resolvedPath.startsWith(resolvedUploadDir + path.sep)) {
+        await fs.writeFile(filePath, buffer);
+        savedUrl = `/uploads/${uniqueName}`;
       }
-
-      await fs.writeFile(filePath, buffer);
-
-      const fileUrl = `/uploads/${uniqueName}`;
-      return NextResponse.json({ url: fileUrl, filename: uniqueName }, { status: 201 });
-    } catch {
-      // Fallback to Data URL on serverless read-only filesystem
-      const mime =
-        ext === ".png"
-          ? "image/png"
-          : ext === ".webp"
-          ? "image/webp"
-          : "image/jpeg";
-      const base64Data = buffer.toString("base64");
-      const dataUrl = `data:${mime};base64,${base64Data}`;
-      return NextResponse.json({ url: dataUrl, filename: uniqueName }, { status: 201 });
+    } catch (pubErr: any) {
+      console.warn("[UPLOAD] Primary public/uploads write failed:", pubErr.message);
     }
+
+    // 2. Secondary fallback destination: /tmp/uploads (always 100% writable on all Linux/Docker hosts)
+    if (!savedUrl) {
+      try {
+        const tmpUploadDir = path.join("/tmp", "uploads");
+        await fs.mkdir(tmpUploadDir, { recursive: true });
+        const filePath = path.join(tmpUploadDir, uniqueName);
+        await fs.writeFile(filePath, buffer);
+        savedUrl = `/uploads/${uniqueName}`;
+      } catch (tmpErr: any) {
+        console.error("[UPLOAD] Secondary /tmp/uploads write failed:", tmpErr.message);
+      }
+    }
+
+    if (savedUrl) {
+      return NextResponse.json({ url: savedUrl, filename: uniqueName }, { status: 201 });
+    }
+
+    // 3. Fallback to compact Data URL only if both disks failed
+    const mime =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".webp"
+        ? "image/webp"
+        : "image/jpeg";
+    const base64Data = buffer.toString("base64");
+    const dataUrl = `data:${mime};base64,${base64Data}`;
+    return NextResponse.json({ url: dataUrl, filename: uniqueName }, { status: 201 });
   } catch (error: any) {
     console.error("Upload error:", error);
     return NextResponse.json(

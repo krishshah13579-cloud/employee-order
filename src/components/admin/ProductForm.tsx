@@ -1365,7 +1365,7 @@ export default function ProductForm({
       const finalImagesList: string[] = [];
       for (let i = 0; i < imagesList.length; i++) {
         const img = imagesList[i];
-        if (img && img.startsWith("data:image/") && img.length > 150 * 1024) {
+        if (img && img.startsWith("data:") && img.length > 30 * 1024) {
           const processed = await uploadImageToServer(img, `product_${productId || "new"}_${i}.jpg`);
           finalImagesList.push(processed);
         } else {
@@ -1375,7 +1375,7 @@ export default function ProductForm({
 
       const finalColorImages: Record<string, string> = {};
       for (const [col, colUrl] of Object.entries(colorImages)) {
-        if (colUrl && colUrl.startsWith("data:image/") && colUrl.length > 150 * 1024) {
+        if (colUrl && colUrl.startsWith("data:") && colUrl.length > 30 * 1024) {
           const matchIdx = imagesList.indexOf(colUrl);
           if (matchIdx >= 0 && finalImagesList[matchIdx]) {
             finalColorImages[col] = finalImagesList[matchIdx];

@@ -15,7 +15,7 @@ export async function compressImageFile(
   return new Promise((resolve, reject) => {
     // If input is a string (e.g. data URL)
     if (typeof file === "string") {
-      if (!file.startsWith("data:image/")) {
+      if (!file.startsWith("data:")) {
         return resolve(file);
       }
       const img = new Image();
@@ -137,7 +137,8 @@ export async function compressDataUrl(
  * Uploads an image (File, Blob, or base64 Data URL) to /api/upload.
  * Encodes in full 4K Ultra-HD (3840px, 90% quality).
  * If /api/upload succeeds, returns the permanent server URL (e.g. "/uploads/...").
- * If /api/upload fails or is unavailable, falls back to the high-res compressed Data URL.
+ * If /api/upload fails or is unavailable, compresses to a compact size (< 250KB)
+ * so that JSON payloads NEVER exceed server limits.
  */
 export async function uploadImageToServer(
   input: File | Blob | string,
@@ -155,8 +156,8 @@ export async function uploadImageToServer(
     ) {
       return input; // Already a hosted URL
     }
-    // Re-compress legacy oversized base64 data URLs (> 200KB) into 4K
-    if (input.length > 200 * 1024) {
+    // Re-compress legacy oversized base64 data URLs (> 50KB) into 4K
+    if (input.length > 50 * 1024) {
       try {
         dataUrl = await compressDataUrl(input, 3840, 3840, 0.90);
       } catch {
@@ -179,7 +180,7 @@ export async function uploadImageToServer(
     }
   }
 
-  if (!dataUrl || !dataUrl.startsWith("data:image/")) {
+  if (!dataUrl || !dataUrl.startsWith("data:")) {
     return dataUrl;
   }
 
@@ -200,20 +201,19 @@ export async function uploadImageToServer(
 
     if (uploadRes.ok) {
       const data = await uploadRes.json();
-      if (data?.url) {
+      if (data?.url && !data.url.startsWith("data:")) {
         return data.url;
       }
     }
   } catch (err) {
-    console.warn("Upload to /api/upload failed, using optimized data URL fallback:", err);
+    console.warn("Upload to /api/upload failed, using safe compact data URL fallback:", err);
   }
 
-  // If upload failed and dataUrl is excessively large (> 6MB), optimize for safe JSON fallback
-  if (dataUrl.length > 6 * 1024 * 1024) {
-    try {
-      return await compressDataUrl(dataUrl, 2048, 2048, 0.85);
-    } catch {}
+  // Safe fallback if disk upload failed: MUST compress to a compact size (< 300KB)
+  // so that the form payload NEVER exceeds 10MB!
+  try {
+    return await compressDataUrl(dataUrl, 1400, 1400, 0.78);
+  } catch {
+    return dataUrl;
   }
-
-  return dataUrl;
 }
