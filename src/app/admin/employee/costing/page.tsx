@@ -229,7 +229,7 @@ export default function AdminCostingPage() {
   // Total Pieces Formula: METER * AVG (Round Off)
   const calculatedTotalPcs = useMemo(() => {
     if (numTotalMeters > 0 && numAvgFabric > 0) {
-      return Math.round(numTotalMeters * numAvgFabric);
+      return Math.round(numTotalMeters / numAvgFabric);
     }
     return 0;
   }, [numTotalMeters, numAvgFabric]);
