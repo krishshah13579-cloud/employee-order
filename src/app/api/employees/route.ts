@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, hashPassword } from "@/lib/auth-security";
 import { recordAuditLog } from "@/lib/audit";
-import { sendEmployeeOnboardingEmail } from "@/lib/email";
+import { sendEmployeeOnboardingEmail, sendEmployeeStep3CredentialsEmail } from "@/lib/email";
 import { ensureDbSchema } from "@/lib/ensure-db-schema";
 
-// Safe base fields to expose to frontend (never expose secret pin)
+// Safe base fields to expose to frontend (including displayPin for Admin portal security view)
 const BASE_SAFE_SELECT = {
   id: true,
   name: true,
+  username: true,
   email: true,
+  displayPin: true,
+  mustChangePin: true,
+  onboardingStep: true,
   mobileNumber: true,
   address: true,
   proofUrl: true,
@@ -96,7 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, mobileNumber, address, proofUrl, designation, isActive, pin } = body;
+    const { name, username, email, mobileNumber, address, proofUrl, designation, isActive, pin } = body;
 
     if (!name || !mobileNumber || !address) {
       return NextResponse.json(
@@ -105,13 +109,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const rawPin = (pin || "1234").trim();
+    const finalUsername = (username || name).trim();
+
     let employee: any;
     try {
       employee = await prisma.employee.create({
         data: {
           name: name.trim(),
+          username: finalUsername,
           email: (email || "").trim() || null,
-          pin: hashPassword((pin || "1234").trim()),
+          pin: hashPassword(rawPin),
+          displayPin: rawPin,
+          mustChangePin: true,
+          onboardingStep: 3,
           mobileNumber: mobileNumber.trim(),
           address: address.trim(),
           proofUrl: proofUrl || null,
@@ -140,8 +151,12 @@ export async function POST(req: NextRequest) {
       employee = await prisma.employee.create({
         data: {
           name: name.trim(),
+          username: finalUsername,
           email: (email || "").trim() || null,
-          pin: hashPassword((pin || "1234").trim()),
+          pin: hashPassword(rawPin),
+          displayPin: rawPin,
+          mustChangePin: true,
+          onboardingStep: 3,
           mobileNumber: mobileNumber.trim(),
           address: address.trim(),
           proofUrl: proofUrl || null,
@@ -185,17 +200,17 @@ export async function POST(req: NextRequest) {
       status: "SUCCESS",
     });
 
-    // Send onboarding welcome email if employee has an email address
-    const rawPin = (pin || "1234").trim();
+    // Send Step 3 Official Credentials email with permanent PIN setup notice
     if (employee.email) {
       try {
-        await sendEmployeeOnboardingEmail({
+        await sendEmployeeStep3CredentialsEmail({
           to: employee.email,
-          username: employee.name,
+          name: employee.name,
+          username: finalUsername,
           pin: rawPin,
         });
       } catch (mailErr) {
-        console.error("Failed to dispatch employee onboarding email:", mailErr);
+        console.error("Failed to dispatch employee credentials email:", mailErr);
       }
     }
 

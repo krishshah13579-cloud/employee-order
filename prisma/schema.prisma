@@ -50,8 +50,12 @@ model AdminProfile {
 model Employee {
   id            Int      @id @default(autoincrement())
   name          String
+  username      String?  // Unique login username
   email         String?  // Staff Email Address
-  pin           String   @default("1234") // Secret PIN for employee portal login
+  pin           String   @default("1234") // Secret PIN for employee portal login (hashed)
+  displayPin    String?  @default("1234") // 4-digit PIN for admin portal security view
+  mustChangePin Boolean  @default(true)   // True for temporary PIN; prompts mandatory permanent PIN change
+  onboardingStep Int     @default(3)      // Tracks onboarding wizard step
   mobileNumber  String
   address       String
   proofUrl      String?  // Photo or document link (Aadhar / PAN / Driving License)

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find all active employees to match name case-insensitively
+    // Find all active employees to match name or username case-insensitively
     let employees: any[] = [];
     try {
       employees = await prisma.employee.findMany({
@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
         select: {
           id: true,
           name: true,
+          username: true,
           pin: true,
           email: true,
+          mustChangePin: true,
           address: true,
           designation: true,
           isTeamLeader: true,
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
       console.warn("[EMPLOYEE_LOGIN] Fallback raw query for active employees:", err);
       try {
         employees = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT id, name, pin, email, address, designation, "isTeamLeader", "canEditOrders", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE "isActive" = true`
+          `SELECT id, name, username, pin, email, "mustChangePin", address, designation, "isTeamLeader", "canEditOrders", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE "isActive" = true`
         );
       } catch {}
     }
@@ -63,7 +65,9 @@ export async function POST(req: NextRequest) {
     }
 
     const employee = employees.find(
-      (e) => e.name.trim().toLowerCase() === name.toLowerCase()
+      (e) =>
+        e.name.trim().toLowerCase() === name.toLowerCase() ||
+        (e.username && e.username.trim().toLowerCase() === name.toLowerCase())
     );
 
     if (!employee) {
@@ -184,7 +188,9 @@ export async function POST(req: NextRequest) {
       employee: {
         id: employee.id,
         name: employee.name,
+        username: employee.username || employee.name,
         email: employee.email,
+        mustChangePin: Boolean(employee.mustChangePin),
         address: employee.address,
         designation: employee.designation,
         isTeamLeader: isTL,

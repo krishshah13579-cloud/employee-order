@@ -70,13 +70,21 @@ export async function ensureDbSchema(force = false) {
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
 
-        -- 5. Ensure wholesale."Employee" canViewOrderForm & EmployeeTask table
+        -- 5. Ensure wholesale."Employee" canViewOrderForm, username, displayPin, mustChangePin, onboardingStep & EmployeeTask table
         BEGIN
           ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+          ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "username" TEXT;
+          ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "displayPin" TEXT DEFAULT '1234';
+          ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "mustChangePin" BOOLEAN DEFAULT true;
+          ALTER TABLE wholesale."Employee" ADD COLUMN IF NOT EXISTS "onboardingStep" INTEGER DEFAULT 3;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
         BEGIN
           ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "canViewOrderForm" BOOLEAN DEFAULT true;
+          ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "username" TEXT;
+          ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "displayPin" TEXT DEFAULT '1234';
+          ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "mustChangePin" BOOLEAN DEFAULT true;
+          ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "onboardingStep" INTEGER DEFAULT 3;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
 

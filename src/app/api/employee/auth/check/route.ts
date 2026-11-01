@@ -64,7 +64,9 @@ export async function GET(_req: NextRequest) {
         select: {
           id: true,
           name: true,
+          username: true,
           email: true,
+          mustChangePin: true,
           address: true,
           designation: true,
           isTeamLeader: true,
@@ -79,7 +81,7 @@ export async function GET(_req: NextRequest) {
       console.warn("[AUTH_CHECK] Falling back to raw employee lookup:", err);
       try {
         const rows = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT id, name, email, address, designation, "isTeamLeader", "canEditOrders", "canUpdateStock", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE id = $1`,
+          `SELECT id, name, username, email, "mustChangePin", address, designation, "isTeamLeader", "canEditOrders", "canUpdateStock", "canAddPreviousBills", "mobileNumber", "isActive" FROM wholesale."Employee" WHERE id = $1`,
           session.id
         );
         employee = rows?.[0];

@@ -16,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  EyeOff,
   RefreshCw,
   Mail,
   Crown,
@@ -152,7 +153,41 @@ interface DeviceInviteItem {
 
 export default function EmployeesPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"access" | "directory" | "devices">("access");
+  const [activeTab, setActiveTab] = useState<"access" | "directory" | "reset-pin" | "devices">("access");
+
+  // PIN Visibility & Dedicated Reset PIN State
+  const [revealedPins, setRevealedPins] = useState<Record<number, boolean>>({});
+  const [resettingPinId, setResettingPinId] = useState<number | null>(null);
+  const [resetPinSearch, setResetPinSearch] = useState<string>("");
+
+  const togglePinVisibility = (empId: number) => {
+    setRevealedPins((prev) => ({ ...prev, [empId]: !prev[empId] }));
+  };
+
+  const handleGenerateAndEmailPin = async (emp: any) => {
+    if (!emp.email) {
+      toast(`Cannot reset PIN: No email registered for "${emp.name}". Please edit employee and add an email address.`, "error");
+      return;
+    }
+    setResettingPinId(emp.id);
+    try {
+      const res = await fetch(`/api/employees/${emp.id}/reset-pin`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast(`🎉 ${data.message}`, "success");
+        await fetchEmployees();
+        await fetchPerformanceData();
+      } else {
+        toast(data.error || "Failed to reset PIN", "error");
+      }
+    } catch (err: any) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      setResettingPinId(null);
+    }
+  };
 
   // Device Security & Blackout Gate state
   const [devices, setDevices] = useState<AuthorizedDeviceItem[]>([]);
@@ -905,6 +940,22 @@ export default function EmployeesPage() {
 
         <button
           type="button"
+          onClick={() => setActiveTab("reset-pin")}
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "reset-pin"
+              ? "border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl"
+              : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
+          }`}
+        >
+          <KeyRound size={14} className={activeTab === "reset-pin" ? "text-orange-600" : "text-gray-400"} />
+          <span>Reset PIN</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+            Email PIN
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("devices")}
           className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === "devices"
@@ -1620,17 +1671,33 @@ export default function EmployeesPage() {
                                 <span className="text-[10px] text-gray-400 font-mono">
                                   EMP-{String(emp.id).padStart(4, "0")}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPinModalEmp({ id: emp.id, name: emp.name });
-                                    setNewPin("1234");
-                                  }}
-                                  className="text-[10px] bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.2 rounded font-mono font-bold cursor-pointer"
-                                  title="Click to reset PIN"
-                                >
-                                  PIN: {emp.pin || "••••"} ↺
-                                </button>
+                                {emp.username && (
+                                  <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-mono font-semibold">
+                                    @{emp.username}
+                                  </span>
+                                )}
+                                <div className="inline-flex items-center gap-1 bg-amber-50/90 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                  <span className="text-[10px] text-amber-900 font-mono font-bold tracking-wider">
+                                    PIN: {revealedPins[emp.id] ? (emp.displayPin || emp.pin || "1234") : "••••"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePinVisibility(emp.id)}
+                                    className="text-amber-700 hover:text-amber-900 transition p-0.5 cursor-pointer"
+                                    title={revealedPins[emp.id] ? "Hide PIN" : "Show PIN"}
+                                  >
+                                    {revealedPins[emp.id] ? <EyeOff size={11} /> : <Eye size={11} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleGenerateAndEmailPin(emp)}
+                                    disabled={resettingPinId === emp.id}
+                                    className="text-[10px] text-orange-600 hover:text-orange-800 ml-0.5 font-bold cursor-pointer"
+                                    title="Generate & Email fresh PIN"
+                                  >
+                                    {resettingPinId === emp.id ? <RefreshCw size={10} className="animate-spin" /> : "↺"}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1871,6 +1938,243 @@ export default function EmployeesPage() {
                       </tr>
                     ))
                   )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          TAB: RESET PIN & SECURITY PIN CENTER
+          ══════════════════════════════════════════════════════════════ */}
+      {activeTab === "reset-pin" && (
+        <div className="space-y-6">
+          {/* Top Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-lg relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/40 text-orange-400 flex items-center justify-center shrink-0">
+                  <KeyRound size={26} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-lg font-black text-white tracking-tight">
+                      Security PIN &amp; Credentials Center
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 font-bold text-[10px] uppercase">
+                      Admin Portal
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                    View active 4-digit security PINs set by staff, or generate a fresh random 4-digit PIN and dispatch it immediately to the employee&apos;s registered email address.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchEmployees();
+                    toast("PIN status refreshed from database", "info");
+                  }}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw size={14} className={loadingDirectory ? "animate-spin text-orange-400" : ""} />
+                  <span>Refresh PINs</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-xs">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                Total Registered Staff
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black text-gray-900">{employees.length}</span>
+                <span className="text-xs text-gray-500">Employees</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white border border-emerald-200 rounded-2xl shadow-xs bg-emerald-50/20">
+              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
+                Permanent PIN Active
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black text-emerald-800">
+                  {employees.filter((e) => !e.mustChangePin).length}
+                </span>
+                <span className="text-xs text-emerald-600">Configured by Employee</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white border border-amber-200 rounded-2xl shadow-xs bg-amber-50/20">
+              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">
+                Temporary PINs (Pending Setup)
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black text-amber-800">
+                  {employees.filter((e) => e.mustChangePin).length}
+                </span>
+                <span className="text-xs text-amber-600">Must Change on Login</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs flex items-center gap-3">
+            <Search className="w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={resetPinSearch}
+              onChange={(e) => setResetPinSearch(e.target.value)}
+              placeholder="Search by employee name, username, or email address..."
+              className="w-full text-xs bg-transparent focus:outline-none text-gray-900"
+            />
+            {resetPinSearch && (
+              <button
+                type="button"
+                onClick={() => setResetPinSearch("")}
+                className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Reset PIN Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase tracking-wider text-[10px] font-bold">
+                    <th className="py-3 px-6">Employee Profile</th>
+                    <th className="py-3 px-6">Staff Email Address</th>
+                    <th className="py-3 px-6">Current Portal Security PIN</th>
+                    <th className="py-3 px-6">PIN Status</th>
+                    <th className="py-3 px-6 text-right">Reset &amp; Dispatch</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {employees
+                    .filter((emp) => {
+                      if (!resetPinSearch.trim()) return true;
+                      const q = resetPinSearch.toLowerCase();
+                      return (
+                        emp.name.toLowerCase().includes(q) ||
+                        (emp.username && emp.username.toLowerCase().includes(q)) ||
+                        (emp.email && emp.email.toLowerCase().includes(q)) ||
+                        emp.designation.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((emp) => {
+                      const isRevealed = Boolean(revealedPins[emp.id]);
+                      const currentPin = emp.displayPin || emp.pin || "1234";
+                      const isResetting = resettingPinId === emp.id;
+
+                      return (
+                        <tr key={emp.id} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                                {emp.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                                  <span>{emp.name}</span>
+                                  {isEmployeeTeamLeader(emp) && (
+                                    <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded-full border border-amber-300">
+                                      <Crown size={10} className="text-amber-600" /> T.L.
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] text-gray-400 font-mono">
+                                    EMP-{String(emp.id).padStart(4, "0")}
+                                  </span>
+                                  {emp.username && (
+                                    <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-mono font-semibold">
+                                      @{emp.username}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-gray-500">&bull; {emp.designation}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-6">
+                            {emp.email ? (
+                              <div className="flex items-center gap-1.5 text-gray-700 font-medium">
+                                <Mail size={13} className="text-gray-400 shrink-0" />
+                                <span>{emp.email}</span>
+                              </div>
+                            ) : (
+                              <span className="text-amber-600 font-bold text-[11px] flex items-center gap-1">
+                                <AlertCircle size={12} /> No Email Registered
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-4 px-6">
+                            <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                              <Lock size={13} className="text-amber-700" />
+                              <span className="font-mono text-sm font-black tracking-widest text-amber-950">
+                                {isRevealed ? currentPin : "••••"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => togglePinVisibility(emp.id)}
+                                className="text-amber-700 hover:text-amber-900 transition p-1 hover:bg-amber-100 rounded-lg cursor-pointer"
+                                title={isRevealed ? "Hide PIN" : "Reveal PIN"}
+                              >
+                                {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-6">
+                            {emp.mustChangePin ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                <Clock size={11} className="text-amber-700" />
+                                <span>Temporary PIN (Change on Login)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                <ShieldCheck size={11} className="text-emerald-700" />
+                                <span>Permanent PIN Active</span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-4 px-6 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateAndEmailPin(emp)}
+                              disabled={isResetting || !emp.email}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={emp.email ? "Generate fresh 4-digit PIN and send to email" : "Email required to reset PIN"}
+                            >
+                              {isResetting ? (
+                                <>
+                                  <RefreshCw size={13} className="animate-spin text-white" />
+                                  <span>Generating &amp; Sending...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles size={13} />
+                                  <span>Generate &amp; Email PIN</span>
+                                </>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

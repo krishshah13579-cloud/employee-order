@@ -4,16 +4,19 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useRouter, usePathname } from "next/navigation";
 import { isNightLogoutTimeIST, isEmployeeTeamLeader } from "@/lib/time";
 import { useToast } from "@/components/ui/Toast";
+import { Lock, KeyRound, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
 
 export interface EmployeeSession {
   id: number;
   name: string;
+  username?: string;
   designation: string;
   isTeamLeader?: boolean;
   canEditOrders?: boolean;
   canUpdateStock?: boolean;
   canAddPreviousBills?: boolean;
   canViewOrderForm?: boolean;
+  mustChangePin?: boolean;
   tasks?: any[];
   mobileNumber?: string;
   email?: string;
@@ -258,9 +261,159 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // Mandatory Permanent PIN Change State (for employees with temporary PIN)
+  const [newPinValue, setNewPinValue] = useState<string>("");
+  const [confirmPinValue, setConfirmPinValue] = useState<string>("");
+  const [showPermanentPin, setShowPermanentPin] = useState<boolean>(false);
+  const [pinChangeLoading, setPinChangeLoading] = useState<boolean>(false);
+  const [pinChangeError, setPinChangeError] = useState<string | null>(null);
+
+  const handleSavePermanentPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError(null);
+
+    const cleanPin = newPinValue.trim();
+    const cleanConfirm = confirmPinValue.trim();
+
+    if (!cleanPin || !/^\d{4}$/.test(cleanPin)) {
+      setPinChangeError("PIN must be exactly 4 numeric digits.");
+      return;
+    }
+    if (cleanPin !== cleanConfirm) {
+      setPinChangeError("PIN confirmation does not match. Please verify.");
+      return;
+    }
+
+    setPinChangeLoading(true);
+    try {
+      const res = await fetch("/api/employee/auth/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPin: cleanPin }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast("🎉 Permanent PIN saved successfully! Use this secret PIN for future logins.", "success");
+        if (employee) {
+          const updated = { ...employee, mustChangePin: false };
+          setEmployee(updated);
+          localStorage.setItem("garmentpro_employee", JSON.stringify(updated));
+        }
+        setNewPinValue("");
+        setConfirmPinValue("");
+      } else {
+        setPinChangeError(data.error || "Failed to set permanent PIN.");
+      }
+    } catch (err: any) {
+      setPinChangeError(err.message || "Network error. Please try again.");
+    } finally {
+      setPinChangeLoading(false);
+    }
+  };
+
+  const showMandatoryPinModal = Boolean(
+    !loading && employee && employee.id !== 0 && employee.mustChangePin
+  );
+
   return (
     <EmployeeContext.Provider value={{ employee, loading, login, logout, refreshSession }}>
       {children}
+
+      {/* Mandatory Permanent PIN Setup Modal */}
+      {showMandatoryPinModal && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-orange-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-slate-100 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-orange-500 flex items-center justify-center mx-auto shadow-inner">
+                <KeyRound className="w-7 h-7" />
+              </div>
+              <h2 className="text-xl font-black text-white tracking-tight">
+                Set Your Permanent 4-Digit PIN
+              </h2>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                Welcome, <strong className="text-orange-400">{employee?.name}</strong>! You are currently using a temporary PIN. Please create your permanent 4-digit security PIN to proceed.
+              </p>
+            </div>
+
+            <form onSubmit={handleSavePermanentPin} className="space-y-4">
+              {pinChangeError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 text-center font-medium">
+                  {pinChangeError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Enter New 4-Digit PIN *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPermanentPin ? "text" : "password"}
+                    inputMode="numeric"
+                    maxLength={4}
+                    required
+                    value={newPinValue}
+                    onChange={(e) => setNewPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="••••"
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center text-2xl font-mono font-bold tracking-widest text-orange-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPermanentPin(!showPermanentPin)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                  >
+                    {showPermanentPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Confirm New 4-Digit PIN *
+                </label>
+                <input
+                  type={showPermanentPin ? "text" : "password"}
+                  inputMode="numeric"
+                  maxLength={4}
+                  required
+                  value={confirmPinValue}
+                  onChange={(e) => setConfirmPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="••••"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center text-2xl font-mono font-bold tracking-widest text-orange-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                  <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+                  <span>Security Notice</span>
+                </div>
+                <p>
+                  This PIN will be your permanent login key. Keep it confidential and do not share it with anyone.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={pinChangeLoading || newPinValue.length !== 4 || confirmPinValue.length !== 4}
+                className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-orange-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pinChangeLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving Permanent PIN...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={16} />
+                    <span>Confirm & Activate Permanent PIN</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </EmployeeContext.Provider>
   );
 }

@@ -8,7 +8,11 @@ import { ensureDbSchema } from "@/lib/ensure-db-schema";
 const BASE_SAFE_SELECT = {
   id: true,
   name: true,
+  username: true,
   email: true,
+  displayPin: true,
+  mustChangePin: true,
+  onboardingStep: true,
   mobileNumber: true,
   address: true,
   proofUrl: true,
@@ -110,22 +114,34 @@ export async function PUT(
 
     let employee: any;
     try {
+      const putData: any = {
+        name: body.name,
+        email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
+        mobileNumber: body.mobileNumber,
+        address: body.address,
+        proofUrl: body.proofUrl,
+        designation: body.designation,
+        isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
+        canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
+        canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
+        canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
+        isActive: body.isActive !== undefined ? body.isActive : true,
+      };
+
+      if (body.username !== undefined) {
+        putData.username = body.username ? body.username.trim() : null;
+      }
+      if (body.pin !== undefined && body.pin.trim()) {
+        putData.pin = hashPassword(body.pin.trim());
+        putData.displayPin = body.pin.trim();
+        if (body.mustChangePin !== undefined) {
+          putData.mustChangePin = Boolean(body.mustChangePin);
+        }
+      }
+
       employee = await prisma.employee.update({
         where: { id: empId },
-        data: {
-          name: body.name,
-          email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
-          pin: body.pin !== undefined && body.pin.trim() ? hashPassword(body.pin.trim()) : undefined,
-          mobileNumber: body.mobileNumber,
-          address: body.address,
-          proofUrl: body.proofUrl,
-          designation: body.designation,
-          isTeamLeader: body.isTeamLeader !== undefined ? Boolean(body.isTeamLeader) : undefined,
-          canEditOrders: body.canEditOrders !== undefined ? Boolean(body.canEditOrders) : undefined,
-          canUpdateStock: body.canUpdateStock !== undefined ? Boolean(body.canUpdateStock) : undefined,
-          canAddPreviousBills: body.canAddPreviousBills !== undefined ? Boolean(body.canAddPreviousBills) : undefined,
-          isActive: body.isActive !== undefined ? body.isActive : true,
-        },
+        data: putData,
         select: BASE_SAFE_SELECT,
       });
     } catch (updateErr) {
@@ -258,6 +274,13 @@ export async function PATCH(
     }
     if (body.pin !== undefined && body.pin.trim()) {
       updateData.pin = hashPassword(body.pin.trim());
+      updateData.displayPin = body.pin.trim();
+      if (body.mustChangePin !== undefined) {
+        updateData.mustChangePin = Boolean(body.mustChangePin);
+      }
+    }
+    if (body.username !== undefined) {
+      updateData.username = body.username ? body.username.trim() : null;
     }
 
     let employee: any;

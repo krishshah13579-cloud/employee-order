@@ -84,8 +84,12 @@ export interface EmployeeTaskData {
 export interface EmployeeData {
   id: number;
   name: string;
+  username?: string | null;
   email?: string | null;
   pin?: string;
+  displayPin?: string | null;
+  mustChangePin?: boolean;
+  onboardingStep?: number;
   mobileNumber: string;
   address: string;
   proofUrl?: string | null;

@@ -611,6 +611,419 @@ export async function sendColorSoldOutNotification(items: SoldOutColorItem[]) {
   }
 }
 
+export interface SendEmployeeStep1Params {
+  to: string;
+  name: string;
+  mobileNumber: string;
+  address: string;
+  designation: string;
+  isTeamLeader: boolean;
+  canEditOrders: boolean;
+  canUpdateStock: boolean;
+  canViewOrderForm: boolean;
+  isActive: boolean;
+}
+
+export interface SendEmployeeStep2Params {
+  to: string;
+  name: string;
+  documentType?: string;
+}
+
+export interface SendEmployeeStep3Params {
+  to: string;
+  name: string;
+  username: string;
+  pin: string;
+}
+
+export interface SendEmployeePinResetParams {
+  to: string;
+  name: string;
+  username?: string;
+  newPin: string;
+}
+
+/**
+ * 1. Step 1 Email: Sent when employee details, designation, and allowed permissions are saved
+ */
+export async function sendEmployeeStep1Email({
+  to,
+  name,
+  mobileNumber,
+  address,
+  designation,
+  isTeamLeader,
+  canEditOrders,
+  canUpdateStock,
+  canViewOrderForm,
+  isActive,
+}: SendEmployeeStep1Params): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  const subject = `Welcome to IQ Trousers - Onboarding Process Started (Step 1 Complete)`;
+
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+        <h1 style="color: #0f172a; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+        <p style="color: #ea580c; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Employee Onboarding System &bull; Step 1 of 3</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 15px; font-weight: 800; color: #1e3a8a; margin: 0 0 6px 0; text-transform: uppercase;">
+            YOUR ONBOARDING PROCESS HAS OFFICIALLY STARTED!
+          </p>
+          <p style="font-size: 13px; color: #3b82f6; margin: 0;">
+            Hello <strong>${name}</strong>, your employee profile has been created in the IQ Trousers Enterprise System.
+          </p>
+        </div>
+
+        <h3 style="color: #0f172a; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px 0;">
+          1. Profile Details Recorded
+        </h3>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.6; color: #334155;">
+          <p style="margin: 3px 0;"><strong>Full Name:</strong> ${name}</p>
+          <p style="margin: 3px 0;"><strong>Registered Mobile:</strong> ${mobileNumber}</p>
+          <p style="margin: 3px 0;"><strong>Designation / Role:</strong> <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 6px; font-weight: 700;">${designation}</span></p>
+          <p style="margin: 3px 0;"><strong>Residential Address:</strong> ${address}</p>
+        </div>
+
+        <h3 style="color: #0f172a; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin: 20px 0 8px 0;">
+          2. Assigned System Permissions & Access Status
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px;">
+          <tbody>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #475569;">Active Login & Ordering Status</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${isActive ? '#15803d' : '#b91c1c'};">${isActive ? 'Active' : 'Inactive'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #475569;">Team Leader (T.L.) 24*7 Access</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${isTeamLeader ? '#ea580c' : '#64748b'};">${isTeamLeader ? 'Enabled (24*7)' : 'Standard (9 PM IST)'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #475569;">Order Form Editing Access</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${canEditOrders ? '#2563eb' : '#64748b'};">${canEditOrders ? 'Approved' : 'Disabled'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #475569;">Stock Update Page Access</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${canUpdateStock ? '#059669' : '#64748b'};">${canUpdateStock ? 'Enabled' : 'Disabled'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #475569;">Order Form View Access</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${canViewOrderForm ? '#15803d' : '#b91c1c'};">${canViewOrderForm ? 'Allowed' : 'Revoked'}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; margin: 16px 0; font-size: 12px; color: #92400e;">
+          <strong>Next Step:</strong> Document upload (Aadhar / PAN / ID proof) is currently being processed. You will receive an update once uploaded.
+        </div>
+
+        <p style="color: #0f172a; font-size: 13px; margin: 20px 0 0 0;">
+          Best Regards,<br>
+          <strong>IQ Trousers Administration</strong>
+        </p>
+      </div>
+
+      <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+        IQ Trousers Wholesale Operations &bull; Ahmedabad, Gujarat
+      </div>
+    </div>
+  `;
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: gmailUser.trim(), pass: cleanPass },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Onboarding" <${gmailUser.trim()}>`,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Step 1 Onboarding email successfully sent to ${to} (${name})`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send Step 1 onboarding email:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(`\n📋 [EMPLOYEE STEP 1 EMAIL] To: ${to} | Name: ${name} | Designation: ${designation}\n`);
+  return { success: true };
+}
+
+/**
+ * 2. Step 2 Email: Sent when employee verification document is uploaded
+ */
+export async function sendEmployeeStep2Email({
+  to,
+  name,
+  documentType = "Identity / Address Proof",
+}: SendEmployeeStep2Params): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  const subject = `Document Uploaded - Step 2 Complete | IQ Trousers`;
+
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+        <h1 style="color: #0f172a; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+        <p style="color: #ea580c; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Employee Onboarding System &bull; Step 2 of 3</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 15px; font-weight: 800; color: #166534; margin: 0 0 6px 0; text-transform: uppercase;">
+            VERIFICATION DOCUMENT UPLOADED SUCCESSFULLY!
+          </p>
+          <p style="font-size: 13px; color: #15803d; margin: 0;">
+            Hello <strong>${name}</strong>, your verification document (<strong>${documentType}</strong>) has been uploaded and secured in your employee profile.
+          </p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin: 16px 0; font-size: 13px; color: #334155; line-height: 1.6;">
+          <p style="margin: 0 0 8px 0;"><strong>Verification Status:</strong> <span style="color: #16a34a; font-weight: 700;">Uploaded & Verified</span></p>
+          <p style="margin: 0;">Your document has been safely encrypted and attached to your IQ Trousers employment records.</p>
+        </div>
+
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; margin: 16px 0; font-size: 12px; color: #1e40af;">
+          <strong>Final Step:</strong> Account credentials (Username & Temporary Security PIN) are now being finalized by the Administrator. You will receive your official login email shortly.
+        </div>
+
+        <p style="color: #0f172a; font-size: 13px; margin: 20px 0 0 0;">
+          Best Regards,<br>
+          <strong>IQ Trousers Administration</strong>
+        </p>
+      </div>
+
+      <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+        IQ Trousers Wholesale Operations &bull; Ahmedabad, Gujarat
+      </div>
+    </div>
+  `;
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: gmailUser.trim(), pass: cleanPass },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Onboarding" <${gmailUser.trim()}>`,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Step 2 Onboarding email successfully sent to ${to} (${name})`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send Step 2 onboarding email:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(`\n📋 [EMPLOYEE STEP 2 EMAIL] To: ${to} | Name: ${name} | Document Uploaded\n`);
+  return { success: true };
+}
+
+/**
+ * 3. Step 3 Email: Official Credentials Email with Username, Temporary 4-Digit PIN & Permanent PIN instructions
+ */
+export async function sendEmployeeStep3CredentialsEmail({
+  to,
+  name,
+  username,
+  pin,
+}: SendEmployeeStep3Params): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const appUrl = process.env.NEXTAUTH_URL || "https://employee.iqtrousers.in";
+
+  const subject = `Your Employee Login Credentials - IQ Trousers Wholesale Portal`;
+
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+        <h1 style="color: #0f172a; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+        <p style="color: #ea580c; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Employee Wholesale Portal &bull; Step 3 Complete</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 15px; font-weight: 800; color: #166534; margin: 0 0 6px 0; text-transform: uppercase;">
+            YOUR ONBOARDING IS COMPLETE!
+          </p>
+          <p style="font-size: 13px; color: #15803d; margin: 0;">
+            Hello <strong>${name}</strong>, your employee portal access is now live. Use the credentials below to sign in:
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${appUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff !important; font-weight: 700; font-size: 14px; padding: 12px 28px; text-decoration: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(234,88,12,0.3);">
+            Open Employee Wholesale Portal &rarr;
+          </a>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;">
+          <p style="color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin: 0 0 12px 0;">Official Login Credentials</p>
+          <div style="margin-bottom: 10px;">
+            <span style="color: #64748b; font-size: 12px; display: block; margin-bottom: 3px;">Username / Login ID:</span>
+            <span style="font-family: monospace; font-size: 16px; font-weight: 700; background: #e2e8f0; padding: 4px 10px; border-radius: 6px; color: #0f172a;">${username}</span>
+          </div>
+          <div>
+            <span style="color: #64748b; font-size: 12px; display: block; margin-bottom: 3px;">Temporary 4-Digit Security PIN:</span>
+            <span style="font-family: monospace; font-size: 20px; font-weight: 900; letter-spacing: 4px; background: #0f172a; color: #f59e0b; padding: 6px 14px; border-radius: 6px; display: inline-block;">${pin}</span>
+          </div>
+        </div>
+
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 14px 16px; margin: 20px 0; font-size: 12px; color: #991b1b; line-height: 1.5;">
+          <strong>IMPORTANT SECURITY NOTICE:</strong><br>
+          Upon your first login using this temporary PIN, the portal will automatically prompt you to <strong>set your secret permanent 4-digit PIN</strong>. Please choose a PIN that only you know.
+        </div>
+
+        <p style="color: #0f172a; font-size: 13px; margin: 20px 0 0 0;">
+          Best Regards,<br>
+          <strong>Krish Sandip Shah</strong><br>
+          <span style="color: #64748b; font-size: 12px;">IQ Trousers Enterprise Operations</span>
+        </p>
+      </div>
+
+      <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+        Direct Portal Link: <a href="${appUrl}" style="color: #ea580c;">${appUrl}</a>
+      </div>
+    </div>
+  `;
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: gmailUser.trim(), pass: cleanPass },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Access" <${gmailUser.trim()}>`,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Step 3 Credentials email successfully sent to ${to} (${username})`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send Step 3 credentials email:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(`\n📋 [EMPLOYEE CREDENTIALS EMAIL] To: ${to} | Username: ${username} | Temporary PIN: ${pin}\n`);
+  return { success: true };
+}
+
+/**
+ * 4. PIN Reset Email: Sent when Admin triggers a PIN reset from the dedicated Reset PIN tab
+ */
+export async function sendEmployeePinResetEmail({
+  to,
+  name,
+  username,
+  newPin,
+}: SendEmployeePinResetParams): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const appUrl = process.env.NEXTAUTH_URL || "https://employee.iqtrousers.in";
+
+  const subject = `Your Security PIN Has Been Reset - IQ Trousers Wholesale Portal`;
+
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+        <h1 style="color: #0f172a; font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 1px;">IQ TROUSERS</h1>
+        <p style="color: #ea580c; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1.5px;">Security PIN Reset Alert</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 15px; font-weight: 800; color: #92400e; margin: 0 0 6px 0; text-transform: uppercase;">
+            SECURITY PIN RESET BY ADMINISTRATOR
+          </p>
+          <p style="font-size: 13px; color: #78350f; margin: 0;">
+            Hello <strong>${name}</strong>, your IQ Trousers employee login PIN has been freshly generated.
+          </p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin: 0 0 10px 0;">New Temporary 4-Digit PIN</p>
+          <div style="display: inline-block; font-family: monospace; font-size: 28px; font-weight: 900; letter-spacing: 6px; background: #0f172a; color: #f59e0b; padding: 10px 24px; border-radius: 8px;">
+            ${newPin}
+          </div>
+          ${username ? `<p style="color: #64748b; font-size: 12px; margin-top: 12px;">Login Username: <strong>${username}</strong></p>` : ''}
+        </div>
+
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${appUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff !important; font-weight: 700; font-size: 14px; padding: 12px 28px; text-decoration: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(234,88,12,0.3);">
+            Log In Now &rarr;
+          </a>
+        </div>
+
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; margin: 16px 0; font-size: 12px; color: #1e40af; line-height: 1.5;">
+          <strong>Note:</strong> When you log in with this temporary PIN, you will be required to configure your permanent personal 4-digit PIN before proceeding to orders.
+        </div>
+
+        <p style="color: #0f172a; font-size: 13px; margin: 20px 0 0 0;">
+          Best Regards,<br>
+          <strong>IQ Trousers Administration</strong>
+        </p>
+      </div>
+
+      <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+        IQ Trousers Wholesale Operations &bull; Ahmedabad, Gujarat
+      </div>
+    </div>
+  `;
+
+  if (gmailUser && gmailAppPassword) {
+    try {
+      const cleanPass = gmailAppPassword.replace(/\s+/g, "").trim();
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: gmailUser.trim(), pass: cleanPass },
+      });
+
+      await transporter.sendMail({
+        from: `"IQ TROUSERS Security" <${gmailUser.trim()}>`,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log(`✅ PIN Reset email successfully sent to ${to} (${name})`);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to send PIN Reset email:", err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(`\n📋 [PIN RESET EMAIL] To: ${to} | Name: ${name} | New PIN: ${newPin}\n`);
+  return { success: true };
+}
+
 export interface SendEmployeeOnboardingParams {
   to: string;
   username: string;
