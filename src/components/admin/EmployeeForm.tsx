@@ -283,9 +283,9 @@ export default function EmployeeForm({
   };
 
   return (
-    <div className="space-y-6 max-w-4xl pb-16">
+    <div className="space-y-5 sm:space-y-6 max-w-4xl pb-28 sm:pb-16 w-full min-w-0">
       {/* Top Breadcrumb & Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-gray-200">
         <div>
           <Link
             href="/admin/employee/employees"
@@ -294,8 +294,8 @@ export default function EmployeeForm({
             <ArrowLeft size={14} />
             <span>Back to Employees</span>
           </Link>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-gray-700" />
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-gray-700 shrink-0" />
             <span>{isEdit ? `Edit Employee: ${formData.name}` : "New Employee Onboarding Wizard"}</span>
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -305,10 +305,10 @@ export default function EmployeeForm({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Link
             href="/admin/employee/employees"
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
+            className="flex-1 sm:flex-none text-center px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
           >
             Cancel
           </Link>
@@ -317,7 +317,7 @@ export default function EmployeeForm({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2 bg-zinc-950 hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Save className="w-4 h-4" />}
               <span>Update Employee</span>
@@ -328,22 +328,32 @@ export default function EmployeeForm({
 
       {/* Stepper Navigation for Creation Mode */}
       {!isEdit && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-2xs">
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4 shadow-2xs">
+          {/* Mobile Current Step Progress Bar */}
+          <div className="sm:hidden mb-2.5 px-0.5 flex items-center justify-between text-xs">
+            <span className="font-bold text-orange-600 uppercase tracking-wider text-[10px]">
+              Step {currentStep} of 3
+            </span>
+            <span className="font-bold text-gray-900 text-[11px] truncate max-w-[200px]">
+              {currentStep === 1 ? "Details & Permissions" : currentStep === 2 ? "Upload Document" : "Credentials & PIN"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
             {/* Step 1 */}
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition ${
+              className={`flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-1 sm:gap-2.5 p-2 sm:p-3 rounded-xl border text-center sm:text-left transition cursor-pointer min-w-0 ${
                 currentStep === 1
-                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs"
+                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs ring-1 ring-blue-500/30"
                   : currentStep > 1
                   ? "border-emerald-300 bg-emerald-50/50 text-emerald-900"
                   : "border-gray-200 bg-gray-50 text-gray-500"
               }`}
             >
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                   currentStep === 1
                     ? "bg-blue-600 text-white"
                     : currentStep > 1
@@ -351,11 +361,11 @@ export default function EmployeeForm({
                     : "bg-gray-200 text-gray-600"
                 }`}
               >
-                {currentStep > 1 ? <CheckCircle2 size={16} /> : "1"}
+                {currentStep > 1 ? <CheckCircle2 size={14} className="sm:w-4 sm:h-4" /> : "1"}
               </div>
-              <div className="min-w-0">
-                <span className="block text-[10px] uppercase tracking-wider font-bold">Step 1</span>
-                <span className="block text-xs font-bold truncate">Details &amp; Permissions</span>
+              <div className="min-w-0 w-full">
+                <span className="hidden sm:block text-[10px] uppercase tracking-wider font-bold">Step 1</span>
+                <span className="block text-[11px] sm:text-xs font-bold truncate">Details</span>
               </div>
             </button>
 
@@ -366,16 +376,16 @@ export default function EmployeeForm({
                 if (currentStep > 2) setCurrentStep(2);
                 else handleProceedToStep2();
               }}
-              className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition ${
+              className={`flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-1 sm:gap-2.5 p-2 sm:p-3 rounded-xl border text-center sm:text-left transition cursor-pointer min-w-0 ${
                 currentStep === 2
-                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs"
+                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs ring-1 ring-blue-500/30"
                   : currentStep > 2
                   ? "border-emerald-300 bg-emerald-50/50 text-emerald-900"
                   : "border-gray-200 bg-gray-50 text-gray-500"
               }`}
             >
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                   currentStep === 2
                     ? "bg-blue-600 text-white"
                     : currentStep > 2
@@ -383,11 +393,11 @@ export default function EmployeeForm({
                     : "bg-gray-200 text-gray-600"
                 }`}
               >
-                {currentStep > 2 ? <CheckCircle2 size={16} /> : "2"}
+                {currentStep > 2 ? <CheckCircle2 size={14} className="sm:w-4 sm:h-4" /> : "2"}
               </div>
-              <div className="min-w-0">
-                <span className="block text-[10px] uppercase tracking-wider font-bold">Step 2 (Mandatory)</span>
-                <span className="block text-xs font-bold truncate">Upload Document</span>
+              <div className="min-w-0 w-full">
+                <span className="hidden sm:block text-[10px] uppercase tracking-wider font-bold">Step 2 (Req)</span>
+                <span className="block text-[11px] sm:text-xs font-bold truncate">Document</span>
               </div>
             </button>
 
@@ -398,22 +408,22 @@ export default function EmployeeForm({
                 if (currentStep === 1) handleProceedToStep2();
                 else if (currentStep === 2) handleProceedToStep3();
               }}
-              className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition ${
+              className={`flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-1 sm:gap-2.5 p-2 sm:p-3 rounded-xl border text-center sm:text-left transition cursor-pointer min-w-0 ${
                 currentStep === 3
-                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs"
+                  ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-2xs ring-1 ring-blue-500/30"
                   : "border-gray-200 bg-gray-50 text-gray-500"
               }`}
             >
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                   currentStep === 3 ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"
                 }`}
               >
                 3
               </div>
-              <div className="min-w-0">
-                <span className="block text-[10px] uppercase tracking-wider font-bold">Step 3</span>
-                <span className="block text-xs font-bold truncate">Username &amp; PIN</span>
+              <div className="min-w-0 w-full">
+                <span className="hidden sm:block text-[10px] uppercase tracking-wider font-bold">Step 3</span>
+                <span className="block text-[11px] sm:text-xs font-bold truncate">Credentials</span>
               </div>
             </button>
           </div>
@@ -424,19 +434,19 @@ export default function EmployeeForm({
           STEP 1: EMPLOYEE DETAILS, DESIGNATION & PERMISSIONS
           ══════════════════════════════════════════════════════════════ */}
       {(isEdit || currentStep === 1) && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-5">
-            <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-blue-600" />
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+            <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h2 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>Personal &amp; Employment Details</span>
               </h2>
-              <span className="text-[11px] text-orange-600 font-bold bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full">
+              <span className="text-[10px] sm:text-[11px] text-orange-600 font-bold bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full self-start sm:self-auto">
                 Step 1: Dispatches Email 1 to Employee
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                   Full Employee Name *
@@ -563,27 +573,27 @@ export default function EmployeeForm({
 
               {/* Tasks for Office Employee */}
               {(formData.designation === "Office Employee" || tasks.length > 0) && (
-                <div className="sm:col-span-2 p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-3">
+                <div className="sm:col-span-2 p-3.5 sm:p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-purple-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                        <ListTodo size={16} />
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-purple-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <ListTodo size={15} />
                       </div>
-                      <div>
-                        <h3 className="text-xs font-black text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                          <span>Assigned Tasks (Office Employee)</span>
+                      <div className="min-w-0">
+                        <h3 className="text-xs font-black text-purple-950 uppercase tracking-wider truncate">
+                          Assigned Tasks (Office Employee)
                         </h3>
-                        <p className="text-[11px] text-purple-700">
-                          These task checkboxes appear in the employee&apos;s Tasks tab.
+                        <p className="text-[10px] sm:text-[11px] text-purple-700 truncate">
+                          Checkboxes appear in employee&apos;s Tasks tab.
                         </p>
                       </div>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-purple-200 text-purple-900 font-bold text-[11px] font-mono">
+                    <span className="px-2 py-0.5 rounded-full bg-purple-200 text-purple-900 font-bold text-[10px] sm:text-[11px] font-mono shrink-0">
                       {tasks.length} {tasks.length === 1 ? "Task" : "Tasks"}
                     </span>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       value={newTaskInput}
@@ -594,13 +604,13 @@ export default function EmployeeForm({
                           handleAddTask();
                         }
                       }}
-                      placeholder="e.g. Verify courier dispatch slips, Check stock recount, Daily cash book"
+                      placeholder="e.g. Verify courier slips, Cash book"
                       className="flex-1 px-3.5 py-2 bg-white border border-purple-300 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-600"
                     />
                     <button
                       type="button"
                       onClick={handleAddTask}
-                      className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                      className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                     >
                       <Plus size={14} />
                       <span>Add Task</span>
@@ -640,45 +650,45 @@ export default function EmployeeForm({
               {/* ══════════════════════════════════════════════════════════════
                   ACCESS & PERMISSION CONTROLS (SCREENSHOT 2)
                   ══════════════════════════════════════════════════════════════ */}
-              <div className="sm:col-span-2 space-y-3 pt-2">
-                <div className="flex items-center pb-1">
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                      className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-600 border-gray-300"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 block">Active Login &amp; Ordering Status</span>
-                      <span className="text-[11px] text-gray-500">
-                        Allow employee to sign in with their PIN and collect wholesale client orders.
-                      </span>
-                    </div>
+              <div className="sm:col-span-2 space-y-3 pt-1">
+                <div className="flex items-start gap-3 pb-1">
+                  <input
+                    type="checkbox"
+                    id="isActiveToggle"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-600 border-gray-300 mt-0.5 shrink-0"
+                  />
+                  <label htmlFor="isActiveToggle" className="cursor-pointer select-none min-w-0 flex-1">
+                    <span className="text-xs font-bold text-gray-900 block">Active Login &amp; Ordering Status</span>
+                    <span className="text-[11px] text-gray-500 block leading-normal mt-0.5">
+                      Allow employee to sign in with their PIN and collect wholesale client orders.
+                    </span>
                   </label>
                 </div>
 
-                {/* Team Leader (T.L.) 24*7 Access Toggle */}
-                <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                {/* Permissions Panel Card */}
+                <div className="p-3 sm:p-4 bg-orange-50/70 border border-orange-200 rounded-2xl space-y-2.5">
+                  {/* Team Leader (T.L.) 24*7 Access Toggle */}
+                  <div className="flex items-start sm:items-center justify-between gap-3 p-3 sm:p-3.5 bg-white/80 rounded-xl border border-orange-200/80">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 sm:mt-0">
                         <Crown size={16} />
                       </div>
-                      <div>
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
-                          <span>Designate as Team Leader (T.L.)</span>
-                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.2 rounded-full border border-amber-300">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-black text-gray-900">Designate as Team Leader (T.L.)</span>
+                          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-2 py-0.2 rounded-full border border-amber-300">
                             24*7 Access
                           </span>
-                        </span>
-                        <span className="text-[11px] text-gray-600">
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5 leading-normal">
                           Team Leaders are permitted to access the employee panel <strong>24*7</strong> (bypasses standard 9:00 PM IST daily logout).
-                        </span>
+                        </p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5 sm:mt-0">
                       <input
                         type="checkbox"
                         checked={Boolean(formData.isTeamLeader)}
@@ -699,25 +709,25 @@ export default function EmployeeForm({
                   </div>
 
                   {/* Order Form Editing Permission (Admin Approval) */}
-                  <div className="flex items-center justify-between p-3.5 bg-blue-50/50 rounded-xl border border-blue-200">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-blue-100 text-blue-800 shrink-0">
+                  <div className="flex items-start sm:items-center justify-between gap-3 p-3 sm:p-3.5 bg-blue-50/60 rounded-xl border border-blue-200">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="p-2 rounded-lg bg-blue-100 text-blue-800 shrink-0 mt-0.5 sm:mt-0">
                         <Edit3 className="w-4 h-4 text-blue-600" />
                       </div>
-                      <div>
-                        <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                          <span>Order Form Editing Access</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold uppercase">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-900">Order Form Editing Access</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 font-bold uppercase">
                             Admin Approval
                           </span>
-                        </h3>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5 leading-normal">
                           Grant this employee explicit permission to edit Pending order forms. If disabled, orders cannot be edited by this employee.
                         </p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5 sm:mt-0">
                       <input
                         type="checkbox"
                         checked={Boolean(formData.canEditOrders)}
@@ -734,22 +744,22 @@ export default function EmployeeForm({
                   </div>
 
                   {/* Stock Update Page Permission */}
-                  <div className="flex items-center justify-between p-3.5 bg-emerald-50/40 rounded-xl border border-emerald-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <div className="flex items-start sm:items-center justify-between gap-3 p-3 sm:p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                         <Package className="w-4 h-4" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3 className="text-xs font-bold text-gray-900">
                           Stock Update Page Access
                         </h3>
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-[11px] text-gray-500 mt-0.5 leading-normal">
                           Allow employee to update sets, ratios, and product photos on /update-stock.
                         </p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5 sm:mt-0">
                       <input
                         type="checkbox"
                         checked={Boolean(formData.canUpdateStock)}
@@ -766,20 +776,20 @@ export default function EmployeeForm({
                   </div>
 
                   {/* Order Form View Access Permission (Allow / Revoke) */}
-                  <div className="flex items-center justify-between p-3.5 bg-amber-50/50 rounded-xl border border-amber-200">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0">
+                  <div className="flex items-start sm:items-center justify-between gap-3 p-3 sm:p-3.5 bg-amber-50/60 rounded-xl border border-amber-200">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5 sm:mt-0">
                         {formData.canViewOrderForm ? (
                           <Eye className="w-4 h-4 text-amber-700" />
                         ) : (
                           <EyeOff className="w-4 h-4 text-slate-500" />
                         )}
                       </div>
-                      <div>
-                        <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                          <span>Order Form View Access</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-900">Order Form View Access</span>
                           <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                            className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
                               formData.canViewOrderForm
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "bg-rose-100 text-rose-800"
@@ -787,14 +797,14 @@ export default function EmployeeForm({
                           >
                             {formData.canViewOrderForm ? "Allowed" : "Revoked"}
                           </span>
-                        </h3>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5 leading-normal">
                           Allow or revoke order form access (/orders/new). If revoked, the Order Form is hidden and disabled for this employee.
                         </p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5 sm:mt-0">
                       <input
                         type="checkbox"
                         checked={Boolean(formData.canViewOrderForm)}
@@ -820,7 +830,7 @@ export default function EmployeeForm({
                 type="button"
                 onClick={handleProceedToStep2}
                 disabled={sendingStep1Email}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 {sendingStep1Email ? (
                   <>
@@ -843,28 +853,28 @@ export default function EmployeeForm({
           STEP 2: UPLOAD DOCUMENT (MANDATORY)
           ══════════════════════════════════════════════════════════════ */}
       {(isEdit || currentStep === 2) && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-5">
-            <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+            <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-blue-600" />
+                <h2 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>ID / Address Proof (Mandatory Document Upload)</span>
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
                   Aadhaar card, PAN card, driving licence, or official verification document.
                 </p>
               </div>
               {!isEdit && (
-                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                <span className="text-[10px] sm:text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full self-start sm:self-auto">
                   Step 2: Dispatches Email 2 to Employee
                 </span>
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
               {formData.proofUrl ? (
-                <div className="relative w-48 h-32 rounded-xl overflow-hidden border border-emerald-200 bg-emerald-50 shadow-xs shrink-0 group">
+                <div className="relative w-full sm:w-48 h-48 sm:h-32 rounded-xl overflow-hidden border border-emerald-200 bg-emerald-50 shadow-xs shrink-0 group">
                   <img
                     src={formData.proofUrl}
                     alt="Proof Preview"
@@ -873,16 +883,20 @@ export default function EmployeeForm({
                   <button
                     type="button"
                     onClick={() => setFormData((prev) => ({ ...prev, proofUrl: "" }))}
-                    className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg shadow-md transition-opacity"
                     title="Remove photo"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
               ) : (
-                <div className="w-48 h-32 rounded-xl border-2 border-dashed border-red-300 flex flex-col items-center justify-center text-red-500 bg-red-50/50 shrink-0">
-                  <FileCheck size={28} />
-                  <span className="text-[11px] font-bold mt-1 text-center px-2">Document Required *</span>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full sm:w-48 h-40 sm:h-32 rounded-xl border-2 border-dashed border-red-300 flex flex-col items-center justify-center text-red-500 bg-red-50/50 shrink-0 cursor-pointer hover:bg-red-50 transition"
+                >
+                  <FileCheck size={32} />
+                  <span className="text-xs sm:text-[11px] font-bold mt-1 text-center px-2">Document Required *</span>
+                  <span className="text-[10px] text-red-400 mt-0.5">Tap to select or take photo</span>
                 </div>
               )}
 
@@ -898,7 +912,7 @@ export default function EmployeeForm({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   {uploading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -917,7 +931,7 @@ export default function EmployeeForm({
                     value={formData.proofUrl}
                     onChange={(e) => setFormData({ ...formData, proofUrl: e.target.value })}
                     placeholder="https://example.com/employee-aadhaar.jpg"
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900"
                   />
                 </div>
               </div>
@@ -932,11 +946,11 @@ export default function EmployeeForm({
           </div>
 
           {!isEdit && (
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setCurrentStep(1)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
               >
                 &larr; Back to Step 1
               </button>
@@ -944,7 +958,7 @@ export default function EmployeeForm({
                 type="button"
                 onClick={handleProceedToStep3}
                 disabled={sendingStep2Email || !formData.proofUrl}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 {sendingStep2Email ? (
                   <>
@@ -967,26 +981,26 @@ export default function EmployeeForm({
           STEP 3: USERNAME & TEMPORARY 4-DIGIT PIN
           ══════════════════════════════════════════════════════════════ */}
       {(isEdit || currentStep === 3) && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-5">
-            <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+            <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <KeyRound className="w-4 h-4 text-blue-600" />
+                <h2 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>Portal Login Credentials</span>
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
                   Set unique username and temporary 4-digit PIN for first-time sign in.
                 </p>
               </div>
               {!isEdit && (
-                <span className="text-[11px] text-purple-700 font-bold bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                <span className="text-[10px] sm:text-[11px] text-purple-700 font-bold bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full self-start sm:self-auto">
                   Step 3: Dispatches Credentials Email
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                   Portal Username / Login ID *
@@ -1042,23 +1056,23 @@ export default function EmployeeForm({
               </div>
             </div>
 
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1.5">
+            <div className="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1.5">
               <div className="flex items-center gap-1.5 font-bold">
-                <ShieldCheck size={16} className="text-amber-600" />
+                <ShieldCheck size={16} className="text-amber-600 shrink-0" />
                 <span>Onboarding Flow Summary</span>
               </div>
-              <p>
+              <p className="leading-relaxed">
                 When you click <strong>Complete Onboarding &amp; Send Credentials</strong>, an official email containing the portal link, Username (<strong>{formData.username || "—"}</strong>), and Temporary PIN (<strong>{formData.pin}</strong>) will be dispatched to <strong>{formData.email}</strong>.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             {!isEdit ? (
               <button
                 type="button"
                 onClick={() => setCurrentStep(2)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
               >
                 &larr; Back to Step 2
               </button>
@@ -1068,7 +1082,7 @@ export default function EmployeeForm({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-950 hover:bg-black text-white text-xs font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-zinc-950 hover:bg-black text-white text-xs font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 cursor-pointer"
             >
               {saving ? (
                 <>

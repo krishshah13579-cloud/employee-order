@@ -878,7 +878,7 @@ export default function EmployeesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             type="button"
             onClick={() => {
@@ -886,7 +886,7 @@ export default function EmployeesPage() {
               fetchEmployees();
             }}
             disabled={loadingPerf || loadingDirectory}
-            className="p-2.5 bg-white border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
+            className="p-2.5 bg-white border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer shrink-0"
             title="Refresh all metrics"
           >
             <RefreshCw size={16} className={loadingPerf || loadingDirectory ? "animate-spin text-zinc-900" : ""} />
@@ -894,7 +894,7 @@ export default function EmployeesPage() {
 
           <Link
             href="/admin/employee/employees/new"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-950 hover:bg-black text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <Plus size={16} />
             <span>Add New Employee</span>
