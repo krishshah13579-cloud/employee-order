@@ -112,10 +112,27 @@ export async function POST(req: NextRequest) {
     const rawPin = (pin || "1234").trim();
     const finalUsername = (username || name).trim();
 
+    // Gap-filling logic: Scan existing employee IDs to find the lowest available positive integer starting from 1
+    // For example: If EMP-002 was deleted and EMP-001 & EMP-003 exist, reuse EMP-002!
+    let nextAvailableId = 1;
+    try {
+      const existingEmployees = await prisma.employee.findMany({
+        select: { id: true },
+        orderBy: { id: "asc" },
+      });
+      const idSet = new Set(existingEmployees.map((e) => e.id));
+      while (idSet.has(nextAvailableId)) {
+        nextAvailableId++;
+      }
+    } catch (idErr) {
+      console.warn("[EMPLOYEE_POST] Error calculating gap-filling ID:", idErr);
+    }
+
     let employee: any;
     try {
       employee = await prisma.employee.create({
         data: {
+          id: nextAvailableId,
           name: name.trim(),
           username: finalUsername,
           email: (email || "").trim() || null,
@@ -136,6 +153,13 @@ export async function POST(req: NextRequest) {
         select: BASE_SAFE_SELECT,
       });
 
+      // Synchronize postgres sequence to highest id
+      try {
+        await prisma.$executeRawUnsafe(
+          `SELECT setval(pg_get_serial_sequence('wholesale."Employee"', 'id'), COALESCE((SELECT MAX(id) FROM wholesale."Employee"), 0) + 1, false);`
+        );
+      } catch {}
+
       if (body.canViewOrderForm !== undefined) {
         try {
           await prisma.$executeRawUnsafe(
@@ -150,6 +174,7 @@ export async function POST(req: NextRequest) {
       await ensureDbSchema(true);
       employee = await prisma.employee.create({
         data: {
+          id: nextAvailableId,
           name: name.trim(),
           username: finalUsername,
           email: (email || "").trim() || null,
@@ -169,6 +194,12 @@ export async function POST(req: NextRequest) {
         },
         select: BASE_SAFE_SELECT,
       });
+
+      try {
+        await prisma.$executeRawUnsafe(
+          `SELECT setval(pg_get_serial_sequence('wholesale."Employee"', 'id'), COALESCE((SELECT MAX(id) FROM wholesale."Employee"), 0) + 1, false);`
+        );
+      } catch {}
     }
 
     // Save initial tasks if provided (for Office Employee or any staff)

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const search = searchParams.get("search");
     const placedByQuery = searchParams.get("placedBy");
+    const employeeIdQuery = searchParams.get("employeeId");
 
     const admin = await getAdminSession(request);
     const employee = await getEmployeeSession(request);
@@ -43,27 +44,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Role-based Order Isolation:
-    // "DONT SHOW OTHER EMPLOYEES DATA IN THAT EMPLOYEES PORTAL. FOR EG. KRISH SHAH USER DATA IS SHOWN IN YASH RAVAL (NOT ALLOWED)."
-    // "JUST TEAM LEADER CAN HAVE A LOOK I.E. KRISH SHAH NO OTHER T.L. CAN CHECK ANY OTHER EMPLOYEES DATA."
+    // Employee portal strictly sees orders placed by them (scoped by employeeId).
+    // Admin portal can filter by specific employeeId (returns empty for new/clean employees).
     if (!admin) {
       if (isTLKrishShah) {
-        // Team Leader Krish Shah can view specific team member's orders if queried, or his own
-        if (placedByQuery && placedByQuery.trim() !== "") {
+        if (employeeIdQuery && employeeIdQuery.trim() !== "") {
+          const qId = parseInt(employeeIdQuery.trim(), 10);
+          where.employeeId = isNaN(qId) ? -1 : qId;
+        } else if (placedByQuery && placedByQuery.trim() !== "") {
           where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
-        } else if (employee?.name) {
-          where.placedBy = { equals: employee.name, mode: "insensitive" };
+        } else if (employee?.id) {
+          where.OR = [
+            { employeeId: employee.id },
+            { employeeId: null, placedBy: { equals: employee.name, mode: "insensitive" } },
+          ];
         }
       } else {
-        // All other employees (including any other TL): STRICTLY lock to their own placed orders!
-        // Never allow them to see Krish Shah or any other colleague's data!
-        if (employee?.name) {
-          where.placedBy = { equals: employee.name, mode: "insensitive" };
+        // All standard employees: strictly locked to their own orders by EMP ID
+        if (employee?.id) {
+          where.OR = [
+            { employeeId: employee.id },
+            { employeeId: null, placedBy: { equals: employee.name, mode: "insensitive" } },
+          ];
         } else {
           return NextResponse.json([]);
         }
       }
-    } else if (placedByQuery && placedByQuery.trim() !== "") {
-      where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
+    } else {
+      // Admin request
+      if (employeeIdQuery && employeeIdQuery.trim() !== "") {
+        const qId = parseInt(employeeIdQuery.trim(), 10);
+        where.employeeId = isNaN(qId) ? -1 : qId;
+      } else if (placedByQuery && placedByQuery.trim() !== "") {
+        where.placedBy = { equals: placedByQuery.trim(), mode: "insensitive" };
+      }
     }
 
     // High performance query: exclude heavy base64 imageUrl/colorImages/visitingCardUrl
@@ -435,50 +449,16 @@ export async function POST(request: NextRequest) {
       gstRate = 0;
     }
 
-    // Determine Order Number & Bill Number
+    // Determine custom Order Number, Tax Invoice Number & Manual Bill Number
     const customOrderNumber = body.orderNumber ? String(body.orderNumber).trim() : "";
-    let orderNumber = customOrderNumber;
-
-    // Determine custom Tax Invoice Number / Manual Bill Number
     let manualBillNumber = body.manualBillNumber ? String(body.manualBillNumber).trim().toUpperCase() : null;
     if (manualBillNumber) {
       const numOnly = manualBillNumber.match(/\d+/);
       if (numOnly) manualBillNumber = numOnly[0];
     }
-
-    if (isExplicitBillWithoutGst || isPreviousBill) {
-      if (!manualBillNumber || !manualBillNumber.trim()) {
-        manualBillNumber = await getNextBillNumber(prisma);
-      }
-      // Isolated Bill sequence with zero clash against Tax Invoices
-      orderNumber = `BILL-${manualBillNumber}`;
-    } else {
-      if (!orderNumber) {
-        orderNumber = await getNextOrderNumber(prisma);
-      } else {
-        // Validate unique custom orderNumber
-        const existing = await prisma.order.findUnique({ where: { orderNumber } });
-        if (existing) {
-          return NextResponse.json(
-            { error: `Order Number "${orderNumber}" already exists in the system. Please use a unique Order No. (e.g. ${orderNumber}-A) or leave blank to auto-generate.` },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
     const customTaxInvoiceNumber = manualBillNumber || (body.taxInvoiceNumber ? String(body.taxInvoiceNumber).trim().toUpperCase() : null);
     const customTaxInvoiceDate = body.taxInvoiceDate ? new Date(body.taxInvoiceDate) : (customTaxInvoiceNumber ? new Date() : null);
-
     const initialStatus = body.status || (customTaxInvoiceNumber ? "Ready" : "Pending");
-    let effectiveTaxInvoiceNumber = customTaxInvoiceNumber;
-    let effectiveTaxInvoiceDate = customTaxInvoiceDate;
-
-    // For standard orders, keep effectiveTaxInvoiceNumber aligned with orderNumber when confirmed
-    if (!isExplicitBillWithoutGst && !isPreviousBill && initialStatus === "Confirmed" && (!effectiveTaxInvoiceNumber || !effectiveTaxInvoiceNumber.trim())) {
-      effectiveTaxInvoiceNumber = orderNumber;
-      effectiveTaxInvoiceDate = new Date();
-    }
 
     // Check miscellaneous transport products
     const isImportedTrousersMix = validatedItems.some((it) =>
@@ -493,6 +473,43 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     const createdOrder = await prisma.$transaction(async (tx) => {
+      // 1. Transactional advisory lock to prevent race conditions during concurrent order creation:
+      // If 2 employees place an order simultaneously, the second waits for the first to finish,
+      // guaranteeing strictly sequential order numbers (e.g. 56 -> 57 and 58) without clashes!
+      try {
+        await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(1357901);');
+      } catch (lockErr) {
+        console.warn("[ORDERS] Advisory lock notice:", lockErr);
+      }
+
+      // Calculate sequential orderNumber and billNumber safely under the exclusive transaction lock
+      let finalOrderNumber = customOrderNumber;
+      let finalEffectiveTaxInvoiceNumber = customTaxInvoiceNumber;
+      let effectiveTaxInvoiceDate = customTaxInvoiceDate;
+
+      if (isExplicitBillWithoutGst || isPreviousBill) {
+        if (!manualBillNumber || !manualBillNumber.trim()) {
+          manualBillNumber = await getNextBillNumber(tx);
+        }
+        finalOrderNumber = `BILL-${manualBillNumber}`;
+        if (!finalEffectiveTaxInvoiceNumber) {
+          finalEffectiveTaxInvoiceNumber = manualBillNumber;
+        }
+      } else {
+        if (!finalOrderNumber) {
+          finalOrderNumber = await getNextOrderNumber(tx);
+        } else {
+          const existing = await tx.order.findUnique({ where: { orderNumber: finalOrderNumber } });
+          if (existing) {
+            throw new Error(`Order Number "${finalOrderNumber}" already exists in the system. Please use a unique Order No. (e.g. ${finalOrderNumber}-A) or leave blank to auto-generate.`);
+          }
+        }
+      }
+
+      if (!isExplicitBillWithoutGst && !isPreviousBill && initialStatus === "Confirmed" && (!finalEffectiveTaxInvoiceNumber || !finalEffectiveTaxInvoiceNumber.trim())) {
+        finalEffectiveTaxInvoiceNumber = finalOrderNumber;
+      }
+
       // Deduct stock only for real-time present orders (skip past-dated bills, post-dated bills without GST, and IMPORTED TROUSERS MIX)
       if (finalShouldDeductStock) {
         for (const { product, orderedSets, orderedLoose } of productDeductionsMap.values()) {
@@ -550,9 +567,14 @@ export async function POST(request: NextRequest) {
         console.warn("[ORDERS] Sequence pre-sync warning:", seqSyncErr);
       }
 
+      const orderEmployeeId = (employee && employee.id > 0)
+        ? employee.id
+        : (body.employeeId ? parseInt(String(body.employeeId), 10) : null);
+
       return await tx.order.create({
         data: {
-          orderNumber,
+          orderNumber: finalOrderNumber,
+          employeeId: orderEmployeeId,
           customerId: customer.id,
           customerName: customer.shopName,
           customerGstPan: customer.gstPanNo,
@@ -568,13 +590,13 @@ export async function POST(request: NextRequest) {
           grandTotal: grandTotal,
           totalPcs: orderTotalPcs,
           totalSets: orderTotalSets,
-          placedBy: placedBy || "Admin",
+          placedBy: placedBy || (employee ? employee.name : "Admin"),
           notes: [
             notes,
-            (isExplicitBillWithoutGst || isPreviousBill) ? `[BILL_WITHOUT_GST: ${effectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null,
+            (isExplicitBillWithoutGst || isPreviousBill) ? `[BILL_WITHOUT_GST: ${finalEffectiveTaxInvoiceNumber || manualBillNumber || ""}]` : null,
             (customOrderNumber) ? `[HANDWRITTEN_BOOK_NO: ${customOrderNumber}]` : null,
           ].filter(Boolean).join(" | ") || null,
-          taxInvoiceNumber: effectiveTaxInvoiceNumber,
+          taxInvoiceNumber: finalEffectiveTaxInvoiceNumber,
           taxInvoiceDate: effectiveTaxInvoiceDate || effectiveOrderDate,
           isPreviousBill,
           previousBillDate: isPreviousBill ? (previousBillDate || effectiveOrderDate) : null,

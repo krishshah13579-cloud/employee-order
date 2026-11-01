@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
         customerId: true,
         customerName: true,
         placedBy: true,
+        employeeId: true,
         totalSets: true,
         totalPcs: true,
         grandTotal: true,
@@ -97,15 +98,24 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Group orders by placedBy
-    const employeeOrdersMap = new Map<string, typeof orders>();
+    // Group orders by employeeId with placedBy fallback for older orders
+    const employeeOrdersMap = new Map<number, typeof orders>();
+    const legacyNameOrdersMap = new Map<string, typeof orders>();
+
     orders.forEach((ord) => {
-      const placed = (ord.placedBy || "").trim().toLowerCase();
-      if (placed) {
-        if (!employeeOrdersMap.has(placed)) {
-          employeeOrdersMap.set(placed, []);
+      if (ord.employeeId) {
+        if (!employeeOrdersMap.has(ord.employeeId)) {
+          employeeOrdersMap.set(ord.employeeId, []);
         }
-        employeeOrdersMap.get(placed)!.push(ord);
+        employeeOrdersMap.get(ord.employeeId)!.push(ord);
+      } else {
+        const placed = (ord.placedBy || "").trim().toLowerCase();
+        if (placed && !placed.includes("(archived)")) {
+          if (!legacyNameOrdersMap.has(placed)) {
+            legacyNameOrdersMap.set(placed, []);
+          }
+          legacyNameOrdersMap.get(placed)!.push(ord);
+        }
       }
     });
 
@@ -116,18 +126,19 @@ export async function GET(request: NextRequest) {
 
     const employeeProfiles = employees.map((emp) => {
       const empCleanName = emp.name.trim().toLowerCase();
-      const empOrders = employeeOrdersMap.get(empCleanName) || [];
+      // Orders linked to this employee's ID, or legacy orders before employeeId was introduced
+      const empOrders = employeeOrdersMap.get(emp.id) || legacyNameOrdersMap.get(empCleanName) || [];
 
       const empTotalRevenue = empOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
       const empTotalSets = empOrders.reduce((sum, o) => sum + (o.totalSets || 0), 0);
       const empTotalPcs = empOrders.reduce((sum, o) => sum + (o.totalPcs || 0), 0);
       totalCompanyTurnover += empTotalRevenue;
 
-      // Find allocated customers
+      // Find allocated customers strictly by allocatedEmployeeId, falling back to active name
       const allocated = customers.filter(
         (c) =>
           c.allocatedEmployeeId === emp.id ||
-          (c.allocatedEmployeeName && c.allocatedEmployeeName.trim().toLowerCase() === empCleanName)
+          (!c.allocatedEmployeeId && c.allocatedEmployeeName && c.allocatedEmployeeName.trim().toLowerCase() === empCleanName)
       );
 
       totalAllocatedCustomersCount += allocated.length;

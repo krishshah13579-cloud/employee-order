@@ -246,6 +246,7 @@ model Order {
   totalPcs        Int         @default(0) // Total Pieces
   totalSets       Int         @default(0) // Total Sets
   placedBy         String?     // Booked by employee/admin
+  employeeId       Int?        // Linked Employee ID (EMP#)
   taxInvoiceNumber String?     // Set by admin once order is ready (e.g. TI-2026-001)
   taxInvoiceDate   DateTime?   // Tax Invoice date set by admin
   taxInvoiceItems  String?     // JSON string of updated items with modified quantities/amounts for tax invoice

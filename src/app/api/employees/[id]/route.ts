@@ -354,10 +354,64 @@ export async function DELETE(
       select: { id: true, name: true },
     });
 
+    if (!employee) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+
+    // 1. Cleanly unallocate any customers assigned to this deleted employee
+    try {
+      await prisma.customer.updateMany({
+        where: { allocatedEmployeeId: empId },
+        data: {
+          allocatedEmployeeId: null,
+          allocatedEmployeeName: null,
+        },
+      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE wholesale."Customer" SET "allocatedEmployeeId" = NULL, "allocatedEmployeeName" = NULL WHERE "allocatedEmployeeId" = $1`,
+        empId
+      );
+    } catch (unallocErr) {
+      console.warn("[EMPLOYEE_DELETE] Customer unallocation warning:", unallocErr);
+    }
+
+    // 2. Disassociate historical orders from this EMP ID so a reused ID starts 100% empty
+    // The textual placedBy (e.g. "Ramesh Patel") is preserved for accounting records
+    try {
+      await prisma.order.updateMany({
+        where: { employeeId: empId },
+        data: {
+          employeeId: null,
+          placedBy: employee.name ? `${employee.name} (Archived)` : "Archived Employee",
+        },
+      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE wholesale."Order" SET "employeeId" = NULL WHERE "employeeId" = $1`,
+        empId
+      );
+    } catch (orderUnlinkErr) {
+      console.warn("[EMPLOYEE_DELETE] Order unlinking warning:", orderUnlinkErr);
+    }
+
+    // 3. Remove assigned tasks
+    try {
+      await prisma.employeeTask.deleteMany({
+        where: { employeeId: empId },
+      });
+    } catch {}
+
+    // 4. Delete the employee record
     await prisma.employee.delete({
       where: { id: empId },
       select: { id: true },
     });
+
+    // 5. Synchronize postgres sequence
+    try {
+      await prisma.$executeRawUnsafe(
+        `SELECT setval(pg_get_serial_sequence('wholesale."Employee"', 'id'), COALESCE((SELECT MAX(id) FROM wholesale."Employee"), 0) + 1, false);`
+      );
+    } catch {}
 
     await recordAuditLog({
       action: "EMPLOYEE_DELETED",
@@ -365,7 +419,7 @@ export async function DELETE(
       actorName: auth.user?.username || "Admin",
       entityType: "Employee",
       entityId: empId,
-      details: `Deleted employee record for "${employee?.name || empId}"`,
+      details: `Deleted employee record for "${employee?.name || empId}". Customers unallocated and past orders safely unlinked.`,
       status: "SUCCESS",
     });
 

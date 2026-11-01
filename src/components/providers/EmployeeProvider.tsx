@@ -26,7 +26,7 @@ export interface EmployeeSession {
 interface EmployeeContextType {
   employee: EmployeeSession | null;
   loading: boolean;
-  login: (name: string, pin: string) => Promise<{ success: boolean; error?: string }>;
+  login: (name: string, pin: string) => Promise<{ success: boolean; error?: string; employee?: EmployeeSession }>;
   logout: (reason?: string) => Promise<void>;
   refreshSession: () => Promise<EmployeeSession | null>;
 }
@@ -237,7 +237,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
 
   // Login handler: Send to server to authenticate (T.L. can log in 24*7)
   const login = useCallback(
-    async (name: string, pin: string): Promise<{ success: boolean; error?: string }> => {
+    async (name: string, pin: string): Promise<{ success: boolean; error?: string; employee?: EmployeeSession }> => {
       try {
         const res = await fetch("/api/employee/auth/login", {
           method: "POST",
@@ -250,7 +250,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
           setEmployee(data.employee);
           localStorage.setItem("garmentpro_employee", JSON.stringify(data.employee));
           localStorage.setItem("garmentpro_employee_name", data.employee.name);
-          return { success: true };
+          return { success: true, employee: data.employee };
         } else {
           return { success: false, error: data.error || "Login failed" };
         }

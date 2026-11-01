@@ -113,6 +113,15 @@ export async function ensureDbSchema(force = false) {
           );
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+        -- 6. Ensure wholesale."Order" employeeId
+        BEGIN
+          ALTER TABLE wholesale."Order" ADD COLUMN IF NOT EXISTS "employeeId" INTEGER;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+          ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "employeeId" INTEGER;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
       END $$;
     `);
     isSchemaEnsured = true;
