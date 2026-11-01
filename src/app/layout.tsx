@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   description: "IQ TROUSERS B2B Wholesale Order Collection & Factory Management System",
   applicationName: "OBEXA",
   manifest: "/manifest.json",
+  verification: {
+    google: "googlebc7ed8e410865694",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
