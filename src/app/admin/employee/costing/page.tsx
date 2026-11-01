@@ -226,7 +226,7 @@ export default function AdminCostingPage() {
     return Math.round(numFabricRate);
   }, [rateMode, numFabricRate, numMtrPerKg]);
 
-  // Total Pieces Formula: METER * AVG (Round Off)
+  // Total Pieces Formula: METER / AVG (Round Off)
   const calculatedTotalPcs = useMemo(() => {
     if (numTotalMeters > 0 && numAvgFabric > 0) {
       return Math.round(numTotalMeters / numAvgFabric);
