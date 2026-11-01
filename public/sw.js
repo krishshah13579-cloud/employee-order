@@ -1,21 +1,64 @@
 // Service Worker for OBEXA Wholesale PWA
-const CACHE_NAME = "obexa-wholesale-v1";
+const CACHE_NAME = "obexa-wholesale-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+      await self.clients.claim();
+    })()
+  );
 });
 
-// Pass-through fetch handler required by Chromium WebAPK criteria
+// Pass-through & Network-First fetch handler
 self.addEventListener("fetch", (event) => {
-  // Let the browser handle standard requests natively; fallback to cache if available
-  if (event.request.method === "GET") {
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.pathname.startsWith("/api/")) return;
+
+  if (request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      (async () => {
+        try {
+          const fresh = await fetch(request, {
+            cache: "no-cache",
+            headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          });
+          if (fresh && fresh.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, fresh.clone());
+            return fresh;
+          }
+          return fresh;
+        } catch (err) {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          throw err;
+        }
+      })()
     );
+    return;
+  }
+
+  event.respondWith(
+    fetch(request).catch(() => caches.match(request))
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
   }
 });
 

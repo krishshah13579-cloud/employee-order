@@ -5,6 +5,7 @@ import { CartProvider } from "@/components/providers/CartProvider";
 import StoreLayoutShell from "@/components/layout/StoreLayoutShell";
 import { EmployeeProvider } from "@/components/providers/EmployeeProvider";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
+import PwaUpdateManager from "@/components/pwa/PwaUpdateManager";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -53,6 +54,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans bg-white text-gray-900 antialiased min-h-screen">
         <ToastProvider>
+          <PwaUpdateManager />
           <EmployeeProvider>
             <NotificationProvider>
               <CartProvider>
