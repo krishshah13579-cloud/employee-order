@@ -86,10 +86,15 @@ function ProductDetailContent() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Gallery state
+  // Gallery & 4K Zoom state
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isHoverZooming, setIsHoverZooming] = useState<boolean>(false);
+  const [zoomOrigin, setZoomOrigin] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Multiple Color Selection State: Map of colorName -> sets count
   const [colorSetsSelection, setColorSetsSelection] = useState<Record<string, number>>({});
@@ -531,10 +536,15 @@ function ProductDetailContent() {
       if (e.key === "Escape") {
         setIsLightboxOpen(false);
         setZoomLevel(1);
+        setPanOffset({ x: 0, y: 0 });
       } else if (e.key === "ArrowLeft" && allImages.length > 1) {
         setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+        setZoomLevel(1);
+        setPanOffset({ x: 0, y: 0 });
       } else if (e.key === "ArrowRight" && allImages.length > 1) {
         setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+        setZoomLevel(1);
+        setPanOffset({ x: 0, y: 0 });
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -1095,19 +1105,35 @@ function ProductDetailContent() {
               LEFT COLUMN: COLOR PHOTO & SETS ORDERING
               ═══════════════════════════════════════════ */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Main Product Photo for Active Color */}
+            {/* Main Product Photo for Active Color with 4K Zoom */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-3">
               <div
                 onClick={() => {
                   setIsLightboxOpen(true);
                   setZoomLevel(1);
+                  setPanOffset({ x: 0, y: 0 });
                 }}
-                className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-zoom-in group"
+                onMouseEnter={() => setIsHoverZooming(true)}
+                onMouseLeave={() => setIsHoverZooming(false)}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+                  const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+                  setZoomOrigin({ x, y });
+                }}
+                className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-crosshair group select-none"
               >
                 <img
                   src={activeColorPhoto}
                   alt={`${product.name} - ${activeColor || "Garment"}`}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  style={{
+                    transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                    transform: isHoverZooming ? "scale(2.5)" : "scale(1)",
+                    transition: isHoverZooming
+                      ? "transform-origin 0.04s ease-out, transform 0.2s ease-out"
+                      : "transform 0.3s ease-out",
+                  }}
+                  className="w-full h-full object-cover pointer-events-none select-none"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'><rect width='400' height='400' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='600' fill='%2394a3b8'>Garment Photo</text></svg>";
@@ -1131,19 +1157,27 @@ function ProductDetailContent() {
                     e.stopPropagation();
                     setIsLightboxOpen(true);
                     setZoomLevel(1);
+                    setPanOffset({ x: 0, y: 0 });
                   }}
                   className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-white px-3 py-1.5 rounded-lg border border-slate-700/60 backdrop-blur-md text-xs font-bold shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 z-10 cursor-pointer"
-                  title="Click to enlarge image in 4K"
+                  title="Click to open Fullscreen 4K viewer"
                 >
                   <Maximize2 size={13} className="text-orange-400" />
-                  <span>Enlarge</span>
+                  <span>4K Fullscreen</span>
                 </button>
 
-                {/* Hover zoom hint at bottom */}
-                <div className="absolute inset-x-0 bottom-0 py-2.5 bg-gradient-to-t from-slate-950/70 via-slate-950/30 to-transparent flex items-center justify-center gap-1.5 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                  <ZoomIn size={14} className="text-orange-400" />
-                  <span>Click photo to enlarge in full resolution</span>
-                </div>
+                {/* Hover zoom indicator banner */}
+                {isHoverZooming ? (
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-950/90 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full border border-slate-700/80 shadow-xl flex items-center gap-1.5 z-20 pointer-events-none animate-fadeIn">
+                    <ZoomIn size={12} className="text-orange-400 animate-pulse" />
+                    <span>4K Magnifier (2.5x) • Click for Fullscreen</span>
+                  </div>
+                ) : (
+                  <div className="absolute inset-x-0 bottom-0 py-2.5 bg-gradient-to-t from-slate-950/70 via-slate-950/30 to-transparent flex items-center justify-center gap-1.5 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                    <ZoomIn size={14} className="text-orange-400" />
+                    <span>Hover mouse to zoom fabric • Click to enlarge in 4K</span>
+                  </div>
+                )}
               </div>
 
               {/* Thumbnails row */}
@@ -1799,6 +1833,7 @@ function ProductDetailContent() {
           onClick={() => {
             setIsLightboxOpen(false);
             setZoomLevel(1);
+            setPanOffset({ x: 0, y: 0 });
           }}
         >
           {/* Top Bar */}
@@ -1833,33 +1868,52 @@ function ProductDetailContent() {
 
             {/* Zoom Controls & Close Button */}
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 text-slate-200">
+              <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 text-slate-200 shadow-md">
                 <button
                   type="button"
-                  onClick={() => setZoomLevel((z) => Math.max(0.75, +(z - 0.25).toFixed(2)))}
-                  disabled={zoomLevel <= 0.75}
-                  className="p-1.5 hover:bg-slate-800 disabled:opacity-40 rounded-lg transition cursor-pointer"
+                  onClick={() =>
+                    setZoomLevel((z) => {
+                      const next = Math.max(1, +(z - 0.25).toFixed(2));
+                      if (next === 1) setPanOffset({ x: 0, y: 0 });
+                      return next;
+                    })
+                  }
+                  disabled={zoomLevel <= 1}
+                  className="p-1.5 hover:bg-slate-800 disabled:opacity-30 rounded-lg transition cursor-pointer"
                   title="Zoom Out (-)"
                 >
                   <ZoomOut size={16} />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoomLevel(1)}
+                  onClick={() => {
+                    setZoomLevel(1);
+                    setPanOffset({ x: 0, y: 0 });
+                  }}
                   className="px-2.5 py-1 text-xs font-mono font-bold hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                  title="Reset Zoom"
+                  title="Click to reset zoom & pan"
                 >
                   {Math.round(zoomLevel * 100)}%
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoomLevel((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
-                  disabled={zoomLevel >= 3}
-                  className="p-1.5 hover:bg-slate-800 disabled:opacity-40 rounded-lg transition cursor-pointer"
+                  onClick={() => setZoomLevel((z) => Math.min(4, +(z + 0.25).toFixed(2)))}
+                  disabled={zoomLevel >= 4}
+                  className="p-1.5 hover:bg-slate-800 disabled:opacity-30 rounded-lg transition cursor-pointer"
                   title="Zoom In (+)"
                 >
                   <ZoomIn size={16} />
                 </button>
+                {(panOffset.x !== 0 || panOffset.y !== 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setPanOffset({ x: 0, y: 0 })}
+                    className="ml-1 px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-orange-400 font-semibold rounded-md border border-slate-700 transition cursor-pointer"
+                    title="Center image position"
+                  >
+                    Center
+                  </button>
+                )}
               </div>
 
               <button
@@ -1867,6 +1921,7 @@ function ProductDetailContent() {
                 onClick={() => {
                   setIsLightboxOpen(false);
                   setZoomLevel(1);
+                  setPanOffset({ x: 0, y: 0 });
                 }}
                 className="bg-slate-800/90 hover:bg-rose-600 text-white p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-700 hover:border-rose-500 transition cursor-pointer flex items-center gap-1.5"
                 title="Close (Esc)"
@@ -1877,13 +1932,26 @@ function ProductDetailContent() {
             </div>
           </div>
 
-          {/* Main Enlarge Image Viewport */}
+          {/* Main Enlarge Image Viewport with Pan & Wheel Zoom */}
           <div
             className="flex-1 relative flex items-center justify-center p-2 sm:p-6 overflow-hidden"
+            onWheel={(e) => {
+              e.preventDefault();
+              if (e.deltaY < 0) {
+                setZoomLevel((z) => Math.min(4, +(z + 0.25).toFixed(2)));
+              } else {
+                setZoomLevel((z) => {
+                  const next = Math.max(1, +(z - 0.25).toFixed(2));
+                  if (next === 1) setPanOffset({ x: 0, y: 0 });
+                  return next;
+                });
+              }
+            }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setIsLightboxOpen(false);
                 setZoomLevel(1);
+                setPanOffset({ x: 0, y: 0 });
               }
             }}
           >
@@ -1894,6 +1962,8 @@ function ProductDetailContent() {
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+                  setZoomLevel(1);
+                  setPanOffset({ x: 0, y: 0 });
                 }}
                 className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 text-white p-2.5 sm:p-3 rounded-full border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-110 z-20 cursor-pointer"
                 title="Previous Image (←)"
@@ -1902,22 +1972,60 @@ function ProductDetailContent() {
               </button>
             )}
 
-            {/* Enlarge Image */}
+            {/* Enlarge 4K Image with Drag & Pan */}
             <div
-              className="relative max-w-full max-h-full flex items-center justify-center overflow-auto"
+              className="relative max-w-full max-h-full flex items-center justify-center select-none"
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                if (zoomLevel <= 1) return;
+                setIsDragging(true);
+                setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+              }}
+              onMouseMove={(e) => {
+                if (!isDragging || zoomLevel <= 1) return;
+                setPanOffset({
+                  x: e.clientX - dragStart.x,
+                  y: e.clientY - dragStart.y,
+                });
+              }}
+              onMouseUp={() => setIsDragging(false)}
+              onMouseLeave={() => setIsDragging(false)}
+              onTouchStart={(e) => {
+                if (zoomLevel <= 1 || e.touches.length !== 1) return;
+                setIsDragging(true);
+                setDragStart({
+                  x: e.touches[0].clientX - panOffset.x,
+                  y: e.touches[0].clientY - panOffset.y,
+                });
+              }}
+              onTouchMove={(e) => {
+                if (!isDragging || zoomLevel <= 1 || e.touches.length !== 1) return;
+                setPanOffset({
+                  x: e.touches[0].clientX - dragStart.x,
+                  y: e.touches[0].clientY - dragStart.y,
+                });
+              }}
+              onTouchEnd={() => setIsDragging(false)}
             >
               <img
                 src={activeColorPhoto}
                 alt={`${product.name} - Enlarge 4K`}
-                onDoubleClick={() => setZoomLevel((z) => (z === 1 ? 2 : 1))}
-                style={{
-                  transform: `scale(${zoomLevel})`,
-                  transition: "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
-                  maxHeight: "75vh",
-                  maxWidth: "88vw",
+                onDoubleClick={() => {
+                  if (zoomLevel === 1) {
+                    setZoomLevel(2.5);
+                  } else {
+                    setZoomLevel(1);
+                    setPanOffset({ x: 0, y: 0 });
+                  }
                 }}
-                className="object-contain rounded-xl shadow-2xl cursor-zoom-in select-none"
+                style={{
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+                  transition: isDragging ? "none" : "transform 0.15s cubic-bezier(0.2, 0, 0, 1)",
+                  maxHeight: "78vh",
+                  maxWidth: "88vw",
+                  cursor: zoomLevel > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in",
+                }}
+                className="object-contain rounded-xl shadow-2xl select-none"
               />
             </div>
 
@@ -1928,6 +2036,8 @@ function ProductDetailContent() {
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+                  setZoomLevel(1);
+                  setPanOffset({ x: 0, y: 0 });
                 }}
                 className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 text-white p-2.5 sm:p-3 rounded-full border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-110 z-20 cursor-pointer"
                 title="Next Image (→)"
@@ -1942,8 +2052,14 @@ function ProductDetailContent() {
             className="flex flex-col items-center gap-2 pb-4 pt-2 bg-gradient-to-t from-black/90 to-transparent z-20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-[11px] text-slate-400 font-medium">
-              Double-click photo to toggle 2x zoom • Use Arrow keys to browse photos • Press Esc to close
+            <div className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
+              <span>Scroll wheel to zoom</span>
+              <span>•</span>
+              <span>Drag to pan across 4K image</span>
+              <span>•</span>
+              <span>Double-click to toggle 2.5x</span>
+              <span>•</span>
+              <span>Esc to close</span>
             </div>
 
             {allImages.length > 1 && (
@@ -1954,6 +2070,8 @@ function ProductDetailContent() {
                     type="button"
                     onClick={() => {
                       setActiveImageIndex(idx);
+                      setZoomLevel(1);
+                      setPanOffset({ x: 0, y: 0 });
                     }}
                     className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                       activeImageIndex === idx

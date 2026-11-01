@@ -1,16 +1,16 @@
 /**
- * High-Fidelity Client-Side Image Processor & Server Uploader
- * Preserves crisp fabric textures, stitching, and color accuracy while generating
- * optimized WebP/JPEG images and uploading them to permanent server storage.
+ * High-Fidelity 4K Ultra-HD Client-Side Image Processor & Server Uploader
+ * Preserves 100% crisp fabric textures, stitching, weaves, and color accuracy in full 4K (up to 3840px, 90% quality)
+ * while uploading to permanent server storage to ensure zero payload truncation.
  *
  * Supports photos up to 14MB+ from smartphones and cameras.
  */
 
 export async function compressImageFile(
   file: File | Blob | string,
-  maxWidth = 2048,
-  maxHeight = 2048,
-  quality = 0.85
+  maxWidth = 3840,
+  maxHeight = 3840,
+  quality = 0.90
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     // If input is a string (e.g. data URL)
@@ -76,7 +76,7 @@ export async function compressImageFile(
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Prefer modern WebP for 3x sharper fabric texture at smaller file sizes
+        // Prefer modern WebP for 3x sharper fabric texture at 4K resolution
         try {
           const webpDataUrl = canvas.toDataURL("image/webp", quality);
           if (webpDataUrl.startsWith("data:image/webp")) {
@@ -126,16 +126,16 @@ function calculateDimensions(
 
 export async function compressDataUrl(
   dataUrl: string,
-  maxWidth = 2048,
-  maxHeight = 2048,
-  quality = 0.85
+  maxWidth = 3840,
+  maxHeight = 3840,
+  quality = 0.90
 ): Promise<string> {
   return compressImageFile(dataUrl, maxWidth, maxHeight, quality);
 }
 
 /**
  * Uploads an image (File, Blob, or base64 Data URL) to /api/upload.
- * If the image is large, it compresses it first to 2048px @ 0.85 to save bandwidth and speed up uploads.
+ * Encodes in full 4K Ultra-HD (3840px, 90% quality).
  * If /api/upload succeeds, returns the permanent server URL (e.g. "/uploads/...").
  * If /api/upload fails or is unavailable, falls back to the high-res compressed Data URL.
  */
@@ -155,10 +155,10 @@ export async function uploadImageToServer(
     ) {
       return input; // Already a hosted URL
     }
-    // Re-compress legacy oversized base64 data URLs (> 150KB)
-    if (input.length > 150 * 1024) {
+    // Re-compress legacy oversized base64 data URLs (> 200KB) into 4K
+    if (input.length > 200 * 1024) {
       try {
-        dataUrl = await compressDataUrl(input, 2048, 2048, 0.85);
+        dataUrl = await compressDataUrl(input, 3840, 3840, 0.90);
       } catch {
         dataUrl = input;
       }
@@ -168,7 +168,7 @@ export async function uploadImageToServer(
   } else {
     filename = (input as File).name || suggestedName;
     try {
-      dataUrl = await compressImageFile(input, 2048, 2048, 0.85);
+      dataUrl = await compressImageFile(input, 3840, 3840, 0.90);
     } catch {
       dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
@@ -206,6 +206,13 @@ export async function uploadImageToServer(
     }
   } catch (err) {
     console.warn("Upload to /api/upload failed, using optimized data URL fallback:", err);
+  }
+
+  // If upload failed and dataUrl is excessively large (> 6MB), optimize for safe JSON fallback
+  if (dataUrl.length > 6 * 1024 * 1024) {
+    try {
+      return await compressDataUrl(dataUrl, 2048, 2048, 0.85);
+    } catch {}
   }
 
   return dataUrl;
