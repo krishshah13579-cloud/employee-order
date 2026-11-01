@@ -86,7 +86,7 @@ function ProductDetailContent() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Gallery & 4K Zoom state
+  // Gallery & 4K Zoom state (Supports Hover Magnifier, Trackpad & Multi-Touch Pinch In/Out)
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -95,6 +95,10 @@ function ProductDetailContent() {
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [initialPinchDist, setInitialPinchDist] = useState<number | null>(null);
+  const [pinchBaseZoom, setPinchBaseZoom] = useState<number>(1);
+  const [cardPinchZoom, setCardPinchZoom] = useState<number>(1);
+  const [cardPinchDist, setCardPinchDist] = useState<number | null>(null);
 
   // Multiple Color Selection State: Map of colorName -> sets count
   const [colorSetsSelection, setColorSetsSelection] = useState<Record<string, number>>({});
@@ -1121,17 +1125,51 @@ function ProductDetailContent() {
                   const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
                   setZoomOrigin({ x, y });
                 }}
-                className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-crosshair group select-none"
+                onTouchStart={(e) => {
+                  if (e.touches.length === 2) {
+                    const dist = Math.hypot(
+                      e.touches[0].clientX - e.touches[1].clientX,
+                      e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    setCardPinchDist(dist);
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (e.touches.length === 2 && cardPinchDist) {
+                    const dist = Math.hypot(
+                      e.touches[0].clientX - e.touches[1].clientX,
+                      e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    const ratio = dist / cardPinchDist;
+                    const next = Math.min(3, Math.max(1, +ratio.toFixed(2)));
+                    setCardPinchZoom(next);
+                    if (next >= 1.25) {
+                      setIsLightboxOpen(true);
+                      setZoomLevel(next);
+                      setCardPinchDist(null);
+                      setCardPinchZoom(1);
+                    }
+                  }
+                }}
+                onTouchEnd={() => {
+                  setCardPinchDist(null);
+                  setCardPinchZoom(1);
+                }}
+                className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-crosshair group select-none touch-pan-y"
               >
                 <img
                   src={activeColorPhoto}
                   alt={`${product.name} - ${activeColor || "Garment"}`}
                   style={{
                     transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
-                    transform: isHoverZooming ? "scale(2.5)" : "scale(1)",
+                    transform: isHoverZooming
+                      ? "scale(2.5)"
+                      : cardPinchZoom > 1
+                      ? `scale(${cardPinchZoom})`
+                      : "scale(1)",
                     transition: isHoverZooming
                       ? "transform-origin 0.04s ease-out, transform 0.2s ease-out"
-                      : "transform 0.3s ease-out",
+                      : "transform 0.25s ease-out",
                   }}
                   className="w-full h-full object-cover pointer-events-none select-none"
                   onError={(e) => {
@@ -1972,9 +2010,9 @@ function ProductDetailContent() {
               </button>
             )}
 
-            {/* Enlarge 4K Image with Drag & Pan */}
+            {/* Enlarge 4K Image with Pinch In / Pinch Out, Drag & Pan */}
             <div
-              className="relative max-w-full max-h-full flex items-center justify-center select-none"
+              className="relative max-w-full max-h-full flex items-center justify-center select-none touch-none"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 if (zoomLevel <= 1) return;
@@ -1991,21 +2029,56 @@ function ProductDetailContent() {
               onMouseUp={() => setIsDragging(false)}
               onMouseLeave={() => setIsDragging(false)}
               onTouchStart={(e) => {
-                if (zoomLevel <= 1 || e.touches.length !== 1) return;
-                setIsDragging(true);
-                setDragStart({
-                  x: e.touches[0].clientX - panOffset.x,
-                  y: e.touches[0].clientY - panOffset.y,
-                });
+                if (e.touches.length === 2) {
+                  // Two-finger pinch in / out gesture start
+                  const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                  );
+                  setInitialPinchDist(dist);
+                  setPinchBaseZoom(zoomLevel);
+                  setIsDragging(false);
+                } else if (e.touches.length === 1 && zoomLevel > 1) {
+                  // Single finger pan when zoomed in
+                  setIsDragging(true);
+                  setDragStart({
+                    x: e.touches[0].clientX - panOffset.x,
+                    y: e.touches[0].clientY - panOffset.y,
+                  });
+                }
               }}
               onTouchMove={(e) => {
-                if (!isDragging || zoomLevel <= 1 || e.touches.length !== 1) return;
-                setPanOffset({
-                  x: e.touches[0].clientX - dragStart.x,
-                  y: e.touches[0].clientY - dragStart.y,
-                });
+                if (e.touches.length === 2 && initialPinchDist) {
+                  // Active two-finger pinch in / out zoom
+                  const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                  );
+                  const ratio = dist / initialPinchDist;
+                  const nextZoom = Math.min(4, Math.max(1, +(pinchBaseZoom * ratio).toFixed(2)));
+                  setZoomLevel(nextZoom);
+                  if (nextZoom === 1) {
+                    setPanOffset({ x: 0, y: 0 });
+                  }
+                } else if (e.touches.length === 1 && isDragging && zoomLevel > 1) {
+                  // Single finger pan
+                  setPanOffset({
+                    x: e.touches[0].clientX - dragStart.x,
+                    y: e.touches[0].clientY - dragStart.y,
+                  });
+                }
               }}
-              onTouchEnd={() => setIsDragging(false)}
+              onTouchEnd={(e) => {
+                if (e.touches.length < 2) {
+                  setInitialPinchDist(null);
+                }
+                if (e.touches.length === 0) {
+                  setIsDragging(false);
+                  if (zoomLevel <= 1) {
+                    setPanOffset({ x: 0, y: 0 });
+                  }
+                }
+              }}
             >
               <img
                 src={activeColorPhoto}
@@ -2052,12 +2125,12 @@ function ProductDetailContent() {
             className="flex flex-col items-center gap-2 pb-4 pt-2 bg-gradient-to-t from-black/90 to-transparent z-20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
-              <span>Scroll wheel to zoom</span>
+            <div className="text-[11px] text-slate-400 font-medium flex flex-wrap justify-center items-center gap-2 px-4 text-center">
+              <span>👌 Pinch in / out or Scroll to zoom</span>
               <span>•</span>
-              <span>Drag to pan across 4K image</span>
+              <span>Drag to pan in 4K</span>
               <span>•</span>
-              <span>Double-click to toggle 2.5x</span>
+              <span>Double-tap for 2.5x</span>
               <span>•</span>
               <span>Esc to close</span>
             </div>
