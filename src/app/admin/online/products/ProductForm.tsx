@@ -628,6 +628,13 @@ export default function ProductForm({
     }
 
     const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    for (const f of filesToUpload) {
+      if (f.size > 20 * 1024 * 1024) {
+        setError(`Photo "${f.name}" exceeds 14MB. Please upload photos under 14MB.`);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
     if (files.length > remainingSlots) {
       setError(`You can only have up to ${MAX_IMAGES} photos in total. Uploading ${remainingSlots} photo(s).`);
     } else {
@@ -1316,7 +1323,7 @@ export default function ProductForm({
                     : `Click to upload photos from computer (Up to ${MAX_IMAGES - imagesList.length} more)`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPG, JPEG, PNG, WEBP, AVIF supported • Up to 10 photos per garment
+                  JPG, JPEG, PNG, WEBP, AVIF (Up to 14MB/photo) • Up to 10 photos per garment
                 </p>
               </div>
             </div>

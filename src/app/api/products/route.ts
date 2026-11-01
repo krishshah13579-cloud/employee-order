@@ -7,6 +7,7 @@ import { sendWebPushNotification } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   try {
@@ -144,7 +145,19 @@ export async function POST(request: NextRequest) {
       return auth.errorResponse!;
     }
 
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch (parseErr: any) {
+      console.error("POST /api/products request.json() failed:", parseErr);
+      return NextResponse.json(
+        {
+          error:
+            "Request payload exceeded maximum limit or was corrupted. Please re-save; photos will be automatically optimized.",
+        },
+        { status: 400 }
+      );
+    }
     const {
       name,
       category,

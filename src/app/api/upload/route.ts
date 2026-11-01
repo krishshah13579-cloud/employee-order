@@ -2,14 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { getAdminSession, getEmployeeSession } from "@/lib/auth-security";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
-const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".pdf"]);
+// Allow photos up to 25MB (supporting user's 14MB+ requirement)
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".pdf",
+  ".heic",
+  ".heif",
+  ".avif",
+  ".svg",
+]);
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/avif",
+  "image/svg+xml",
   "application/pdf",
 ]);
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,47 +40,92 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
+    let buffer: Buffer;
+    let originalName = "";
+    let ext = ".jpg";
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    const contentType = req.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const json = await req.json();
+      const base64Data = json.base64 || json.fileData || json.dataUrl;
+      if (!base64Data) {
+        return NextResponse.json({ error: "No image data provided" }, { status: 400 });
+      }
+
+      const match = String(base64Data).match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        const mime = match[1].toLowerCase();
+        const raw = match[2];
+        buffer = Buffer.from(raw, "base64");
+        ext = mime.includes("webp")
+          ? ".webp"
+          : mime.includes("png")
+          ? ".png"
+          : mime.includes("svg")
+          ? ".svg"
+          : ".jpg";
+        originalName = json.filename || `photo_${Date.now()}`;
+      } else {
+        return NextResponse.json({ error: "Invalid base64 format" }, { status: 400 });
+      }
+    } else {
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+
+      if (!file) {
+        return NextResponse.json({ error: "No file provided" }, { status: 400 });
+      }
+
+      // 1. File Size Validation (allows up to 25MB)
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: "File too large. Maximum allowed file size is 25MB." },
+          { status: 400 }
+        );
+      }
+
+      // 2. Extension & MIME Validation
+      ext = (path.extname(file.name) || "").toLowerCase();
+      if (!ext && file.type) {
+        if (file.type.includes("webp")) ext = ".webp";
+        else if (file.type.includes("png")) ext = ".png";
+        else ext = ".jpg";
+      }
+
+      if (!ALLOWED_EXTENSIONS.has(ext)) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (file.type && !ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
+        return NextResponse.json(
+          { error: "Invalid file content type. Please upload a valid image or PDF." },
+          { status: 400 }
+        );
+      }
+
+      if (ext === ".jpeg") ext = ".jpg";
+
+      const bytes = await file.arrayBuffer();
+      buffer = Buffer.from(bytes);
+      originalName = path.basename(file.name, path.extname(file.name));
     }
 
-    // 1. File Size Validation
-    if (file.size > MAX_FILE_SIZE) {
+    if (buffer.length > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Maximum allowed file size is 10MB." },
+        { error: "File too large. Maximum allowed file size is 25MB." },
         { status: 400 }
       );
     }
-
-    // 2. Extension & MIME Validation
-    let ext = (path.extname(file.name) || "").toLowerCase();
-    if (!ALLOWED_EXTENSIONS.has(ext)) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid file format. Only JPG, PNG, WEBP images and PDF documents are allowed.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (file.type && !ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
-      return NextResponse.json(
-        { error: "Invalid file content type. Please upload a valid image or PDF." },
-        { status: 400 }
-      );
-    }
-
-    if (ext === ".jpeg") ext = ".jpg";
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     // 3. Strict Filename Sanitization
-    const rawBase = path.basename(file.name, path.extname(file.name));
+    const rawBase = path.basename(originalName);
     const cleanBase = rawBase.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
     const uniqueName = `${Date.now()}_${cleanBase || "file"}${ext}`;
 
@@ -88,7 +150,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url: fileUrl, filename: uniqueName }, { status: 201 });
     } catch {
       // Fallback to Data URL on serverless read-only filesystem
-      const mime = file.type || "image/jpeg";
+      const mime =
+        ext === ".png"
+          ? "image/png"
+          : ext === ".webp"
+          ? "image/webp"
+          : "image/jpeg";
       const base64Data = buffer.toString("base64");
       const dataUrl = `data:${mime};base64,${base64Data}`;
       return NextResponse.json({ url: dataUrl, filename: uniqueName }, { status: 201 });

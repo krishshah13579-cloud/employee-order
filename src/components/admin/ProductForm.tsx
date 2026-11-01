@@ -56,7 +56,7 @@ import {
   sellSingleSizeFromColorStock,
   unpackSetToLoosePieces,
 } from "@/lib/stock";
-import { compressImageFile } from "@/lib/imageCompression";
+import { compressImageFile, uploadImageToServer } from "@/lib/imageCompression";
 
 // Standard Trouser & Formal Apparel Color Presets
 const PRESET_COLORS = [
@@ -1167,7 +1167,7 @@ export default function ProductForm({
     });
   };
 
-  // Image management
+  // Image management (Supports photos up to 14MB+ per photo)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1177,15 +1177,24 @@ export default function ProductForm({
       return;
     }
 
+    // Size limit check: allow up to 14MB per photo (with 20MB buffer)
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].size > 20 * 1024 * 1024) {
+        toast(`Photo "${files[i].name}" exceeds 14MB. Please select photos up to 14MB.`, "error");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
+
     setUploadingImages(true);
     const uploadedUrls: string[] = [];
 
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Crisp 4K Ultra-HD garment photo processing (3840px, 90% WebP/JPEG)
-        const dataUrl = await compressImageFile(file, 3840, 3840, 0.90);
-        uploadedUrls.push(dataUrl);
+        // High-definition processing (2048px @ 0.85 quality) and server storage upload
+        const serverUrl = await uploadImageToServer(file, file.name);
+        uploadedUrls.push(serverUrl);
       }
 
       if (uploadedUrls.length > 0) {
@@ -1352,6 +1361,32 @@ export default function ProductForm({
 
       const sortedColors = sortColorsByAlphabet(selectedColors, colorAlphabetMap);
 
+      // Sanitize photos: convert any large base64 strings to permanent server URLs or lightweight WebP
+      const finalImagesList: string[] = [];
+      for (let i = 0; i < imagesList.length; i++) {
+        const img = imagesList[i];
+        if (img && img.startsWith("data:image/") && img.length > 150 * 1024) {
+          const processed = await uploadImageToServer(img, `product_${productId || "new"}_${i}.jpg`);
+          finalImagesList.push(processed);
+        } else {
+          finalImagesList.push(img);
+        }
+      }
+
+      const finalColorImages: Record<string, string> = {};
+      for (const [col, colUrl] of Object.entries(colorImages)) {
+        if (colUrl && colUrl.startsWith("data:image/") && colUrl.length > 150 * 1024) {
+          const matchIdx = imagesList.indexOf(colUrl);
+          if (matchIdx >= 0 && finalImagesList[matchIdx]) {
+            finalColorImages[col] = finalImagesList[matchIdx];
+          } else {
+            finalColorImages[col] = await uploadImageToServer(colUrl, `color_${col}.jpg`);
+          }
+        } else {
+          finalColorImages[col] = colUrl;
+        }
+      }
+
       const payload = {
         name: formData.name.trim(),
         category: formData.category,
@@ -1365,13 +1400,13 @@ export default function ProductForm({
         price: retPrice,
         costPrice: formData.costPrice !== undefined && String(formData.costPrice).trim() !== "" ? parseFloat(String(formData.costPrice)) : null,
         mixPcs: totalLoosePcs,
-        colorImages: Object.keys(colorImages).length > 0 ? JSON.stringify(colorImages) : null,
+        colorImages: Object.keys(finalColorImages).length > 0 ? JSON.stringify(finalColorImages) : null,
         setsColorwise: serializedStock || null,
         damageStock: serializedDamageStock,
         sizeGuide: JSON.stringify(normalizedSizeGuide),
         washGuide: formData.washGuide,
         description: formData.description,
-        imageUrl: imagesList.length > 0 ? JSON.stringify(imagesList) : null,
+        imageUrl: finalImagesList.length > 0 ? JSON.stringify(finalImagesList) : null,
         colorMapping: JSON.stringify(colorAlphabetMap),
         isActive: formData.isActive,
       };
@@ -2235,7 +2270,7 @@ export default function ProductForm({
                     : `Click to upload photos from computer (Up to ${MAX_IMAGES - imagesList.length} more)`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPG, JPEG, PNG, WEBP supported • Up to 10 photos per garment
+                  JPG, PNG, WEBP, HEIC (Up to 14MB/photo) • Up to 10 photos per garment
                 </p>
               </div>
             </div>

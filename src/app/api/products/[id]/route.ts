@@ -6,6 +6,7 @@ import { sendColorSoldOutNotification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 60;
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +52,20 @@ export async function PUT(
 
     const { id } = await params;
     const productId = parseInt(id, 10);
-    const body = await request.json();
+    
+    let body: any;
+    try {
+      body = await request.json();
+    } catch (parseErr: any) {
+      console.error("PUT /api/products/[id] request.json() failed:", parseErr);
+      return NextResponse.json(
+        {
+          error:
+            "Request payload exceeded maximum limit or was corrupted. Please re-save; photos will be automatically optimized.",
+        },
+        { status: 400 }
+      );
+    }
 
     const ratioSizes = body.sizesRatio ? getSizesFromRatio(body.sizesRatio) : [];
     const pcs = body.pcsPerSet
