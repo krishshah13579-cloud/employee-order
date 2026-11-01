@@ -349,11 +349,6 @@ function ProductsContent() {
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 <th className="py-3.5 px-6">Product & Category</th>
-                <th className="py-3.5 px-6">Colors Available</th>
-                <th className="py-3.5 px-6">Mandatory Size Ratio</th>
-                <th className="py-3.5 px-6">Stock Sets</th>
-                <th className="py-3.5 px-6">Dual Selling Rate</th>
-                <th className="py-3.5 px-6">Size Guide</th>
                 <th className="py-3.5 px-6">Status</th>
                 <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
@@ -361,13 +356,13 @@ function ProductsContent() {
             <tbody className="divide-y divide-gray-100">
               {loading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={3} className="py-12 text-center text-gray-400">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={3} className="py-12 text-center text-gray-400">
                     No products found. Click "Add New Garment" to list a product.
                   </td>
                 </tr>
@@ -414,170 +409,6 @@ function ProductsContent() {
                           })()}
                         </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-6 max-w-xs">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {p.colorsAvailable.split(",").map((c, i) => {
-                          const trimmed = c.trim();
-                          if (!trimmed) return null;
-                          const colorInfo = getColorHex(trimmed);
-
-                          // Find alphabet letter from colorMapping if present
-                          let letter = String.fromCharCode(65 + i); // Default A, B, C...
-                          if (p.colorMapping) {
-                            try {
-                              const map = JSON.parse(p.colorMapping);
-                              const found = Object.entries(map).find(
-                                ([_, col]) => String(col).toLowerCase() === trimmed.toLowerCase()
-                              );
-                              if (found) letter = found[0];
-                            } catch {}
-                          }
-
-                          return (
-                            <span
-                              key={i}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white text-gray-800 text-[11px] font-semibold rounded-lg border border-gray-200 shadow-2xs"
-                              title={`Admin Wholesale Code: ${letter} -> ${trimmed}`}
-                            >
-                              <span className="w-4 h-4 rounded-md bg-zinc-900 text-white font-mono font-black text-[10px] flex items-center justify-center shrink-0">
-                                {letter}
-                              </span>
-                              <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/15"
-                                style={{ backgroundColor: colorInfo.hex }}
-                              />
-                              <span>{trimmed}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      {(() => {
-                        const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "28 to 36");
-                        const distinctRatios = new Set<string>();
-                        if (p.sizesRatio) distinctRatios.add(p.sizesRatio);
-                        for (const ratios of Object.values(detailedRatioSets)) {
-                          for (const [rKey, cnt] of Object.entries(ratios)) {
-                            if (cnt > 0) distinctRatios.add(rKey);
-                          }
-                        }
-                        const ratioList = Array.from(distinctRatios);
-                        const hasMultiple = ratioList.length > 1;
-
-                        return (
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 flex items-center gap-1 text-xs">
-                              <Layers size={13} className="text-blue-600" />
-                              {p.sizesRatio}
-                            </span>
-                            <span className="text-[11px] text-gray-500 font-mono">
-                              [{p.sizesList}] • <span className="font-bold text-blue-700">{p.pcsPerSet} pcs/set</span>
-                            </span>
-                            {hasMultiple && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {ratioList.map((r) => (
-                                  <span key={r} className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                    {r}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-4 px-6 text-xs max-w-xs">
-                      {(() => {
-                        const total = p.setsColorwise ? getTotalAvailableSets(p.setsColorwise) : 0;
-                        const detailedRatioSets = parseDetailedColorRatioSets(p.setsColorwise, p.sizesRatio || "28 to 36");
-                        let accurateSetPcs = 0;
-                        let hasRatioBreakdown = false;
-                        for (const ratios of Object.values(detailedRatioSets)) {
-                          for (const [rKey, count] of Object.entries(ratios)) {
-                            const cnt = Math.max(0, count || 0);
-                            if (cnt > 0) {
-                              hasRatioBreakdown = true;
-                              const rSizes = getSizesFromRatio(rKey);
-                              const rPcs = rSizes.length > 0 && rSizes[0] !== rKey ? rSizes.length : (p.pcsPerSet || 5);
-                              accurateSetPcs += cnt * rPcs;
-                            }
-                          }
-                        }
-                        const totalSetPcs = hasRatioBreakdown ? accurateSetPcs : total * (p.pcsPerSet || 5);
-                        const totalPcs = totalSetPcs + ((p as any).mixPcs || 0);
-                        const parsed = p.setsColorwise ? parseColorwiseSets(p.setsColorwise) : {};
-                        const isZero = !p.setsColorwise || (total === 0 && ((p as any).mixPcs || 0) === 0);
-
-                        return (
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold font-mono text-[11px] w-fit ${
-                                  isZero
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                    : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                }`}
-                              >
-                                {isZero ? "0 Sets (Sold Out)" : `${total} Sets (${totalPcs} pcs)`}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => openQuickStock(p)}
-                                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md transition cursor-pointer"
-                                title="Update Stock Sets"
-                              >
-                                ⚡ Edit Stock
-                              </button>
-                            </div>
-                            <div className="text-[10px] text-gray-500 truncate" title={p.setsColorwise || "No stock configured"}>
-                              {Object.keys(parsed).length > 0
-                                ? Object.entries(parsed)
-                                    .map(([col, cnt]) => `${col}: ${cnt}`)
-                                    .join(", ")
-                                : "No stock configured"}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-4 px-6 text-xs">
-                      <div className="flex flex-col gap-1 font-mono">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 uppercase shrink-0">
-                            Retailer
-                          </span>
-                          <span className="font-bold text-gray-900 text-xs">
-                            {formatCurrency(p.retailerPrice || p.price)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 uppercase shrink-0">
-                            Wholesaler
-                          </span>
-                          <span className="font-bold text-gray-900 text-xs">
-                            {formatCurrency(p.wholesalerPrice || Math.max(0, (p.retailerPrice || p.price) - 100))}
-                          </span>
-                        </div>
-                        {p.mrp ? (
-                          <div className="text-[10px] text-gray-400 font-sans mt-0.5">
-                            MRP: ₹{p.mrp}
-                          </div>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      {p.sizeGuide ? (
-                        <button
-                          onClick={() => setPreviewGuide({ name: p.name, guide: p.sizeGuide! })}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition-colors cursor-pointer"
-                        >
-                          <Ruler size={13} /> View Guide
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">No guide</span>
-                      )}
                     </td>
                     <td className="py-4 px-6">
                       {p.isActive ? (
