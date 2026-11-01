@@ -972,7 +972,16 @@ export default function UpdateStockPage() {
                                   className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-2xs block"
                                   title="Click to view full photo"
                                 >
-                                  <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.onerror = null;
+                                      target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+                                    }}
+                                  />
                                 </button>
                               ) : (
                                 <div className="w-10 h-10 mx-auto rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300">

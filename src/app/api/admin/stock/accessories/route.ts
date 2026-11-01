@@ -41,19 +41,22 @@ export async function GET(req: NextRequest) {
     const types = typesRaw.map((t: any) => t.name);
 
     const totalItems = items.length;
-    const totalQuantity = items.reduce((acc, it) => acc + it.quantity, 0);
-    const lowStockCount = items.filter((it) => it.quantity <= it.minAlertQty).length;
-    const totalValuation = items.reduce((acc, it) => acc + Math.round(it.quantity * it.costPerUnit), 0);
+    const totalQuantity = items.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+    const lowStockCount = items.filter((it) => (Number(it.quantity) || 0) <= (Number(it.minAlertQty) || 0)).length;
+    const totalValuation = items.reduce((acc, it) => acc + Math.round((Number(it.quantity) || 0) * (Number(it.costPerUnit) || 0)), 0);
+
+    const summaryMetrics = {
+      totalItems,
+      totalQuantity,
+      lowStockCount,
+      totalValuation,
+    };
 
     return NextResponse.json({
       items,
       types,
-      metrics: {
-        totalItems,
-        totalQuantity,
-        lowStockCount,
-        totalValuation,
-      },
+      metrics: summaryMetrics,
+      summary: summaryMetrics,
     });
   } catch (err: any) {
     console.error("Error fetching accessories:", err);

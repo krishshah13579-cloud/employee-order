@@ -273,7 +273,42 @@ export default function AdminStockPage() {
   const [isAddingType, setIsAddingType] = useState(false);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [updatingPhotoId, setUpdatingPhotoId] = useState<number | null>(null);
   const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+
+  const handleQuickUploadForAccessory = async (
+    itemId: number,
+    itemName: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUpdatingPhotoId(itemId);
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Upload failed");
+
+      const putRes = await fetch("/api/admin/stock/accessories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: itemId, imageUrl: uploadData.url }),
+      });
+      if (!putRes.ok) throw new Error("Failed to save trim photo");
+
+      toast(`Photo updated for "${itemName}"!`, "success");
+      fetchAccessories();
+    } catch (err: any) {
+      toast(err.message || "Failed to update photo", "error");
+    } finally {
+      setUpdatingPhotoId(null);
+    }
+  };
 
   const handleSyncStore = async () => {
     try {
@@ -319,8 +354,21 @@ export default function AdminStockPage() {
       const res = await fetch("/api/admin/stock/accessories", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load accessories");
       const data = await res.json();
-      setAccessories(data.items || []);
-      setAccessorySummary(data.summary || null);
+      const items: AccessoryItemData[] = Array.isArray(data.items) ? data.items : [];
+      setAccessories(items);
+
+      const totalQuantity = items.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+      const lowStockCount = items.filter((it) => (Number(it.quantity) || 0) <= (Number(it.minAlertQty) || 0)).length;
+      const totalValuation = items.reduce((acc, it) => acc + Math.round((Number(it.quantity) || 0) * (Number(it.costPerUnit) || 0)), 0);
+
+      const incomingSummary = data.summary || data.metrics || {};
+      setAccessorySummary({
+        totalItems: Number(incomingSummary.totalItems) || items.length,
+        totalQuantity: incomingSummary.totalQuantity !== undefined ? Number(incomingSummary.totalQuantity) : totalQuantity,
+        lowStockCount: incomingSummary.lowStockCount !== undefined ? Number(incomingSummary.lowStockCount) : lowStockCount,
+        totalValuation: incomingSummary.totalValuation !== undefined ? Number(incomingSummary.totalValuation) : totalValuation,
+      });
+
       if (Array.isArray(data.types) && data.types.length > 0) {
         setAccessoryTypes(data.types);
       }
@@ -1071,34 +1119,47 @@ export default function AdminStockPage() {
       {activeTab === "ACCESSORIES" && (
         <div className="space-y-4">
           {/* Summary Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Trim Types</span>
-              <span className="text-xl font-black text-slate-900 font-mono">
-                {accessorySummary?.totalItems ?? accessories.length}
-              </span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Units In Stock</span>
-              <span className="text-xl font-black text-blue-700 font-mono">
-                {(accessorySummary?.totalQuantity ?? 0).toLocaleString("en-IN")}
-              </span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Low Stock Alerts</span>
-              <span className={`text-xl font-black font-mono ${
-                (accessorySummary?.lowStockCount ?? 0) > 0 ? "text-red-600" : "text-emerald-600"
-              }`}>
-                {accessorySummary?.lowStockCount ?? 0}
-              </span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Trims Valuation</span>
-              <span className="text-xl font-black text-amber-700 font-mono">
-                {formatCurrency(accessorySummary?.totalValuation ?? 0)}
-              </span>
-            </div>
-          </div>
+          {(() => {
+            const fallbackUnits = accessories.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+            const fallbackLow = accessories.filter((it) => (Number(it.quantity) || 0) <= (Number(it.minAlertQty) || 0)).length;
+            const fallbackVal = accessories.reduce((acc, it) => acc + Math.round((Number(it.quantity) || 0) * (Number(it.costPerUnit) || 0)), 0);
+
+            const displayTotalTypes = accessorySummary?.totalItems ?? accessories.length;
+            const displayTotalUnits = accessorySummary?.totalQuantity ?? fallbackUnits;
+            const displayLowStock = accessorySummary?.lowStockCount ?? fallbackLow;
+            const displayValuation = accessorySummary?.totalValuation ?? fallbackVal;
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Trim Types</span>
+                  <span className="text-xl font-black text-slate-900 font-mono">
+                    {displayTotalTypes}
+                  </span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Units In Stock</span>
+                  <span className="text-xl font-black text-blue-700 font-mono">
+                    {displayTotalUnits.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Low Stock Alerts</span>
+                  <span className={`text-xl font-black font-mono ${
+                    displayLowStock > 0 ? "text-red-600" : "text-emerald-600"
+                  }`}>
+                    {displayLowStock}
+                  </span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Trims Valuation</span>
+                  <span className="text-xl font-black text-amber-700 font-mono">
+                    {formatCurrency(displayValuation)}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Toolbar */}
           <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -1183,19 +1244,56 @@ export default function AdminStockPage() {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="py-2.5 px-3 text-center">
-                            {item.imageUrl ? (
-                              <button
-                                type="button"
-                                onClick={() => setViewingImage({ url: item.imageUrl!, title: item.name })}
-                                className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-2xs block"
-                                title="Click to view full photo"
-                              >
-                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                              </button>
-                            ) : (
-                              <div className="w-10 h-10 mx-auto rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300">
-                                <ImageIcon size={16} />
+                            {updatingPhotoId === item.id ? (
+                              <div className="w-10 h-10 mx-auto rounded-lg border border-blue-200 bg-blue-50/70 flex items-center justify-center text-blue-600 shadow-2xs">
+                                <Loader2 size={16} className="animate-spin" />
                               </div>
+                            ) : item.imageUrl ? (
+                              <div className="relative inline-block group">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingImage({ url: item.imageUrl!, title: item.name })}
+                                  className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-2xs block"
+                                  title="Click to view full photo"
+                                >
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.onerror = null;
+                                      target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+                                    }}
+                                  />
+                                </button>
+                                <label
+                                  className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow cursor-pointer"
+                                  title="Change photo"
+                                >
+                                  <Upload size={9} />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleQuickUploadForAccessory(item.id, item.name, e)}
+                                  />
+                                </label>
+                              </div>
+                            ) : (
+                              <label
+                                className="w-10 h-10 mx-auto rounded-lg border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/60 flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition cursor-pointer group shadow-2xs"
+                                title={`Upload photo for ${item.name}`}
+                              >
+                                <Upload size={13} className="group-hover:scale-110 transition-transform" />
+                                <span className="text-[8px] font-bold mt-0.5">Add</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => handleQuickUploadForAccessory(item.id, item.name, e)}
+                                />
+                              </label>
                             )}
                           </td>
                           <td className="py-3 px-4">
