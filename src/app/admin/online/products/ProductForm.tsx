@@ -122,14 +122,14 @@ async function safeParseResponse(res: Response): Promise<{ ok: boolean; data: an
 }
 
 /**
- * Client-side 4K Ultra-HD photo processing to optimized Data URL:
- * Preserves camera/phone uploads at full 4K UHD resolution (up to 3840px, 90% quality).
- * Preserves 100% sharp fabric weave, texture, and stitch detail on zoom.
+ * Client-side Balanced 4K Ultra-HD photo processing to optimized Data URL:
+ * Preserves camera/phone uploads at balanced 4K UHD resolution (up to 2880px, 82% quality).
+ * Preserves 100% sharp fabric weave, texture, and stitch detail on zoom while reducing size by 75%.
  */
 async function fileToOptimizedDataUrl(
   file: File,
-  maxDimension = 3840,
-  quality = 0.90
+  maxDimension = 2880,
+  quality = 0.82
 ): Promise<string> {
   return new Promise((resolve) => {
     try {

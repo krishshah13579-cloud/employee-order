@@ -1192,7 +1192,7 @@ export default function ProductForm({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // 4K Ultra-HD processing (3840px @ 0.90 quality) and server storage upload
+        // Balanced 4K Ultra-HD processing (2880px @ 0.82 WebP) and server storage upload
         const serverUrl = await uploadImageToServer(file, file.name);
         uploadedUrls.push(serverUrl);
       }
@@ -2270,7 +2270,7 @@ export default function ProductForm({
                     : `Click to upload photos from computer (Up to ${MAX_IMAGES - imagesList.length} more)`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPG, PNG, WEBP, HEIC (4K Ultra-HD up to 14MB/photo) • Up to 10 photos per garment
+                  JPG, PNG, WEBP, HEIC (Balanced 4K up to 14MB/photo) • Up to 10 photos per garment
                 </p>
               </div>
             </div>
