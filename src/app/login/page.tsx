@@ -25,6 +25,7 @@ export default function EmployeeLoginPage() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNightLogoutNotice, setIsNightLogoutNotice] = useState<boolean>(false);
+  const [isInactivityNotice, setIsInactivityNotice] = useState<boolean>(false);
 
   // Mandatory First-Login Permanent PIN Setup state
   const [mustSetPermanentPin, setMustSetPermanentPin] = useState<boolean>(false);
@@ -35,12 +36,14 @@ export default function EmployeeLoginPage() {
   const [savingPermanentPin, setSavingPermanentPin] = useState<boolean>(false);
   const [permanentPinError, setPermanentPinError] = useState<string | null>(null);
 
-  // Check URL params for night logout reason
+  // Check URL params for logout reasons (night logout or 30-min inactivity)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("reason") === "night_logout") {
         setIsNightLogoutNotice(true);
+      } else if (params.get("reason") === "inactivity") {
+        setIsInactivityNotice(true);
       }
     }
   }, []);
@@ -300,6 +303,20 @@ export default function EmployeeLoginPage() {
                     </strong>
                     <span>
                       The employee wholesale portal automatically closes everyday after 9:00 PM IST for general sales staff. Team Leaders (T.L.) have unrestricted 24*7 access.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {isInactivityNotice && (
+                <div className="p-3.5 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-amber-300 animate-in fade-in">
+                  <span className="text-base leading-none">⏱️</span>
+                  <div>
+                    <strong className="block text-amber-200 font-bold mb-0.5">
+                      Session Expired (30 Mins Inactivity)
+                    </strong>
+                    <span>
+                      For your account security, you were automatically logged out after 30 minutes of inactivity. Please enter your PIN to continue.
                     </span>
                   </div>
                 </div>

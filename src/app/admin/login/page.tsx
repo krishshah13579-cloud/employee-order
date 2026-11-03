@@ -42,6 +42,16 @@ export default function AdminLoginPage() {
   const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const [loginError, setLoginError] = useState("");
 
+  // Check URL params for inactivity timeout or other reasons
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reason") === "inactivity") {
+        setLoginError("⏱️ Admin session timed out after 30 minutes of inactivity. Please sign in again.");
+      }
+    }
+  }, []);
+
   // Check if admin account exists in database
   useEffect(() => {
     async function checkSetupStatus() {

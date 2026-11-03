@@ -60,6 +60,7 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
     setEmployee(null);
     localStorage.removeItem("garmentpro_employee");
     localStorage.removeItem("garmentpro_employee_name");
+    localStorage.removeItem("garmentpro_last_active_timestamp");
     const redirectUrl = reason ? `/login?reason=${encodeURIComponent(reason)}` : "/login";
     router.replace(redirectUrl);
   }, [router]);
@@ -95,6 +96,102 @@ export function EmployeeProvider({ children }: { children: React.ReactNode }) {
     // Check periodically every 30 seconds
     const interval = setInterval(enforceNightLogout, 30000);
     return () => clearInterval(interval);
+  }, [employee, logout]);
+
+  // 30 minutes inactivity timeout
+  useEffect(() => {
+    if (!employee) return;
+
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 mins
+    const INACTIVITY_STORAGE_KEY = "garmentpro_last_active_timestamp";
+    const THROTTLE_INTERVAL_MS = 10 * 1000;
+
+    let isLoggingOut = false;
+    let lastThrottle = 0;
+
+    const triggerInactivityLogout = () => {
+      if (isLoggingOut) return;
+      isLoggingOut = true;
+      try {
+        localStorage.removeItem(INACTIVITY_STORAGE_KEY);
+      } catch {}
+      logout("inactivity");
+    };
+
+    const evaluateInactivity = () => {
+      if (isLoggingOut) return;
+      try {
+        const storedStr = localStorage.getItem(INACTIVITY_STORAGE_KEY);
+        if (!storedStr) {
+          const now = Date.now();
+          lastThrottle = now;
+          localStorage.setItem(INACTIVITY_STORAGE_KEY, now.toString());
+          return;
+        }
+
+        const lastActive = parseInt(storedStr, 10);
+        if (isNaN(lastActive) || lastActive <= 0) {
+          localStorage.setItem(INACTIVITY_STORAGE_KEY, Date.now().toString());
+          return;
+        }
+
+        if (Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
+          triggerInactivityLogout();
+        }
+      } catch {}
+    };
+
+    const recordUserActivity = () => {
+      if (isLoggingOut) return;
+      const now = Date.now();
+      if (now - lastThrottle > THROTTLE_INTERVAL_MS) {
+        lastThrottle = now;
+        try {
+          localStorage.setItem(INACTIVITY_STORAGE_KEY, now.toString());
+        } catch {}
+      }
+    };
+
+    evaluateInactivity();
+    if (!isLoggingOut) {
+      recordUserActivity();
+    }
+
+    const monitoredEvents = ["mousedown", "keydown", "touchstart", "scroll", "click", "mousemove"];
+    monitoredEvents.forEach((ev) => window.addEventListener(ev, recordUserActivity, { passive: true }));
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        evaluateInactivity();
+        if (!isLoggingOut) recordUserActivity();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (event.key === INACTIVITY_STORAGE_KEY && event.newValue) {
+        const remoteTime = parseInt(event.newValue, 10);
+        if (!isNaN(remoteTime)) {
+          lastThrottle = remoteTime;
+          if (Date.now() - remoteTime >= INACTIVITY_TIMEOUT_MS) {
+            triggerInactivityLogout();
+          }
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageEvent);
+
+    const intervalTimer = setInterval(evaluateInactivity, 15000);
+
+    return () => {
+      monitoredEvents.forEach((ev) => window.removeEventListener(ev, recordUserActivity));
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      window.removeEventListener("storage", handleStorageEvent);
+      clearInterval(intervalTimer);
+    };
   }, [employee, logout]);
 
   // Function to re-verify session with database immediately (used when permissions change)
