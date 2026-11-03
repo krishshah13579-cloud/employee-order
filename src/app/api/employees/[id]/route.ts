@@ -33,6 +33,12 @@ export async function GET(
   try {
     await ensureDbSchema();
 
+    // Only logged-in Admin can inspect employee details and credentials
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { id } = await params;
     const empId = parseInt(id, 10);
     if (isNaN(empId)) {

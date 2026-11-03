@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-security";
+import { requireAdminOrEmployee, getAdminSession } from "@/lib/auth-security";
 
 // GET /api/admin/sales/[id]: Get single sales invoice details
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdminOrEmployee(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { id } = await params;
     const invoiceId = parseInt(id, 10);
 

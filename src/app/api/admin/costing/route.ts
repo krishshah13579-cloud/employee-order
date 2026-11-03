@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,6 +36,11 @@ function normalizeVendorName(name?: string | null): string {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
     await ensureDbSchema();
 
@@ -187,6 +193,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { ensureDbSchema } = await import("@/lib/ensure-db-schema");
     await ensureDbSchema();
 
@@ -475,6 +486,11 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await req.json();
     const { id, isGR } = body;
     const costingId = parseInt(id, 10);
@@ -519,6 +535,11 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { searchParams } = new URL(req.url);
     const id = parseInt(searchParams.get("id") || "0", 10);
     const designNo = searchParams.get("designNo");

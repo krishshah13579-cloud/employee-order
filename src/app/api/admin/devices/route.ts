@@ -4,9 +4,15 @@ import { generateRandomCode } from "@/lib/device-gate";
 import { dispatchAutomatedWhatsApp } from "@/lib/whatsapp";
 import { recordAuditLog } from "@/lib/audit";
 import { sendWebPushNotification } from "@/lib/web-push";
+import { requireAdmin } from "@/lib/auth-security";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     // 1. Fetch all registered devices ordered by last used
     const devices = await prisma.authorizedDevice.findMany({
       orderBy: { lastUsedAt: "desc" },
@@ -48,6 +54,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||

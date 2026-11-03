@@ -231,6 +231,27 @@ export async function requireAdmin(req: NextRequest) {
 }
 
 /**
+ * Middleware helper for routes accessible by either Admin or logged-in Employee
+ */
+export async function requireAdminOrEmployee(req: NextRequest) {
+  const admin = await getAdminSession(req);
+  if (admin) {
+    return { authorized: true, user: admin, role: "admin" as const };
+  }
+  const employee = await getEmployeeSession(req);
+  if (employee) {
+    return { authorized: true, user: employee, role: "employee" as const };
+  }
+  return {
+    authorized: false,
+    errorResponse: NextResponse.json(
+      { error: "Unauthorized: Active admin or employee session required." },
+      { status: 401 }
+    ),
+  };
+}
+
+/**
  * In-memory OTP failed attempt tracker to prevent brute-forcing
  */
 const failedOtpAttempts: Record<string, { count: number; lockedUntil: number }> = {};

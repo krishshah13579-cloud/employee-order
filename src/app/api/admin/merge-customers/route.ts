@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-security";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const allCustomers = await prisma.customer.findMany({
       select: {
         id: true,
@@ -54,6 +60,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     // 1. DWARKADHISH CLOTHING:
     // Find the first account (having GST GGLPS3886R, phone 8128756632, or 0 bills)
     const firstDwarkadhish = await prisma.customer.findFirst({

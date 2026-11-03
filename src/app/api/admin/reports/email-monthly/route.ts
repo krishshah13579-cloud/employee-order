@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendMonthlyOrdersReportEmail } from "@/lib/email";
+import { requireAdmin } from "@/lib/auth-security";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await request.json().catch(() => ({}));
     const now = new Date();
     const month = body.month ? parseInt(body.month, 10) : now.getMonth() + 1; // 1-12

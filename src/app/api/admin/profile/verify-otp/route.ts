@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { signToken } from "@/lib/auth-security";
+import { signToken, requireAdmin } from "@/lib/auth-security";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { code } = await req.json();
 
     if (!code) {

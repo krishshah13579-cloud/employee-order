@@ -31,6 +31,12 @@ export async function GET(req: NextRequest) {
   try {
     await ensureDbSchema();
 
+    // Only logged-in Admin can list employees and credentials
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
 

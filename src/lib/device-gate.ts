@@ -16,9 +16,8 @@ const SECRET_SEED =
   process.env.ADMIN_2FA_SECRET ||
   "iq-trousers-master-device-authorization-secret-key-2026";
 
-// Master Passkey for Super Admin Multi-Device Instant Unlock
-export const MASTER_DEVICE_PASSKEY =
-  process.env.SUPERADMIN_DEVICE_KEY || "IQ-SUPERADMIN-MASTER-PASS-2026";
+// Master Passkey for Super Admin Multi-Device Instant Unlock (set via environment variable)
+export const MASTER_DEVICE_PASSKEY = process.env.SUPERADMIN_DEVICE_KEY || "";
 
 export interface DeviceTokenPayload {
   deviceId: string;
@@ -194,10 +193,7 @@ export function isBotOrCrawler(userAgent: string | null | undefined): boolean {
  */
 export function isValidMasterKey(key: string | null | undefined): boolean {
   if (!key) return false;
-  const cleanKey = key.trim();
-  return (
-    cleanKey === MASTER_DEVICE_PASSKEY ||
-    cleanKey === "IQ-SUPERADMIN-MASTER-PASS-2026" ||
-    cleanKey === "iqtrousers2026"
-  );
+  const masterKey = process.env.SUPERADMIN_DEVICE_KEY?.trim();
+  if (!masterKey) return false;
+  return key.trim() === masterKey;
 }

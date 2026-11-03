@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-security";
+import { requireAdminOrEmployee } from "@/lib/auth-security";
 import { DEFAULT_INVOICE_TEMPLATE } from "@/lib/invoice-template-types";
 
 export async function GET(
@@ -8,9 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ customerId: string }> }
 ) {
   try {
-    const admin = await getAdminSession(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdminOrEmployee(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
     }
 
     const { customerId } = await params;

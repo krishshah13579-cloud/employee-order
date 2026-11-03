@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCustomerLedgerPdfBuffer } from "@/lib/pdf-generator";
+import { requireAdminOrEmployee } from "@/lib/auth-security";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ customerId: string }> }
 ) {
   try {
+    const auth = await requireAdminOrEmployee(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const { customerId } = await params;
     const cid = parseInt(customerId, 10);
     if (isNaN(cid)) {

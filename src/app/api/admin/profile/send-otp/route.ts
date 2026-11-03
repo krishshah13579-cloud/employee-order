@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendOtpEmail } from "@/lib/email";
+import { requireAdmin } from "@/lib/auth-security";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     // 1. Find the admin account & profile
     const admin = await prisma.adminAccount.findFirst();
     const profile = await prisma.adminProfile.findFirst();

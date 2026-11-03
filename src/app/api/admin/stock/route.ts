@@ -745,7 +745,10 @@ export async function PUT(request: NextRequest) {
 
       fetch("https://www.iqtrousers.in/api/sync-stock", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-sync-secret": process.env.SYNC_STOCK_SECRET || "1a08f1242cec6f7c1d19635591c516eaaea70388a1093f2c",
+        },
         body: JSON.stringify({
           styleCode: updated.name,
           totalPcs,

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PAST_INVOICES_1_TO_39 } from "@/lib/pastInvoicesData";
+import { requireAdmin } from "@/lib/auth-security";
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     let importedOrders = 0;
     let importedInvoices = 0;
     let createdCustomers = 0;

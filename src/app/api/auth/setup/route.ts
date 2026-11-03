@@ -5,13 +5,9 @@ import { signToken, hashPassword } from "@/lib/auth-security";
 export async function GET() {
   try {
     const adminCount = await prisma.adminAccount.count();
-    const admins = await prisma.adminAccount.findMany({
-      select: { username: true },
-    });
     return NextResponse.json({
       needsSetup: adminCount === 0,
-      adminCount,
-      registeredUsernames: admins.map((a) => a.username),
+      adminCount: adminCount > 0 ? 1 : 0,
     });
   } catch (error: any) {
     console.error("Setup check error:", error);

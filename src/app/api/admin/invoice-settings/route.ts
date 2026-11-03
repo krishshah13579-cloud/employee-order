@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getInvoiceTemplateSettings, saveInvoiceTemplateSettings } from "@/lib/invoice-template";
+import { requireAdmin } from "@/lib/auth-security";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const settings = await getInvoiceTemplateSettings();
     return NextResponse.json(settings);
   } catch (error: any) {
@@ -15,6 +21,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) {
+      return auth.errorResponse!;
+    }
+
     const body = await request.json();
     const updated = await saveInvoiceTemplateSettings(body);
     return NextResponse.json({ success: true, settings: updated });
